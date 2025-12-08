@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Web3 Multi-Chain Wallet",
+  "version": "1.0",
+  "description": "A multi-chain (Hive, Steem, Blurt) wallet extension with multisig, bulk transfers, and AI-powered transaction analysis.",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "Web3 Multi-Chain Wallet"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

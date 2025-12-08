@@ -1,0 +1,38 @@
+{
+  "name": "web3-multi-chain-wallet",
+  "private": true,
+  "version": "1.0.4",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@blurtfoundation/blurtjs": "^1.0.0",
+    "@google/genai": "*",
+    "@hiveio/dhive": "^1.2.8",
+    "buffer": "^6.0.3",
+    "dsteem": "^0.11.3",
+    "process": "^0.11.10",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.3.2",
+    "typescript": "^5.0.2",
+    "vite": "^5.2.0",
+    "vite-plugin-node-polyfills": "^0.22.0"
+  },
+  "overrides": {
+    "ws": "^8.17.0",
+    "node-fetch": "^2.6.7",
+    "cross-fetch": "^3.1.5"
+  }
+}

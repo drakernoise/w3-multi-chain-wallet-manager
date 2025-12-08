@@ -1,0 +1,7 @@
+{
+  "name": "Web3 Multi-Chain Wallet",
+  "description": "A multi-chain (Hive, Steem, Blurt) wallet extension with multisig, bulk transfers, and AI-powered transaction analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
