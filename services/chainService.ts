@@ -386,23 +386,22 @@ export const broadcastBulkTransfer = async (
     chain: Chain,
     from: string,
     activeKey: string,
-    items: { to: string; amount: number; memo: string }[]
+    items: { to: string; amount: number; memo: string }[],
+    tokenSymbol?: string
 ): Promise<{ success: boolean; txId?: string; error?: string }> => {
-    // ... (keep existing implementation or refactor to use broadcastOperations)
-    // For safety, keeping existing implementation but could wrap above.
-    // Reuse generic
-    // const nodeUrl = getActiveNode(chain); // Unused
-    const tokenSymbol = chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT';
+    // Determine default token if not provided
+    const defaultToken = chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT';
+    const symbol = tokenSymbol || defaultToken;
+
     const ops = items.map(item => {
         return ['transfer', {
             from,
             to: item.to,
-            amount: `${item.amount.toFixed(3)} ${tokenSymbol}`,
+            amount: `${item.amount.toFixed(3)} ${symbol}`,
             memo: item.memo
         }];
     });
 
-    // Reuse generic
     return broadcastOperations(chain, activeKey, ops);
 };
 

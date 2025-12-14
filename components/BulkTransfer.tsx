@@ -22,6 +22,18 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
     const [singleMemo, setSingleMemo] = useState<string>('');
     const [recipientsText, setRecipientsText] = useState<string>('');
 
+    // Token State
+    const [selectedToken, setSelectedToken] = useState<string>(
+        chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT'
+    );
+
+    // Sync token on chain change
+    useEffect(() => {
+        if (chain === Chain.HIVE) setSelectedToken('HIVE');
+        else if (chain === Chain.STEEM) setSelectedToken('STEEM');
+        else setSelectedToken('BLURT');
+    }, [chain]);
+
     // Multi Mode State
     const [items, setItems] = useState<BulkItem[]>([{ to: '', amount: 0, memo: '' }]);
 
@@ -221,7 +233,7 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
                     </div>
 
                     <div className="flex justify-between items-center text-[10px] text-slate-400 bg-dark-900 p-2 rounded">
-                        <span>{t('transfer.per_user')} <span className="text-white">{singleAmount} {chain}</span></span>
+                        <span>{t('transfer.per_user')} <span className="text-white">{singleAmount} {selectedToken}</span></span>
                         <span className="italic max-w-[150px] truncate" title={singleMemo}>{singleMemo || "No Memo"}</span>
                     </div>
                 </div>
@@ -245,7 +257,7 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
                             <div key={idx} className="flex flex-col bg-dark-900 p-2 rounded border border-dark-800">
                                 <div className="flex justify-between font-bold mb-1">
                                     <span className="text-white">@{item.to.replace(/^@/, '')}</span>
-                                    <span className="text-green-400">{item.amount} {chain}</span>
+                                    <span className="text-green-400">{item.amount} {selectedToken}</span>
                                 </div>
                                 <span className="text-[10px] text-slate-500 italic truncate" title={item.memo}>{item.memo || "No Memo"}</span>
                             </div>
@@ -294,7 +306,9 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
 
             const activeKey = account.activeKey;
 
-            const result = await broadcastBulkTransfer(chain, selectedAccount, activeKey, finalItems);
+
+
+            const result = await broadcastBulkTransfer(chain, selectedAccount, activeKey, finalItems, selectedToken);
 
             if (result.success) {
                 setConfirmModal({
@@ -366,6 +380,30 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
                 >
                     {accounts.map(a => <option key={a.name} value={a.name}>@{a.name}</option>)}
                 </select>
+
+                {/* Token Selector */}
+                {(chain === Chain.HIVE || chain === Chain.STEEM) && (
+                    <div className="mt-2 flex items-center justify-end gap-2">
+                        <span className="text-xs text-slate-400">Asset:</span>
+                        <select
+                            value={selectedToken}
+                            onChange={(e) => setSelectedToken(e.target.value)}
+                            className="bg-dark-900 border border-dark-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500"
+                        >
+                            {chain === Chain.HIVE ? (
+                                <>
+                                    <option value="HIVE">HIVE</option>
+                                    <option value="HBD">HBD</option>
+                                </>
+                            ) : (
+                                <>
+                                    <option value="STEEM">STEEM</option>
+                                    <option value="SBD">SBD</option>
+                                </>
+                            )}
+                        </select>
+                    </div>
+                )}
                 {/* Optional Balance Display */}
                 {accounts.find(a => a.name === selectedAccount)?.balance !== undefined && (
                     <div className="text-[10px] text-slate-400 mt-1 text-right">
@@ -438,7 +476,7 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="text-xs font-bold text-slate-400 mb-1 block">{t('bulk.amount')} ({chain})</label>
+                                <label className="text-xs font-bold text-slate-400 mb-1 block">{t('bulk.amount')} ({selectedToken})</label>
                                 <input
                                     type="text"
                                     inputMode="decimal"
@@ -579,7 +617,7 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
             <div className="p-4 bg-dark-800 border-t border-dark-700">
                 <div className="flex justify-between items-end mb-2 text-xs">
                     <span className="text-slate-400">{t('bulk.total')}</span>
-                    <span className="text-lg font-bold text-white">{totalAmount.toFixed(3)} <span className="text-sm font-normal text-slate-500">{chain}</span></span>
+                    <span className="text-lg font-bold text-white">{totalAmount.toFixed(3)} <span className="text-sm font-normal text-slate-500">{selectedToken}</span></span>
                 </div>
                 <button
                     onClick={handleInitiateSend}
