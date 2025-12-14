@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Gravity Wallet Security Test v3</title>
+    <style>
+        body {
+            background: #222;
+            color: #0f0;
+            font-family: monospace;
+            padding: 20px;
+        }
+
+        button {
+            padding: 10px;
+            cursor: pointer;
+            margin: 5px;
+            background: #444;
+            color: white;
+            border: 1px solid #0f0;
+        }
+
+        #log {
+            border-top: 1px solid #666;
+            margin-top: 20px;
+            padding-top: 10px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Gravity Red Team Tool v3</h1>
+    <p>Debug Info: <span id="debugInfo">Checking...</span></p>
+    <div>
+        <button id="btnFuzz">Run Fuzzer</button>
+        <button id="btnFlood">Run Flood (DoS)</button>
+        <button id="btnXSS">Test XSS</button>
+        <button onclick="document.getElementById('log').innerText=''">Clear Log</button>
+    </div>
+    <div id="log">Ready.</div>
+
+    <script>
+        function log(msg) {
+            const el = document.getElementById('log');
+            el.innerText += `\n[${new Date().toLocaleTimeString()}] ${msg}`;
+        }
+
+        document.getElementById('btnFuzz').addEventListener('click', runFuzzer);
+        document.getElementById('btnFlood').addEventListener('click', runFlood);
+        document.getElementById('btnXSS').addEventListener('click', runXSS);
+
+        // Detect available API methods
+        let apiMethod = null;
+        setTimeout(() => {
+            const el = document.getElementById('debugInfo');
+            if (window.gravity) {
+                const keys = Object.keys(window.gravity);
+                el.innerText = "window.gravity detected. Methods: " + keys.join(', ');
+
+                if (typeof window.gravity.request === 'function') apiMethod = window.gravity.request;
+                else if (typeof window.hive_keychain !== 'undefined' && window.hive_keychain.request) apiMethod = window.hive_keychain.request;
+
+                if (apiMethod) log("API Request method found.");
+                else log("API found but no request() method. Will use postMessage.");
+            } else {
+                el.innerText = "window.gravity MISSING (Check extension permissions for file://)";
+            }
+        }, 1000);
+
+        // Helper to send request
+        function sendReq(payload) {
+            return new Promise((resolve, reject) => {
+                if (apiMethod) {
+                    // Use Direct API
+                    try {
+                        apiMethod(payload, (response) => {
+                            resolve(response);
+                        });
+                    } catch (e) { reject(e); }
+                } else {
+                    // Fallback to PostMessage
+                    // Note: postMessage is fire-and-forget unless we listen for msg
+                    window.postMessage({ type: 'gravity_request', ...payload }, '*');
+                    resolve({ sent: true }); // Assume sent
+                }
+            });
+        }
+
+        // 1. FUZZER
+        async function runFuzzer() {
+            log("--- STARTING FUZZER ---");
+            const vectors = [
+                { name: "Null Method", m: null, p: [] },
+                { name: "Empty Method", m: "", p: [] },
+                { name: "Giant String", m: "A".repeat(5000), p: [] },
+                { name: "Invalid Params", m: "requestHandshake", p: { bad: "object" } }
+            ];
+
+            for (const v of vectors) {
+                log(`Fuzzing: ${v.name}`);
+                try {
+                    await sendReq({ method: v.m, params: v.p });
+                } catch (e) { log("Err: " + e); }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            log("Fuzzer done.");
+        }
+
+        // 2. FLOOD
+        async function runFlood() {
+            log("--- STARTING FLOOD (500 reqs) ---");
+            let done = 0;
+            const start = Date.now();
+
+            // Send requests in rapid succession
+            for (let i = 0; i < 500; i++) {
+                // Use Handshake as it's lightweight
+                // Don't await response to simulate flood
+                try {
+                    if (apiMethod) {
+                        // Call without waiting for callback to be truly async flood
+                        // But we need to handle "apiMethod might need params"
+                        // Gravity usually expects: (handshake, params, callback) or ({req}, cb)
+                        // Let's assume standard keychain: (cb, 'Handshake', 'requestHandshake')
+                        // Or our Gravity Universal: request({method...})
+
+                        // We try/catch around the call
+                        // We pass a dummy callback
+                        window.gravity.request({ method: 'requestHandshake' }, () => { done++; });
+                    } else {
+                        window.postMessage({ type: 'gravity_request', method: 'requestHandshake' }, '*');
+                        done++;
+                    }
+                } catch (e) { }
+
+                if (i % 50 === 0) await new Promise(r => setTimeout(r, 5));
+            }
+
+            setTimeout(() => {
+                log(`Flood finished. Time: ${Date.now() - start}ms`);
+            }, 1000);
+        }
+
+        // 3. XSS / Injection
+        async function runXSS() {
+            log("--- STARTING XSS TEST ---");
+            const payloads = [
+                "<h1>HACK</h1>",
+                "javascript:alert(1)"
+            ];
+
+            for (const p of payloads) {
+                log(`Payload: ${p}`);
+                // Try to put it in Memo field
+                try {
+                    await sendReq({
+                        method: 'requestTransfer',
+                        params: ['me', 'hacker', '100', p]
+                    });
+                } catch (e) { }
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            log("Check Popups.");
+        }
+    </script>
+</body>
+
+</html>

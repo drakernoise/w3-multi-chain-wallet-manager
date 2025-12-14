@@ -5,7 +5,7 @@ declare const chrome: any;
 // Constants for encryption
 const SALT_LEN = 16;
 const IV_LEN = 12;
-const ITERATIONS = 100000;
+const ITERATIONS = 600000; // Increased to OWASP standard
 const ALGO = 'AES-GCM';
 const HASH = 'SHA-256';
 
@@ -41,7 +41,7 @@ async function getKeyFromBytes(passwordBytes: Uint8Array, salt: Uint8Array): Pro
     },
     keyMaterial,
     { name: ALGO, length: 256 },
-    false,
+    true, // Extractable (needed for session persistence)
     ['encrypt', 'decrypt']
   );
 }
@@ -59,6 +59,7 @@ async function storeInternalKey(key: string) {
 }
 
 export async function getInternalKey(): Promise<string | null> {
+  // Legacy or Raw key (unsafe)
   let val: any;
   if (typeof chrome !== 'undefined' && chrome.storage) {
     const res = await chrome.storage.local.get(['device_auth_struct']);
@@ -69,29 +70,90 @@ export async function getInternalKey(): Promise<string | null> {
 
   if (!val) return null;
 
-  // Handle potential JSON obfuscation/wrapping
   try {
-    // If it's a string that looks like JSON, parse it
     if (typeof val === 'string' && val.trim().startsWith('{')) {
       val = JSON.parse(val);
     }
-
-    // If valid object, look for likely key properties
     if (typeof val === 'object' && val !== null) {
-      if (val.k) return val.k; // Found in user log: { k: '...' }
-
+      if (val.k) return val.k;
       if (val.key) return val.key;
-      if (val.token) return val.token;
-      if (val.secret) return val.secret;
-      // Debugging
-      console.log("DEBUG: Found object in storage:", val);
     }
-  } catch (e) {
-    // Not JSON, just use as string
+  } catch (e) { }
+
+  return typeof val === 'string' ? val : String(val);
+}
+
+// Check if a PIN-protected key exists
+export async function hasPinProtectedKey(): Promise<boolean> {
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    const res = await chrome.storage.local.get(['device_pin_data']);
+    return !!res.device_pin_data;
+  }
+  return !!localStorage.getItem('device_pin_data');
+}
+
+export async function saveInternalKeyWithPin(keyStr: string, pin: string): Promise<void> {
+  // Use high iterations for PIN because entropy is low
+  const salt = window.crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  const pinKey = await getKey(pin, salt);
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(IV_LEN));
+  const encData = new TextEncoder().encode(keyStr);
+
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: ALGO, iv },
+    pinKey,
+    encData
+  );
+
+  // Pack: salt + iv + ciphertext
+  const bundle = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+  bundle.set(salt, 0);
+  bundle.set(iv, SALT_LEN);
+  bundle.set(new Uint8Array(encrypted), SALT_LEN + IV_LEN);
+
+  const base64 = btoa(String.fromCharCode(...bundle));
+
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    await chrome.storage.local.set({ 'device_pin_data': base64 });
+    // Clear unsafe legacy key if exists
+    await chrome.storage.local.remove('device_auth_struct');
+  } else {
+    localStorage.setItem('device_pin_data', base64);
+    localStorage.removeItem('device_auth_struct');
+  }
+}
+
+export async function loadInternalKeyWithPin(pin: string): Promise<string | null> {
+  let base64: string | undefined | null;
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    const res = await chrome.storage.local.get(['device_pin_data']);
+    base64 = res.device_pin_data;
+  } else {
+    base64 = localStorage.getItem('device_pin_data');
   }
 
-  // Fallback: return raw value (if it was a simple string) or toString()
-  return typeof val === 'string' ? val : String(val);
+  if (!base64) return null;
+
+  try {
+    const bundle = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const salt = bundle.slice(0, SALT_LEN);
+    const iv = bundle.slice(SALT_LEN, SALT_LEN + IV_LEN);
+    const ciphertext = bundle.slice(SALT_LEN + IV_LEN);
+
+    const key = await getKey(pin, salt);
+
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: ALGO, iv },
+      key,
+      ciphertext
+    );
+
+    return new TextDecoder().decode(decrypted);
+  } catch (e) {
+    console.error("PIN Decryption failed", e);
+    return null; // Wrong PIN
+  }
 }
 
 export async function initVault(password: string): Promise<Vault> {
@@ -102,12 +164,16 @@ export async function initVault(password: string): Promise<Vault> {
 
 // For Google Auth / Biometrics where we don't have a user password,
 // we generate a high-entropy internal key and SAVE IT.
-export async function initVaultWithGeneratedKey(): Promise<{ vault: Vault, internalKey: string }> {
+export async function initVaultWithGeneratedKey(pin?: string): Promise<{ vault: Vault, internalKey: string }> {
   const internalKey = Array.from(window.crypto.getRandomValues(new Uint8Array(32)))
     .map(b => b.toString(16).padStart(2, '0')).join('');
 
-  // SAVE THE KEY so we can log in later!
-  await storeInternalKey(internalKey);
+  // SAVE THE KEY
+  if (pin) {
+    await saveInternalKeyWithPin(internalKey, pin);
+  } else {
+    await storeInternalKey(internalKey); // Legacy/Insecure fallback
+  }
 
   const emptyVault: Vault = { accounts: [], lastUpdated: Date.now() };
 
@@ -132,8 +198,7 @@ export async function saveVault(password: string, vault: Vault): Promise<void> {
       key = cachedKey;
       salt = cachedSalt;
     } else {
-      console.error("Attempted to save with cached key but cache is empty!");
-      return; // Fail safe
+      throw new Error("Attempted to save with cached key but cache is empty!");
     }
   } else {
     // New encryption session (or re-keying)
@@ -142,6 +207,8 @@ export async function saveVault(password: string, vault: Vault): Promise<void> {
     // Cache for this session
     cachedKey = key;
     cachedSalt = salt;
+    // Persist to session storage
+    await persistSession();
   }
 
   const iv = window.crypto.getRandomValues(new Uint8Array(IV_LEN));
@@ -169,6 +236,15 @@ export async function saveVault(password: string, vault: Vault): Promise<void> {
   }
 }
 
+export async function getVault(): Promise<string | null> {
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    const res = await chrome.storage.local.get(['vaultData']);
+    return res.vaultData || null;
+  } else {
+    return localStorage.getItem('vaultData');
+  }
+}
+
 // Helper for trying decryption with a specific password string
 async function tryDecrypt(password: string, base64Vault: string): Promise<Vault | null> {
   try {
@@ -189,6 +265,7 @@ async function tryDecrypt(password: string, base64Vault: string): Promise<Vault 
     // Cache successful login
     cachedKey = key;
     cachedSalt = salt;
+    await persistSession();
 
     return JSON.parse(dec.decode(decrypted));
   } catch (e) {
@@ -237,4 +314,56 @@ export async function unlockVault(password: string): Promise<Vault | null> {
 export function clearCryptoCache() {
   cachedKey = null;
   cachedSalt = null;
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+    chrome.storage.session.remove('crypto_session');
+  }
+}
+
+// Persist session key to memory (not disk)
+async function persistSession() {
+  if (!cachedKey || !cachedSalt) return;
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+    const exported = await window.crypto.subtle.exportKey('raw', cachedKey);
+    const saltArr = Array.from(cachedSalt);
+    const keyArr = Array.from(new Uint8Array(exported));
+    chrome.storage.session.set({
+      crypto_session: { key: keyArr, salt: saltArr }
+    });
+  }
+}
+
+// Restore session from memory
+export async function tryRestoreSession(): Promise<boolean> {
+  if (cachedKey) return true; // Already loaded
+
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+    return new Promise((resolve) => {
+      chrome.storage.session.get(['crypto_session'], async (res: any) => {
+        if (res.crypto_session) {
+          try {
+            const { key, salt } = res.crypto_session;
+            // Import the raw AES-GCM key directly (it was derived, but exported as raw)
+            // Actually, deriveKey returns an AES-GCM key.
+            const importedKey = await window.crypto.subtle.importKey(
+              'raw',
+              new Uint8Array(key),
+              ALGO, // 'AES-GCM'
+              true,
+              ['encrypt', 'decrypt']
+            );
+
+            cachedKey = importedKey;
+            cachedSalt = new Uint8Array(salt);
+            resolve(true);
+          } catch (e) {
+            console.warn("Session restore failed", e);
+            resolve(false);
+          }
+        } else {
+          resolve(false);
+        }
+      });
+    });
+  }
+  return false;
 }

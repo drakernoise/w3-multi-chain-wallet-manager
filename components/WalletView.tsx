@@ -1,5 +1,6 @@
 import React from 'react';
 import { Chain, Account } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface WalletViewProps {
   chain: Chain;
@@ -8,7 +9,9 @@ interface WalletViewProps {
   onManage?: (account: Account) => void;
   onSend?: (account: Account) => void;
   onReceive?: (account: Account) => void;
-  onRefresh?: () => void; // New prop to trigger balance reload
+  onHistory?: (account: Account) => void;
+  onRefresh?: () => void;
+  onAddAccount?: () => void;
 }
 
 export const WalletView: React.FC<WalletViewProps> = ({
@@ -18,93 +21,127 @@ export const WalletView: React.FC<WalletViewProps> = ({
   onManage,
   onSend,
   onReceive,
-  onRefresh
+  onHistory,
+  onRefresh,
+  onAddAccount
 }) => {
-  return (
-    <div className="space-y-4">
-      {/* Header with Network Selector and Refresh */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Network</h2>
-          <select
-            value={chain}
-            onChange={(e) => onChainChange(e.target.value as Chain)}
-            className="bg-dark-800 border border-dark-600 rounded-lg px-2 py-1 text-sm font-bold text-white focus:border-blue-500 outline-none cursor-pointer"
-          >
-            <option value={Chain.HIVE}>HIVE</option>
-            <option value={Chain.STEEM}>STEEM</option>
-            <option value={Chain.BLURT}>BLURT</option>
-          </select>
-        </div>
+  const { t } = useTranslation();
 
+  return (
+    <div className="space-y-4 relative h-full overflow-y-auto p-4 custom-scrollbar">
+      {/* Header with Network Refresh */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-200 to-slate-400">
+          {t('wallet.network_label')}
+        </h2>
         <button
           onClick={onRefresh}
-          className="p-2 bg-dark-800 rounded-full hover:bg-dark-700 hover:text-blue-400 text-slate-400 transition-colors"
-          title="Refresh Balances"
+          className="p-2 bg-dark-800 rounded-full hover:bg-dark-700 hover:text-blue-400 transition-colors border border-dark-700"
+          title={t('wallet.refresh_tooltip')}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </button>
       </div>
 
+      {/* Chain Selector Tabs */}
+      <div className="flex p-1 bg-dark-800 rounded-xl mb-6 border border-dark-700">
+        {[Chain.HIVE, Chain.STEEM, Chain.BLURT].map((c) => (
+          <button
+            key={c}
+            onClick={() => onChainChange(c)}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${chain === c
+              ? c === Chain.HIVE ? 'bg-hive text-white shadow-lg' : c === Chain.STEEM ? 'bg-steem text-white shadow-lg' : 'bg-blurt text-white shadow-lg'
+              : 'text-slate-500 hover:text-slate-300'
+              }`}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
       {accounts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-slate-500 gap-4 border border-dashed border-dark-700 rounded-xl bg-dark-800/30">
-          <svg className="w-16 h-16 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-          <div className="text-center">
-            <p className="font-bold">No {chain} accounts found</p>
-            <p className="text-xs mt-1">Select a different network or add an account.</p>
-          </div>
+        <div className="text-center py-10 opacity-50 bg-dark-800/50 rounded-xl border border-dashed border-dark-700 flex flex-col items-center gap-4">
+          <p className="text-sm">{t('wallet.no_accounts_chain').replace('{chain}', chain)}</p>
+          {onAddAccount && (
+            <button
+              onClick={onAddAccount}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg text-xs transition-colors shadow-lg"
+            >
+              {t('wallet.add_one')}
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
-          {accounts.map((account) => {
-            // Use the real balance stored in state, default to 0 if loading
-            const balance = account.balance || 0;
+          {accounts.map(account => {
             const hasActive = !!account.activeKey;
             const hasPosting = !!account.postingKey;
 
             return (
-              <div key={`${account.chain}-${account.name}`} className="bg-dark-800 rounded-xl p-4 border border-dark-700 shadow-sm relative overflow-hidden group">
-                {/* Background decoration */}
-                <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white to-transparent opacity-5 rounded-bl-full pointer-events-none ${chain === Chain.HIVE ? 'from-hive' : chain === Chain.STEEM ? 'from-steem' : 'from-blurt'
-                  }`} />
+              <div key={account.name} className="relative bg-dark-800 p-5 rounded-2xl border border-dark-700 shadow-xl overflow-hidden group hover:border-dark-600 transition-all">
 
-                <div className="flex justify-between items-start mb-4">
+                {/* Background Decoration Logo */}
+                <div className="absolute top-[-20px] right-[-20px] w-32 h-32 opacity-5 pointer-events-none transform rotate-12 group-hover:opacity-10 transition-opacity duration-500 blur-sm">
+                  <img
+                    src={chain === Chain.HIVE ? "/Logo_hive.png" : chain === Chain.STEEM ? "/logosteem.png" : "/logoblurt.png"}
+                    alt={chain}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+
+                <div className="flex justify-between items-start mb-4 relative z-10">
                   <div>
                     <h3 className="font-bold text-lg text-white flex items-center gap-2">
                       @{account.name}
                       <div className="flex gap-1">
-                        {hasActive && <span className="w-2 h-2 rounded-full bg-green-500" title="Active Key Present"></span>}
-                        {hasPosting && <span className="w-2 h-2 rounded-full bg-blue-500" title="Posting Key Present"></span>}
+                        {hasActive && <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]" title={t('wallet.active_key_tooltip')}></span>}
+                        {hasPosting && <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" title={t('wallet.posting_key_tooltip')}></span>}
                       </div>
                     </h3>
-                    <button
-                      onClick={() => onManage && onManage(account)}
-                      className="text-[10px] bg-dark-900/50 hover:bg-dark-700 text-slate-400 hover:text-white px-2 py-1 rounded border border-dark-600 mt-1 transition-colors flex items-center gap-1"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-                      Manage Keys
-                    </button>
+                    <p className="text-xs text-slate-400 font-bold tracking-wider mt-1">{chain} COIN</p>
                   </div>
-                  <div className="text-right flex flex-col items-end">
-                    <p className="text-2xl font-mono font-bold">{balance.toFixed(3)}</p>
-                    <p className="text-xs text-slate-400 font-bold tracking-wider mb-1">{chain} COIN</p>
+                  <div className="text-right">
+                    <span className="text-2xl font-black bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
+                      {/* Handle numeric balance correctly */}
+                      {typeof account.balance === 'number'
+                        ? account.balance.toFixed(3)
+                        : (typeof account.balance === 'string' ? (account.balance as string).split(' ')[0] : '0.000')}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500 ml-1">
+                      {chain}
+                    </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-4">
+                {/* Action Buttons Grid */}
+                <div className="grid grid-cols-4 gap-2 mt-4 relative z-10">
                   <button
                     onClick={() => onSend && onSend(account)}
-                    className="bg-dark-700 hover:bg-dark-600 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-blue-500/50 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 group/btn"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
-                    Send
+                    <svg className="w-4 h-4 text-slate-400 group-hover/btn:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                    {t('wallet.send')}
                   </button>
                   <button
                     onClick={() => onReceive && onReceive(account)}
-                    className="bg-dark-700 hover:bg-dark-600 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-green-500/50 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 group/btn"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                    Receive
+                    <svg className="w-4 h-4 text-slate-400 group-hover/btn:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    {t('wallet.receive')}
+                  </button>
+                  <button
+                    onClick={() => onHistory && onHistory(account)}
+                    className="bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-purple-500/50 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 group/btn"
+                  >
+                    <svg className="w-4 h-4 text-slate-400 group-hover/btn:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {t('wallet.history')}
+                  </button>
+                  <button
+                    onClick={() => onManage && onManage(account)}
+                    className="bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-orange-500/50 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 group/btn"
+                  >
+                    <svg className="w-4 h-4 text-slate-400 group-hover/btn:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                    {t('wallet.keys')}
                   </button>
                 </div>
               </div>

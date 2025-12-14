@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Account } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface TransferModalProps {
     account: Account;
@@ -8,7 +9,10 @@ interface TransferModalProps {
     onTransfer: (from: Account, to: string, amount: string, memo: string) => Promise<void>;
 }
 
+import { fetchAccountData } from '../services/chainService';
+
 export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAccount, accounts, onClose, onTransfer }) => {
+    const { t } = useTranslation();
     // Allow switching sending account
     const [selectedAccount, setSelectedAccount] = useState<Account>(initialAccount);
 
@@ -17,32 +21,140 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
     const [memo, setMemo] = useState('');
     const [isSending, setIsSending] = useState(false);
 
+    const [error, setError] = useState<string | null>(null);
+
+    // Validation State
+    const [isValidRecipient, setIsValidRecipient] = useState<boolean | null>(null);
+    const [isValidating, setIsValidating] = useState(false);
+
+    // Debounced Validation
+    React.useEffect(() => {
+        setError(null); // Clear error on input change
+        const check = async () => {
+            if (!to || to.length < 3) {
+                setIsValidRecipient(null);
+                setIsValidating(false);
+                return;
+            }
+            setIsValidating(true);
+            try {
+                const data = await fetchAccountData(selectedAccount.chain, to.replace(/^@/, ''));
+                setIsValidRecipient(!!data);
+            } catch {
+                setIsValidRecipient(false);
+            } finally {
+                setIsValidating(false);
+            }
+        };
+        const timer = setTimeout(check, 500);
+        return () => clearTimeout(timer);
+    }, [to, selectedAccount.chain]);
+
+    // Clear error on amount change
+    React.useEffect(() => {
+        if (error) setError(null);
+    }, [amount]);
+
     // Filter accounts to only show those of the same chain as the currently selected one?
     // Or allow switching chain too? Let's allow switching chain by selecting different account.
 
     const hasActiveKey = !!selectedAccount.activeKey;
 
-    const handleSend = async () => {
-        if (!to || !amount) return;
+    const [step, setStep] = useState<'input' | 'review'>('input');
+
+    const handleReview = () => {
+        setError(null);
+        if (!to) {
+            setError(t('validation.required'));
+            return;
+        }
+        if (isValidRecipient === false) {
+            // Inline error is already shown, but let's reinforce or just return
+            return;
+        }
+
+        const val = parseFloat(amount);
+        if (!amount || isNaN(val) || val <= 0) {
+            setError(t('validation.invalid_amount'));
+            return;
+        }
+
+        setStep('review');
+    };
+
+    const handleConfirm = async () => {
         setIsSending(true);
         await onTransfer(selectedAccount, to, amount, memo);
         setIsSending(false);
         onClose();
     };
 
+    if (step === 'review') {
+        // ... review render (unchanged)
+        return (
+            <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+                <div className="bg-dark-900 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col animate-fadeIn">
+                    <h2 className="text-xl font-bold text-white mb-4">{t('transfer.review_title')}</h2>
+
+                    <div className="bg-dark-950 p-4 rounded-lg border border-dark-700 space-y-4 mb-6">
+                        <div className="flex justify-between items-center border-b border-dark-800 pb-2">
+                            <span className="text-xs text-slate-500 uppercase font-bold">{t('sign.from')}</span>
+                            <span className="text-sm font-bold text-white">@{selectedAccount.name}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-dark-800 pb-2">
+                            <span className="text-xs text-slate-500 uppercase font-bold">{t('sign.to')}</span>
+                            <span className="text-sm font-bold text-white">@{to}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-b border-dark-800 pb-2">
+                            <span className="text-xs text-slate-500 uppercase font-bold">{t('bulk.amount')}</span>
+                            <span className="text-lg font-bold text-blue-400">{amount} {selectedAccount.chain}</span>
+                        </div>
+                        <div>
+                            <span className="text-xs text-slate-500 uppercase font-bold block mb-1">{t('bulk.memo')}</span>
+                            <div className="text-xs text-slate-300 italic bg-dark-900 p-2 rounded break-all max-h-20 overflow-y-auto">
+                                {memo || "No Memo"}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setStep('input')}
+                            disabled={isSending}
+                            className="flex-1 py-3 rounded-lg font-bold bg-dark-800 text-slate-400 hover:bg-dark-700 transition-colors"
+                        >
+                            {t('transfer.back')}
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            disabled={isSending}
+                            className="flex-1 py-3 rounded-lg font-bold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg flex justify-center items-center gap-2"
+                        >
+                            {isSending ? <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" /> : t('wallet.send')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Input Step handles... (rest of the component)
+
+
     return (
         <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
             <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        Send {selectedAccount.chain}
+                        {t('wallet.send')} {selectedAccount.chain}
                     </h2>
                     <button onClick={onClose} className="text-slate-500 hover:text-white">✕</button>
                 </div>
+                {/* ... fields ... */}
 
                 <div className="space-y-4 mb-6">
                     <div className="p-3 bg-dark-900 rounded-lg border border-dark-700">
-                        <label className="text-xs text-slate-500 block mb-1">From Account</label>
+                        <label className="text-xs text-slate-500 block mb-1">{t('sign.from')}</label>
                         <select
                             value={`${selectedAccount.chain}-${selectedAccount.name}`}
                             onChange={(e) => {
@@ -62,25 +174,36 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
 
                     {!hasActiveKey && (
                         <div className="bg-red-900/20 text-red-400 p-2 rounded text-xs text-center border border-red-500/30">
-                            Active Key required to send funds.
+                            {t('sign.keys_missing')} {/* Or specific Active Key message */}
                         </div>
                     )}
 
                     <div>
-                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">To</label>
+                        <div className="flex justify-between">
+                            <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">{t('sign.to')}</label>
+                            {isValidating && <span className="text-[10px] text-blue-400 animate-pulse">{t('bulk.checking')}</span>}
+                        </div>
                         <div className="relative">
                             <span className="absolute left-3 top-2.5 text-slate-500">@</span>
                             <input
                                 value={to}
                                 onChange={(e) => setTo(e.target.value)}
-                                className="w-full bg-dark-900 border border-dark-600 rounded-lg py-2 pl-7 pr-3 text-sm focus:border-blue-500 outline-none"
-                                placeholder="recipient"
+                                className={`w-full bg-dark-900 border rounded-lg py-2 pl-7 pr-8 text-sm outline-none transition-colors ${isValidRecipient === false ? 'border-red-500/50 focus:border-red-500' :
+                                        isValidRecipient === true ? 'border-green-500/50 focus:border-green-500' :
+                                            'border-dark-600 focus:border-blue-500'
+                                    }`}
+                                placeholder={t('import.placeholder_username')}
                             />
+                            <div className="absolute right-3 top-2.5 text-xs">
+                                {isValidRecipient === true && <span className="text-green-400">✓</span>}
+                                {isValidRecipient === false && <span className="text-red-400 font-bold">✕</span>}
+                            </div>
                         </div>
+                        {isValidRecipient === false && <p className="text-[10px] text-red-400 mt-1">{t('validation.account_not_found').replace('{chain}', selectedAccount.chain)}</p>}
                     </div>
 
                     <div>
-                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">Amount</label>
+                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">{t('bulk.amount')}</label>
                         <div className="relative">
                             <input
                                 type="number"
@@ -92,33 +215,39 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                             <span className="absolute right-3 top-2 text-xs font-bold text-slate-500 pt-0.5">{selectedAccount.chain}</span>
                         </div>
                         {selectedAccount.balance !== undefined && (
-                            <p className="text-[10px] text-slate-500 mt-1 text-right">Available: {selectedAccount.balance.toFixed(3)}</p>
+                            <p className="text-[10px] text-slate-500 mt-1 text-right">{t('transfer.available')} {selectedAccount.balance.toFixed(3)}</p>
                         )}
                     </div>
 
                     <div>
-                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">Memo (Optional)</label>
+                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">{t('bulk.memo')} (Optional)</label>
                         <input
                             value={memo}
                             onChange={(e) => setMemo(e.target.value)}
                             className="w-full bg-dark-900 border border-dark-600 rounded-lg py-2 px-3 text-sm focus:border-blue-500 outline-none"
-                            placeholder="Public note"
+                            placeholder={t('transfer.memo_placeholder')}
                         />
                     </div>
                 </div>
 
+                {error && (
+                    <div className="text-red-400 text-xs text-center font-bold mb-3 animate-pulse bg-red-900/20 p-2 rounded border border-red-500/30">
+                        {error}
+                    </div>
+                )}
+
                 <button
-                    onClick={handleSend}
+                    onClick={handleReview}
                     disabled={isSending || !to || !amount || !hasActiveKey}
                     className="w-full py-3 rounded-lg font-bold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                 >
                     {isSending ? (
                         <>
                             <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            Broadcasting...
+                            {t('bulk.sign_broadcast')}...
                         </>
                     ) : (
-                        "Confirm Transfer"
+                        t('transfer.review_btn')
                     )}
                 </button>
             </div>

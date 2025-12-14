@@ -2,25 +2,26 @@ import { Chain } from '../types';
 
 // Candidate Nodes
 export const HIVE_CANDIDATES = [
-    'https://api.openhive.network',
-    'https://api.hive.blog',
     'https://api.deathwing.me',
-    'https://anyx.io',
-    'https://rpc.ausbit.dev',
+    'https://api.hive.blog',
+    'https://api.openhive.network',
+    'https://hive-api.arcange.eu',
+    'https://techcoderx.com',
 ];
 
 export const STEEM_CANDIDATES = [
     'https://api.steemit.com',
-    'https://api.justyy.com',
-    'https://api.moecki.online',
-    'https://steem.61dom.com'
+    'https://api.steem.fans', // Often reliable
+    // 'https://steem.61dom.com', // REMOVED (DNS Error)
+    'https://api.steememory.com',
 ];
 
 export const BLURT_CANDIDATES = [
-    'https://rpc.blurt.world',
     'https://rpc.beblurt.com',
+    // 'https://rpc.blurt.one', // REMOVED (502 Error)
     'https://blurt-rpc.saboin.com',
-    'https://rpc.blurt.one'
+    'https://rpc.blurt.world',
+    'https://kentzz.blurt.world',
 ];
 
 // Active nodes state (in-memory)
@@ -96,4 +97,9 @@ const findBestNode = async (chain: Chain, candidates: string[]) => {
 
 export const getActiveNode = (chain: Chain): string => {
     return activeNodes[chain];
+};
+
+export const updateActiveNode = (chain: Chain, url: string): void => {
+    activeNodes[chain] = url;
+    console.log(`Switched active node for ${chain} to ${url}`);
 };

@@ -13,6 +13,7 @@ export default defineConfig({
   plugins: [
     react(),
     nodePolyfills({
+      exclude: ['vm', 'console'], // Avoid vm (eval) and console overrides
       globals: {
         Buffer: true,
         global: true,
@@ -32,6 +33,7 @@ export default defineConfig({
       // allowing Vite to process them and apply the regenerator shim
       '@hiveio/dhive': path.resolve(__dirname, 'node_modules/@hiveio/dhive/lib/index-browser.js'),
       'dsteem': path.resolve(__dirname, 'node_modules/dsteem/lib/index-browser.js'),
+      'vm': path.resolve(__dirname, 'src/empty-module.js'),
     }
   },
   build: {
@@ -45,7 +47,28 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        background: 'src/background/index.ts',
+        content: 'src/content/index.ts',
+        provider: 'src/content/provider.ts'
       },
+      output: {
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name].[ext]',
+        manualChunks: (id) => {
+          // Separate vendor libs
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+          // Separate services (shared logic)
+          if (id.includes('/services/')) {
+            return 'chainService';
+          }
+          // Helper: Separate polyfills?
+          return null;
+        },
+
+      }
     },
   },
 })

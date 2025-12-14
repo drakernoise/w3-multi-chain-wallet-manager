@@ -1,5 +1,6 @@
 import React from 'react';
 import { Account, Chain } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface ManageWalletsProps {
   accounts: Account[];
@@ -8,29 +9,31 @@ interface ManageWalletsProps {
 }
 
 export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, onEdit, onImport }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="flex flex-col h-full space-y-4">
       <div className="flex justify-between items-center p-4 border-b border-dark-700">
-        <h2 className="text-lg font-bold">My Wallets</h2>
+        <h2 className="text-lg font-bold">{t('settings.accounts_title')}</h2>
         <button
           onClick={onImport}
           className="text-xs bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded text-white font-bold transition-colors"
         >
-          + Add New
+          {t('settings.add_new')}
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
         {accounts.length === 0 ? (
           <div className="text-center text-slate-500 py-10">
-            <p>No accounts yet.</p>
+            <p>{t('settings.no_accounts')}</p>
           </div>
         ) : (
           accounts.map((acc, idx) => (
             <div key={`${acc.chain}-${acc.name}-${idx}`} className="bg-dark-800 border border-dark-700 rounded-lg p-3 flex justify-between items-center group hover:border-dark-600">
               <div className="flex items-center gap-3">
                 <div className={`w-2 h-8 rounded-full ${acc.chain === Chain.HIVE ? 'bg-hive' :
-                    acc.chain === Chain.STEEM ? 'bg-steem' : 'bg-blurt'
+                  acc.chain === Chain.STEEM ? 'bg-steem' : 'bg-blurt'
                   }`} />
                 <div>
                   <h3 className="font-bold text-sm text-slate-200">@{acc.name}</h3>

@@ -1,7 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Chain, BulkItem } from '../types';
 
-export const analyzeTransaction = async (chain: Chain, sender: string, items: BulkItem[]): Promise<string> => {
+export const analyzeTransaction = async (chain: Chain, sender: string, items: BulkItem[], promptPrefix: string = "Please analyze this for potential safety issues"): Promise<string> => {
 
   // Access the key via Vite's environment variable
   const apiKey = import.meta.env.VITE_API_KEY;
@@ -10,32 +10,58 @@ export const analyzeTransaction = async (chain: Chain, sender: string, items: Bu
     return "AI Analysis Unavailable: API Key not configured in .env file.";
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const genAI = new GoogleGenerativeAI(apiKey);
 
   const prompt = `
-    I am about to execute a bulk blockchain transaction on the ${chain} network.
+    ${promptPrefix}
+    Network: ${chain}
     Sender: ${sender}
     Recipients: ${JSON.stringify(items)}
     
-    Please analyze this for potential safety issues (e.g., suspicious memos, unusually high amounts, common scams). 
-    Provide a very brief, 2-sentence summary confirming if it looks safe or if caution is advised.
+    Provide a very brief, 2-sentence summary.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
+  // Try multiple models in order of preference/speed
+  const models = ["gemini-2.5-flash", "gemini-2.5-flash-latest", "gemini-pro"];
+  let lastError = null;
 
-    return response.text || "Analysis complete: No specific warnings.";
-  } catch (error: any) {
-    console.error("Gemini Error:", error);
+  for (const modelName of models) {
+    try {
+      console.log(`Attempting AI analysis with model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
 
-    // Check for specific error codes related to restrictions
-    if (error.message?.includes('403') || error.status === 403) {
-      return "Access Denied: Please check API Key restrictions in Google Cloud Console.";
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      return text || "Analysis complete: No specific warnings.";
+    } catch (error: any) {
+      console.warn(`Model ${modelName} failed:`, error.message);
+      lastError = error;
+
+      // If permission denied, stop trying (Key issue)
+      if (error.message?.includes('403') || error.status === 403) {
+        return "Access Denied: Please check API Key restrictions in Google Cloud Console.";
+      }
     }
-
-    return "AI service temporarily unavailable.";
   }
+
+  // If all failed
+  let debugMsg = "";
+  try {
+    const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const listData = await listResp.json();
+    if (listData.models) {
+      const modelNames = listData.models.map((m: any) => m.name).join(', ');
+      console.log("DEBUG Available Models:", modelNames);
+      debugMsg = ` (Available: ${modelNames})`;
+    } else if (listData.error) {
+      debugMsg = ` (API Error: ${listData.error.message})`;
+    }
+  } catch (e) {
+    debugMsg = " (Could not list models)";
+  }
+
+  return `AI Service Error: Could not connect to any model. Last error: ${lastError?.message || 'Unknown'}.${debugMsg}`;
+
 };

@@ -49,12 +49,20 @@ export const verifyKeyAgainstChain = async (
         }
 
         // 3. Check if derived key exists in the account's auths
+        // Normalize prefixes for Blurt/Steem/Hive compatibility
+        const validPrefixes = ['STM', 'BLT', 'TST', 'GLS'];
+        const pubKeyBody = derivedPub.slice(3); // Remove default prefix (usually STM)
+
+        const possibleKeys = validPrefixes.map(prefix => prefix + pubKeyBody);
+        // Also include the raw derived key just in case logic above is off
+        possibleKeys.push(derivedPub);
+
         if (type === 'memo') {
-            return accountData.memo_key === derivedPub;
+            return possibleKeys.includes(accountData.memo_key);
         } else {
             const auths = type === 'active' ? accountData.active.key_auths : accountData.posting.key_auths;
             // auths is an array of [key, weight], e.g. [["STM5...", 1]]
-            return auths.some(auth => auth[0] === derivedPub);
+            return auths.some(auth => possibleKeys.includes(auth[0]));
         }
 
     } catch (e) {

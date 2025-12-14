@@ -38,7 +38,7 @@ export interface Vault {
 
 export interface BulkItem {
   to: string;
-  amount: number;
+  amount: number | string;
   memo: string;
 }
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Chain, Account } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface MultiSigProps {
   chain: Chain;
@@ -7,6 +8,7 @@ interface MultiSigProps {
 }
 
 export const MultiSig: React.FC<MultiSigProps> = () => {
+  const { t } = useTranslation();
   return (
     <div className="h-full flex flex-col items-center justify-center p-8 text-center">
       <div className="relative w-64 h-64 mb-8 group">
@@ -19,11 +21,11 @@ export const MultiSig: React.FC<MultiSigProps> = () => {
       </div>
 
       <h2 className="text-4xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent mb-4 tracking-tight">
-        Under Construction...
+        {t('multisig.construction_title')}
       </h2>
 
       <p className="text-slate-400 max-w-sm text-lg leading-relaxed">
-        We are currently building this feature to ensure maximum security and functionality.
+        {t('multisig.construction_desc')}
       </p>
 
       <div className="mt-8 flex gap-3 opacity-75">

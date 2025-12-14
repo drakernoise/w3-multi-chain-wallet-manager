@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Chain, ViewState, Account, WalletState, Vault } from './types';
 import { LockScreen } from './components/LockScreen';
@@ -11,26 +12,27 @@ import { ImportModal } from './components/ImportModal';
 import { ManageAccountModal } from './components/ManageAccountModal';
 import { TransferModal } from './components/TransferModal';
 import { ReceiveModal } from './components/ReceiveModal';
+import { HistoryModal } from './components/HistoryModal';
+import { SignRequest } from './components/SignRequest';
+import { NotificationToast } from './components/NotificationToast'; // Added
 import { detectWeb3Context, getAccountBalance, broadcastTransfer } from './services/chainService';
-import { saveVault } from './services/cryptoService';
+import { saveVault, getVault, clearCryptoCache, tryRestoreSession } from './services/cryptoService';
 import { benchmarkNodes } from './services/nodeService';
+import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
 
 declare const chrome: any;
 
 export default function App() {
-  const [isLocked, setIsLocked] = useState<boolean>(true);
-  const [activeChain, setActiveChain] = useState<Chain>(Chain.HIVE);
-  const [currentView, setCurrentView] = useState<ViewState>(ViewState.LANDING);
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  );
+}
 
-  // Modal States
-  const [showImport, setShowImport] = useState<boolean>(false);
-  const [managingAccount, setManagingAccount] = useState<Account | null>(null);
-  const [transferAccount, setTransferAccount] = useState<Account | null>(null);
-  const [receiveAccount, setReceiveAccount] = useState<Account | null>(null);
-
-  const [web3Context, setWeb3Context] = useState<string | null>(null);
-
-  // Wallet State
+function AppContent() {
+  const { t } = useTranslation();
+  /* State */
   const [walletState, setWalletState] = useState<WalletState>({
     accounts: [],
     encryptedMaster: false,
@@ -38,33 +40,95 @@ export default function App() {
     useBiometrics: false
   });
 
+  const [activeChain, setActiveChain] = useState<Chain>(Chain.HIVE);
+  const [currentView, setCurrentView] = useState<ViewState>(ViewState.LANDING);
+
+  // Modals / Specific Flow States
+  const [showImport, setShowImport] = useState(false);
+  const [managingAccount, setManagingAccount] = useState<Account | null>(null);
+  const [transferAccount, setTransferAccount] = useState<Account | null>(null);
+  const [receiveAccount, setReceiveAccount] = useState<Account | null>(null);
+  const [historyAccount, setHistoryAccount] = useState<Account | null>(null);
+  const [isLocked, setIsLocked] = useState(true);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [needsSave, setNeedsSave] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [needsSave, setNeedsSave] = useState(false);
+  const [web3Context, setWeb3Context] = useState<string | null>(null);
 
-  // 1. Load Initial State
+  // Notifications
+  const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [lockReason, setLockReason] = useState<string | null>(null);
+
+  // Signing Request ID
+  const [requestId, setRequestId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(['walletConfig'], (result: any) => {
-        if (result.walletConfig) {
-          setWalletState(prev => ({
-            ...prev,
-            encryptedMaster: result.walletConfig.encryptedMaster,
-            useGoogleAuth: result.walletConfig.useGoogleAuth,
-            useBiometrics: result.walletConfig.useBiometrics
-          }));
-        }
+    const params = new URLSearchParams(window.location.search);
+    const req = params.get('requestId');
+    if (req) setRequestId(req);
+  }, []);
+
+  // 1. Load Initial State & Session
+  useEffect(() => {
+    const loadState = async () => {
+      // Load Vault Metadata
+      const vaultData = await getVault();
+      if (vaultData) {
+        setWalletState(prev => ({
+          ...prev,
+          accounts: [], // Keys are encrypted
+          encryptedMaster: true,
+          useGoogleAuth: false,
+          useBiometrics: false
+        }));
+      }
+
+      // Check Active Session (chrome.storage.session)
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+        // Try to restore crypto session first
+        const restored = await tryRestoreSession();
+
+        chrome.storage.session.get(['session_accounts'], (res: any) => {
+          if (res.session_accounts && res.session_accounts.length > 0) {
+
+            if (restored) {
+              setWalletState(prev => ({ ...prev, accounts: res.session_accounts }));
+              setIsLocked(false);
+              setTimeout(fetchBalances, 500);
+            } else {
+              console.warn("Session accounts found but crypto key missing. Forcing re-login.");
+              chrome.storage.session.remove('session_accounts');
+            }
+
+            setIsDataLoaded(true);
+            return;
+          }
+          setIsDataLoaded(true);
+        });
+      } else {
         setIsDataLoaded(true);
-      });
-    } else {
-      setIsDataLoaded(true);
-    }
+      }
 
-    const context = detectWeb3Context();
-    if (context) setWeb3Context(context);
+      // Also load walletConfig
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(['walletConfig'], (result: any) => {
+          if (result.walletConfig) {
+            setWalletState(prev => ({
+              ...prev,
+              encryptedMaster: result.walletConfig.encryptedMaster,
+              useGoogleAuth: result.walletConfig.useGoogleAuth,
+              useBiometrics: result.walletConfig.useBiometrics
+            }));
+          }
+        });
+      }
 
-    // Start Node Benchmark in background
-    benchmarkNodes();
+      const context = detectWeb3Context();
+      if (context) setWeb3Context(context);
+
+      benchmarkNodes();
+    };
+    loadState();
   }, []);
 
   // 2. Save Config when it changes
@@ -85,37 +149,55 @@ export default function App() {
   useEffect(() => {
     if (!isLocked && needsSave && walletState.encryptedMaster) {
       const vault: Vault = { accounts: walletState.accounts, lastUpdated: Date.now() };
-      saveVault('cached', vault).then(() => setNeedsSave(false));
+      saveVault('cached', vault)
+        .then(() => setNeedsSave(false))
+        .catch(err => {
+          console.warn("Auto-save failed:", err);
+          if (err.message && err.message.includes('cache is empty')) {
+            setLockReason("Session expired. Please unlock to save changes.");
+            setIsLocked(true); // Identify lost session -> Lock
+          }
+        });
     }
   }, [walletState.accounts, isLocked, needsSave]);
 
-  // 4. Poll Balances when unlocked
+  // 4. Poll Balances automatically
+  useEffect(() => {
+    let interval: any;
+    if (!isLocked && walletState.accounts.length > 0) {
+      interval = setInterval(fetchBalances, 60000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLocked, walletState.accounts.length]);
+
   const fetchBalances = async () => {
     if (isLocked || walletState.accounts.length === 0) return;
     setIsRefreshing(true);
 
     const updatedAccounts = await Promise.all(walletState.accounts.map(async (acc) => {
-      // Only fetch if chain matches current view to save bandwidth, OR fetch all?
-      // Let's fetch all so totals are correct.
       const balance = await getAccountBalance(acc.chain, acc.name);
       return { ...acc, balance };
     }));
 
     setWalletState(prev => ({ ...prev, accounts: updatedAccounts }));
     setIsRefreshing(false);
-    // Note: We generally don't persist balances to vault to avoid excessive writes,
-    // but if we wanted to cache them offline, we would setNeedsSave(true) here.
   };
 
   const handleUnlock = (decryptedAccounts: Account[]) => {
     setWalletState(prev => ({ ...prev, accounts: decryptedAccounts }));
     setIsLocked(false);
-    // Trigger balance fetch shortly after unlock
+
+    // Save to Session
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+      chrome.storage.session.set({ session_accounts: decryptedAccounts });
+    }
+
     setTimeout(() => fetchBalances(), 500);
   };
 
   const handleImport = async (newAccounts: Account[]) => {
-    // Fetch initial balance for new account immediately
     const withBalance = await Promise.all(newAccounts.map(async acc => ({
       ...acc,
       balance: await getAccountBalance(acc.chain, acc.name)
@@ -126,6 +208,7 @@ export default function App() {
       accounts: [...prev.accounts, ...withBalance]
     }));
     setNeedsSave(true);
+    setNotification({ msg: 'Account imported successfully', type: 'success' });
     setShowImport(false);
   };
 
@@ -153,10 +236,9 @@ export default function App() {
     setManagingAccount(null);
   };
 
-  // BROADCAST TO BLOCKCHAIN
   const handleTransfer = async (fromAcc: Account, to: string, amount: string, memo: string) => {
     if (!fromAcc.activeKey) {
-      alert("No active key found for this account.");
+      setNotification({ msg: "No active key found for this account.", type: 'error' });
       return;
     }
 
@@ -171,13 +253,13 @@ export default function App() {
       );
 
       if (result.success) {
-        alert(`Transaction Successful! TX: ${result.txId?.substring(0, 8)}...`);
-        fetchBalances(); // Refresh to show new balance
+        setNotification({ msg: `TX: ${result.txId?.substring(0, 8)}...`, type: 'success' });
+        fetchBalances();
       } else {
-        alert(`Transaction Failed: ${result.error}`);
+        setNotification({ msg: `Failed: ${result.error}`, type: 'error' });
       }
     } catch (e) {
-      alert("Unexpected error during broadcast.");
+      setNotification({ msg: "Unexpected error during broadcast.", type: 'error' });
     }
   };
 
@@ -187,6 +269,116 @@ export default function App() {
     if (chain === Chain.BLURT && context.includes('blurt')) return true;
     return false;
   };
+
+  /* Detached Window State */
+  const [isDetached, setIsDetached] = useState(false);
+
+  useEffect(() => {
+    const isDetachedMode = typeof window !== 'undefined' && window.location.search.includes('detached=true');
+    const TARGET_WIDTH = 360;
+    const TARGET_HEIGHT = 700;
+    const OUTER_WIDTH = 376;
+    const OUTER_HEIGHT = 739;
+
+    if (isDetachedMode) {
+      setIsDetached(true);
+      document.body.style.width = `${TARGET_WIDTH}px`;
+      document.body.style.height = `${TARGET_HEIGHT}px`;
+      document.body.style.overflow = 'hidden';
+
+      let animationFrameId: number;
+      const lockSize = () => {
+        if (window.innerWidth <= 380 && window.innerHeight <= 750 && window.innerWidth >= 350) {
+          animationFrameId = requestAnimationFrame(lockSize);
+          return;
+        }
+        const screenW = window.screen.availWidth || window.screen.width;
+        const screenH = window.screen.availHeight || window.screen.height;
+        const left = Math.round((screenW - OUTER_WIDTH) / 2);
+        const top = Math.round((screenH - OUTER_HEIGHT) / 2);
+        try {
+          window.resizeTo(OUTER_WIDTH, OUTER_HEIGHT);
+          window.moveTo(left, top);
+        } catch (e) { }
+
+        if (typeof chrome !== 'undefined' && chrome.windows) {
+          chrome.windows.getCurrent((win: any) => {
+            if (win.state === 'maximized' || win.width > 400 || win.height > 800) {
+              chrome.windows.update(win.id, {
+                state: 'normal',
+                width: OUTER_WIDTH,
+                height: OUTER_HEIGHT,
+                left: left,
+                top: top
+              });
+            }
+          });
+        }
+        animationFrameId = requestAnimationFrame(lockSize);
+      };
+      window.addEventListener('resize', lockSize);
+      lockSize();
+      return () => {
+        window.removeEventListener('resize', lockSize);
+        cancelAnimationFrame(animationFrameId);
+      };
+    } else {
+      if (typeof chrome !== 'undefined' && chrome.extension) {
+        const views = chrome.extension.getViews();
+        const detachedView = views.find((v: any) => v.location.href.includes('detached=true'));
+        if (detachedView) {
+          detachedView.focus();
+          window.close();
+        }
+      }
+    }
+  }, []);
+
+  const handleToggleDetach = () => {
+    if (isDetached) {
+      window.close();
+    } else {
+      const width = 376;
+      const height = 739;
+      const left = Math.round((window.screen.width / 2) - (width / 2));
+      const top = Math.round((window.screen.height / 2) - (height / 2));
+
+      if (typeof chrome !== 'undefined' && chrome.windows) {
+        chrome.windows.create({
+          url: 'index.html?detached=true',
+          type: 'popup',
+          width: width,
+          height: height,
+          left: left,
+          top: top,
+          focused: true
+        });
+        window.close();
+      } else {
+        window.open(
+          'index.html?detached=true',
+          'GravityWalletDetached',
+          `width=${width},height=${height},left=${left},top=${top},resizable=no,scrollbars=no,status=no`
+        );
+        window.close();
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      const listener = (changes: any, area: string) => {
+        if (area === 'session' && changes.session_accounts) {
+          if (!changes.session_accounts.newValue) {
+            setIsLocked(true);
+            setWalletState(prev => ({ ...prev, accounts: [] }));
+          }
+        }
+      };
+      chrome.storage.onChanged.addListener(listener);
+      return () => chrome.storage.onChanged.removeListener(listener);
+    }
+  }, []);
 
   if (!isDataLoaded) {
     return <div className="h-full bg-dark-900 flex items-center justify-center text-slate-500">Loading...</div>;
@@ -198,8 +390,14 @@ export default function App() {
         onUnlock={handleUnlock}
         walletState={walletState}
         setWalletState={setWalletState}
+        lockReason={lockReason}
       />
     );
+  }
+
+  // SIGNING REQUEST UI
+  if (requestId) {
+    return <SignRequest requestId={requestId} accounts={walletState.accounts} onComplete={() => window.close()} />;
   }
 
   return (
@@ -209,21 +407,30 @@ export default function App() {
         onChangeView={setCurrentView}
         onLock={() => {
           setWalletState(prev => ({ ...prev, accounts: [] }));
+          clearCryptoCache();
           setIsLocked(true);
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+            chrome.storage.session.remove('session_accounts');
+          }
         }}
+        isDetached={isDetached}
+        onToggleDetach={handleToggleDetach}
       />
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Header */}
         <header className="h-14 border-b border-dark-700 flex items-center justify-between px-4 bg-dark-800 shadow-md z-10">
           <div className="flex items-center gap-2">
             {currentView === ViewState.LANDING ? (
-              <h1 className="font-bold tracking-wider text-sm">HOME</h1>
+              <h1 className="font-bold tracking-wider text-sm">{t('sidebar.home').toUpperCase()}</h1>
+            ) : currentView === ViewState.MANAGE ? (
+              <h1 className="font-bold tracking-wider text-sm text-slate-200">{t('settings.title').toUpperCase()}</h1>
             ) : (
               <>
-                <div className={`w-3 h-3 rounded-full ${activeChain === Chain.HIVE ? 'bg-hive' :
-                  activeChain === Chain.STEEM ? 'bg-steem' : 'bg-blurt'
-                  } ${isRefreshing ? 'animate-spin' : ''} shadow-[0_0_8px_rgba(255,255,255,0.3)]`} />
+                <img
+                  src={activeChain === Chain.HIVE ? '/Logo_hive.png' : activeChain === Chain.STEEM ? '/logosteem.png' : '/logoblurt.png'}
+                  alt={activeChain}
+                  className={`w-5 h-5 object-contain ${isRefreshing ? 'animate-spin' : ''}`}
+                />
                 <h1 className="font-bold tracking-wider text-sm">{activeChain} NETWORK</h1>
               </>
             )}
@@ -238,14 +445,14 @@ export default function App() {
             <button
               onClick={() => setShowImport(true)}
               className="text-xs bg-dark-700 hover:bg-dark-600 px-2 py-1 rounded text-slate-300 transition-colors"
+              title={t('header.add')}
             >
-              + Add
+              {t('header.add')}
             </button>
           </div>
         </header>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        <div className="flex-1 overflow-hidden relative">
           {currentView === ViewState.LANDING && (
             <Landing
               onSelectChain={(chain) => {
@@ -264,7 +471,9 @@ export default function App() {
               onManage={(acc) => setManagingAccount(acc)}
               onSend={(acc) => setTransferAccount(acc)}
               onReceive={(acc) => setReceiveAccount(acc)}
+              onHistory={(acc) => setHistoryAccount(acc)}
               onRefresh={fetchBalances}
+              onAddAccount={() => setShowImport(true)}
             />
           )}
 
@@ -277,7 +486,12 @@ export default function App() {
           )}
 
           {currentView === ViewState.BULK && (
-            <BulkTransfer chain={activeChain} accounts={walletState.accounts} />
+            <BulkTransfer
+              chain={activeChain}
+              accounts={walletState.accounts.filter(a => a.chain === activeChain)}
+              refreshBalance={fetchBalances}
+              onChangeChain={setActiveChain}
+            />
           )}
 
           {currentView === ViewState.MULTISIG && (
@@ -307,8 +521,15 @@ export default function App() {
         <TransferModal
           account={transferAccount}
           onClose={() => setTransferAccount(null)}
-          accounts={walletState.accounts} // Pass all accounts for switcher
+          accounts={walletState.accounts}
           onTransfer={handleTransfer}
+        />
+      )}
+
+      {historyAccount && (
+        <HistoryModal
+          account={historyAccount}
+          onClose={() => setHistoryAccount(null)}
         />
       )}
 
@@ -316,7 +537,15 @@ export default function App() {
         <ReceiveModal
           account={receiveAccount}
           onClose={() => setReceiveAccount(null)}
-          accounts={walletState.accounts} // Pass all accounts for switcher
+          accounts={walletState.accounts}
+        />
+      )}
+
+      {notification && (
+        <NotificationToast
+          message={notification.msg}
+          type={notification.type}
+          onClose={() => setNotification(null)}
         />
       )}
     </div>
