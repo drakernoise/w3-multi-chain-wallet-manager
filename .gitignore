@@ -28,3 +28,6 @@ dist-ssr
 
 # Temporary
 temp_recovery/
+
+# Secrets
+.env

@@ -2,7 +2,9 @@
 
 **La Primera Billetera Web3 Multi-Cadena con IA Integrada para Hive, Steem y Blurt.**
 
-![Gravity Wallet Banner](public/logowallet_big.png)
+<div align="center">
+  <img src="public/logowallet_big.png" alt="Gravity Wallet Banner" width="300" />
+</div>
 
 Gravity Wallet es una extensión de navegador de última generación diseñada para el ecosistema Graphene. No es solo una billetera; es tu copiloto inteligente para la Web3. Con soporte nativo para **Hive**, **Steem** y **Blurt**, Gravity elimina la necesidad de tener múltiples extensiones instaladas.
 
