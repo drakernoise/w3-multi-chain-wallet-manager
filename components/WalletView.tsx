@@ -100,16 +100,27 @@ export const WalletView: React.FC<WalletViewProps> = ({
                     </h3>
                     <p className="text-xs text-slate-400 font-bold tracking-wider mt-1">{chain} COIN</p>
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent">
-                      {/* Handle numeric balance correctly */}
-                      {typeof account.balance === 'number'
-                        ? account.balance.toFixed(3)
-                        : (typeof account.balance === 'string' ? (account.balance as string).split(' ')[0] : '0.000')}
-                    </span>
-                    <span className="text-xs font-bold text-slate-500 ml-1">
-                      {chain}
-                    </span>
+                  <div className="text-right flex flex-col items-end">
+                    {/* Primary Balance */}
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-black bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent block max-w-[140px] truncate" title={String(account.balance)}>
+                        {account.balance !== undefined ? account.balance.toFixed(3) : '0.000'}
+                      </span>
+                      <span className="text-xs font-bold text-slate-500">
+                        {chain}
+                      </span>
+                    </div>
+                    {/* Secondary Balance (HBD/SBD) */}
+                    {(chain === Chain.HIVE || chain === Chain.STEEM) && (
+                      <div className="flex items-baseline gap-1 mt-[-4px]">
+                        <span className="text-sm font-bold text-slate-400 block max-w-[100px] truncate" title={String(account.secondaryBalance)}>
+                          {account.secondaryBalance !== undefined ? account.secondaryBalance.toFixed(3) : '0.000'}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-600">
+                          {chain === Chain.HIVE ? 'HBD' : 'SBD'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

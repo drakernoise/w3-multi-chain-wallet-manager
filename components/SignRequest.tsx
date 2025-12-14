@@ -180,8 +180,17 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             } else if (isBroadcast) {
                 // Generic Broadcast
                 let operations = request.params[1];
-                // request.params[2] is key type
-                const response = await broadcastOperations(account.chain, account.activeKey!, operations);
+                const keyType = request.params[2]; // 'Posting' or 'Active'
+
+                let key = account.postingKey;
+                // If specifically Active requested, use Active
+                if (keyType === 'Active') key = account.activeKey;
+                // If Posting requested but missing, try Active
+                if (!key && account.activeKey) key = account.activeKey;
+
+                if (!key) throw new Error(`${keyType || 'Posting'} key missing for this account`);
+
+                const response = await broadcastOperations(account.chain, key, operations);
                 if (!response.success) throw new Error(response.error);
                 result = { result: response.txId, message: t('sign.success'), ...response };
 

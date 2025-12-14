@@ -6,7 +6,7 @@ interface TransferModalProps {
     account: Account;
     accounts: Account[]; // All accounts to allow switching
     onClose: () => void;
-    onTransfer: (from: Account, to: string, amount: string, memo: string) => Promise<void>;
+    onTransfer: (from: Account, to: string, amount: string, memo: string, symbol?: string) => Promise<void>;
 }
 
 import { fetchAccountData } from '../services/chainService';
@@ -19,7 +19,18 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
     const [to, setTo] = useState('');
     const [amount, setAmount] = useState('');
     const [memo, setMemo] = useState('');
+    const [currency, setCurrency] = useState<string>(
+        initialAccount.chain === 'HIVE' ? 'HIVE' : initialAccount.chain === 'STEEM' ? 'STEEM' : 'BLURT'
+    );
     const [isSending, setIsSending] = useState(false);
+
+    // Reset currency when chain changes
+    React.useEffect(() => {
+        const c = selectedAccount.chain;
+        if (c === 'HIVE') setCurrency('HIVE');
+        else if (c === 'STEEM') setCurrency('STEEM');
+        else setCurrency('BLURT');
+    }, [selectedAccount.chain]);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -84,7 +95,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
 
     const handleConfirm = async () => {
         setIsSending(true);
-        await onTransfer(selectedAccount, to, amount, memo);
+        await onTransfer(selectedAccount, to, amount, memo, currency);
         setIsSending(false);
         onClose();
     };
@@ -107,7 +118,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                         </div>
                         <div className="flex justify-between items-center border-b border-dark-800 pb-2">
                             <span className="text-xs text-slate-500 uppercase font-bold">{t('bulk.amount')}</span>
-                            <span className="text-lg font-bold text-blue-400">{amount} {selectedAccount.chain}</span>
+                            <span className="text-lg font-bold text-blue-400">{amount} {currency}</span>
                         </div>
                         <div>
                             <span className="text-xs text-slate-500 uppercase font-bold block mb-1">{t('bulk.memo')}</span>
@@ -187,10 +198,14 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                             <span className="absolute left-3 top-2.5 text-slate-500">@</span>
                             <input
                                 value={to}
-                                onChange={(e) => setTo(e.target.value)}
+                                onChange={(e) => {
+                                    // Sanitize: lowercase, remove spaces, remove invisible chars, remove @
+                                    const val = e.target.value.toLowerCase().replace(/[@\s\u200B-\u200D\uFEFF]/g, '');
+                                    setTo(val);
+                                }}
                                 className={`w-full bg-dark-900 border rounded-lg py-2 pl-7 pr-8 text-sm outline-none transition-colors ${isValidRecipient === false ? 'border-red-500/50 focus:border-red-500' :
-                                        isValidRecipient === true ? 'border-green-500/50 focus:border-green-500' :
-                                            'border-dark-600 focus:border-blue-500'
+                                    isValidRecipient === true ? 'border-green-500/50 focus:border-green-500' :
+                                        'border-dark-600 focus:border-blue-500'
                                     }`}
                                 placeholder={t('import.placeholder_username')}
                             />
@@ -209,10 +224,32 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                                 type="number"
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
-                                className="w-full bg-dark-900 border border-dark-600 rounded-lg py-2 pl-3 pr-16 text-sm focus:border-blue-500 outline-none"
+                                className="w-full bg-dark-900 border border-dark-600 rounded-lg py-2 pl-3 pr-20 text-sm focus:border-blue-500 outline-none"
                                 placeholder="0.000"
                             />
-                            <span className="absolute right-3 top-2 text-xs font-bold text-slate-500 pt-0.5">{selectedAccount.chain}</span>
+                            <div className="absolute right-1 top-1 bottom-1 flex items-center">
+                                {(selectedAccount.chain === 'HIVE' || selectedAccount.chain === 'STEEM') ? (
+                                    <select
+                                        value={currency}
+                                        onChange={(e) => setCurrency(e.target.value)}
+                                        className="h-full bg-dark-800 text-xs font-bold text-white border-l border-dark-600 rounded-r-lg px-2 outline-none cursor-pointer hover:bg-dark-700"
+                                    >
+                                        {selectedAccount.chain === 'HIVE' ? (
+                                            <>
+                                                <option value="HIVE">HIVE</option>
+                                                <option value="HBD">HBD</option>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <option value="STEEM">STEEM</option>
+                                                <option value="SBD">SBD</option>
+                                            </>
+                                        )}
+                                    </select>
+                                ) : (
+                                    <span className="px-3 text-xs font-bold text-slate-500">{selectedAccount.chain}</span>
+                                )}
+                            </div>
                         </div>
                         {selectedAccount.balance !== undefined && (
                             <p className="text-[10px] text-slate-500 mt-1 text-right">{t('transfer.available')} {selectedAccount.balance.toFixed(3)}</p>

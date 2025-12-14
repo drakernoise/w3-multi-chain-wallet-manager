@@ -243,7 +243,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onClose, onImport, ini
                   <input
                     type="text"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[@\s\u200B-\u200D\uFEFF]/g, ''))}
                     className={`w-full bg-dark-900 border ${usernameError ? 'border-red-500' : (chainData ? 'border-green-500' : 'border-dark-600')} rounded-lg py-2 pl-7 pr-3 text-sm text-white focus:outline-none`}
                     placeholder={t('import.placeholder_username')}
                     disabled={isSaving}

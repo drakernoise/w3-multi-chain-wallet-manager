@@ -20,6 +20,7 @@ export interface Account {
   activeKey?: string;
   memoKey?: string;
   balance?: number;
+  secondaryBalance?: number;
 }
 
 export interface WalletState {

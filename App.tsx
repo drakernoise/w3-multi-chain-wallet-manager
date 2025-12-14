@@ -165,7 +165,7 @@ function AppContent() {
   useEffect(() => {
     let interval: any;
     if (!isLocked && walletState.accounts.length > 0) {
-      interval = setInterval(fetchBalances, 60000);
+      interval = setInterval(fetchBalances, 12000);
     }
     return () => {
       if (interval) clearInterval(interval);
@@ -177,8 +177,8 @@ function AppContent() {
     setIsRefreshing(true);
 
     const updatedAccounts = await Promise.all(walletState.accounts.map(async (acc) => {
-      const balance = await getAccountBalance(acc.chain, acc.name);
-      return { ...acc, balance };
+      const balances = await getAccountBalance(acc.chain, acc.name);
+      return { ...acc, balance: balances.primary, secondaryBalance: balances.secondary };
     }));
 
     setWalletState(prev => ({ ...prev, accounts: updatedAccounts }));
@@ -198,10 +198,14 @@ function AppContent() {
   };
 
   const handleImport = async (newAccounts: Account[]) => {
-    const withBalance = await Promise.all(newAccounts.map(async acc => ({
-      ...acc,
-      balance: await getAccountBalance(acc.chain, acc.name)
-    })));
+    const withBalance = await Promise.all(newAccounts.map(async acc => {
+      const balances = await getAccountBalance(acc.chain, acc.name);
+      return {
+        ...acc,
+        balance: balances.primary,
+        secondaryBalance: balances.secondary
+      };
+    }));
 
     setWalletState(prev => ({
       ...prev,
@@ -236,7 +240,7 @@ function AppContent() {
     setManagingAccount(null);
   };
 
-  const handleTransfer = async (fromAcc: Account, to: string, amount: string, memo: string) => {
+  const handleTransfer = async (fromAcc: Account, to: string, amount: string, memo: string, symbol?: string) => {
     if (!fromAcc.activeKey) {
       setNotification({ msg: "No active key found for this account.", type: 'error' });
       return;
@@ -249,7 +253,8 @@ function AppContent() {
         fromAcc.activeKey,
         to,
         amount,
-        memo
+        memo,
+        symbol
       );
 
       if (result.success) {

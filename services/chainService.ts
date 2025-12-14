@@ -17,26 +17,38 @@ export interface ChainAccountData {
     memo_key: string;
     balance?: string;
     savings_balance?: string;
+    hbd_balance?: string;
+    sbd_balance?: string;
 }
 
 // --- PUBLIC API ---
 
-export const getAccountBalance = async (chain: Chain, username: string): Promise<number> => {
+export const getAccountBalance = async (chain: Chain, username: string): Promise<{ primary: number, secondary: number }> => {
     try {
         const data = await fetchAccountData(chain, username);
-        if (!data) return 0;
+        if (!data) return { primary: 0, secondary: 0 };
 
-        let balanceStr = "0";
-        if (chain === Chain.HIVE || chain === Chain.STEEM) {
-            balanceStr = data.balance || "0";
+        let primaryStr = "0";
+        let secondaryStr = "0";
+
+        if (chain === Chain.HIVE) {
+            primaryStr = data.balance || "0";
+            secondaryStr = data.hbd_balance || "0";
+        } else if (chain === Chain.STEEM) {
+            primaryStr = data.balance || "0";
+            secondaryStr = data.sbd_balance || "0";
         } else if (chain === Chain.BLURT) {
-            balanceStr = (data as any).balance || "0";
+            primaryStr = (data as any).balance || "0";
+            secondaryStr = "0";
         }
 
-        return parseFloat(balanceStr.split(' ')[0]);
+        return {
+            primary: parseFloat(primaryStr.split(' ')[0]),
+            secondary: parseFloat(secondaryStr.split(' ')[0])
+        };
     } catch (e) {
         console.error(`Failed to get balance for ${username}:`, e);
-        return 0;
+        return { primary: 0, secondary: 0 };
     }
 };
 
@@ -193,23 +205,26 @@ export const broadcastTransfer = async (
     activeKey: string,
     to: string,
     amount: string,
-    memo: string
+    memo: string,
+    tokenSymbol?: string
 ): Promise<{ success: boolean; txId?: string; error?: string }> => {
     const formattedAmount = parseFloat(amount).toFixed(3);
     const nodeUrl = getActiveNode(chain);
+    const defaultToken = chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT';
+    const symbol = tokenSymbol || defaultToken;
 
     try {
         if (chain === Chain.HIVE) {
             const client = new HiveClient(nodeUrl);
             const key = HivePrivateKey.fromString(activeKey);
-            const transfer = { from, to, amount: `${formattedAmount} HIVE`, memo };
+            const transfer = { from, to, amount: `${formattedAmount} ${symbol}`, memo };
             const result = await client.broadcast.transfer(transfer, key);
             return { success: true, txId: result.id };
         }
         else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const key = SteemPrivateKey.fromString(activeKey);
-            const transfer = { from, to, amount: `${formattedAmount} STEEM`, memo };
+            const transfer = { from, to, amount: `${formattedAmount} ${symbol}`, memo };
             const result = await client.broadcast.transfer(transfer, key);
             return { success: true, txId: result.id };
         }

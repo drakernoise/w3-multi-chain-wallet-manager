@@ -404,12 +404,19 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
                         </select>
                     </div>
                 )}
-                {/* Optional Balance Display */}
-                {accounts.find(a => a.name === selectedAccount)?.balance !== undefined && (
-                    <div className="text-[10px] text-slate-400 mt-1 text-right">
-                        Balance: <span className="text-green-400 font-mono">{accounts.find(a => a.name === selectedAccount)?.balance}</span>
-                    </div>
-                )}
+                {/* Balance Display */}
+                {(() => {
+                    const acc = accounts.find(a => a.name === selectedAccount);
+                    const bal = (selectedToken === 'HBD' || selectedToken === 'SBD') ? acc?.secondaryBalance : acc?.balance;
+                    if (bal !== undefined) {
+                        return (
+                            <div className="text-[10px] text-slate-400 mt-1 text-right">
+                                Balance: <span className="text-green-400 font-mono">{bal.toFixed(3)}</span>
+                            </div>
+                        );
+                    }
+                    return null;
+                })()}
             </div>
 
             {/* Tabs */}
@@ -441,6 +448,25 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
 
                 {mode === 'single' ? (
                     <div className="space-y-4">
+                        {/* 1. Amount */}
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 mb-1 block">{t('bulk.amount')} ({selectedToken})</label>
+                            <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0.000"
+                                value={singleAmount}
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(',', '.');
+                                    if (val === '' || !isNaN(Number(val)) || val.endsWith('.')) {
+                                        setSingleAmount(val as any);
+                                    }
+                                }}
+                                className="w-full bg-dark-800 border border-dark-600 rounded-lg p-2 text-sm text-white focus:border-blue-500 outline-none"
+                            />
+                        </div>
+
+                        {/* 2. Recipients */}
                         <div>
                             <div className="flex justify-between">
                                 <label className="text-xs font-bold text-slate-400 mb-1 block">{t('bulk.recipients')}</label>
@@ -448,7 +474,10 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
                             </div>
                             <textarea
                                 value={recipientsText}
-                                onChange={(e) => setRecipientsText(e.target.value)}
+                                onChange={(e) => {
+                                    // Remove invisible chars, keep structure
+                                    setRecipientsText(e.target.value.replace(/[\u200B-\u200D\uFEFF]/g, ''));
+                                }}
                                 className="w-full h-24 bg-dark-800 border border-dark-600 rounded-lg p-2 text-xs font-mono text-slate-300 focus:border-blue-500 outline-none resize-none"
                                 placeholder={`user1, user2\nuser3`}
                             />
@@ -471,36 +500,17 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
                                     );
                                 })}
                             </div>
-
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs font-bold text-slate-400 mb-1 block">{t('bulk.amount')} ({selectedToken})</label>
-                                <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="0.000"
-                                    value={singleAmount}
-                                    onChange={(e) => {
-                                        const val = e.target.value.replace(',', '.');
-                                        if (val === '' || !isNaN(Number(val)) || val.endsWith('.')) {
-                                            setSingleAmount(val as any);
-                                        }
-                                    }}
-                                    className="w-full bg-dark-800 border border-dark-600 rounded-lg p-2 text-sm text-white focus:border-blue-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-400 mb-1 block">{t('bulk.memo')}</label>
-                                <input
-                                    type="text"
-                                    value={singleMemo}
-                                    onChange={(e) => setSingleMemo(e.target.value)}
-                                    className="w-full bg-dark-800 border border-dark-600 rounded-lg p-2 text-sm text-white focus:border-blue-500 outline-none"
-                                    placeholder="Public Memo"
-                                />
-                            </div>
+                        {/* 3. Memo */}
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 mb-1 block">{t('bulk.memo')}</label>
+                            <textarea
+                                value={singleMemo}
+                                onChange={(e) => setSingleMemo(e.target.value)}
+                                className="w-full h-16 bg-dark-800 border border-dark-600 rounded-lg p-2 text-sm text-white focus:border-blue-500 outline-none resize-none"
+                                placeholder="Public Memo"
+                            />
                         </div>
                     </div>
                 ) : (
@@ -512,52 +522,55 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
 
                             return (
                                 <div key={idx} className="flex gap-2 items-start bg-dark-800/50 p-2 rounded-lg border border-dark-700/50 relative">
-                                    <div className="grid grid-cols-12 gap-2 flex-1">
-                                        <div className="col-span-4 relative">
-                                            <input
-                                                placeholder={t('import.username')}
-                                                value={item.to}
-                                                onChange={e => {
-                                                    const newItems = [...items];
-                                                    newItems[idx].to = e.target.value;
-                                                    setItems(newItems);
-                                                }}
-                                                className={`w-full bg-dark-900 border rounded px-2 py-1 text-xs outline-none text-white placeholder-slate-600 ${isValid ? 'border-green-500/50' : isInvalid ? 'border-red-500/50' : 'border-dark-600'
-                                                    }`}
-                                            />
-                                            {/* Status Icon */}
-                                            <div className="absolute right-2 top-1.5 text-[10px]">
-                                                {isValid && <span className="text-green-400">✓</span>}
-                                                {isInvalid && <span className="text-red-400 font-bold">✕</span>}
+                                    <div className="flex flex-col gap-2 flex-1 relative">
+                                        <div className="flex gap-2">
+                                            {/* Username */}
+                                            <div className="flex-1 relative">
+                                                <input
+                                                    placeholder={t('import.username')}
+                                                    value={item.to}
+                                                    onChange={e => {
+                                                        const newItems = [...items];
+                                                        newItems[idx].to = e.target.value.toLowerCase().replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+                                                        setItems(newItems);
+                                                    }}
+                                                    className={`w-full bg-dark-900 border rounded px-2 py-2 text-xs outline-none text-white placeholder-slate-600 ${isValid ? 'border-green-500/50' : isInvalid ? 'border-red-500/50' : 'border-dark-600'
+                                                        }`}
+                                                />
+                                                <div className="absolute right-2 top-2 text-[10px]">
+                                                    {isValid && <span className="text-green-400">✓</span>}
+                                                    {isInvalid && <span className="text-red-400 font-bold">✕</span>}
+                                                </div>
+                                            </div>
+                                            {/* Amount */}
+                                            <div className="w-1/3">
+                                                <input
+                                                    type="text"
+                                                    inputMode="decimal"
+                                                    placeholder="0.000"
+                                                    value={item.amount}
+                                                    onChange={e => {
+                                                        const val = e.target.value.replace(',', '.');
+                                                        if (val === '' || !isNaN(Number(val)) || val.endsWith('.')) {
+                                                            const newItems = [...items];
+                                                            newItems[idx].amount = val;
+                                                            setItems(newItems);
+                                                        }
+                                                    }}
+                                                    onBlur={_ => {
+                                                        const val = parseFloat(item.amount.toString());
+                                                        if (!isNaN(val)) {
+                                                            const newItems = [...items];
+                                                            newItems[idx].amount = val;
+                                                            setItems(newItems);
+                                                        }
+                                                    }}
+                                                    className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-2 text-xs outline-none text-white placeholder-slate-600"
+                                                />
                                             </div>
                                         </div>
-                                        <div className="col-span-3">
-                                            <input
-                                                type="text"
-                                                inputMode="decimal"
-                                                placeholder="0.000"
-                                                value={item.amount}
-                                                onChange={e => {
-                                                    const val = e.target.value.replace(',', '.');
-                                                    // Allow empty, numbers, or "0."
-                                                    if (val === '' || !isNaN(Number(val)) || val.endsWith('.')) {
-                                                        const newItems = [...items];
-                                                        newItems[idx].amount = val;
-                                                        setItems(newItems);
-                                                    }
-                                                }}
-                                                onBlur={_ => {
-                                                    const val = parseFloat(item.amount.toString());
-                                                    if (!isNaN(val)) {
-                                                        const newItems = [...items];
-                                                        newItems[idx].amount = val;
-                                                        setItems(newItems);
-                                                    }
-                                                }}
-                                                className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-1 text-xs outline-none text-white placeholder-slate-600"
-                                            />
-                                        </div>
-                                        <div className="col-span-5">
+                                        {/* Memo - Full Width */}
+                                        <div className="w-full">
                                             <input
                                                 placeholder={t('bulk.memo')}
                                                 value={item.memo}
@@ -566,7 +579,7 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
                                                     newItems[idx].memo = e.target.value;
                                                     setItems(newItems);
                                                 }}
-                                                className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-1 text-xs outline-none text-white placeholder-slate-600"
+                                                className="w-full bg-dark-900 border border-dark-600 rounded px-2 py-2 text-xs outline-none text-white placeholder-slate-600"
                                             />
                                         </div>
                                     </div>
