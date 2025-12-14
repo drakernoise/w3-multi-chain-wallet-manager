@@ -251,9 +251,17 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                                 )}
                             </div>
                         </div>
-                        {selectedAccount.balance !== undefined && (
-                            <p className="text-[10px] text-slate-500 mt-1 text-right">{t('transfer.available')} {selectedAccount.balance.toFixed(3)}</p>
-                        )}
+                        {(() => {
+                            const bal = (currency === 'HBD' || currency === 'SBD') ? selectedAccount.secondaryBalance : selectedAccount.balance;
+                            if (bal !== undefined) {
+                                return (
+                                    <p className="text-[10px] text-slate-500 mt-1 text-right">
+                                        {t('transfer.available')} <span className="font-bold text-white">{bal.toFixed(3)} {currency}</span>
+                                    </p>
+                                );
+                            }
+                            return null;
+                        })()}
                     </div>
 
                     <div>
