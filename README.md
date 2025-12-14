@@ -1,5 +1,9 @@
 # Gravity Web3 Multi-Chain Wallet
 
+<div align="center">
+  <img src="public/logowallet_big.png" alt="Gravity Wallet Banner" width="300" />
+</div>
+
 Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **Steem**, and **Blurt** blockchains. It allows you to manage accounts, transfer funds, sign transactions, and interact with Web3 dApps seamlessly.
 
 ## Features
@@ -57,3 +61,4 @@ This extension requires the following permissions:
 ## Privacy
 
 See [PRIVACY.md](PRIVACY.md) for details. We do not track you.
+
