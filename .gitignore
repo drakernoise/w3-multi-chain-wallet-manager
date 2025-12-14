@@ -38,4 +38,6 @@ tests/
 
 # Managed Scripts
 backup.bat
-scripts/backup.ps1
+
+# Empty Translation Dir
+i18n/
