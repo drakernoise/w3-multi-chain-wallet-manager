@@ -2,6 +2,8 @@
 // Gravity Provider API
 // This script is injected into the web page context.
 
+// CHANGE THIS to your trusted parent/origin, e.g., the domain of your extension/page.
+const GRAVITY_TRUSTED_ORIGIN = "https://gravitywallet.io";
 interface GravityRequest {
     id: string;
     method: string;
@@ -76,13 +78,14 @@ class GravityProvider {
             this.callbacks.set(id, callback);
         }
 
+        // Security fix: only send messages to the trusted origin (not '*')
         window.postMessage({
             type: 'gravity_request',
             id,
             method,
             params,
             appName: 'GravityWallet'
-        }, '*');
+        }, GRAVITY_TRUSTED_ORIGIN);
     }
 }
 
