@@ -1,4 +1,7 @@
 (function () {
+    // IMPORTANT: Set this to the exact origin your app is served from
+    // e.g. 'https://example.com'
+    const TRUSTED_ORIGIN = 'https://example.com';
     console.log('Gravity: Initializing native provider (Clean JS)...');
 
     class GravityProvider {
@@ -83,7 +86,7 @@
                 params,
                 appName: 'GravityWallet',
                 requestChain: this.chainHint // Pass the hint to background
-            }, '*');
+            }, TRUSTED_ORIGIN);
         }
     }
 
