@@ -75,7 +75,9 @@
 
         send(method, params, callback) {
             // console.log(`Gravity Debug: send called for ${method}`, params);
-            const id = Date.now().toString() + Math.random().toString();
+            const array = new Uint32Array(1);
+            window.crypto.getRandomValues(array);
+            const id = Date.now().toString() + array[0].toString();
             if (callback) {
                 this.callbacks.set(id, callback);
             }
