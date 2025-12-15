@@ -490,10 +490,20 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
 
 export const detectWeb3Context = (): string | null => {
     if (typeof window === 'undefined') return null;
-    const url = window.location.href;
-    if (url.includes('steemit.com')) return 'steemit';
-    if (url.includes('hive.blog') || url.includes('peakd.com')) return 'hive';
-    if (url.includes('blurt.blog') || url.includes('beblurt.com')) return 'blurt';
+    let hostname: string;
+    try {
+        hostname = new URL(window.location.href).hostname;
+    } catch {
+        return null;
+    }
+    // Check for steemit context
+    if (hostname === 'steemit.com' || hostname.endsWith('.steemit.com')) return 'steemit';
+    // Check for hive context
+    if (hostname === 'hive.blog' || hostname.endsWith('.hive.blog') ||
+        hostname === 'peakd.com' || hostname.endsWith('.peakd.com')) return 'hive';
+    // Check for blurt context
+    if (hostname === 'blurt.blog' || hostname.endsWith('.blurt.blog') ||
+        hostname === 'beblurt.com' || hostname.endsWith('.beblurt.com')) return 'blurt';
     return null;
 };
 
