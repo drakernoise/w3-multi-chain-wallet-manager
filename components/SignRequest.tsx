@@ -77,10 +77,48 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             // Smart Account Selection (Match Chain logic)
             const detectChain = (url: string) => {
                 if (!url) return null;
-                const u = url.toLowerCase();
-                if (u.includes('peakd.com') || u.includes('ecency.com') || u.includes('tribaldex.com') || u.includes('hive')) return 'HIVE';
-                if (u.includes('blurt.blog') || u.includes('blurt')) return 'BLURT';
-                if (u.includes('steemit.com') || u.includes('steem')) return 'STEEM';
+                try {
+                    // Try parsing. If fails, fallback to substring method as last resort.
+                    const parsedUrl = new URL(url.toLowerCase());
+                    const hostname = parsedUrl.hostname;
+                    // Known HIVE domains
+                    if (
+                        hostname === 'peakd.com' ||
+                        hostname.endsWith('.peakd.com') ||
+                        hostname === 'ecency.com' ||
+                        hostname.endsWith('.ecency.com') ||
+                        hostname === 'tribaldex.com' ||
+                        hostname.endsWith('.tribaldex.com') ||
+                        hostname === 'hive.blog' ||
+                        hostname.endsWith('.hive.blog')
+                    ) {
+                        return 'HIVE';
+                    }
+                    // Known BLURT domains
+                    if (
+                        hostname === 'blurt.blog' ||
+                        hostname.endsWith('.blurt.blog')
+                    ) {
+                        return 'BLURT';
+                    }
+                    // Known STEEM domains
+                    if (
+                        hostname === 'steemit.com' ||
+                        hostname.endsWith('.steemit.com')
+                    ) {
+                        return 'STEEM';
+                    }
+                    // Allow fallbacks for generic keywords in hostname only
+                    if (hostname.includes('hive')) return 'HIVE';
+                    if (hostname.includes('blurt')) return 'BLURT';
+                    if (hostname.includes('steem')) return 'STEEM';
+                } catch (_) {
+                    // Fallback: crude substring check only for legacy/bad data, but not recommended
+                    const u = url.toLowerCase();
+                    if (u.includes('peakd.com') || u.includes('ecency.com') || u.includes('tribaldex.com') || u.includes('hive')) return 'HIVE';
+                    if (u.includes('blurt.blog') || u.includes('blurt')) return 'BLURT';
+                    if (u.includes('steemit.com') || u.includes('steem')) return 'STEEM';
+                }
                 return null;
             };
             const targetChain = detectChain(origin);
