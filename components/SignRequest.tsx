@@ -113,11 +113,42 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     if (hostname.includes('blurt')) return 'BLURT';
                     if (hostname.includes('steem')) return 'STEEM';
                 } catch (_) {
-                    // Fallback: crude substring check only for legacy/bad data, but not recommended
+                    // Fallback: Try extracting hostname manually using regex as a last resort
                     const u = url.toLowerCase();
-                    if (u.includes('peakd.com') || u.includes('ecency.com') || u.includes('tribaldex.com') || u.includes('hive')) return 'HIVE';
-                    if (u.includes('blurt.blog') || u.includes('blurt')) return 'BLURT';
-                    if (u.includes('steemit.com') || u.includes('steem')) return 'STEEM';
+                    // Try to use regex to extract the hostname robustly
+                    const match = u.match(/^[a-z]+:\/\/([^\/?#]+)/);
+                    if (match) {
+                        const fallbackHost = match[1];
+                        if (
+                            fallbackHost === 'peakd.com' ||
+                            fallbackHost.endsWith('.peakd.com') ||
+                            fallbackHost === 'ecency.com' ||
+                            fallbackHost.endsWith('.ecency.com') ||
+                            fallbackHost === 'tribaldex.com' ||
+                            fallbackHost.endsWith('.tribaldex.com') ||
+                            fallbackHost === 'hive.blog' ||
+                            fallbackHost.endsWith('.hive.blog')
+                        ) {
+                            return 'HIVE';
+                        }
+                        if (
+                            fallbackHost === 'blurt.blog' ||
+                            fallbackHost.endsWith('.blurt.blog')
+                        ) {
+                            return 'BLURT';
+                        }
+                        if (
+                            fallbackHost === 'steemit.com' ||
+                            fallbackHost.endsWith('.steemit.com')
+                        ) {
+                            return 'STEEM';
+                        }
+                        // As an absolute last resort, allow partial matching on host only (not recommended)
+                        if (fallbackHost.includes('hive')) return 'HIVE';
+                        if (fallbackHost.includes('blurt')) return 'BLURT';
+                        if (fallbackHost.includes('steem')) return 'STEEM';
+                    }
+                    // If no host found, do not fallback to dangerous substring match -- just return null.
                 }
                 return null;
             };
