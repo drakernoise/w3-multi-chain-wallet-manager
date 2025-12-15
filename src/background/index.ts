@@ -6,10 +6,31 @@ declare var chrome: any;
 
 function detectChainFromUrl(url: string = ""): string | null {
     if (!url) return null;
-    if (url.includes('peakd.com') || url.includes('ecency.com') || url.includes('tribaldex.com') || url.includes('hive')) return 'HIVE';
-    if (url.includes('blurt.blog') || url.includes('blurt')) return 'BLURT';
-    if (url.includes('steemit.com') || url.includes('steem')) return 'STEEM';
-    return null;
+    try {
+        const u = new URL(url);
+        const host = u.hostname.toLowerCase();
+        // HIVE list - customize as needed
+        const hiveHosts = ['peakd.com', 'ecency.com', 'tribaldex.com'];
+        if (
+            hiveHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
+            host.includes('hive')
+        ) return 'HIVE';
+        // BLURT list - customize as needed
+        const blurtHosts = ['blurt.blog'];
+        if (
+            blurtHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
+            host.includes('blurt')
+        ) return 'BLURT';
+        // STEEM list - customize as needed
+        const steemHosts = ['steemit.com'];
+        if (
+            steemHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
+            host.includes('steem')
+        ) return 'STEEM';
+        return null;
+    } catch (e) {
+        return null;
+    }
 }
 
 // Listen for messages from Content Script or Popup
