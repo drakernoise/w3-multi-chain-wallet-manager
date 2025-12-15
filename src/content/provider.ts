@@ -25,10 +25,16 @@ class GravityProvider {
 
             const data = event.data;
             if (data && data.type === 'gravity_response') {
+                console.log('[Gravity Provider] Received response:', data);
                 const callback = this.callbacks.get(data.id);
                 if (callback) {
+                    console.log('[Gravity Provider] Executing callback for ID:', data.id);
+                    console.log('[Gravity Provider] Callback will receive:', data.response);
                     callback(data.response);
+                    console.log('[Gravity Provider] Callback executed successfully');
                     this.callbacks.delete(data.id);
+                } else {
+                    console.warn('[Gravity Provider] No callback found for ID:', data.id, 'Available IDs:', Array.from(this.callbacks.keys()));
                 }
             }
         });
@@ -49,8 +55,29 @@ class GravityProvider {
         this.send('requestVote', [username, permlink, author, weight], callback);
     }
 
-    requestPost(username: string, title: string, body: string, parentPerm: string, parentAuthor: string, jsonMetadata: any, permlink: string, callback?: Function) {
-        this.send('requestPost', [username, title, body, parentPerm, parentAuthor, jsonMetadata, permlink], callback);
+    requestPost(username: string, title: string, body: string, parentPerm: string, parentAuthor: string, jsonMetadata: any, permlink: string, commentOptions?: any, callback?: Function, _rpc?: string): Promise<any> | void {
+        // Handle flexible parameter positions - callback can be at position 8 or 9
+        let actualCallback = callback;
+        if (typeof commentOptions === 'function') {
+            // commentOptions is actually the callback (old signature)
+            actualCallback = commentOptions;
+        }
+
+        if (actualCallback) {
+            this.send('requestPost', [username, title, body, parentPerm, parentAuthor, jsonMetadata, permlink], actualCallback);
+        } else {
+            // Return a Promise for async/await usage
+            return new Promise((resolve, reject) => {
+                this.send('requestPost', [username, title, body, parentPerm, parentAuthor, jsonMetadata, permlink], (response: any) => {
+                    if (response && response.success) {
+                        // Resolve with Hive Keychain compatible format
+                        resolve({ success: true, result: response.result });
+                    } else {
+                        reject(response?.error || 'Unknown error');
+                    }
+                });
+            });
+        }
     }
 
     requestCustomJson(username: string, id: string, key: string, json: string, display_msg: string, callback?: Function) {
@@ -71,23 +98,26 @@ class GravityProvider {
 
     // Generic Send
     private send(method: string, params: any[], callback?: Function) {
-        // console.log(`Gravity Debug: send called for ${method}`, params);
         const array = new Uint32Array(1);
         window.crypto.getRandomValues(array);
         const id = Date.now().toString() + array[0].toString();
 
         if (callback) {
+            console.log('[Gravity Provider] Registering callback for ID:', id, 'Method:', method);
             this.callbacks.set(id, callback);
+        } else {
+            console.warn('[Gravity Provider] No callback provided for method:', method);
         }
 
-        // Security fix: only send messages to the trusted origin (not '*')
+        // Security fix: restrict message target to the same origin where the script is running
+        console.log('[Gravity Provider] Sending request:', { id, method, params });
         window.postMessage({
             type: 'gravity_request',
             id,
             method,
             params,
             appName: 'GravityWallet'
-        }, GRAVITY_TRUSTED_ORIGIN);
+        }, window.location.origin);
     }
 }
 

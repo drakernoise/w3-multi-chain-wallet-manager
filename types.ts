@@ -9,7 +9,8 @@ export enum ViewState {
   WALLET = 'WALLET',
   BULK = 'BULK',
   MULTISIG = 'MULTISIG',
-  MANAGE = 'MANAGE'
+  MANAGE = 'MANAGE',
+  HELP = 'HELP'
 }
 
 export interface Account {

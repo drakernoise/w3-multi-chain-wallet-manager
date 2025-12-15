@@ -71,7 +71,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({ account,
                     <>
                         <div className="space-y-4 mb-6">
                             <div>
-                                <label className="text-[10px] text-blue-400 mb-1 block uppercase font-bold">Posting Key</label>
+                                <label className="text-[10px] text-blue-400 mb-1 block uppercase font-bold">{t('manage.label_posting')}</label>
                                 <input
                                     type="password"
                                     value={postingKey}
@@ -82,7 +82,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({ account,
                             </div>
 
                             <div>
-                                <label className="text-[10px] text-green-400 mb-1 block uppercase font-bold">Active Key</label>
+                                <label className="text-[10px] text-green-400 mb-1 block uppercase font-bold">{t('manage.label_active')}</label>
                                 <input
                                     type="password"
                                     value={activeKey}
@@ -93,7 +93,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({ account,
                             </div>
 
                             <div>
-                                <label className="text-[10px] text-slate-400 mb-1 block uppercase font-bold">Memo Key</label>
+                                <label className="text-[10px] text-slate-400 mb-1 block uppercase font-bold">{t('manage.label_memo')}</label>
                                 <input
                                     type="password"
                                     value={memoKey}
@@ -110,7 +110,7 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({ account,
                             <button
                                 onClick={handleSave}
                                 disabled={isValidating}
-                                className="w-full py-3 rounded-lg font-bold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg disabled:opacity-50"
+                                className="w-full py-3 h-auto min-h-[48px] rounded-lg font-bold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg disabled:opacity-50 whitespace-normal leading-tight"
                             >
                                 {isValidating ? t('manage.validating') : t('manage.save_verify')}
                             </button>

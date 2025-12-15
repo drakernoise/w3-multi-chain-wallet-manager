@@ -1,14 +1,8 @@
 import { Chain } from '../types';
-import { Client as HiveClient, PrivateKey as HivePrivateKey, cryptoUtils } from '@hiveio/dhive';
+import { PrivateKey as HivePrivateKey, cryptoUtils } from '@hiveio/dhive';
 import { Client as SteemClient, PrivateKey as SteemPrivateKey } from 'dsteem';
-// hive-tx import removed as we use manual fetch + dhive now
-
-
-
 import { getActiveNode, HIVE_CANDIDATES, STEEM_CANDIDATES, BLURT_CANDIDATES } from './nodeService';
 import * as blurt from '@blurtfoundation/blurtjs';
-
-
 
 export interface ChainAccountData {
     name: string;
@@ -20,6 +14,64 @@ export interface ChainAccountData {
     hbd_balance?: string;
     sbd_balance?: string;
 }
+
+// --- HELPER: Manual Fetch for HIVE (Service Worker Compatible) ---
+// This bypasses 'dhive' networking to avoid "WorkerGlobalScope: Illegal invocation" errors.
+// It performs standard Hive RPC calls using native fetch.
+const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key: string): Promise<any> => {
+    // 1. Get Dynamic Global Properties
+    const propsResponse = await fetch(nodeUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'condenser_api.get_dynamic_global_properties',
+            params: [],
+            id: 1
+        }),
+        headers: { 'Content-Type': 'application/json' }
+    });
+    const propsJson = await propsResponse.json();
+    if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
+    const props = propsJson.result;
+
+    // 2. Prepare Transaction Data
+    const ref_block_num = props.head_block_number & 0xFFFF;
+    const ref_block_prefix = Buffer.from(props.head_block_id, 'hex').readUInt32LE(4);
+    // 1 min expiration is standard for interactive signing
+    const expiration = new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5);
+
+    const tx = {
+        ref_block_num,
+        ref_block_prefix,
+        expiration,
+        operations,
+        extensions: []
+    };
+
+    // 3. Sign (Offline using dhive crypto)
+    const privateKey = HivePrivateKey.fromString(key);
+    const signedTx = cryptoUtils.signTransaction(tx, [privateKey]);
+
+    // 4. Broadcast Synchronous
+    const broadcastResponse = await fetch(nodeUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'condenser_api.broadcast_transaction_synchronous',
+            params: [signedTx],
+            id: 1
+        }),
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+    const broadcastResult = await broadcastResponse.json();
+    if (broadcastResult.error) {
+        throw new Error(broadcastResult.error.message || JSON.stringify(broadcastResult.error));
+    }
+
+    return broadcastResult.result; // Returns { id: "txid", block_num: 123, ... }
+};
+
 
 // --- PUBLIC API ---
 
@@ -76,8 +128,6 @@ export const fetchAccountData = async (chain: Chain, username: string): Promise<
                 headers: opts.headers,
                 body: opts.body
             }).then(res => {
-                // Mimic the xhr logic behavior if needed, but fetch returns Response directly
-                // Our code expects a standard Response object which fetch returns.
                 return res;
             });
         }
@@ -109,32 +159,21 @@ export const fetchAccountData = async (chain: Chain, username: string): Promise<
 
     for (let i = 0; i < Math.min(candidates.length, maxRetries); i++) {
         const nodeUrl = candidates[i];
-        console.log(`Attempting fetch for ${username} on ${chain} using ${nodeUrl} (Attempt ${i + 1}/${maxRetries})`);
-
         try {
             if (chain === Chain.HIVE) {
-                const client = new HiveClient(nodeUrl);
-                try {
-                    const accounts = await withTimeout(client.database.getAccounts([username]));
-                    if (accounts.length > 0) return (accounts[0] as unknown as ChainAccountData);
-                } catch (err) {
-                    try {
-                        const response: any = await withTimeout(safeFetch(nodeUrl, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                jsonrpc: '2.0',
-                                method: 'condenser_api.get_accounts',
-                                params: [[username]],
-                                id: 1
-                            }),
-                            headers: { 'Content-Type': 'application/json' }
-                        }));
-                        const json = await response.json();
-                        if (json.result && json.result.length > 0) return json.result[0];
-                    } catch (rawErr) {
-                        // continue
-                    }
-                }
+                // Use fetch for HIVE to be safe
+                const response: any = await withTimeout(safeFetch(nodeUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'condenser_api.get_accounts',
+                        params: [[username]],
+                        id: 1
+                    }),
+                    headers: { 'Content-Type': 'application/json' }
+                }));
+                const json = await response.json();
+                if (json.result && json.result.length > 0) return json.result[0];
             }
             else if (chain === Chain.STEEM) {
                 const client = new SteemClient(nodeUrl);
@@ -156,7 +195,7 @@ export const fetchAccountData = async (chain: Chain, username: string): Promise<
                 if (json.result && json.result.length > 0) return json.result[0];
             }
         } catch (e) {
-            console.warn(`Node ${nodeUrl} failed:`, e);
+            // console.warn(`Node ${nodeUrl} failed:`, e);
         }
     }
     return null;
@@ -207,7 +246,7 @@ export const broadcastTransfer = async (
     amount: string,
     memo: string,
     tokenSymbol?: string
-): Promise<{ success: boolean; txId?: string; error?: string }> => {
+): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const formattedAmount = parseFloat(amount).toFixed(3);
     const nodeUrl = getActiveNode(chain);
     const defaultToken = chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT';
@@ -215,11 +254,9 @@ export const broadcastTransfer = async (
 
     try {
         if (chain === Chain.HIVE) {
-            const client = new HiveClient(nodeUrl);
-            const key = HivePrivateKey.fromString(activeKey);
-            const transfer = { from, to, amount: `${formattedAmount} ${symbol}`, memo };
-            const result = await client.broadcast.transfer(transfer, key);
-            return { success: true, txId: result.id };
+            const transfer = ['transfer', { from, to, amount: `${formattedAmount} ${symbol}`, memo }];
+            const result = await broadcastHiveTransaction(nodeUrl, [transfer], activeKey);
+            return { success: true, txId: result.id, opResult: result };
         }
         else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
@@ -244,14 +281,13 @@ export const broadcastTransfer = async (
     }
 };
 
-export const broadcastVote = async (chain: Chain, voter: string, key: string, author: string, permlink: string, weight: number): Promise<{ success: boolean; txId?: string; error?: string }> => {
+export const broadcastVote = async (chain: Chain, voter: string, key: string, author: string, permlink: string, weight: number): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const nodeUrl = getActiveNode(chain);
     try {
         if (chain === Chain.HIVE) {
-            const client = new HiveClient(nodeUrl);
-            const privateKey = HivePrivateKey.fromString(key);
-            const result = await client.broadcast.vote({ voter, author, permlink, weight }, privateKey);
-            return { success: true, txId: result.id };
+            const vote = ['vote', { voter, author, permlink, weight }];
+            const result = await broadcastHiveTransaction(nodeUrl, [vote], key);
+            return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const privateKey = SteemPrivateKey.fromString(key);
@@ -272,17 +308,23 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
     }
 };
 
-export const broadcastCustomJson = async (chain: Chain, username: string, key: string, id: string, json: string, keyType: 'Posting' | 'Active'): Promise<{ success: boolean; txId?: string; error?: string }> => {
+export const broadcastCustomJson = async (chain: Chain, username: string, key: string, id: string, json: string, keyType: 'Posting' | 'Active'): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const nodeUrl = getActiveNode(chain);
     try {
         const required_auths = keyType === 'Active' ? [username] : [];
         const required_posting_auths = keyType === 'Posting' ? [username] : [];
 
         if (chain === Chain.HIVE) {
-            const client = new HiveClient(nodeUrl);
-            const privateKey = HivePrivateKey.fromString(key);
-            const result = await client.broadcast.json({ id, json, required_auths, required_posting_auths }, privateKey);
-            return { success: true, txId: result.id };
+            // MANUAL BROADCAST for Reliability in Service Worker (Fixes 'Illegal invocation' fetch error)
+            const op: any = ['custom_json', {
+                required_auths,
+                required_posting_auths,
+                id,
+                json
+            }];
+            const result = await broadcastHiveTransaction(nodeUrl, [op], key);
+            return { success: true, txId: result.id, opResult: result };
+
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const privateKey = SteemPrivateKey.fromString(key);
@@ -312,64 +354,16 @@ export const broadcastOperations = async (
 
     try {
         if (chain === Chain.HIVE) {
-            // FULLY MANUAL APPROACH: Fetch Props -> Build -> dhive.Sign -> Fetch Broadcast
-            // This avoids all hive-tx and dhive-network issues in Popup/SW.
-
-            // 1. Get Dynamic Global Properties
-            const propsResponse = await fetch(nodeUrl, {
-                method: 'POST',
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    method: 'condenser_api.get_dynamic_global_properties',
-                    params: [],
-                    id: 1
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const propsJson = await propsResponse.json();
-            if (!propsJson.result) throw new Error("Failed to fetch props");
-            const props = propsJson.result;
-
-            // 2. Prepare Transaction Data
-            const ref_block_num = props.head_block_number & 0xFFFF;
-            const ref_block_prefix = Buffer.from(props.head_block_id, 'hex').readUInt32LE(4);
-            const expiration = new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5);
-
-            const tx = {
-                ref_block_num,
-                ref_block_prefix,
-                expiration,
-                operations,
-                extensions: []
-            };
-
-            // 3. Sign (Offline)
-            const privateKey = HivePrivateKey.fromString(activeKey);
-            const signedTx = cryptoUtils.signTransaction(tx, [privateKey]);
-
-            // 4. Broadcast Synchronous (to get ID/Block)
-            const broadcastResponse = await fetch(nodeUrl, {
-                method: 'POST',
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    method: 'condenser_api.broadcast_transaction_synchronous',
-                    params: [signedTx],
-                    id: 1
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            const broadcastResult = await broadcastResponse.json();
-
-            if (broadcastResult.error) {
-                throw new Error(broadcastResult.error.message || JSON.stringify(broadcastResult.error));
-            }
+            // FULLY MANUAL APPROACH
+            // Use broadcastHiveTransaction
+            const result = await broadcastHiveTransaction(nodeUrl, operations, activeKey);
 
             return {
                 success: true,
-                txId: broadcastResult.result ? broadcastResult.result.id : 'unknown',
-                opResult: broadcastResult.result
+                txId: result.id,
+                opResult: result
             };
+
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const key = SteemPrivateKey.fromString(activeKey);
@@ -421,7 +415,7 @@ export const broadcastBulkTransfer = async (
 };
 
 export const broadcastPowerUp = async (chain: Chain, username: string, activeKey: string, to: string, amount: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
-    const op = ['transfer_to_vesting', {
+    const op: any = ['transfer_to_vesting', {
         from: username,
         to: to,
         amount: amount
@@ -430,7 +424,7 @@ export const broadcastPowerUp = async (chain: Chain, username: string, activeKey
 };
 
 export const broadcastPowerDown = async (chain: Chain, username: string, activeKey: string, vestingShares: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
-    const op = ['withdraw_vesting', {
+    const op: any = ['withdraw_vesting', {
         account: username,
         vesting_shares: vestingShares
     }];
@@ -438,7 +432,7 @@ export const broadcastPowerDown = async (chain: Chain, username: string, activeK
 };
 
 export const broadcastDelegation = async (chain: Chain, username: string, activeKey: string, delegatee: string, vestingShares: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
-    const op = ['delegate_vesting_shares', {
+    const op: any = ['delegate_vesting_shares', {
         delegator: username,
         delegatee: delegatee,
         vesting_shares: vestingShares
@@ -470,9 +464,14 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
 
     try {
         if (chain === Chain.HIVE) {
-            const client = new HiveClient([node]);
-            const history = await client.call('condenser_api', 'get_account_history', [username, -1, 50]);
-            return history.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
+            // Use native fetch for history in SW
+            const response = await fetch(node, {
+                method: 'POST',
+                body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 50], id: 1 }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const json = await response.json();
+            if (json.result) return json.result.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
         }
         if (chain === Chain.STEEM) {
             const client = new SteemClient(node);

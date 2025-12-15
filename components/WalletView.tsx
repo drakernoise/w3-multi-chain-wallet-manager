@@ -65,7 +65,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
           {onAddAccount && (
             <button
               onClick={onAddAccount}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg text-xs transition-colors shadow-lg"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg text-xs transition-colors shadow-lg whitespace-normal leading-tight h-auto max-w-[200px]"
             >
               {t('wallet.add_one')}
             </button>
@@ -89,8 +89,8 @@ export const WalletView: React.FC<WalletViewProps> = ({
                   />
                 </div>
 
-                <div className="flex justify-between items-start mb-4 relative z-10">
-                  <div>
+                <div className="flex flex-col mb-4 relative z-10 space-y-1">
+                  <div className="flex items-center justify-between">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2">
                       @{account.name}
                       <div className="flex gap-1">
@@ -98,25 +98,26 @@ export const WalletView: React.FC<WalletViewProps> = ({
                         {hasPosting && <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" title={t('wallet.posting_key_tooltip')}></span>}
                       </div>
                     </h3>
-                    <p className="text-xs text-slate-400 font-bold tracking-wider mt-1">{chain} COIN</p>
                   </div>
-                  <div className="text-right flex flex-col items-end">
+
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
                     {/* Primary Balance */}
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black bg-gradient-to-br from-white to-slate-400 bg-clip-text text-transparent block max-w-[140px] truncate" title={String(account.balance)}>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-bold text-slate-500 text-xs tracking-wide">{chain}</span>
+                      <span className={`w-1 h-1 rounded-full ${chain === Chain.HIVE ? 'bg-red-500' : chain === Chain.STEEM ? 'bg-blue-500' : 'bg-orange-500'}`}></span>
+                      <span className="font-bold text-white text-lg tracking-tight" title={String(account.balance)}>
                         {account.balance !== undefined ? account.balance.toFixed(3) : '0.000'}
                       </span>
-                      <span className="text-xs font-bold text-slate-500">
-                        {chain}
-                      </span>
                     </div>
+
                     {/* Secondary Balance (HBD/SBD) */}
                     {(chain === Chain.HIVE || chain === Chain.STEEM) && (
-                      <div className="flex items-baseline gap-1 mt-[-4px]">
-                        <span className="text-sm font-bold text-slate-400 block max-w-[100px] truncate" title={String(account.secondaryBalance)}>
+                      <div className="flex items-baseline gap-1.5 ml-1">
+                        <span className="text-slate-600 font-bold text-[10px]">•</span>
+                        <span className="font-bold text-slate-400 text-sm" title={String(account.secondaryBalance)}>
                           {account.secondaryBalance !== undefined ? account.secondaryBalance.toFixed(3) : '0.000'}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-600">
+                        <span className="text-[10px] font-bold text-slate-500">
                           {chain === Chain.HIVE ? 'HBD' : 'SBD'}
                         </span>
                       </div>
@@ -125,34 +126,46 @@ export const WalletView: React.FC<WalletViewProps> = ({
                 </div>
 
                 {/* Action Buttons Grid */}
-                <div className="grid grid-cols-4 gap-2 mt-4 relative z-10">
+                <div className="grid grid-cols-4 gap-2 mt-4 relative z-10 w-full">
                   <button
                     onClick={() => onSend && onSend(account)}
-                    className="bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-blue-500/50 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 group/btn"
+                    className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-blue-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                    aria-label={t('wallet.send')}
                   >
-                    <svg className="w-4 h-4 text-slate-400 group-hover/btn:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
-                    {t('wallet.send')}
+                    <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                      {t('wallet.send')}
+                    </span>
                   </button>
                   <button
                     onClick={() => onReceive && onReceive(account)}
-                    className="bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-green-500/50 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 group/btn"
+                    className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-green-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                    aria-label={t('wallet.receive')}
                   >
-                    <svg className="w-4 h-4 text-slate-400 group-hover/btn:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
-                    {t('wallet.receive')}
+                    <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-green-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                      {t('wallet.receive')}
+                    </span>
                   </button>
                   <button
                     onClick={() => onHistory && onHistory(account)}
-                    className="bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-purple-500/50 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 group/btn"
+                    className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-purple-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                    aria-label={t('wallet.history')}
                   >
-                    <svg className="w-4 h-4 text-slate-400 group-hover/btn:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {t('wallet.history')}
+                    <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-purple-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                      {t('wallet.history')}
+                    </span>
                   </button>
                   <button
                     onClick={() => onManage && onManage(account)}
-                    className="bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-orange-500/50 py-2 rounded-lg text-xs font-medium transition-all flex flex-col items-center gap-1 group/btn"
+                    className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-orange-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                    aria-label={t('wallet.keys')}
                   >
-                    <svg className="w-4 h-4 text-slate-400 group-hover/btn:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-                    {t('wallet.keys')}
+                    <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-orange-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                      {t('wallet.keys')}
+                    </span>
                   </button>
                 </div>
               </div>

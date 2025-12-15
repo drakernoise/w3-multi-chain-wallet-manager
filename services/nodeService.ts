@@ -2,11 +2,11 @@ import { Chain } from '../types';
 
 // Candidate Nodes
 export const HIVE_CANDIDATES = [
-    'https://api.deathwing.me',
     'https://api.hive.blog',
     'https://api.openhive.network',
     'https://hive-api.arcange.eu',
     'https://techcoderx.com',
+    'https://api.deathwing.me',
 ];
 
 export const STEEM_CANDIDATES = [
@@ -37,7 +37,7 @@ const checkNodeLatency = async (url: string): Promise<number> => {
     const start = Date.now();
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
         const response = await fetch(url, {
             method: 'POST',
@@ -64,7 +64,7 @@ const checkNodeLatency = async (url: string): Promise<number> => {
 };
 
 export const benchmarkNodes = async (): Promise<void> => {
-    console.log("Starting Node Benchmark...");
+    // console.log("Starting Node Benchmark...");
 
     await Promise.all([
         findBestNode(Chain.HIVE, HIVE_CANDIDATES),
@@ -72,7 +72,7 @@ export const benchmarkNodes = async (): Promise<void> => {
         findBestNode(Chain.BLURT, BLURT_CANDIDATES),
     ]);
 
-    console.log("Benchmark Complete:", activeNodes);
+    // console.log("Benchmark Complete:", activeNodes);
 };
 
 const findBestNode = async (chain: Chain, candidates: string[]) => {
@@ -89,9 +89,10 @@ const findBestNode = async (chain: Chain, candidates: string[]) => {
     const best = latencies[0];
     if (best.latency < 99999) {
         activeNodes[chain] = best.url;
-        console.log(`Best node for ${chain}: ${best.url} (${best.latency}ms)`);
+        // console.log(`Best node for ${chain}: ${best.url} (${best.latency}ms)`);
     } else {
-        console.warn(`All nodes failed for ${chain}, keeping default: ${activeNodes[chain]}`);
+        // Silently keep default if all fail to avoid user confusion
+        // console.debug(`All nodes failed for ${chain}, keeping default: ${activeNodes[chain]}`);
     }
 };
 

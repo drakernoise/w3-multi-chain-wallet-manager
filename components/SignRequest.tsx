@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../contexts/LanguageContext';
-import { Account } from '../types';
+import { Account, Chain } from '../types';
 import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation } from '../services/chainService';
 
 interface SignRequestProps {
@@ -19,12 +19,14 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
     const [error, setError] = useState('');
     const [processing, setProcessing] = useState(false);
     const [voteWeight, setVoteWeight] = useState<number>(10000);
+    const [chainHint, setChainHint] = useState<Chain | null>(null);
 
     useEffect(() => {
         chrome.runtime.sendMessage({ type: 'gravity_get_request', requestId }, (resp: any) => {
             if (resp && resp.request) {
                 setRequest(resp.request);
                 setOrigin(resp.origin || t('sign.unknown_source'));
+                if (resp.chain) setChainHint(resp.chain as Chain);
 
                 // Initialize vote weight if applicable
                 const method = resp.request.method;
@@ -32,7 +34,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     setVoteWeight(Number(resp.request.params[3]));
                 }
             } else {
-                setError("Request expired or not found");
+                setError(t('sign.expired'));
             }
             setLoading(false);
         });
@@ -74,97 +76,19 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
         try {
             const username = request.params[0];
 
-            // Smart Account Selection (Match Chain logic)
-            const detectChain = (url: string) => {
-                if (!url) return null;
-                try {
-                    // Try parsing. If fails, fallback to substring method as last resort.
-                    const parsedUrl = new URL(url.toLowerCase());
-                    const hostname = parsedUrl.hostname;
-                    // Known HIVE domains
-                    if (
-                        hostname === 'peakd.com' ||
-                        hostname.endsWith('.peakd.com') ||
-                        hostname === 'ecency.com' ||
-                        hostname.endsWith('.ecency.com') ||
-                        hostname === 'tribaldex.com' ||
-                        hostname.endsWith('.tribaldex.com') ||
-                        hostname === 'hive.blog' ||
-                        hostname.endsWith('.hive.blog')
-                    ) {
-                        return 'HIVE';
-                    }
-                    // Known BLURT domains
-                    if (
-                        hostname === 'blurt.blog' ||
-                        hostname.endsWith('.blurt.blog')
-                    ) {
-                        return 'BLURT';
-                    }
-                    // Known STEEM domains
-                    if (
-                        hostname === 'steemit.com' ||
-                        hostname.endsWith('.steemit.com')
-                    ) {
-                        return 'STEEM';
-                    }
-                    // Allow fallbacks for generic keywords in hostname only
-                    if (hostname.includes('hive')) return 'HIVE';
-                    if (hostname.includes('blurt')) return 'BLURT';
-                    if (hostname.includes('steem')) return 'STEEM';
-                } catch (_) {
-                    // Fallback: Try extracting hostname manually using regex as a last resort
-                    const u = url.toLowerCase();
-                    // Try to use regex to extract the hostname robustly
-                    const match = u.match(/^[a-z]+:\/\/([^\/?#]+)/);
-                    if (match) {
-                        const fallbackHost = match[1];
-                        if (
-                            fallbackHost === 'peakd.com' ||
-                            fallbackHost.endsWith('.peakd.com') ||
-                            fallbackHost === 'ecency.com' ||
-                            fallbackHost.endsWith('.ecency.com') ||
-                            fallbackHost === 'tribaldex.com' ||
-                            fallbackHost.endsWith('.tribaldex.com') ||
-                            fallbackHost === 'hive.blog' ||
-                            fallbackHost.endsWith('.hive.blog')
-                        ) {
-                            return 'HIVE';
-                        }
-                        if (
-                            fallbackHost === 'blurt.blog' ||
-                            fallbackHost.endsWith('.blurt.blog')
-                        ) {
-                            return 'BLURT';
-                        }
-                        if (
-                            fallbackHost === 'steemit.com' ||
-                            fallbackHost.endsWith('.steemit.com')
-                        ) {
-                            return 'STEEM';
-                        }
-                        // As an absolute last resort, allow partial matching on host only (not recommended)
-                        if (fallbackHost.includes('hive')) return 'HIVE';
-                        if (fallbackHost.includes('blurt')) return 'BLURT';
-                        if (fallbackHost.includes('steem')) return 'STEEM';
-                    }
-                    // If no host found, do not fallback to dangerous substring match -- just return null.
-                }
-                return null;
-            };
-            const targetChain = detectChain(origin);
+            // 1. Use Chain Hint from Background (Secure & Centralized)
+            let targetChain = chainHint;
+
+            // 2. Fallback: If no hint, try to match by name only (Generic)
             let account = accounts.find(a => a.name === username && (targetChain ? a.chain === targetChain : true));
 
-            // Fallback: If specific chain search failed, try finding HIVE default, or just name match
+            // 3. Last Resort: Prefer HIVE if ambiguous
+            if (!account && !targetChain) {
+                account = accounts.find(a => a.name === username && a.chain === 'HIVE');
+            }
+            // 4. Any match
             if (!account) {
-                if (targetChain) {
-                    // Maybe user has account but chain naming is different? Try name only as last resort
-                    account = accounts.find(a => a.name === username);
-                } else {
-                    // Prefer HIVE if ambiguous
-                    account = accounts.find(a => a.name === username && a.chain === 'HIVE');
-                    if (!account) account = accounts.find(a => a.name === username);
-                }
+                account = accounts.find(a => a.name === username);
             }
 
             if (!account) {
@@ -185,6 +109,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             const isPowerUp = method === 'requestPowerUp' || method === 'powerUp';
             const isPowerDown = method === 'requestPowerDown' || method === 'powerDown';
             const isDelegation = method === 'requestDelegation' || method === 'delegation';
+            const isPost = method === 'requestPost' || method === 'post';
 
             // Check Key Requirement properly
             const needsActive = isTransfer || isPowerUp || isPowerDown || isDelegation ||
@@ -192,7 +117,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 (isCustomJson && request.params[2] === 'Active');
 
             if (needsActive && !account.activeKey) {
-                throw new Error(t('sign.active_key_missing') || "Active Key missing");
+                throw new Error(t('sign.active_missing'));
             }
 
             if (isTransfer) {
@@ -224,7 +149,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 let key = account.postingKey;
                 if (type === 'Active') key = account.activeKey;
 
-                if (!key) throw new Error(`${type} key missing for this account`);
+                if (!key) throw new Error(t('sign.key_missing_type').replace('{type}', type));
 
                 const response = await broadcastCustomJson(account.chain, account.name, key!, id, typeof json === 'string' ? json : JSON.stringify(json), type as any);
                 if (!response.success) throw new Error(response.error);
@@ -239,7 +164,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 else if (type === 'Active') keyStr = account.activeKey || "";
                 else if (type === 'Memo') keyStr = account.memoKey || "";
 
-                if (!keyStr) throw new Error(`${type} key missing`);
+                if (!keyStr) throw new Error(t('sign.key_missing_generic').replace('{type}', type));
 
                 const response = signMessage(account.chain, message, keyStr);
 
@@ -257,7 +182,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // If Posting requested but missing, try Active
                 if (!key && account.activeKey) key = account.activeKey;
 
-                if (!key) throw new Error(`${keyType || 'Posting'} key missing for this account`);
+                if (!key) throw new Error(t('sign.key_missing_type').replace('{type}', keyType || 'Posting'));
 
                 const response = await broadcastOperations(account.chain, key, operations);
                 if (!response.success) throw new Error(response.error);
@@ -298,7 +223,33 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 if (!response.success) throw new Error(response.error);
                 const finalResult = response.opResult || response.txId;
                 result = { result: finalResult, message: t('sign.success'), ...response };
+
+            } else if (isPost) {
+                const title = request.params[1];
+                const body = request.params[2];
+                const parentPermlink = request.params[3];
+                const parentAuthor = request.params[4];
+                const jsonMetadata = request.params[5];
+                const permlink = request.params[6];
+                // comment_options might be at index 7? check if needed.
+
+                // Construct comment operation
+                const op = ['comment', {
+                    parent_author: parentAuthor,
+                    parent_permlink: parentPermlink,
+                    author: username,
+                    permlink: permlink,
+                    title: title,
+                    body: body,
+                    json_metadata: typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata)
+                }];
+
+                const response = await broadcastOperations(account.chain, account.postingKey || account.activeKey!, [op]);
+                if (!response.success) throw new Error(response.error);
+                // Match Hive Keychain format exactly: only success and result (opResult object)
+                result = { success: true, result: response.opResult || response.txId };
             }
+
 
             notifyBackground(result, null);
 
@@ -326,8 +277,10 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             requestId,
             result,
             error: err
+        }, () => {
+            if (chrome.runtime.lastError) console.error("Gravity: Failed to resolve request", chrome.runtime.lastError);
+            onComplete();
         });
-        onComplete();
     };
 
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">{t('sign.loading')}</div>;
@@ -338,6 +291,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
     const isVote = method === 'requestVote' || method === 'vote';
     const isCustomJson = method === 'requestCustomJson' || method === 'customJSON';
     const isSignBuffer = method === 'requestSignBuffer' || method === 'signBuffer';
+    const isPost = method === 'requestPost' || method === 'post';
     const isFile = origin === 'file' || origin.startsWith('file://');
     const domain = isFile ? t('sign.local_file') : (origin.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/im) || [null, origin])[1];
 
@@ -458,23 +412,51 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     </div>
                 ) : isSignBuffer ? (
                     <div className="w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down">
-                        <h3 className="text-xs uppercase tracking-widest text-slate-500 mb-4 text-center">{t('sign.sign_buffer_title') || "Sign Message"}</h3>
+                        <h3 className="text-xs uppercase tracking-widest text-slate-500 mb-4 text-center">{t('sign.buffer_title')}</h3>
 
                         <div className="space-y-4">
                             <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
-                                <p className="text-xs text-slate-500 mb-2 uppercase">Message</p>
+                                <p className="text-xs text-slate-500 mb-2 uppercase">{t('sign.message_label')}</p>
                                 <div className="max-h-32 overflow-y-auto custom-scrollbar">
                                     <p className="text-sm text-slate-300 font-mono break-all">{request.params[1]}</p>
                                 </div>
                             </div>
 
                             <div className="flex justify-between items-center text-xs text-slate-500 pt-2">
-                                <span>{t('sign.key_type') || "Key"}</span>
+                                <span>{t('sign.key_type')}</span>
                                 <span className="text-blue-400 font-bold">{request.params[2]}</span>
                             </div>
 
                             <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700">
                                 <span>{t('sign.from')}</span>
+                                <span className="text-white font-bold">@{request.params[0]}</span>
+                            </div>
+                        </div>
+                    </div>
+                ) : isPost ? (
+                    <div className="w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down">
+                        <h3 className="text-xs uppercase tracking-widest text-slate-500 mb-4 text-center">{t('sign.post_title') || "POST / COMMENT"}</h3>
+
+                        <div className="space-y-4">
+                            {/* Title if valid */}
+                            {request.params[1] && (
+                                <div>
+                                    <p className="text-[10px] uppercase text-slate-500 mb-1">Title</p>
+                                    <p className="text-sm font-bold text-white">{request.params[1]}</p>
+                                </div>
+                            )}
+
+                            <div>
+                                <p className="text-[10px] uppercase text-slate-500 mb-1">Content</p>
+                                <div className="bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-40 overflow-y-auto custom-scrollbar">
+                                    <p className="text-xs text-slate-300 whitespace-pre-wrap font-mono">
+                                        {request.params[2]}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700">
+                                <span>{t('sign.author')}</span>
                                 <span className="text-white font-bold">@{request.params[0]}</span>
                             </div>
                         </div>
@@ -524,14 +506,14 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 <div className="flex gap-4 max-w-xs mx-auto">
                     <button
                         onClick={() => handleDecision(false)}
-                        className="flex-1 py-3 rounded-lg font-bold text-slate-400 hover:text-white hover:bg-dark-700 transition-colors"
+                        className="flex-1 py-3 px-2 h-auto min-h-[48px] rounded-lg font-bold text-slate-400 hover:text-white hover:bg-dark-700 transition-colors whitespace-normal leading-tight"
                     >
                         {t('sign.reject')}
                     </button>
                     <button
                         onClick={() => handleDecision(true)}
                         disabled={processing}
-                        className="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-900/20 transition-all transform hover:scale-[1.02]"
+                        className="flex-1 py-3 px-2 h-auto min-h-[48px] rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-900/20 transition-all transform hover:scale-[1.02] whitespace-normal leading-tight"
                     >
                         {processing ? t('sign.signing') : t('sign.confirm')}
                     </button>

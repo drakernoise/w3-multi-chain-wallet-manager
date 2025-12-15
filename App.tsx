@@ -14,6 +14,7 @@ import { TransferModal } from './components/TransferModal';
 import { ReceiveModal } from './components/ReceiveModal';
 import { HistoryModal } from './components/HistoryModal';
 import { SignRequest } from './components/SignRequest';
+import { HelpView } from './components/HelpView';
 import { NotificationToast } from './components/NotificationToast'; // Added
 import { detectWeb3Context, getAccountBalance, broadcastTransfer } from './services/chainService';
 import { saveVault, getVault, clearCryptoCache, tryRestoreSession } from './services/cryptoService';
@@ -280,10 +281,10 @@ function AppContent() {
 
   useEffect(() => {
     const isDetachedMode = typeof window !== 'undefined' && window.location.search.includes('detached=true');
-    const TARGET_WIDTH = 360;
-    const TARGET_HEIGHT = 700;
-    const OUTER_WIDTH = 376;
-    const OUTER_HEIGHT = 739;
+    const TARGET_WIDTH = 400;
+    const TARGET_HEIGHT = 600;
+    const OUTER_WIDTH = 416;
+    const OUTER_HEIGHT = 639;
 
     if (isDetachedMode) {
       setIsDetached(true);
@@ -293,7 +294,7 @@ function AppContent() {
 
       let animationFrameId: number;
       const lockSize = () => {
-        if (window.innerWidth <= 380 && window.innerHeight <= 750 && window.innerWidth >= 350) {
+        if (window.innerWidth <= 420 && window.innerHeight <= 650 && window.innerWidth >= 390) {
           animationFrameId = requestAnimationFrame(lockSize);
           return;
         }
@@ -308,7 +309,7 @@ function AppContent() {
 
         if (typeof chrome !== 'undefined' && chrome.windows) {
           chrome.windows.getCurrent((win: any) => {
-            if (win.state === 'maximized' || win.width > 400 || win.height > 800) {
+            if (win.state === 'maximized' || win.width > 450 || win.height > 700) {
               chrome.windows.update(win.id, {
                 state: 'normal',
                 width: OUTER_WIDTH,
@@ -343,8 +344,8 @@ function AppContent() {
     if (isDetached) {
       window.close();
     } else {
-      const width = 376;
-      const height = 739;
+      const width = 416;
+      const height = 639;
       const left = Math.round((window.screen.width / 2) - (width / 2));
       const top = Math.round((window.screen.height / 2) - (height / 2));
 
@@ -429,6 +430,8 @@ function AppContent() {
               <h1 className="font-bold tracking-wider text-sm">{t('sidebar.home').toUpperCase()}</h1>
             ) : currentView === ViewState.MANAGE ? (
               <h1 className="font-bold tracking-wider text-sm text-slate-200">{t('settings.title').toUpperCase()}</h1>
+            ) : currentView === ViewState.HELP ? (
+              <h1 className="font-bold tracking-wider text-sm text-slate-200">{t('help.title').toUpperCase()}</h1>
             ) : (
               <>
                 <img
@@ -496,11 +499,16 @@ function AppContent() {
               accounts={walletState.accounts.filter(a => a.chain === activeChain)}
               refreshBalance={fetchBalances}
               onChangeChain={setActiveChain}
+              onAddAccount={() => setShowImport(true)}
             />
           )}
 
           {currentView === ViewState.MULTISIG && (
             <MultiSig chain={activeChain} accounts={walletState.accounts} />
+          )}
+
+          {currentView === ViewState.HELP && (
+            <HelpView />
           )}
         </div>
       </main>
@@ -528,6 +536,7 @@ function AppContent() {
           onClose={() => setTransferAccount(null)}
           accounts={walletState.accounts}
           onTransfer={handleTransfer}
+          disableAccountSelection={true}
         />
       )}
 

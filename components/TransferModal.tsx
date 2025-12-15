@@ -7,11 +7,12 @@ interface TransferModalProps {
     accounts: Account[]; // All accounts to allow switching
     onClose: () => void;
     onTransfer: (from: Account, to: string, amount: string, memo: string, symbol?: string) => Promise<void>;
+    disableAccountSelection?: boolean;
 }
 
 import { fetchAccountData } from '../services/chainService';
 
-export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAccount, accounts, onClose, onTransfer }) => {
+export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAccount, accounts, onClose, onTransfer, disableAccountSelection }) => {
     const { t } = useTranslation();
     // Allow switching sending account
     const [selectedAccount, setSelectedAccount] = useState<Account>(initialAccount);
@@ -123,7 +124,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                         <div>
                             <span className="text-xs text-slate-500 uppercase font-bold block mb-1">{t('bulk.memo')}</span>
                             <div className="text-xs text-slate-300 italic bg-dark-900 p-2 rounded break-all max-h-20 overflow-y-auto">
-                                {memo || "No Memo"}
+                                {memo || t('transfer.no_memo')}
                             </div>
                         </div>
                     </div>
@@ -152,6 +153,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
     // Input Step handles... (rest of the component)
 
 
+    // Input Step
     return (
         <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
             <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col">
@@ -161,31 +163,37 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                     </h2>
                     <button onClick={onClose} className="text-slate-500 hover:text-white">✕</button>
                 </div>
-                {/* ... fields ... */}
 
                 <div className="space-y-4 mb-6">
                     <div className="p-3 bg-dark-900 rounded-lg border border-dark-700">
                         <label className="text-xs text-slate-500 block mb-1">{t('sign.from')}</label>
-                        <select
-                            value={`${selectedAccount.chain}-${selectedAccount.name}`}
-                            onChange={(e) => {
-                                const [c, n] = e.target.value.split('-');
-                                const acc = accounts.find(a => a.chain === c && a.name === n);
-                                if (acc) setSelectedAccount(acc);
-                            }}
-                            className="w-full bg-dark-800 text-white border border-dark-600 rounded p-2 text-sm outline-none focus:border-blue-500"
-                        >
-                            {accounts.map(a => (
-                                <option key={`${a.chain}-${a.name}`} value={`${a.chain}-${a.name}`}>
-                                    @{a.name} ({a.chain})
-                                </option>
-                            ))}
-                        </select>
+                        {disableAccountSelection ? (
+                            <div className="w-full bg-dark-800 text-slate-400 border border-dark-600 rounded p-2 text-sm font-bold flex items-center gap-2 cursor-not-allowed">
+                                <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                                @{selectedAccount.name}
+                            </div>
+                        ) : (
+                            <select
+                                value={`${selectedAccount.chain}-${selectedAccount.name}`}
+                                onChange={(e) => {
+                                    const [c, n] = e.target.value.split('-');
+                                    const acc = accounts.find(a => a.chain === c && a.name === n);
+                                    if (acc) setSelectedAccount(acc);
+                                }}
+                                className="w-full bg-dark-800 text-white border border-dark-600 rounded p-2 text-sm outline-none focus:border-blue-500"
+                            >
+                                {accounts.map(a => (
+                                    <option key={`${a.chain}-${a.name}`} value={`${a.chain}-${a.name}`}>
+                                        @{a.name} ({a.chain})
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     {!hasActiveKey && (
                         <div className="bg-red-900/20 text-red-400 p-2 rounded text-xs text-center border border-red-500/30">
-                            {t('sign.keys_missing')} {/* Or specific Active Key message */}
+                            {t('sign.keys_missing')}
                         </div>
                     )}
 
@@ -199,7 +207,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                             <input
                                 value={to}
                                 onChange={(e) => {
-                                    // Sanitize: lowercase, remove spaces, remove invisible chars, remove @
                                     const val = e.target.value.toLowerCase().replace(/[@\s\u200B-\u200D\uFEFF]/g, '');
                                     setTo(val);
                                 }}
@@ -265,7 +272,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                     </div>
 
                     <div>
-                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">{t('bulk.memo')} (Optional)</label>
+                        <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">{t('bulk.memo')} {t('transfer.optional')}</label>
                         <input
                             value={memo}
                             onChange={(e) => setMemo(e.target.value)}
@@ -284,7 +291,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                 <button
                     onClick={handleReview}
                     disabled={isSending || !to || !amount || !hasActiveKey}
-                    className="w-full py-3 rounded-lg font-bold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                    className="w-full py-3 h-auto min-h-[48px] rounded-lg font-bold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 whitespace-normal leading-tight"
                 >
                     {isSending ? (
                         <>

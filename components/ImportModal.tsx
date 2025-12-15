@@ -61,7 +61,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onClose, onImport, ini
       setChainData(data);
     } else {
       setChainData(null);
-      setUsernameError(`Account not found on ${selectedChain}`);
+      setUsernameError(t('import.not_found').replace('{chain}', selectedChain));
     }
   };
 
@@ -70,7 +70,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onClose, onImport, ini
 
     // 1. Username Validation
     if (usernameError || !chainData) {
-      setGeneralError("Please enter a valid, existing username.");
+      setGeneralError(t('import.error_username'));
       return;
     }
 
@@ -80,13 +80,13 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onClose, onImport, ini
     const memoErr = validatePrivateKey(memoKey);
 
     if (postingErr || activeErr || memoErr) {
-      setGeneralError("One or more keys have an invalid format.");
+      setGeneralError(t('import.error_format'));
       return;
     }
 
     // 3. Requirement Check
     if (!postingKey && !activeKey && !memoKey) {
-      setGeneralError("You must provide at least one private key.");
+      setGeneralError(t('import.error_missing_key'));
       return;
     }
 
@@ -96,7 +96,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onClose, onImport, ini
     if (postingKey) {
       const isValid = await verifyKeyAgainstChain(selectedChain, username, postingKey, 'posting');
       if (!isValid) {
-        setGeneralError("Posting Key does not match the account on chain.");
+        setGeneralError(t('import.match_error_posting'));
         setIsSaving(false);
         return;
       }
@@ -105,7 +105,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onClose, onImport, ini
     if (activeKey) {
       const isValid = await verifyKeyAgainstChain(selectedChain, username, activeKey, 'active');
       if (!isValid) {
-        setGeneralError("Active Key does not match the account on chain.");
+        setGeneralError(t('import.match_error_active'));
         setIsSaving(false);
         return;
       }
@@ -114,7 +114,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onClose, onImport, ini
     if (memoKey) {
       const isValid = await verifyKeyAgainstChain(selectedChain, username, memoKey, 'memo');
       if (!isValid) {
-        setGeneralError("Memo Key does not match the account on chain.");
+        setGeneralError(t('import.match_error_memo'));
         setIsSaving(false);
         return;
       }

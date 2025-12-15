@@ -42,7 +42,7 @@
         "<all_urls>"
       ],
       "js": [
-        "provider_raw.js"
+        "assets/provider.js"
       ],
       "run_at": "document_start",
       "world": "MAIN"

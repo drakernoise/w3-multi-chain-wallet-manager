@@ -1,7 +1,6 @@
 (function () {
-    // IMPORTANT: Set this to the exact origin your app is served from
-    // e.g. 'https://example.com'
-    const TRUSTED_ORIGIN = 'https://example.com';
+    // Use current origin to allow all dApps to communicate
+    const TRUSTED_ORIGIN = window.location.origin;
     console.log('Gravity: Initializing native provider (Clean JS)...');
 
     class GravityProvider {

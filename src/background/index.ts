@@ -71,11 +71,15 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                 console.log('Gravity: Auto-signed request from whitelist');
                 sendResponse(autoResult);
             } else {
+                const chainHint = detectChainFromUrl(sender.url || sender.tab?.url);
+
                 // Store request consistently in Session Storage (Persists across SW sleep)
                 const reqData = {
                     data: request,
                     tabId: sender.tab?.id,
-                    origin: sender.origin || sender.url
+                    frameId: sender.frameId,
+                    origin: sender.origin || sender.url,
+                    chain: chainHint
                 };
 
                 chrome.storage.session.set({ [`req_${requestId}`]: reqData }, () => {
@@ -95,7 +99,8 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
             const req = res[`req_${requestId}`];
             sendResponse({
                 request: req ? req.data : null,
-                origin: req ? req.origin : null
+                origin: req ? req.origin : null,
+                chain: req ? req.chain : null
             });
         });
         return true; // Async response
@@ -108,11 +113,21 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         chrome.storage.session.get([`req_${requestId}`]).then((res: any) => {
             const pending = res[`req_${requestId}`];
             if (pending) {
+                const targetOptions: any = {};
+                if (typeof pending.frameId !== 'undefined') targetOptions.frameId = pending.frameId;
+
+                // Clean result construction:
+                // If 'result' input is an object containing { result: "txid", opResult: {...} }, use it directly.
+                // Otherwise wrap it.
+                // However, 'SignRequest' sends the FULL object as 'result'.
+                // Ideally, we want response to be: { success: true, result: "txid", message: "...", opResult: {...} }
+                const payload = error ? { success: false, error } : { success: true, ...result };
+
                 chrome.tabs.sendMessage(pending.tabId, {
                     type: 'gravity_response',
                     id: requestId, // Use the original ID
-                    response: error ? { success: false, error } : { success: true, result, ...result }
-                });
+                    response: payload
+                }, targetOptions);
                 // Cleanup
                 chrome.storage.session.remove([`req_${requestId}`]);
             }
@@ -187,6 +202,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const isPowerUp = method === 'requestPowerUp' || method === 'powerUp';
         const isPowerDown = method === 'requestPowerDown' || method === 'powerDown';
         const isDelegation = method === 'requestDelegation' || method === 'delegation';
+        const isPost = method === 'requestPost' || method === 'post';
 
         let response: any;
 
@@ -245,6 +261,26 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             else keyStr = account.activeKey || "";
             if (!keyStr) return null;
             response = await broadcastOperations(account.chain, keyStr, operations);
+
+        } else if (isPost) {
+            const title = request.params[1];
+            const body = request.params[2];
+            const parentPermlink = request.params[3];
+            const parentAuthor = request.params[4];
+            const jsonMetadata = request.params[5];
+            const permlink = request.params[6];
+            const op = ['comment', {
+                parent_author: parentAuthor,
+                parent_permlink: parentPermlink,
+                author: username,
+                permlink: permlink,
+                title: title,
+                body: body,
+                json_metadata: typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata)
+            }];
+            const key = account.postingKey || account.activeKey;
+            if (!key) return null;
+            response = await broadcastOperations(account.chain, key, [op]);
 
         } else if (isPowerUp) {
             // console.log("Gravity Debug: Processing PowerUp...");
