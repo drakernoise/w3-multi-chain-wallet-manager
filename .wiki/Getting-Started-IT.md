@@ -101,21 +101,48 @@
 
 ## Usare con le dApp
 
-### Connessione a PeakD
+Gravity Wallet è compatibile con **tutti i frontend** che supportano l'API Hive Keychain sulle blockchain Blurt, Hive e Steem.
 
-1. **Navigare su PeakD**: Vai su [peakd.com](https://peakd.com)
-2. **Cliccare su Accedi**: Seleziona l'opzione "Hive Keychain"
+### Frontend Blurt
+
+1. **Navigare su qualsiasi frontend Blurt**:
+   - [blurt.blog](https://blurt.blog) - Frontend ufficiale di Blurt
+   - [blurt.world](https://blurt.world) - Frontend della comunità
+   - [blurt.one](https://blurt.one) - Frontend alternativo
+
+2. **Cliccare su Accedi**: Seleziona l'opzione "Hive Keychain" o "Keychain"
 3. **Gravity Wallet si Attiva**: Apparirà un popup
 4. **Approvare la Connessione**: Clicca su "Approva" per connetterti
 5. **Iniziare a Usare**: Ora puoi postare, votare e commentare
 
-### Connessione ad Altre dApp
+### Frontend Hive
 
-Gravity Wallet è compatibile con qualsiasi dApp che supporti l'API Hive Keychain:
-- **Ecency**: Piattaforma di blogging sociale
-- **Tribaldex**: Scambio di token
-- **Splinterlands**: Gaming
+Compatibile con tutte le principali dApp di Hive:
+- **[PeakD](https://peakd.com)**: Piattaforma di blogging completa
+- **[Ecency](https://ecency.com)**: Piattaforma sociale ottimizzata per mobile
+- **[Hive.blog](https://hive.blog)**: Frontend ufficiale di Hive
+- **[LeoFinance](https://leofinance.io)**: Comunità focalizzata sulla finanza
+- **[Tribaldex](https://tribaldex.com)**: Piattaforma di scambio token
+- **[Splinterlands](https://splinterlands.com)**: Gioco di carte collezionabili
 - **E molte altre!**
+
+### Frontend Steem
+
+Funziona perfettamente con le piattaforme Steem:
+- **[Steemit](https://steemit.com)**: Frontend ufficiale di Steem
+- **[SteemPeak](https://steempeak.com)**: Piattaforma della comunità
+- **[Busy](https://busy.org)**: Interfaccia alternativa di Steem
+
+### Come Funziona
+
+Gravity Wallet emula l'**API Hive Keychain**, rendendolo compatibile con qualsiasi dApp che supporti Keychain. Quando una dApp richiede un'azione:
+
+1. **Rilevamento Automatico**: La dApp rileva Gravity Wallet come Keychain
+2. **Popup Appare**: Vedi i dettagli della richiesta
+3. **Rivedere e Approvare**: Verifica l'operazione e approva
+4. **Trasmissione Transazione**: Gravity Wallet firma e trasmette alla blockchain corretta
+
+**Nota**: Verifica sempre di essere sulla blockchain corretta prima di approvare le transazioni!
 
 ## Migliori Pratiche di Sicurezza
 

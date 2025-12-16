@@ -101,21 +101,48 @@
 
 ## Using with dApps
 
-### Connecting to PeakD
+Gravity Wallet is compatible with **all frontends** that support Hive Keychain API across Blurt, Hive, and Steem blockchains.
 
-1. **Navigate to PeakD**: Go to [peakd.com](https://peakd.com)
-2. **Click Login**: Select "Hive Keychain" option
+### Blurt Frontends
+
+1. **Navigate to any Blurt frontend**:
+   - [blurt.blog](https://blurt.blog) - Official Blurt frontend
+   - [blurt.world](https://blurt.world) - Community frontend
+   - [blurt.one](https://blurt.one) - Alternative frontend
+
+2. **Click Login**: Select "Hive Keychain" or "Keychain" option
 3. **Gravity Wallet Activates**: A popup will appear
 4. **Approve Connection**: Click "Approve" to connect
 5. **Start Using**: You can now post, vote, and comment
 
-### Connecting to Other dApps
+### Hive Frontends
 
-Gravity Wallet is compatible with any dApp that supports Hive Keychain API:
-- **Ecency**: Social blogging platform
-- **Tribaldex**: Token trading
-- **Splinterlands**: Gaming
+Compatible with all major Hive dApps:
+- **[PeakD](https://peakd.com)**: Full-featured blogging platform
+- **[Ecency](https://ecency.com)**: Mobile-friendly social platform
+- **[Hive.blog](https://hive.blog)**: Official Hive frontend
+- **[LeoFinance](https://leofinance.io)**: Finance-focused community
+- **[Tribaldex](https://tribaldex.com)**: Token trading platform
+- **[Splinterlands](https://splinterlands.com)**: Trading card game
 - **And many more!**
+
+### Steem Frontends
+
+Works seamlessly with Steem platforms:
+- **[Steemit](https://steemit.com)**: Official Steem frontend
+- **[SteemPeak](https://steempeak.com)**: Community platform
+- **[Busy](https://busy.org)**: Alternative Steem interface
+
+### How It Works
+
+Gravity Wallet emulates the **Hive Keychain API**, making it compatible with any dApp that supports Keychain. When a dApp requests an action:
+
+1. **Automatic Detection**: dApp detects Gravity Wallet as Keychain
+2. **Popup Appears**: You see the request details
+3. **Review & Approve**: Check the operation and approve
+4. **Transaction Broadcast**: Gravity Wallet signs and broadcasts to the correct blockchain
+
+**Note**: Always verify you're on the correct blockchain before approving transactions!
 
 ## Security Best Practices
 
