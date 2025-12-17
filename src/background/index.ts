@@ -1,6 +1,8 @@
+// Polyfill for libs expecting 'exports'
+(self as any).exports = {};
 
-// Background Worker
 import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation } from '../../services/chainService';
+import { getChainConfig, isChainSupported } from '../../config/chainConfig';
 
 declare var chrome: any;
 
@@ -9,24 +11,29 @@ function detectChainFromUrl(url: string = ""): string | null {
     try {
         const u = new URL(url);
         const host = u.hostname.toLowerCase();
-        // HIVE list - customize as needed
+
+        // Use configuration for detection if possible, or keep simple heuristics for now
+        // HIVE
         const hiveHosts = ['peakd.com', 'ecency.com', 'tribaldex.com'];
         if (
             hiveHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
             host.includes('hive')
         ) return 'HIVE';
-        // BLURT list - customize as needed
-        const blurtHosts = ['blurt.blog'];
+
+        // BLURT
+        const blurtHosts = ['blurt.blog', 'blurtwallet.com'];
         if (
             blurtHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
             host.includes('blurt')
         ) return 'BLURT';
-        // STEEM list - customize as needed
+
+        // STEEM
         const steemHosts = ['steemit.com'];
         if (
             steemHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
             host.includes('steem')
         ) return 'STEEM';
+
         return null;
     } catch (e) {
         return null;
@@ -35,7 +42,8 @@ function detectChainFromUrl(url: string = ""): string | null {
 
 // Listen for messages from Content Script or Popup
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
-    // console.log("Gravity Debug: MESSAGE RECEIVED", request.type, request.method); // Disabled for production
+    // console.log("Gravity Debug: MESSAGE RECEIVED", request.type, request.method); // Debug only
+    // console.log("Gravity: MSG", request.type, request.method); // Debug only
 
     // 1. Request from Web Page (via Content Script)
     if (request.type === 'gravity_request') {
@@ -123,6 +131,8 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                 // Ideally, we want response to be: { success: true, result: "txid", message: "...", opResult: {...} }
                 const payload = error ? { success: false, error } : { success: true, ...result };
 
+                // console.log('Gravity: Sending response to dApp:', payload); // Debug only
+
                 chrome.tabs.sendMessage(pending.tabId, {
                     type: 'gravity_response',
                     id: requestId, // Use the original ID
@@ -140,6 +150,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
 
 
 async function tryAutoSign(request: any, sender: any): Promise<any | null> {
+    // console.log('Gravity: tryAutoSign called for method:', request.method, 'from:', sender.origin); // Debug only
     try {
         // 1. Get Whitelist
         const local = await chrome.storage.local.get(['gravity_whitelist']);
@@ -203,6 +214,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const isPowerDown = method === 'requestPowerDown' || method === 'powerDown';
         const isDelegation = method === 'requestDelegation' || method === 'delegation';
         const isPost = method === 'requestPost' || method === 'post';
+        const isSignedCall = method === 'requestSignedCall' || method === 'signedCall';
 
         let response: any;
 
@@ -210,7 +222,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             const to = request.params[1];
             const amount = request.params[2];
             const memo = request.params[3] || '';
-            if (!account.activeKey) return null;
+            if (!account.activeKey) return { success: false, error: 'Active key required for transfer' };
             response = await broadcastTransfer(account.chain, account.name, account.activeKey, to, amount, memo);
 
         } else if (isVote) {
@@ -218,7 +230,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             const author = request.params[2];
             const weight = Number(request.params[3]);
             const key = account.postingKey || account.activeKey;
-            if (!key) return null;
+            if (!key) return { success: false, error: 'Posting or Active key required for voting' };
             response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
 
         } else if (isCustomJson) {
@@ -227,7 +239,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             const json = request.params[3];
             let key = account.postingKey;
             if (type === 'Active') key = account.activeKey;
-            if (!key) return null;
+            if (!key) return { success: false, error: 'Key required for custom JSON operation' };
             response = await broadcastCustomJson(account.chain, account.name, key, id, typeof json === 'string' ? json : JSON.stringify(json), type as any);
 
         } else if (isSignBuffer) {
@@ -237,7 +249,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             if (type === 'Posting') keyStr = account.postingKey || "";
             else if (type === 'Active') keyStr = account.activeKey || "";
             else if (type === 'Memo') keyStr = account.memoKey || "";
-            if (!keyStr) return null;
+            if (!keyStr) return { success: false, error: 'Key required for signing' };
             // Use requested chain (e.g. Hive) if DApp specified it, to ensure correct signature format (STM vs BLT)
             // Fallback: Detect from URL if hint is missing (e.g. older provider cached)
             const url = sender?.tab?.url || sender?.url || "";
@@ -255,31 +267,137 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             let operations = request.params[1];
             const keyType = request.params[2];
             if (operations && !Array.isArray(operations) && operations.operations) operations = operations.operations;
+
+            // Critical Fix for Steemit: Sanitize 'comment' operations in generic broadcast
+            // Create CLEAN objects to avoid __config and other non-serializable junk
+            try {
+                if (operations && Array.isArray(operations)) {
+                    operations = operations.map((op: any) => {
+                        if (Array.isArray(op) && op[0] === 'comment' && op[1]) {
+                            const payload = op[1];
+
+                            let parentPermlink = payload.parent_permlink;
+
+                            // CRITICAL: Steemit sends 'category' instead of 'parent_permlink' for root posts
+                            if (!parentPermlink && !payload.parent_author) {
+                                console.warn('Gravity: Sanitizing generic broadcast comment - missing parent_permlink');
+
+                                // Strategy 1: Use 'category' field if present (Steemit-specific)
+                                if (payload.category) {
+                                    parentPermlink = payload.category;
+                                    console.log('Gravity: Using category as parent_permlink:', payload.category);
+                                }
+
+                                // Strategy 2: Try to recover from json_metadata tags
+                                if (!parentPermlink && payload.json_metadata) {
+                                    try {
+                                        const meta = typeof payload.json_metadata === 'string' ? JSON.parse(payload.json_metadata) : payload.json_metadata;
+                                        if (meta.tags && meta.tags[0]) {
+                                            parentPermlink = meta.tags[0];
+                                            console.log('Gravity: Recovered parent_permlink from tags:', meta.tags[0]);
+                                        }
+                                    } catch (e) { }
+                                }
+
+                                // Strategy 3: Last resort fallback
+                                if (!parentPermlink) {
+                                    parentPermlink = 'general';
+                                    console.warn('Gravity: Using fallback "general" for parent_permlink');
+                                }
+                            }
+
+                            // Create CLEAN object with ONLY the fields we need
+                            const cleanPayload = {
+                                parent_author: payload.parent_author || '',
+                                parent_permlink: parentPermlink || 'general',
+                                author: payload.author || '',
+                                permlink: payload.permlink || '',
+                                title: payload.title || '',
+                                body: payload.body || '',
+                                json_metadata: payload.json_metadata || '{}'
+                            };
+
+                            return ['comment', cleanPayload];
+                        }
+                        return op;
+                    });
+                }
+            } catch (err) {
+                console.warn('Gravity: Error during operation sanitization (non-fatal)', err);
+            }
+
             let keyStr = "";
             if (keyType === 'Posting') keyStr = account.postingKey || "";
             else if (keyType === 'Active') keyStr = account.activeKey || "";
             else keyStr = account.activeKey || "";
-            if (!keyStr) return null;
+            if (!keyStr) return { success: false, error: 'Key required for broadcast operation' };
             response = await broadcastOperations(account.chain, keyStr, operations);
 
         } else if (isPost) {
             const title = request.params[1];
             const body = request.params[2];
-            const parentPermlink = request.params[3];
+            let parentPermlink = request.params[3];
             const parentAuthor = request.params[4];
-            const jsonMetadata = request.params[5];
+            let jsonMetadata = request.params[5];
             const permlink = request.params[6];
+
+            console.log('Gravity: requestPost params:', { title, parentPermlink, parentAuthor, jsonMetadata, permlink });
+
+            // Ensure json_metadata is a string for the operation
+            const jsonMetadataStr = typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata);
+
+            // POST RECOVERY LOGIC
+            // Critical for Steem: parent_permlink must be a string (tag or slug)
+            if (!parentPermlink) {
+                console.warn('Gravity: parent_permlink is missing. Attempting recovery...');
+
+                // Strategy 1: Check if Steemit sent 'category' field (common in their API)
+                if ((request.params as any).category) {
+                    parentPermlink = (request.params as any).category;
+                    console.log('Gravity: Recovered parent_permlink from category field:', parentPermlink);
+                }
+
+                // Strategy 2: Extract from tags in metadata
+                if (!parentPermlink) {
+                    try {
+                        const metadata = typeof jsonMetadata === 'string' ? JSON.parse(jsonMetadata) : jsonMetadata;
+                        if (metadata && metadata.tags && Array.isArray(metadata.tags) && metadata.tags.length > 0) {
+                            parentPermlink = metadata.tags[0];
+                            console.log('Gravity: Recovered parent_permlink from tags:', parentPermlink);
+                        }
+                    } catch (e) {
+                        console.warn('Gravity: Failed to parse metadata params for recovery:', e);
+                    }
+                }
+
+                // Strategy 3: If still missing and it's a root post (no parentAuthor), default to 'general'
+                if (!parentPermlink && !parentAuthor) {
+                    parentPermlink = 'general'; // Last resort fallback to avoid crash
+                    console.warn('Gravity: Using fallback "general" for parent_permlink');
+                }
+            }
+
+            // Final sanity check
+            if (!parentPermlink) {
+                console.error('Gravity: Critical - parent_permlink is still null/undefined. Operation will fail.');
+                return { success: false, error: 'Missing parent_permlink (category/tag)' };
+            }
+
+            // Sanitize ALL fields to ensure none are null/undefined (serializer crashes on null)
             const op = ['comment', {
-                parent_author: parentAuthor,
-                parent_permlink: parentPermlink,
-                author: username,
-                permlink: permlink,
-                title: title,
-                body: body,
-                json_metadata: typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata)
+                parent_author: parentAuthor || '',
+                parent_permlink: parentPermlink || 'general',
+                author: username || '',
+                permlink: permlink || '',
+                title: title || '',
+                body: body || '',
+                json_metadata: jsonMetadataStr || '{}'
             }];
+
             const key = account.postingKey || account.activeKey;
-            if (!key) return null;
+            if (!key) return { success: false, error: 'Posting or Active key required for posting' };
+
+            console.log('Gravity: Broadcasting post op:', op);
             response = await broadcastOperations(account.chain, key, [op]);
 
         } else if (isPowerUp) {
@@ -289,9 +407,10 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             const to = rawTo.replace(/^@/, '');
 
             let amount = request.params[2];
-            // Normalize amount
+            // Normalize amount using chain configuration
             if (amount && !amount.includes(' ')) {
-                const symbol = account.chain === 'HIVE' ? 'HIVE' : account.chain === 'STEEM' ? 'STEEM' : 'BLURT';
+                const config = isChainSupported(account.chain) ? getChainConfig(account.chain) : null;
+                const symbol = config ? config.primaryToken : 'HIVE'; // Fallback to HIVE if obscure
                 amount = `${parseFloat(amount).toFixed(3)} ${symbol}`;
             }
             // console.log(`Gravity Debug: Amount normalized: ${amount}`);
@@ -306,7 +425,10 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         } else if (isPowerDown) {
             let vestingShares = request.params[1];
             if (vestingShares && !vestingShares.includes(' ')) {
-                vestingShares = `${parseFloat(vestingShares).toFixed(6)} VESTS`;
+                // Use chain config for vesting token (usually VESTS for all Graphene chains)
+                const config = isChainSupported(account.chain) ? getChainConfig(account.chain) : null;
+                const vestingToken = config ? config.vestingToken : 'VESTS';
+                vestingShares = `${parseFloat(vestingShares).toFixed(6)} ${vestingToken}`;
             }
             if (!account.activeKey) return { success: false, gravity_error: "MISSING_ACTIVE_KEY", error: "Gravity Wallet: Active Key required for Power Down." };
             response = await broadcastPowerDown(account.chain, account.name, account.activeKey, vestingShares);
@@ -324,21 +446,60 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             if (!account.activeKey) return { success: false, error: "Gravity Wallet: Missing Active Key for Delegation." };
             response = await broadcastDelegation(account.chain, account.name, account.activeKey, delegatee, vestingShares);
 
+        } else if (isSignedCall) {
+            // requestSignedCall is used by BlurtWallet for API calls that need to be signed
+            // Parameters: username, method, params, keyType
+            const apiMethod = request.params[1];
+            const apiParams = request.params[2];
+            const keyType = request.params[3];
+
+            let keyStr = "";
+            if (keyType === 'Posting') keyStr = account.postingKey || "";
+            else if (keyType === 'Active') keyStr = account.activeKey || "";
+            else keyStr = account.postingKey || "";
+
+            if (!keyStr) return { success: false, error: 'Key required for signed call' };
+
+            // Create a custom JSON operation for the signed call
+            const customJsonOp = ['custom_json', {
+                required_auths: keyType === 'Active' ? [username] : [],
+                required_posting_auths: keyType === 'Posting' ? [username] : [],
+                id: apiMethod,
+                json: JSON.stringify(apiParams)
+            }];
+
+            response = await broadcastOperations(account.chain, keyStr, [customJsonOp]);
+
         } else {
-            return null;
+            return { success: false, error: 'Unsupported operation' };
         }
 
+        // Validate response exists
+        if (!response) {
+            console.error('Gravity: No response from broadcast operation');
+            return { success: false, error: 'No response from wallet' };
+        }
+
+        // console.log('Gravity: Raw response from operation:', response); // Debug only
+
         if (!response.success) {
-            return { success: false, error: response.error };
+            // console.log('Gravity: Operation failed, returning error:', response.error); // Debug only
+            return { success: false, error: response.error || 'Operation failed' };
         }
 
         // For broadcast ops, prefer returning the full opResult object (PeakD expectation?) 
-        // fallback to txId if missing.
-        const finalResult = response.opResult || response.txId;
+        // fallback to txId if missing. CRITICAL: Never return null/undefined as Steemit will crash
+        const finalResult = response.opResult || response.txId || response.result || 'success';
+
+        // console.log('Gravity: finalResult constructed:', finalResult); // Debug only
 
         const result = isSignBuffer
             ? { result: response.result, message: 'Signed successfully', ...response }
             : { result: finalResult, message: 'Signed successfully', ...response };
+
+        // if (isSignBuffer) { console.log('Gravity: SignBuffer response:', result); } // Debug only
+
+        // console.log('Gravity: Final result object being returned:', result); // Debug only
 
         return { success: true, pending: false, ...result };
 

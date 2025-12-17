@@ -45,7 +45,8 @@
         "assets/provider.js"
       ],
       "run_at": "document_start",
-      "world": "MAIN"
+      "world": "MAIN",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [

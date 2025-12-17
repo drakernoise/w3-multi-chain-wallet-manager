@@ -1,7 +1,8 @@
 import { Chain } from '../types';
 import { PrivateKey as HivePrivateKey, cryptoUtils } from '@hiveio/dhive';
 import { Client as SteemClient, PrivateKey as SteemPrivateKey } from 'dsteem';
-import { getActiveNode, HIVE_CANDIDATES, STEEM_CANDIDATES, BLURT_CANDIDATES } from './nodeService';
+import { getActiveNode } from './nodeService';
+import { getChainConfig } from '../config/chainConfig';
 import * as blurt from '@blurtfoundation/blurtjs';
 
 export interface ChainAccountData {
@@ -80,125 +81,45 @@ export const getAccountBalance = async (chain: Chain, username: string): Promise
         const data = await fetchAccountData(chain, username);
         if (!data) return { primary: 0, secondary: 0 };
 
-        let primaryStr = "0";
-        let secondaryStr = "0";
+        const config = getChainConfig(chain);
+        const primaryField = config.api.balanceFields.primary;
+        const secondaryField = config.api.balanceFields.secondary;
 
-        if (chain === Chain.HIVE) {
-            primaryStr = data.balance || "0";
-            secondaryStr = data.hbd_balance || "0";
-        } else if (chain === Chain.STEEM) {
-            primaryStr = data.balance || "0";
-            secondaryStr = data.sbd_balance || "0";
-        } else if (chain === Chain.BLURT) {
-            primaryStr = (data as any).balance || "0";
-            secondaryStr = "0";
-        }
+        const primaryStr = (data as any)[primaryField] || "0";
+        const secondaryStr = secondaryField ? ((data as any)[secondaryField] || "0") : "0";
 
         return {
             primary: parseFloat(primaryStr.split(' ')[0]),
             secondary: parseFloat(secondaryStr.split(' ')[0])
         };
-    } catch (e) {
-        console.error(`Failed to get balance for ${username}:`, e);
+    } catch (error) {
+        console.error(`Error fetching balance for ${username} on ${chain}:`, error);
         return { primary: 0, secondary: 0 };
     }
 };
 
-const withTimeout = <T>(promise: Promise<T>, ms: number = 8000): Promise<T> => {
-    return Promise.race([
-        promise,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms))
-    ]);
-};
-
 export const fetchAccountData = async (chain: Chain, username: string): Promise<ChainAccountData | null> => {
-    const activeNode = getActiveNode(chain);
-    let candidates: string[] = [];
-    if (chain === Chain.HIVE) candidates = [activeNode, ...HIVE_CANDIDATES.filter(n => n !== activeNode)];
-    else if (chain === Chain.STEEM) candidates = [activeNode, ...STEEM_CANDIDATES.filter(n => n !== activeNode)];
-    else if (chain === Chain.BLURT) candidates = [activeNode, ...BLURT_CANDIDATES.filter(n => n !== activeNode)];
-
-    const maxRetries = 3;
-
-    const safeFetch = (url: string, opts: any): Promise<Response> => {
-        // Service Worker environment (MV3) does not have XMLHttpRequest. Use fetch.
-        if (typeof XMLHttpRequest === 'undefined') {
-            return fetch(url, {
-                method: opts.method || 'GET',
-                headers: opts.headers,
-                body: opts.body
-            }).then(res => {
-                return res;
-            });
-        }
-
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open(opts.method || 'GET', url);
-            if (opts.headers) {
-                Object.keys(opts.headers).forEach(key => {
-                    xhr.setRequestHeader(key, opts.headers[key]);
-                });
-            }
-            xhr.onload = () => {
-                resolve(new Response(xhr.responseText, {
-                    status: xhr.status,
-                    statusText: xhr.statusText,
-                    headers: new Headers(xhr.getAllResponseHeaders().split('\r\n').reduce((acc: any, line) => {
-                        const parts = line.split(': ');
-                        if (parts.length === 2) acc[parts[0]] = parts[1];
-                        return acc;
-                    }, {}))
-                }));
-            };
-            xhr.onerror = () => reject(new TypeError('Network request failed via XHR'));
-            xhr.ontimeout = () => reject(new TypeError('Network request timed out via XHR'));
-            xhr.send(opts.body);
+    const nodeUrl = getActiveNode(chain);
+    try {
+        const response = await fetch(nodeUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'condenser_api.get_accounts',
+                params: [[username]],
+                id: 1
+            }),
+            headers: { 'Content-Type': 'application/json' }
         });
-    };
-
-    for (let i = 0; i < Math.min(candidates.length, maxRetries); i++) {
-        const nodeUrl = candidates[i];
-        try {
-            if (chain === Chain.HIVE) {
-                // Use fetch for HIVE to be safe
-                const response: any = await withTimeout(safeFetch(nodeUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        method: 'condenser_api.get_accounts',
-                        params: [[username]],
-                        id: 1
-                    }),
-                    headers: { 'Content-Type': 'application/json' }
-                }));
-                const json = await response.json();
-                if (json.result && json.result.length > 0) return json.result[0];
-            }
-            else if (chain === Chain.STEEM) {
-                const client = new SteemClient(nodeUrl);
-                const accounts = await withTimeout(client.database.getAccounts([username]));
-                if (accounts.length > 0) return (accounts[0] as unknown as ChainAccountData);
-            }
-            else if (chain === Chain.BLURT) {
-                const response: any = await withTimeout(safeFetch(nodeUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        method: 'condenser_api.get_accounts',
-                        params: [[username]],
-                        id: 1
-                    }),
-                    headers: { 'Content-Type': 'application/json' }
-                }));
-                const json = await response.json();
-                if (json.result && json.result.length > 0) return json.result[0];
-            }
-        } catch (e) {
-            // console.warn(`Node ${nodeUrl} failed:`, e);
+        const json = await response.json();
+        if (json.result && json.result.length > 0) {
+            return json.result[0];
         }
+        return null;
+    } catch (error) {
+        console.error(`Error fetching account data for ${username} on ${chain}:`, error);
+        return null;
     }
-    return null;
 };
 
 export const validateAccountKeys = async (chain: Chain, username: string, keys: { active?: string, posting?: string, memo?: string }): Promise<{ valid: boolean, error?: string }> => {

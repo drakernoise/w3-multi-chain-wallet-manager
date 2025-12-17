@@ -168,13 +168,64 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = signMessage(account.chain, message, keyStr);
 
+                // console.log('SignRequest: signMessage response:', response); // Debug only
+
                 if (!response.success) throw new Error(response.error);
                 result = { result: response.result, message: t('sign.success'), ...response };
+
+                // console.log('SignRequest: signBuffer result:', result); // Debug only
 
             } else if (isBroadcast) {
                 // Generic Broadcast
                 let operations = request.params[1];
                 const keyType = request.params[2]; // 'Posting' or 'Active'
+
+                // console.log('SignRequest: isBroadcast - Raw operations:', operations); // Debug only
+
+                // CRITICAL: Sanitize 'comment' operations (Steemit fix)
+                // Create CLEAN objects to avoid __config and other junk
+                if (operations && Array.isArray(operations)) {
+                    operations = operations.map((op: any) => {
+                        if (Array.isArray(op) && op[0] === 'comment' && op[1]) {
+                            const payload = op[1];
+                            // console.log('SignRequest: Found comment, creating clean object...'); // Debug only
+
+                            let parentPermlink = payload.parent_permlink;
+
+                            // Use 'category' field if present (Steemit-specific)
+                            if (!parentPermlink && !payload.parent_author && payload.category) {
+                                parentPermlink = payload.category;
+                                // console.log('SignRequest: Using category:', payload.category); // Debug only
+                            }
+
+                            // Try to recover from json_metadata tags
+                            if (!parentPermlink && payload.json_metadata) {
+                                try {
+                                    const meta = typeof payload.json_metadata === 'string' ? JSON.parse(payload.json_metadata) : payload.json_metadata;
+                                    if (meta.tags && meta.tags[0]) {
+                                        parentPermlink = meta.tags[0];
+                                        // console.log('SignRequest: Recovered from tags:', meta.tags[0]); // Debug only
+                                    }
+                                } catch (e) { }
+                            }
+
+                            // Create CLEAN object with ONLY the fields we need
+                            const cleanPayload = {
+                                parent_author: payload.parent_author || '',
+                                parent_permlink: parentPermlink || 'general',
+                                author: payload.author || '',
+                                permlink: payload.permlink || '',
+                                title: payload.title || '',
+                                body: payload.body || '',
+                                json_metadata: payload.json_metadata || '{}'
+                            };
+
+                            // console.log('SignRequest: Clean payload created'); // Debug only
+                            return ['comment', cleanPayload];
+                        }
+                        return op;
+                    });
+                }
 
                 let key = account.postingKey;
                 // If specifically Active requested, use Active
@@ -225,24 +276,53 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 result = { result: finalResult, message: t('sign.success'), ...response };
 
             } else if (isPost) {
+                // console.log('SignRequest: Entering isPost handler'); // Debug only
                 const title = request.params[1];
                 const body = request.params[2];
-                const parentPermlink = request.params[3];
+                let parentPermlink = request.params[3];
                 const parentAuthor = request.params[4];
                 const jsonMetadata = request.params[5];
                 const permlink = request.params[6];
-                // comment_options might be at index 7? check if needed.
 
-                // Construct comment operation
+                // console.log('SignRequest: Raw params:', { title, parentPermlink, parentAuthor, permlink }); // Debug only
+
+                // CRITICAL: Sanitize parameters to prevent serializer crashes
+                // Steemit sends 'category' field or undefined parent_permlink
+                if (!parentPermlink) {
+                    // Try to recover from metadata tags
+                    try {
+                        const metadata = typeof jsonMetadata === 'string' ? JSON.parse(jsonMetadata) : jsonMetadata;
+                        if (metadata && metadata.tags && Array.isArray(metadata.tags) && metadata.tags.length > 0) {
+                            parentPermlink = metadata.tags[0];
+                        }
+                    } catch (e) { }
+
+                    // Fallback
+                    if (!parentPermlink) parentPermlink = 'general';
+                }
+
+                // Construct comment operation with sanitized fields
                 const op = ['comment', {
-                    parent_author: parentAuthor,
-                    parent_permlink: parentPermlink,
-                    author: username,
-                    permlink: permlink,
-                    title: title,
-                    body: body,
-                    json_metadata: typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata)
+                    parent_author: parentAuthor || '',
+                    parent_permlink: parentPermlink || 'general',
+                    author: username || '',
+                    permlink: permlink || '',
+                    title: title || '',
+                    body: body || '',
+                    json_metadata: typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata || {})
                 }];
+
+                console.log('SignRequest: About to broadcast operation:', JSON.stringify(op, null, 2));
+                const opPayload = op[1] as any;
+                console.log('SignRequest: Operation fields:', {
+                    parent_author: opPayload.parent_author,
+                    parent_permlink: opPayload.parent_permlink,
+                    author: opPayload.author,
+                    permlink: opPayload.permlink,
+                    title: opPayload.title,
+                    body: opPayload.body?.substring(0, 50),
+                    json_metadata: opPayload.json_metadata?.substring(0, 100)
+                });
 
                 const response = await broadcastOperations(account.chain, account.postingKey || account.activeKey!, [op]);
                 if (!response.success) throw new Error(response.error);
@@ -291,6 +371,8 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
     const isVote = method === 'requestVote' || method === 'vote';
     const isCustomJson = method === 'requestCustomJson' || method === 'customJSON';
     const isSignBuffer = method === 'requestSignBuffer' || method === 'signBuffer';
+    // @ts-ignore - Used in handleDecision
+    const isBroadcast = method === 'requestBroadcast' || method === 'broadcast';
     const isPost = method === 'requestPost' || method === 'post';
     const isFile = origin === 'file' || origin.startsWith('file://');
     const domain = isFile ? t('sign.local_file') : (origin.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/im) || [null, origin])[1];

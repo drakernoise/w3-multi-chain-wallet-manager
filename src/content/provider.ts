@@ -1,162 +1,383 @@
+/**
+ * Gravity Wallet Provider
+ * 
+ * This script provides a standard-compliant API for interacting with Graphene-based blockchains
+ * (Hive, Blurt, Steem). It implements compatibility with Hive Keychain and WhaleVault APIs.
+ * 
+ * @version 1.0.4
+ */
 
-// Gravity Provider API
-// This script is injected into the web page context.
+// Prevent multiple injections
+if (!(window as any)._gravityProvider) {
 
-// CHANGE THIS to your trusted parent/origin, e.g., the domain of your extension/page.
-const GRAVITY_TRUSTED_ORIGIN = "https://gravitywallet.io";
-interface GravityRequest {
-    id: string;
-    method: string;
-    params: any[];
-    type: string;
-}
+    // Configuration
+    const PROVIDER_CONFIG = {
+        name: 'Gravity',
+        version: '1.0.4',
+        messageType: 'gravity_request',
+        responseType: 'gravity_response'
+    } as const;
 
-class GravityProvider {
-    callbacks: Map<string, Function>;
+    // Supported wallet aliases for multi-chain compatibility
+    const WALLET_ALIASES = [
+        'hive_keychain',
+        'whalevault',
+        'blurt_keychain',
+        'blurt',
+        'steem_keychain'
+    ] as const;
 
-    constructor() {
-        this.callbacks = new Map();
-        this.setupListener();
+    // Handshake events for wallet detection
+    const HANDSHAKE_EVENTS = [
+        'hive_keychain_handshake',
+        'whalevault_handshake',
+        'steem_keychain_handshake',
+        'blurt_keychain_handshake'
+    ] as const;
+
+    /**
+     * Response interface for API calls
+     */
+    interface ProviderResponse {
+        success: boolean;
+        message?: string;
+        result?: any;
+        error?: string;
+        [key: string]: any;
     }
 
-    setupListener() {
-        window.addEventListener('message', (event) => {
-            if (event.source !== window) return;
+    /**
+     * Main provider class implementing Keychain/WhaleVault API
+     */
+    class GravityProvider {
+        private callbacks: Map<string, Function>;
+        public readonly name: string;
+        public readonly version: string;
 
-            const data = event.data;
-            if (data && data.type === 'gravity_response') {
-                console.log('[Gravity Provider] Received response:', data);
-                const callback = this.callbacks.get(data.id);
-                if (callback) {
-                    console.log('[Gravity Provider] Executing callback for ID:', data.id);
-                    console.log('[Gravity Provider] Callback will receive:', data.response);
-                    callback(data.response);
-                    console.log('[Gravity Provider] Callback executed successfully');
-                    this.callbacks.delete(data.id);
-                } else {
-                    console.warn('[Gravity Provider] No callback found for ID:', data.id, 'Available IDs:', Array.from(this.callbacks.keys()));
+        constructor() {
+            this.name = PROVIDER_CONFIG.name;
+            this.version = PROVIDER_CONFIG.version;
+            this.callbacks = new Map();
+            this.setupListener();
+        }
+
+        /**
+         * Set up message listener for responses from the extension
+         */
+        private setupListener(): void {
+            window.addEventListener('message', (event: MessageEvent) => {
+                // Security: only accept messages from same window
+                if (event.source !== window) return;
+
+                const data = event.data;
+                if (data?.type === PROVIDER_CONFIG.responseType) {
+                    const callback = this.callbacks.get(data.id);
+                    if (callback) {
+                        callback(data.response);
+                        this.callbacks.delete(data.id);
+                    }
                 }
+            });
+        }
+
+        /**
+         * Generate a unique request ID
+         */
+        private generateId(): string {
+            const randomBytes = new Uint32Array(1);
+            window.crypto.getRandomValues(randomBytes);
+            return `${Date.now()}-${randomBytes[0]}`;
+        }
+
+        /**
+         * Send a request to the extension
+         */
+        private send(method: string, params: any[], callback?: Function): Promise<any> | void {
+            const id = this.generateId();
+
+            const sendMessage = (): void => {
+                window.postMessage({
+                    type: PROVIDER_CONFIG.messageType,
+                    id,
+                    method,
+                    params,
+                    appName: PROVIDER_CONFIG.name
+                }, window.location.origin);
+            };
+
+            if (callback) {
+                this.callbacks.set(id, callback);
+                sendMessage();
+            } else {
+                return new Promise((resolve, reject) => {
+                    this.callbacks.set(id, (response: ProviderResponse) => {
+                        if (response.success) {
+                            resolve(response);
+                        } else {
+                            reject(response);
+                        }
+                    });
+                    sendMessage();
+                });
+            }
+        }
+
+        // ==================== API Methods ====================
+
+        /**
+         * Handshake to verify extension is installed and ready
+         */
+        requestHandshake = (callback?: Function): Promise<ProviderResponse> | void => {
+            const response: ProviderResponse = {
+                success: true,
+                message: 'Handshake successful',
+                version: this.version,
+                name: this.name
+            };
+
+            if (callback) {
+                // Immediate callback response
+                setTimeout(() => callback(response), 0);
+            } else {
+                return Promise.resolve(response);
+            }
+        }
+
+        /**
+         * Request a transfer transaction
+         */
+        requestTransfer = (
+            username: string,
+            to: string,
+            amount: string,
+            memo: string,
+            currency: string,
+            callback?: Function,
+            enforceEndpoint?: boolean
+        ): Promise<any> | void => {
+            return this.send('requestTransfer', [username, to, amount, memo, currency, enforceEndpoint], callback);
+        }
+
+        /**
+         * Request a vote transaction
+         */
+        requestVote = (
+            username: string,
+            permlink: string,
+            author: string,
+            weight: number,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('requestVote', [username, permlink, author, weight], callback);
+        }
+
+        /**
+         * Request a post/comment transaction
+         */
+        requestPost = (
+            username: string,
+            title: string,
+            body: string,
+            parentPerm: string,
+            parentAuthor: string,
+            jsonMetadata: any,
+            permlink: string,
+            commentOptions?: any,
+            callback?: Function,
+            _rpc?: string
+        ): Promise<any> | void => {
+            // Handle flexible callback parameter position
+            const actualCallback = typeof commentOptions === 'function' ? commentOptions : callback;
+
+            if (actualCallback) {
+                return this.send('requestPost', [username, title, body, parentPerm, parentAuthor, jsonMetadata, permlink], actualCallback);
+            } else {
+                return new Promise((resolve, reject) => {
+                    this.send('requestPost', [username, title, body, parentPerm, parentAuthor, jsonMetadata, permlink], (response: ProviderResponse) => {
+                        if (response?.success) {
+                            resolve({ success: true, result: response.result });
+                        } else {
+                            reject(response?.error || 'Unknown error');
+                        }
+                    });
+                });
+            }
+        }
+
+        /**
+         * Request a custom JSON transaction
+         */
+        requestCustomJson = (
+            username: string,
+            id: string,
+            key: string,
+            json: string,
+            display_msg: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('requestCustomJson', [username, id, key, json, display_msg], callback);
+        }
+
+        /**
+         * Request message signing
+         */
+        requestSignBuffer = (
+            username: string,
+            message: string,
+            key: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('requestSignBuffer', [username, message, key], callback);
+        }
+
+        /**
+         * Alias for requestSignBuffer (WhaleVault compatibility)
+         */
+        requestVerifyKey = (
+            username: string,
+            message: string,
+            key: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.requestSignBuffer(username, message, key, callback);
+        }
+
+        /**
+         * Request transaction broadcast
+         */
+        requestBroadcast = (
+            username: string,
+            operations: any[],
+            key: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('requestBroadcast', [username, operations, key], callback);
+        }
+
+        /**
+         * Alias for requestBroadcast
+         */
+        requestSignTx = (
+            username: string,
+            operations: any[],
+            key: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.requestBroadcast(username, operations, key, callback);
+        }
+
+        /**
+         * Request signed call (BlurtWallet/Blurt Keychain specific)
+         * This method is required by BlurtWallet's hasCompatibleKeychain() check
+         */
+        requestSignedCall = (
+            username: string,
+            method: string,
+            params: any,
+            key: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('requestSignedCall', [username, method, params, key], callback);
+        }
+
+        /**
+         * Request Power Up (Staking)
+         */
+        requestPowerUp = (
+            username: string,
+            to: string,
+            amount: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('requestPowerUp', [username, to, amount], callback);
+        }
+
+        /**
+         * Request Power Down (Unstaking)
+         */
+        requestPowerDown = (
+            username: string,
+            vestingShares: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('requestPowerDown', [username, vestingShares], callback);
+        }
+
+        /**
+         * Request Delegation
+         */
+        requestDelegation = (
+            username: string,
+            delegatee: string,
+            amount: string,
+            unit: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('requestDelegation', [username, delegatee, amount, unit], callback);
+        }
+    }
+
+    // ==================== Initialization ====================
+
+    /**
+     * Initialize the provider and set up global aliases
+     */
+    function initializeProvider(): void {
+        const provider = new GravityProvider();
+
+        // Set main gravity object
+        (window as any).gravity = provider;
+        (window as any)._gravityProvider = provider;
+
+        // Set up wallet aliases for compatibility
+        WALLET_ALIASES.forEach(alias => {
+            const existing = (window as any)[alias];
+            // Only inject if doesn't exist or is a placeholder without methods
+            if (!existing || typeof existing.requestHandshake !== 'function') {
+                (window as any)[alias] = provider;
             }
         });
     }
 
-    // --- Hive Keychain API Compatibility ---
+    /**
+     * Dispatch handshake events to notify dApps of wallet presence
+     */
+    function dispatchHandshakeEvents(): void {
+        const detail = {
+            version: PROVIDER_CONFIG.version,
+            name: PROVIDER_CONFIG.name
+        };
 
-    requestHandshake(callback?: Function) {
-        // Immediate local response
-        if (callback) callback();
+        HANDSHAKE_EVENTS.forEach(eventName => {
+            // Dispatch on both window and document for maximum compatibility
+            window.dispatchEvent(new CustomEvent(eventName, { detail }));
+            document.dispatchEvent(new CustomEvent(eventName, { detail }));
+        });
     }
 
-    requestTransfer(username: string, to: string, amount: string, memo: string, currency: string, callback?: Function, enforceEndpoint?: boolean) {
-        this.send('requestTransfer', [username, to, amount, memo, currency, enforceEndpoint], callback);
-    }
+    /**
+     * Set up event dispatching with retries for race condition handling
+     */
+    function setupEventDispatching(): void {
+        // Immediate dispatch
+        dispatchHandshakeEvents();
 
-    requestVote(username: string, permlink: string, author: string, weight: number, callback?: Function) {
-        this.send('requestVote', [username, permlink, author, weight], callback);
-    }
-
-    requestPost(username: string, title: string, body: string, parentPerm: string, parentAuthor: string, jsonMetadata: any, permlink: string, commentOptions?: any, callback?: Function, _rpc?: string): Promise<any> | void {
-        // Handle flexible parameter positions - callback can be at position 8 or 9
-        let actualCallback = callback;
-        if (typeof commentOptions === 'function') {
-            // commentOptions is actually the callback (old signature)
-            actualCallback = commentOptions;
+        // Dispatch on DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', dispatchHandshakeEvents);
         }
 
-        if (actualCallback) {
-            this.send('requestPost', [username, title, body, parentPerm, parentAuthor, jsonMetadata, permlink], actualCallback);
-        } else {
-            // Return a Promise for async/await usage
-            return new Promise((resolve, reject) => {
-                this.send('requestPost', [username, title, body, parentPerm, parentAuthor, jsonMetadata, permlink], (response: any) => {
-                    if (response && response.success) {
-                        // Resolve with Hive Keychain compatible format
-                        resolve({ success: true, result: response.result });
-                    } else {
-                        reject(response?.error || 'Unknown error');
-                    }
-                });
-            });
-        }
+        // Dispatch on window load
+        window.addEventListener('load', dispatchHandshakeEvents);
+
+        // Delayed dispatches for apps that initialize asynchronously
+        setTimeout(dispatchHandshakeEvents, 100);
+        setTimeout(dispatchHandshakeEvents, 500);
+        setTimeout(dispatchHandshakeEvents, 1000);
+        setTimeout(dispatchHandshakeEvents, 2000);
     }
 
-    requestCustomJson(username: string, id: string, key: string, json: string, display_msg: string, callback?: Function) {
-        this.send('requestCustomJson', [username, id, key, json, display_msg], callback);
-    }
-
-    requestSignBuffer(username: string, message: string, key: string, callback?: Function) {
-        this.send('requestSignBuffer', [username, message, key], callback);
-    }
-
-    requestBroadcast(username: string, operations: any[], key: string, callback?: Function) {
-        this.send('requestBroadcast', [username, operations, key], callback);
-    }
-
-    requestSignTx(username: string, operations: any[], key: string, callback?: Function) {
-        this.send('requestBroadcast', [username, operations, key], callback);
-    }
-
-    // Generic Send
-    private send(method: string, params: any[], callback?: Function) {
-        const array = new Uint32Array(1);
-        window.crypto.getRandomValues(array);
-        const id = Date.now().toString() + array[0].toString();
-
-        if (callback) {
-            console.log('[Gravity Provider] Registering callback for ID:', id, 'Method:', method);
-            this.callbacks.set(id, callback);
-        } else {
-            console.warn('[Gravity Provider] No callback provided for method:', method);
-        }
-
-        // Security fix: restrict message target to the same origin where the script is running
-        console.log('[Gravity Provider] Sending request:', { id, method, params });
-        window.postMessage({
-            type: 'gravity_request',
-            id,
-            method,
-            params,
-            appName: 'GravityWallet'
-        }, window.location.origin);
-    }
+    // Initialize everything
+    initializeProvider();
+    setupEventDispatching();
 }
-
-// Expose globally
-(window as any).gravity = new GravityProvider();
-
-// Hive Keychain Alias (Compatibility Mode)
-if (!(window as any).hive_keychain) {
-    (window as any).hive_keychain = (window as any).gravity;
-}
-
-// WhaleVault Alias (Blurt Compatibility)
-if (!(window as any).whalevault) {
-    (window as any).whalevault = (window as any).gravity;
-}
-
-// Blurt Keychain Alias (Specific for BeBlurt and others)
-if (!(window as any).blurt_keychain) {
-    // console.log('Gravity: Injecting blurt_keychain alias');
-    (window as any).blurt_keychain = (window as any).gravity;
-}
-
-// Steem Keychain Alias
-if (!(window as any).steem_keychain) {
-    (window as any).steem_keychain = (window as any).gravity;
-}
-// Dispatch Handshake Events (Announce Presence)
-const dispatchHandshake = () => {
-    window.dispatchEvent(new CustomEvent('hive_keychain_handshake'));
-    window.dispatchEvent(new CustomEvent('whalevault_handshake'));
-    window.dispatchEvent(new CustomEvent('steem_keychain_handshake'));
-    window.dispatchEvent(new CustomEvent('blurt_keychain_handshake'));
-    // console.log('Gravity: Handshake dispatched.');
-};
-
-dispatchHandshake();
-
-// Retry on load to ensure listeners are ready
-window.addEventListener('load', dispatchHandshake);
-
-// Just in case, one more time after a short delay (common fix for race conditions)
-setTimeout(dispatchHandshake, 1000);

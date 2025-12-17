@@ -24,6 +24,29 @@ window.addEventListener('message', (event) => {
     });
 });
 
+// Manual Injection Strategy (Backup for Manifest Injection)
+// This ensures that even if Rocket Loader or other scripts interfere, we have a second vector of injection.
+const injectScript = () => {
+    try {
+        const container = document.head || document.documentElement;
+        if (!container) return; // Should not happen at document_start but good safety
+
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('assets/provider.js');
+        script.setAttribute('type', 'text/javascript');
+        script.setAttribute('async', 'false'); // Force synchronous-like execution if possible
+        script.onload = function () {
+            // console.log("Gravity: Provider script injected via DOM");
+            (this as any).remove();
+        };
+        container.insertBefore(script, container.children[0]);
+    } catch (e) {
+        console.error('Gravity: Injection failed', e);
+    }
+};
+
+injectScript();
+
 // Listen for async responses from Background (User Signed/Rejected)
 chrome.runtime.onMessage.addListener((msg: any, _sender: any, _sendResponse: any) => {
     if (msg.type === 'gravity_response') {
