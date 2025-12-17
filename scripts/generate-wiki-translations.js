@@ -332,6 +332,6 @@ console.log('📝 Note: Full User Guide and Troubleshooting translations are ext
 console.log('💡 Consider using professional translation services for production use.\n');
 `;
 
-## fs.writeFileSync(path.join(__dirname, 'generate-wiki-translations.js'), script);
-## console.log('✅ Created wiki translation generator script');
+
+
 
