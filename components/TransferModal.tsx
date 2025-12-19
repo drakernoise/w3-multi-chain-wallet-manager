@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Account } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
+import { fetchAccountData } from '../services/chainService';
 
 interface TransferModalProps {
     account: Account;
@@ -9,8 +10,6 @@ interface TransferModalProps {
     onTransfer: (from: Account, to: string, amount: string, memo: string, symbol?: string) => Promise<void>;
     disableAccountSelection?: boolean;
 }
-
-import { fetchAccountData } from '../services/chainService';
 
 export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAccount, accounts, onClose, onTransfer, disableAccountSelection }) => {
     const { t } = useTranslation();
@@ -25,13 +24,34 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
     );
     const [isSending, setIsSending] = useState(false);
 
+    // Recent Recipients State
+    const [recentRecipients, setRecentRecipients] = useState<string[]>([]);
+    const [showRecent, setShowRecent] = useState(false);
+
     // Reset currency when chain changes
-    React.useEffect(() => {
+    useEffect(() => {
         const c = selectedAccount.chain;
         if (c === 'HIVE') setCurrency('HIVE');
         else if (c === 'STEEM') setCurrency('STEEM');
         else setCurrency('BLURT');
     }, [selectedAccount.chain]);
+
+    // Load recent recipients
+    useEffect(() => {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.get(['recentRecipients'], (result: { recentRecipients?: string[] }) => {
+                if (result.recentRecipients) {
+                    setRecentRecipients(result.recentRecipients);
+                }
+            });
+        }
+
+        // Prevent background scrolling
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, []);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +60,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
     const [isValidating, setIsValidating] = useState(false);
 
     // Debounced Validation
-    React.useEffect(() => {
+    useEffect(() => {
         setError(null); // Clear error on input change
         const check = async () => {
             if (!to || to.length < 3) {
@@ -63,12 +83,9 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
     }, [to, selectedAccount.chain]);
 
     // Clear error on amount change
-    React.useEffect(() => {
+    useEffect(() => {
         if (error) setError(null);
     }, [amount]);
-
-    // Filter accounts to only show those of the same chain as the currently selected one?
-    // Or allow switching chain too? Let's allow switching chain by selecting different account.
 
     const hasActiveKey = !!selectedAccount.activeKey;
 
@@ -80,8 +97,9 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
             setError(t('validation.required'));
             return;
         }
+
+        // If validation finished and is false, block
         if (isValidRecipient === false) {
-            // Inline error is already shown, but let's reinforce or just return
             return;
         }
 
@@ -94,17 +112,42 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
         setStep('review');
     };
 
+    const saveRecipient = (name: string) => {
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+            chrome.storage.local.get(['recentRecipients'], (result: { recentRecipients?: string[] }) => {
+                const list = result.recentRecipients || [];
+                if (!list.includes(name)) {
+                    const newList = [name, ...list].slice(0, 10);
+                    chrome.storage.local.set({ recentRecipients: newList });
+                }
+            });
+        }
+    };
+
     const handleConfirm = async () => {
         setIsSending(true);
-        await onTransfer(selectedAccount, to, amount, memo, currency);
-        setIsSending(false);
-        onClose();
+        try {
+            await onTransfer(selectedAccount, to, amount, memo, currency);
+            saveRecipient(to);
+            onClose();
+        } catch (e) {
+            console.error(e);
+            setError(t('bulk.error_failed'));
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handleMaxClick = () => {
+        const bal = (currency === 'HBD' || currency === 'SBD') ? selectedAccount.secondaryBalance : selectedAccount.balance;
+        if (bal !== undefined) {
+            setAmount(bal.toString());
+        }
     };
 
     if (step === 'review') {
-        // ... review render (unchanged)
         return (
-            <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
                 <div className="bg-dark-900 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col animate-fadeIn">
                     <h2 className="text-xl font-bold text-white mb-4">{t('transfer.review_title')}</h2>
 
@@ -150,13 +193,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
         );
     }
 
-    // Input Step handles... (rest of the component)
-
-
     // Input Step
     return (
-        <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-            <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col">
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+            <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         {t('wallet.send')} {selectedAccount.chain}
@@ -206,20 +246,48 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                             <span className="absolute left-3 top-2.5 text-slate-500">@</span>
                             <input
                                 value={to}
+                                onFocus={() => !to && setShowRecent(true)}
+                                onBlur={() => setTimeout(() => setShowRecent(false), 200)}
                                 onChange={(e) => {
                                     const val = e.target.value.toLowerCase().replace(/[@\s\u200B-\u200D\uFEFF]/g, '');
                                     setTo(val);
+                                    setShowRecent(false);
                                 }}
                                 className={`w-full bg-dark-900 border rounded-lg py-2 pl-7 pr-8 text-sm outline-none transition-colors ${isValidRecipient === false ? 'border-red-500/50 focus:border-red-500' :
                                     isValidRecipient === true ? 'border-green-500/50 focus:border-green-500' :
                                         'border-dark-600 focus:border-blue-500'
                                     }`}
                                 placeholder={t('import.placeholder_username')}
+                                autoComplete="off"
                             />
                             <div className="absolute right-3 top-2.5 text-xs">
                                 {isValidRecipient === true && <span className="text-green-400">✓</span>}
                                 {isValidRecipient === false && <span className="text-red-400 font-bold">✕</span>}
                             </div>
+
+                            {/* Suggestions Dropdown */}
+                            {showRecent && recentRecipients.length > 0 && !to && (
+                                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-40 overflow-y-auto custom-scrollbar animate-slide-down">
+                                    <div className="px-3 py-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-dark-700 bg-dark-900/50">
+                                        {t('common.recent_recipients')}
+                                    </div>
+                                    {recentRecipients.map((recipient) => (
+                                        <div
+                                            key={recipient}
+                                            onClick={() => {
+                                                setTo(recipient);
+                                                setShowRecent(false);
+                                            }}
+                                            className="px-3 py-2 text-sm text-slate-300 hover:bg-blue-600/20 hover:text-white cursor-pointer transition-colors flex items-center gap-2"
+                                        >
+                                            <span className="w-6 h-6 rounded-full bg-dark-700 flex items-center justify-center text-[10px] text-slate-400 font-bold">
+                                                {recipient.charAt(0).toUpperCase()}
+                                            </span>
+                                            <span>{recipient}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         {isValidRecipient === false && <p className="text-[10px] text-red-400 mt-1">{t('validation.account_not_found').replace('{chain}', selectedAccount.chain)}</p>}
                     </div>
@@ -263,7 +331,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                             if (bal !== undefined) {
                                 return (
                                     <p className="text-[10px] text-slate-500 mt-1 text-right">
-                                        {t('transfer.available')} <span className="font-bold text-white">{bal.toFixed(3)} {currency}</span>
+                                        {t('transfer.available')}
+                                        <span onClick={handleMaxClick} className="font-bold text-white cursor-pointer hover:text-blue-400 ml-1">
+                                            {bal.toFixed(3)} {currency}
+                                        </span>
                                     </p>
                                 );
                             }

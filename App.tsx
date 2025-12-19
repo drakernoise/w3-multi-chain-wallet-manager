@@ -179,7 +179,7 @@ function AppContent() {
 
     const updatedAccounts = await Promise.all(walletState.accounts.map(async (acc) => {
       const balances = await getAccountBalance(acc.chain, acc.name);
-      return { ...acc, balance: balances.primary, secondaryBalance: balances.secondary };
+      return { ...acc, balance: balances.primary, secondaryBalance: balances.secondary, stakedBalance: balances.staked };
     }));
 
     setWalletState(prev => ({ ...prev, accounts: updatedAccounts }));
@@ -204,7 +204,8 @@ function AppContent() {
       return {
         ...acc,
         balance: balances.primary,
-        secondaryBalance: balances.secondary
+        secondaryBalance: balances.secondary,
+        stakedBalance: balances.staked
       };
     }));
 

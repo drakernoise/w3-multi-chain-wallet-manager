@@ -76,25 +76,87 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
 
 // --- PUBLIC API ---
 
-export const getAccountBalance = async (chain: Chain, username: string): Promise<{ primary: number, secondary: number }> => {
+const fetchGlobalProps = async (chain: Chain): Promise<any> => {
     try {
-        const data = await fetchAccountData(chain, username);
-        if (!data) return { primary: 0, secondary: 0 };
+        const nodeUrl = await getActiveNode(chain);
+        const response = await fetch(nodeUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'condenser_api.get_dynamic_global_properties',
+                params: [],
+                id: 1
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const json = await response.json();
+        return json.result;
+    } catch (error) {
+        console.error(`Error fetching global props for ${chain}:`, error);
+        return null;
+    }
+};
+
+const convertToVests = async (chain: Chain, amountInPower: number): Promise<string> => {
+    const props = await fetchGlobalProps(chain);
+    if (!props) throw new Error("Could not fetch global properties for conversion");
+
+    const totalVestingFund = parseFloat(String(props.total_vesting_fund_hive || props.total_vesting_fund_steem || props.total_vesting_fund_blurt || "0").split(' ')[0]);
+    const totalVestingShares = parseFloat(String(props.total_vesting_shares).split(' ')[0]);
+
+    if (totalVestingFund === 0) return "0.000000 VESTS";
+    const vests = (amountInPower * totalVestingShares) / totalVestingFund;
+    return `${vests.toFixed(6)} VESTS`;
+};
+
+export const getAccountBalance = async (chain: Chain, username: string): Promise<{ primary: number, secondary: number, staked: number }> => {
+    try {
+        const [accountData, globalProps] = await Promise.all([
+            fetchAccountData(chain, username),
+            fetchGlobalProps(chain)
+        ]);
+
+        if (!accountData) return { primary: 0, secondary: 0, staked: 0 };
+
+        // Handle different API response formats
+        const account = (accountData as any).account || (Array.isArray((accountData as any).accounts) ? (accountData as any).accounts[0] : accountData);
+        if (!account) return { primary: 0, secondary: 0, staked: 0 };
 
         const config = getChainConfig(chain);
         const primaryField = config.api.balanceFields.primary;
         const secondaryField = config.api.balanceFields.secondary;
 
-        const primaryStr = (data as any)[primaryField] || "0";
-        const secondaryStr = secondaryField ? ((data as any)[secondaryField] || "0") : "0";
+        const primaryStr = (account as any)[primaryField] || "0";
+        const secondaryStr = secondaryField ? ((account as any)[secondaryField] || "0") : "0";
+
+        // Get vesting_shares
+        const vestingSharesStr = (account as any)['vesting_shares'] || "0";
+        const vestingShares = parseFloat(String(vestingSharesStr).split(' ')[0]);
+
+        // Exact Power Calculation based on Global Properties
+        let stakedPower = 0;
+        if (globalProps) {
+            const totalVestingFund = parseFloat(String(globalProps.total_vesting_fund_hive || globalProps.total_vesting_fund_steem || globalProps.total_vesting_fund_blurt || "0").split(' ')[0]);
+            const totalVestingShares = parseFloat(String(globalProps.total_vesting_shares).split(' ')[0]);
+
+            if (totalVestingShares > 0) {
+                stakedPower = (vestingShares * totalVestingFund) / totalVestingShares;
+            }
+        } else {
+            // Fallback approximation
+            stakedPower = vestingShares / 1950;
+        }
+
+        console.log(`Gravity: Balances for ${username}:`, { primary: primaryStr, secondary: secondaryStr, staked: stakedPower });
 
         return {
-            primary: parseFloat(primaryStr.split(' ')[0]),
-            secondary: parseFloat(secondaryStr.split(' ')[0])
+            primary: parseFloat(String(primaryStr).split(' ')[0]),
+            secondary: parseFloat(String(secondaryStr).split(' ')[0]),
+            staked: stakedPower
         };
     } catch (error) {
         console.error(`Error fetching balance for ${username} on ${chain}:`, error);
-        return { primary: 0, secondary: 0 };
+        return { primary: 0, secondary: 0, staked: 0 };
     }
 };
 
@@ -344,22 +406,98 @@ export const broadcastPowerUp = async (chain: Chain, username: string, activeKey
     return broadcastOperations(chain, activeKey, [op]);
 };
 
-export const broadcastPowerDown = async (chain: Chain, username: string, activeKey: string, vestingShares: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
-    const op: any = ['withdraw_vesting', {
-        account: username,
-        vesting_shares: vestingShares
+export const broadcastPowerDown = async (chain: Chain, username: string, activeKey: string, amountPower: number): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+    try {
+        const vestingShares = amountPower === 0 ? "0.000000 VESTS" : await convertToVests(chain, amountPower);
+        const op: any = ['withdraw_vesting', {
+            account: username,
+            vesting_shares: vestingShares
+        }];
+        return broadcastOperations(chain, activeKey, [op]);
+    } catch (e: any) {
+        return { success: false, error: e.message || "Failed to convert power to vests" };
+    }
+};
+
+export const broadcastDelegation = async (chain: Chain, username: string, activeKey: string, delegatee: string, amountPower: number): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+    try {
+        const vestingShares = amountPower === 0 ? "0.000000 VESTS" : await convertToVests(chain, amountPower);
+        const op: any = ['delegate_vesting_shares', {
+            delegator: username,
+            delegatee: delegatee,
+            vesting_shares: vestingShares
+        }];
+        return broadcastOperations(chain, activeKey, [op]);
+    } catch (e: any) {
+        return { success: false, error: e.message || "Failed to convert power to vests" };
+    }
+};
+
+// HBD/SBD Savings (Staking) - Blurt doesn't have this feature
+export const broadcastSavingsDeposit = async (chain: Chain, username: string, activeKey: string, amount: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+    if (chain === Chain.BLURT) {
+        return { success: false, error: 'Blurt does not support savings' };
+    }
+
+    const op: any = ['transfer_to_savings', {
+        from: username,
+        to: username,
+        amount: amount,
+        memo: ''
     }];
     return broadcastOperations(chain, activeKey, [op]);
 };
 
-export const broadcastDelegation = async (chain: Chain, username: string, activeKey: string, delegatee: string, vestingShares: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
-    const op: any = ['delegate_vesting_shares', {
-        delegator: username,
-        delegatee: delegatee,
-        vesting_shares: vestingShares
+export const broadcastSavingsWithdraw = async (chain: Chain, username: string, activeKey: string, amount: string, requestId: number): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+    if (chain === Chain.BLURT) {
+        return { success: false, error: 'Blurt does not support savings' };
+    }
+
+    const op: any = ['transfer_from_savings', {
+        from: username,
+        request_id: requestId,
+        to: username,
+        amount: amount,
+        memo: ''
     }];
     return broadcastOperations(chain, activeKey, [op]);
 };
+
+// RC (Resource Credits) Delegation - Hive only
+export const broadcastRCDelegate = async (chain: Chain, username: string, activeKey: string, delegatee: string, amountHP: number): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+    if (chain !== Chain.HIVE) {
+        return { success: false, error: 'RC delegation is only available on Hive' };
+    }
+
+    try {
+        const vestingShares = await convertToVests(chain, amountHP);
+        const maxRC = parseInt(vestingShares.split(' ')[0].replace('.', '')); // Simplified magnitude for RC
+
+        const op: any = ['delegate_rc', {
+            from: username,
+            delegatees: [delegatee],
+            max_rc: maxRC
+        }];
+        return broadcastOperations(chain, activeKey, [op]);
+    } catch (e: any) {
+        return { success: false, error: e.message || "Failed to convert HP to RC" };
+    }
+};
+
+export const broadcastRCUndelegate = async (chain: Chain, username: string, activeKey: string, delegatee: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+    if (chain !== Chain.HIVE) {
+        return { success: false, error: 'RC delegation is only available on Hive' };
+    }
+
+    // To undelegate, set max_rc to 0
+    const op: any = ['delegate_rc', {
+        from: username,
+        delegatees: [delegatee],
+        max_rc: 0
+    }];
+    return broadcastOperations(chain, activeKey, [op]);
+};
+
 
 export interface HistoryItem {
     date: string;
@@ -388,7 +526,7 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
             // Use native fetch for history in SW
             const response = await fetch(node, {
                 method: 'POST',
-                body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 50], id: 1 }),
+                body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 500], id: 1 }),
                 headers: { 'Content-Type': 'application/json' }
             });
             const json = await response.json();
@@ -396,11 +534,11 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
         }
         if (chain === Chain.STEEM) {
             const client = new SteemClient(node);
-            const history = await client.database.call('get_account_history', [username, -1, 50]);
+            const history = await client.database.call('get_account_history', [username, -1, 500]);
             return history.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
         }
         if (chain === Chain.BLURT) {
-            const response = await fetch(node, { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 50], id: 1 }), headers: { 'Content-Type': 'application/json' } });
+            const response = await fetch(node, { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 500], id: 1 }), headers: { 'Content-Type': 'application/json' } });
             const json = await response.json();
             if (json.result) return json.result.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
         }

@@ -12,7 +12,7 @@ const WIKI_DIR = path.join(__dirname, '..', '.wiki');
 
 // Ensure wiki directory exists
 if (!fs.existsSync(WIKI_DIR)) {
-    fs.mkdirSync(WIKI_DIR, { recursive: true });
+   fs.mkdirSync(WIKI_DIR, { recursive: true });
 }
 
 console.log('🌍 Generating multilingual wiki pages...\n');
@@ -330,8 +330,3 @@ console.log('✅ Created: Getting-Started-IT.md');
 console.log('\n✨ Wiki translation generation complete!');
 console.log('📝 Note: Full User Guide and Troubleshooting translations are extensive.');
 console.log('💡 Consider using professional translation services for production use.\n');
-`;
-
-
-
-

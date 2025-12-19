@@ -22,6 +22,7 @@ export interface Account {
   memoKey?: string;
   balance?: number;
   secondaryBalance?: number;
+  stakedBalance?: number; // HP/SP/BP (Power)
 }
 
 export interface WalletState {

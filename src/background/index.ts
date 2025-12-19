@@ -203,8 +203,18 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         if (!account) return null;
         // console.log(`Gravity Debug: Selected Account: ${account.name} (${account.chain})`);
 
-        // 3. Perform Operation (Logic copied from SignRequest)
-        // Check Keys
+        // Security: Force manual confirmation for financial operations, even if whitelisted.
+        // This prevents "surprise" transfers if the user accidentally trusted a domain globally.
+        if (
+            method === 'requestTransfer' ||
+            method === 'requestPowerUp' ||
+            method === 'requestPowerDown' ||
+            method === 'requestDelegation'
+        ) {
+            console.log('Gravity: Forcing manual confirmation for financial operation:', method);
+            return null;
+        }
+
         const isTransfer = method === 'requestTransfer';
         const isVote = method === 'requestVote' || method === 'vote';
         const isCustomJson = method === 'requestCustomJson' || method === 'customJSON';
@@ -250,6 +260,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             else if (type === 'Active') keyStr = account.activeKey || "";
             else if (type === 'Memo') keyStr = account.memoKey || "";
             if (!keyStr) return { success: false, error: 'Key required for signing' };
+
             // Use requested chain (e.g. Hive) if DApp specified it, to ensure correct signature format (STM vs BLT)
             // Fallback: Detect from URL if hint is missing (e.g. older provider cached)
             const url = sender?.tab?.url || sender?.url || "";
@@ -487,8 +498,10 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             return { success: false, error: response.error || 'Operation failed' };
         }
 
-        // For broadcast ops, prefer returning the full opResult object (PeakD expectation?) 
-        // fallback to txId if missing. CRITICAL: Never return null/undefined as Steemit will crash
+        // Fix result format for dApp compatibility (Hive Engine etc.)
+        // Prefer opResult (object) if available, otherwise txId (string).
+        // Some dApps expect { result: { id: "..." } }, others just { result: "..." }.
+        // Providing opResult usually satisfies those looking for an object.
         const finalResult = response.opResult || response.txId || response.result || 'success';
 
         // console.log('Gravity: finalResult constructed:', finalResult); // Debug only
@@ -496,6 +509,12 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const result = isSignBuffer
             ? { result: response.result, message: 'Signed successfully', ...response }
             : { result: finalResult, message: 'Signed successfully', ...response };
+
+        // Safety check to prevent "Cannot create property 'id' on string" error downstream
+        // in case 'response' itself was physically a string (unlikely but possible in some error paths)
+        if (typeof result !== 'object') {
+            return { success: true, pending: false, result: result, message: 'Signed successfully' };
+        }
 
         // if (isSignBuffer) { console.log('Gravity: SignBuffer response:', result); } // Debug only
 

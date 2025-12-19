@@ -15,7 +15,10 @@ export const HelpView: React.FC = () => {
         detach: <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" stroke="currentColor" fill="currentColor" />,
         send: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />,
         receive: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />,
-        history: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        history: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />,
+        power: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />,
+        savings: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+        rc: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
     };
 
     const navItems = [
@@ -32,55 +35,86 @@ export const HelpView: React.FC = () => {
         { icon: icons.send, label: t('wallet.send'), desc: t('help.btn_send') },
         { icon: icons.receive, label: t('wallet.receive'), desc: t('help.btn_receive') },
         { icon: icons.history, label: t('wallet.history'), desc: t('help.btn_history') },
-        { icon: icons.wallet, label: t('wallet.keys'), desc: t('help.btn_keys') }, // Reuse wallet icon for keys
+        { icon: icons.power, label: 'Power up/down', desc: t('help.btn_powerup') },
+        { icon: icons.savings, label: 'Savings', desc: t('help.btn_savings') },
+        { icon: icons.rc, label: 'Resource Credits', desc: t('help.btn_rc') },
     ];
 
     return (
         <div className="h-full overflow-y-auto p-4 custom-scrollbar text-slate-300 space-y-8 animate-fadeIn">
             <h2 className="text-2xl font-bold text-white mb-6 border-b border-dark-700 pb-2">{t('help.title')}</h2>
 
-            {/* Navigation Guide */}
-            <section>
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Navigation</h3>
-                <div className="space-y-3">
-                    {navItems.map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-4 bg-dark-800 p-3 rounded-xl border border-dark-700">
-                            <div className="shrink-0 w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center text-slate-400">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{item.icon}</svg>
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-white text-sm">{item.label}</h4>
-                                <p className="text-xs text-slate-400 mt-1">{item.desc}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </section>
+            {/* Core Features */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <section className="bg-dark-800 p-5 rounded-2xl border border-dark-700">
+                    <h3 className="text-blue-400 font-bold mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                        {t('help.keys_title')}
+                    </h3>
+                    <p className="text-xs text-slate-400 mb-4">{t('help.keys_desc')}</p>
+                    <ul className="space-y-2 text-sm">
+                        <li><strong className="text-white">Posting:</strong> {t('help.posting_key_desc')}</li>
+                        <li><strong className="text-white">Active:</strong> {t('help.active_key_desc')}</li>
+                        <li><strong className="text-white">Memo:</strong> {t('help.memo_key_desc')}</li>
+                    </ul>
+                </section>
 
-            {/* Actions Guide */}
+                <section className="bg-dark-800 p-5 rounded-2xl border border-dark-700">
+                    <h3 className="text-pink-400 font-bold mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        {t('help.power_title')}
+                    </h3>
+                    <p className="text-xs text-slate-400 mb-4">{t('help.power_desc')}</p>
+                    <ul className="space-y-2 text-sm">
+                        <li className="flex gap-2 text-slate-300">• {t('help.power_point')}</li>
+                        <li className="flex gap-2 text-slate-300">• {t('help.power_down_point')}</li>
+                        <li className="flex gap-2 text-slate-300">• {t('help.delegate_point')}</li>
+                    </ul>
+                </section>
+            </div>
+
+            {/* Account Actions Section */}
             <section>
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Account Actions</h3>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {actionItems.map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-4 bg-dark-800 p-3 rounded-xl border border-dark-700">
-                            <div className="shrink-0 w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center text-slate-400">
+                        <div key={idx} className="flex items-start gap-4 bg-dark-900/50 p-3 rounded-xl border border-dark-700/50 hover:border-dark-600 transition-colors">
+                            <div className="shrink-0 w-10 h-10 bg-dark-800 rounded-lg flex items-center justify-center text-slate-400">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{item.icon}</svg>
                             </div>
                             <div>
-                                <h4 className="font-bold text-white text-sm">{item.label}</h4>
-                                <p className="text-xs text-slate-400 mt-1">{item.desc}</p>
+                                <h4 className="font-bold text-white text-[13px]">{item.label}</h4>
+                                <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</p>
                             </div>
                         </div>
                     ))}
                 </div>
             </section>
 
-            <section className="bg-dark-800 rounded-xl p-5 border border-dark-700 shadow-lg mt-8">
+            {/* Navigation Guide */}
+            <section>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Main Navigation</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {navItems.map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-4 bg-dark-900/50 p-3 rounded-xl border border-dark-700/50">
+                            <div className="shrink-0 w-10 h-10 bg-dark-800 rounded-lg flex items-center justify-center text-slate-400">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{item.icon}</svg>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white text-[13px]">{item.label}</h4>
+                                <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            <section className="bg-blue-900/10 rounded-2xl p-6 border border-blue-500/20 shadow-lg mt-8">
                 <h3 className="text-lg font-bold text-blue-400 mb-3 flex items-center gap-2">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                     {t('help.security_title')}
                 </h3>
-                <p className="text-sm leading-relaxed">{t('help.security_desc')}</p>
+                <p className="text-sm leading-relaxed text-slate-400">{t('help.security_desc')}</p>
             </section>
         </div>
     );

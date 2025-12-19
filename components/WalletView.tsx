@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Chain, Account } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
+import { PowerModal } from './PowerModal';
+import { SavingsModal } from './SavingsModal';
+import { RCModal } from './RCModal';
 
 interface WalletViewProps {
   chain: Chain;
@@ -26,6 +29,20 @@ export const WalletView: React.FC<WalletViewProps> = ({
   onAddAccount
 }) => {
   const { t } = useTranslation();
+
+  // Modal state
+  const [modalState, setModalState] = useState<{
+    type: 'powerup' | 'powerdown' | 'delegate' | 'savings-deposit' | 'savings-withdraw' | 'rc-delegate' | 'rc-undelegate' | null;
+    account: Account | null;
+  }>({ type: null, account: null });
+
+  const openModal = (type: typeof modalState.type, account: Account) => {
+    setModalState({ type, account });
+  };
+
+  const closeModal = () => {
+    setModalState({ type: null, account: null });
+  };
 
   return (
     <div className="space-y-4 relative h-full overflow-y-auto p-4 custom-scrollbar">
@@ -122,6 +139,17 @@ export const WalletView: React.FC<WalletViewProps> = ({
                         </span>
                       </div>
                     )}
+
+                    {/* Staked Power Balance (HP/SP/BP) */}
+                    <div className="flex items-baseline gap-1.5 ml-1">
+                      <span className="text-slate-600 font-bold text-[10px]">/</span>
+                      <span className="font-bold text-blue-400 text-sm" title={String(account.stakedBalance)}>
+                        {account.stakedBalance !== undefined ? account.stakedBalance.toFixed(3) : '0.000'}
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-500/80">
+                        {chain === Chain.HIVE ? 'HP' : chain === Chain.STEEM ? 'SP' : 'BP'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -168,10 +196,123 @@ export const WalletView: React.FC<WalletViewProps> = ({
                     </span>
                   </button>
                 </div>
+
+                {/* Second Row - Power & Savings Operations */}
+                {hasActive && (
+                  <div className="grid grid-cols-3 gap-2 mt-2 relative z-10 w-full">
+                    {/* Power Up */}
+                    <button
+                      onClick={() => openModal('powerup', account)}
+                      className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-cyan-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                      aria-label="Power Up"
+                    >
+                      <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                        Power Up
+                      </span>
+                    </button>
+                    {/* Power Down */}
+                    <button
+                      onClick={() => openModal('powerdown', account)}
+                      className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-yellow-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                      aria-label="Power Down"
+                    >
+                      <div className="relative w-5 h-5">
+                        <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-yellow-400 transition-colors absolute inset-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        <svg className="w-3 h-3 text-red-500 group-hover/btn:text-red-400 transition-colors absolute top-0 right-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </div>
+                      <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                        Power Down
+                      </span>
+                    </button>
+                    {/* Delegate */}
+                    <button
+                      onClick={() => openModal('delegate', account)}
+                      className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-pink-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                      aria-label="Delegate"
+                    >
+                      <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-pink-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                      <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                        Delegate
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Third Row - Savings & RC (chain-specific) */}
+                {hasActive && (
+                  <div className="grid grid-cols-3 gap-2 mt-2 relative z-10 w-full">
+                    {/* Savings (HBD/SBD - Hive & Steem only) */}
+                    {(chain === Chain.HIVE || chain === Chain.STEEM) && (
+                      <button
+                        onClick={() => openModal('savings-deposit', account)}
+                        className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-emerald-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                        aria-label="Savings"
+                      >
+                        <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-emerald-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                          Savings
+                        </span>
+                      </button>
+                    )}
+                    {/* RC Delegation (Hive only) */}
+                    {chain === Chain.HIVE && (
+                      <button
+                        onClick={() => openModal('rc-delegate', account)}
+                        className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-indigo-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                        aria-label="Delegate RC"
+                      >
+                        <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-indigo-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>
+                        <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
+                          Delegate RC
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
+      )}
+
+      {/* Modals */}
+      {modalState.account && modalState.type && (
+        <>
+          {(modalState.type === 'powerup' || modalState.type === 'powerdown' || modalState.type === 'delegate') && (
+            <PowerModal
+              account={modalState.account}
+              type={modalState.type}
+              onClose={closeModal}
+              onSuccess={() => {
+                closeModal();
+                onRefresh?.();
+              }}
+            />
+          )}
+          {(modalState.type === 'savings-deposit' || modalState.type === 'savings-withdraw') && (
+            <SavingsModal
+              account={modalState.account}
+              type={modalState.type === 'savings-deposit' ? 'deposit' : 'withdraw'}
+              onClose={closeModal}
+              onSuccess={() => {
+                closeModal();
+                onRefresh?.();
+              }}
+            />
+          )}
+          {(modalState.type === 'rc-delegate' || modalState.type === 'rc-undelegate') && (
+            <RCModal
+              account={modalState.account}
+              type={modalState.type === 'rc-delegate' ? 'delegate' : 'undelegate'}
+              onClose={closeModal}
+              onSuccess={() => {
+                closeModal();
+                onRefresh?.();
+              }}
+            />
+          )}
+        </>
       )}
     </div>
   );

@@ -41,3 +41,8 @@ backup.bat
 
 # Empty Translation Dir
 i18n/
+
+# Temporary and Personal Files
+~$*
+*.xlsx
+OUTSIDE EXTENSION.txt

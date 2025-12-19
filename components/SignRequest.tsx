@@ -126,7 +126,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 const memo = request.params[3] || '';
                 const response = await broadcastTransfer(account.chain, account.name, account.activeKey!, to, amount, memo);
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.txId, message: t('sign.success'), ...response };
+                result = { result: response.opResult || response.txId, message: t('sign.success'), ...response };
 
             } else if (isVote) {
                 const author = request.params[2];
@@ -139,7 +139,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.txId, message: t('sign.success'), ...response };
+                result = { result: response.opResult || response.txId, message: t('sign.success'), ...response };
 
             } else if (isCustomJson) {
                 const id = request.params[1];
@@ -153,7 +153,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = await broadcastCustomJson(account.chain, account.name, key!, id, typeof json === 'string' ? json : JSON.stringify(json), type as any);
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.txId, message: t('sign.success'), ...response };
+                result = { result: response.opResult || response.txId, message: t('sign.success'), ...response };
 
             } else if (isSignBuffer) {
                 const message = request.params[1];
@@ -237,7 +237,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = await broadcastOperations(account.chain, key, operations);
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.txId, message: t('sign.success'), ...response };
+                result = { result: response.opResult || response.txId, message: t('sign.success'), ...response };
 
             } else if (isPowerUp) {
                 const to = request.params[1] || account.name; // Already sanitized in Background
@@ -389,7 +389,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center">
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
 
                 {isTransfer ? (
                     <div className="w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down">
@@ -477,7 +477,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                             <div>
                                 <p className="text-xs text-slate-500 mb-1">{t('sign.json_payload')}</p>
-                                <div className="bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-40 overflow-y-auto custom-scrollbar">
+                                <div className="bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-60 overflow-y-auto custom-scrollbar">
                                     <pre className="text-[10px] text-green-400 whitespace-pre-wrap break-all font-mono">
                                         {typeof request.params[3] === 'string'
                                             ? JSON.stringify(JSON.parse(request.params[3]), null, 2)
@@ -499,7 +499,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                         <div className="space-y-4">
                             <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
                                 <p className="text-xs text-slate-500 mb-2 uppercase">{t('sign.message_label')}</p>
-                                <div className="max-h-32 overflow-y-auto custom-scrollbar">
+                                <div className="max-h-60 overflow-y-auto custom-scrollbar">
                                     <p className="text-sm text-slate-300 font-mono break-all">{request.params[1]}</p>
                                 </div>
                             </div>
@@ -530,7 +530,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                             <div>
                                 <p className="text-[10px] uppercase text-slate-500 mb-1">Content</p>
-                                <div className="bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-40 overflow-y-auto custom-scrollbar">
+                                <div className="bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-60 overflow-y-auto custom-scrollbar">
                                     <p className="text-xs text-slate-300 whitespace-pre-wrap font-mono">
                                         {request.params[2]}
                                     </p>
@@ -550,13 +550,13 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                             <p className="text-xs uppercase text-slate-500 mb-1">{t('sign.operation')}</p>
                             <p className="font-mono text-blue-400 font-bold">{request?.method}</p>
                         </div>
-                        <div className="bg-dark-800 p-4 rounded-xl border border-dark-700">
+                        <div className="bg-dark-800 p-4 rounded-xl border border-dark-700 w-full">
                             <p className="text-xs uppercase text-slate-500 mb-2">{t('sign.params')}</p>
-                            <div className="space-y-2">
+                            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
                                 {request.params.map((param: any, idx: number) => (
                                     <div key={idx} className="flex gap-2 text-xs border-b border-dark-700 last:border-0 pb-2 last:pb-0">
-                                        <span className="text-slate-500 w-6 font-mono opacity-50">{idx}:</span>
-                                        <span className="text-slate-300 font-mono break-all">{typeof param === 'object' ? JSON.stringify(param) : String(param)}</span>
+                                        <span className="text-slate-500 w-6 font-mono opacity-50 shrink-0">{idx}:</span>
+                                        <span className="text-slate-300 font-mono break-all leading-relaxed">{typeof param === 'object' ? JSON.stringify(param, null, 2) : String(param)}</span>
                                     </div>
                                 ))}
                             </div>
