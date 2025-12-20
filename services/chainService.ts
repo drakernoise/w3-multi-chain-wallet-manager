@@ -319,16 +319,24 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
 export const broadcastCustomJson = async (chain: Chain, username: string, key: string, id: string, json: string, keyType: 'Posting' | 'Active'): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const nodeUrl = getActiveNode(chain);
     try {
-        const required_auths = keyType === 'Active' ? [username] : [];
-        const required_posting_auths = keyType === 'Posting' ? [username] : [];
+        // Ensure keyType is valid, default to 'Posting' if undefined
+        const validKeyType = (keyType === 'Active' || keyType === 'Posting') ? keyType : 'Posting';
+
+        // Ensure these are always arrays, never undefined
+        const required_auths = validKeyType === 'Active' ? [username] : [];
+        const required_posting_auths = validKeyType === 'Posting' ? [username] : [];
 
         if (chain === Chain.HIVE) {
+            // Ensure json is a string
+            const jsonString = typeof json === 'string' ? json : JSON.stringify(json);
+
             const op: any = ['custom_json', {
-                required_auths,
-                required_posting_auths,
-                id,
-                json: typeof json === 'string' ? json : JSON.stringify(json)
+                required_auths: required_auths,  // Explicitly set
+                required_posting_auths: required_posting_auths,  // Explicitly set
+                id: id,
+                json: jsonString
             }];
+
             const result = await broadcastHiveTransaction(nodeUrl, [op], key);
             return { success: true, txId: result.id, opResult: result };
 
@@ -351,6 +359,7 @@ export const broadcastCustomJson = async (chain: Chain, username: string, key: s
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
+        console.error('Custom JSON Error:', e);
         return { success: false, error: e.message || "Custom JSON failed" };
     }
 };

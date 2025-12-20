@@ -170,6 +170,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
 
         // 2. Get Session (Keys)
         const session = await chrome.storage.session.get(['session_accounts']);
+
         if (!session.session_accounts || session.session_accounts.length === 0) return null; // Locked
 
         // CRITICAL FIX: Multi-chain Account Selection
@@ -183,7 +184,6 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const potentialAccounts = session.session_accounts.filter((a: any) => a.name === username);
 
         if (potentialAccounts.length === 0) {
-            // console.log("Gravity Debug: No accounts found with that name.");
             return null;
         }
 
@@ -197,11 +197,15 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             account = potentialAccounts.find((a: any) => a.chain === 'HIVE');
             // If no Hive, take the first one (e.g. Blurt/Steem only)
             if (!account) account = potentialAccounts[0];
-            // console.log("Gravity Debug: Fallback account selection used.");
         }
 
-        if (!account) return null;
-        // console.log(`Gravity Debug: Selected Account: ${account.name} (${account.chain})`);
+        if (!account) return { success: false, error: 'Account not found or wallet locked' };
+
+        // 3. Chain ID Handling for Request (pass it down if needed)
+        // Ensure request knows the target chain
+        if (!request.requestChain && detectedChain) {
+            request.requestChain = detectedChain;
+        }
 
         // Security: Force manual confirmation for financial operations, even if whitelisted.
         // This prevents "surprise" transfers if the user accidentally trusted a domain globally.
@@ -277,6 +281,8 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         } else if (isBroadcast) {
             let operations = request.params[1];
             const keyType = request.params[2];
+
+
             if (operations && !Array.isArray(operations) && operations.operations) operations = operations.operations;
 
             // Critical Fix for Steemit: Sanitize 'comment' operations in generic broadcast
@@ -334,12 +340,20 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                         // Sanitize custom_json operations
                         if (op[0] === 'custom_json') {
                             const payload = op[1];
+
+                            // CRITICAL: Ensure both required_auths and required_posting_auths exist
+                            // Hive.blog sometimes sends operations without required_auths
                             const cleanPayload = {
-                                required_auths: Array.isArray(payload.required_auths) ? payload.required_auths : [],
-                                required_posting_auths: Array.isArray(payload.required_posting_auths) ? payload.required_posting_auths : [],
+                                required_auths: (payload.required_auths !== undefined && Array.isArray(payload.required_auths))
+                                    ? payload.required_auths
+                                    : [],
+                                required_posting_auths: (payload.required_posting_auths !== undefined && Array.isArray(payload.required_posting_auths))
+                                    ? payload.required_posting_auths
+                                    : [],
                                 id: payload.id || '',
                                 json: typeof payload.json === 'string' ? payload.json : JSON.stringify(payload.json || {})
                             };
+
                             return ['custom_json', cleanPayload];
                         }
 
@@ -351,10 +365,15 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             }
 
             let keyStr = "";
-            if (keyType === 'Posting') keyStr = account.postingKey || "";
-            else if (keyType === 'Active') keyStr = account.activeKey || "";
-            else keyStr = account.activeKey || "";
+            // Fix: Handle case-insensitive key types (Hive.blog sends 'posting', others send 'Posting')
+            const normalizedKeyType = (keyType || '').toLowerCase();
+
+            if (normalizedKeyType === 'posting') keyStr = account.postingKey || "";
+            else if (normalizedKeyType === 'active') keyStr = account.activeKey || "";
+            else keyStr = account.activeKey || ""; // Default fallback
+
             if (!keyStr) return { success: false, error: 'Key required for broadcast operation' };
+
             response = await broadcastOperations(account.chain, keyStr, operations);
 
         } else if (isPost) {
