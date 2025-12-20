@@ -16,7 +16,7 @@ import { HistoryModal } from './components/HistoryModal';
 import { SignRequest } from './components/SignRequest';
 import { HelpView } from './components/HelpView';
 import { NotificationToast } from './components/NotificationToast'; // Added
-import { detectWeb3Context, getAccountBalance, broadcastTransfer } from './services/chainService';
+import { detectWeb3Context, fetchBalances as serviceFetchBalances, broadcastTransfer } from './services/chainService';
 import { saveVault, getVault, clearCryptoCache, tryRestoreSession } from './services/cryptoService';
 import { benchmarkNodes } from './services/nodeService';
 import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
@@ -177,13 +177,26 @@ function AppContent() {
     if (isLocked || walletState.accounts.length === 0) return;
     setIsRefreshing(true);
 
-    const updatedAccounts = await Promise.all(walletState.accounts.map(async (acc) => {
-      const balances = await getAccountBalance(acc.chain, acc.name);
-      return { ...acc, balance: balances.primary, secondaryBalance: balances.secondary, stakedBalance: balances.staked };
-    }));
+    try {
+      const updatedAccounts = await Promise.all(walletState.accounts.map(async (acc) => {
+        const balances = await serviceFetchBalances(acc.chain, acc.name);
+        return {
+          ...acc,
+          balance: balances.primary,
+          secondaryBalance: balances.secondary,
+          stakedBalance: balances.staked,
+          powerDownActive: balances.powerDownActive,
+          nextPowerDown: balances.nextPowerDown,
+          powerDownAmount: balances.powerDownAmount
+        };
+      }));
 
-    setWalletState(prev => ({ ...prev, accounts: updatedAccounts }));
-    setIsRefreshing(false);
+      setWalletState(prev => ({ ...prev, accounts: updatedAccounts }));
+    } catch (err) {
+      console.warn("Poll balances failed:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleUnlock = (decryptedAccounts: Account[]) => {
@@ -200,12 +213,15 @@ function AppContent() {
 
   const handleImport = async (newAccounts: Account[]) => {
     const withBalance = await Promise.all(newAccounts.map(async acc => {
-      const balances = await getAccountBalance(acc.chain, acc.name);
+      const balances = await serviceFetchBalances(acc.chain, acc.name);
       return {
         ...acc,
         balance: balances.primary,
         secondaryBalance: balances.secondary,
-        stakedBalance: balances.staked
+        stakedBalance: balances.staked,
+        powerDownActive: balances.powerDownActive,
+        nextPowerDown: balances.nextPowerDown,
+        powerDownAmount: balances.powerDownAmount
       };
     }));
 

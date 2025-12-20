@@ -1,7 +1,7 @@
 export enum Chain {
+  BLURT = 'BLURT',
   HIVE = 'HIVE',
-  STEEM = 'STEEM',
-  BLURT = 'BLURT'
+  STEEM = 'STEEM'
 }
 
 export enum ViewState {
@@ -23,6 +23,9 @@ export interface Account {
   balance?: number;
   secondaryBalance?: number;
   stakedBalance?: number; // HP/SP/BP (Power)
+  powerDownActive?: boolean;
+  nextPowerDown?: string;
+  powerDownAmount?: number;
 }
 
 export interface WalletState {

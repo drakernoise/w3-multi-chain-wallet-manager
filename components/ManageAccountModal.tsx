@@ -57,8 +57,8 @@ export const ManageAccountModal: React.FC<ManageAccountModalProps> = ({ account,
     };
 
     return (
-        <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-            <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col max-h-full">
+        <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto my-auto">
                 <div className="flex justify-between items-center mb-4">
                     <div>
                         <h2 className="text-xl font-bold">{t('manage.title')}</h2>

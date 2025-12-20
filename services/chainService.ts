@@ -14,6 +14,10 @@ export interface ChainAccountData {
     savings_balance?: string;
     hbd_balance?: string;
     sbd_balance?: string;
+    next_vesting_withdrawal?: string;
+    vesting_withdraw_rate?: string;
+    to_withdraw?: string;
+    withdrawn?: string;
 }
 
 // --- HELPER: Manual Fetch for HIVE (Service Worker Compatible) ---
@@ -109,50 +113,60 @@ const convertToVests = async (chain: Chain, amountInPower: number): Promise<stri
     return `${vests.toFixed(6)} VESTS`;
 };
 
-export const getAccountBalance = async (chain: Chain, username: string): Promise<{ primary: number, secondary: number, staked: number }> => {
+export const fetchBalances = async (chain: Chain, username: string): Promise<{ primary: number; secondary: number; staked: number; powerDownActive?: boolean; nextPowerDown?: string; powerDownAmount?: number }> => {
+    const nodeUrl = getActiveNode(chain);
     try {
-        const [accountData, globalProps] = await Promise.all([
-            fetchAccountData(chain, username),
-            fetchGlobalProps(chain)
-        ]);
+        const response = await fetch(nodeUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'condenser_api.get_accounts',
+                params: [[username]],
+                id: 1
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
 
-        if (!accountData) return { primary: 0, secondary: 0, staked: 0 };
+        const json = await response.json();
+        if (!json.result || json.result.length === 0) return { primary: 0, secondary: 0, staked: 0 };
 
-        // Handle different API response formats
-        const account = (accountData as any).account || (Array.isArray((accountData as any).accounts) ? (accountData as any).accounts[0] : accountData);
-        if (!account) return { primary: 0, secondary: 0, staked: 0 };
-
+        const acc = json.result[0];
         const config = getChainConfig(chain);
-        const primaryField = config.api.balanceFields.primary;
-        const secondaryField = config.api.balanceFields.secondary;
 
-        const primaryStr = (account as any)[primaryField] || "0";
-        const secondaryStr = secondaryField ? ((account as any)[secondaryField] || "0") : "0";
-
-        // Get vesting_shares
-        const vestingSharesStr = (account as any)['vesting_shares'] || "0";
-        const vestingShares = parseFloat(String(vestingSharesStr).split(' ')[0]);
-
-        // Exact Power Calculation based on Global Properties
+        // Fetch Global Properties for VESTS conversion
+        const props = await fetchGlobalProps(chain);
         let stakedPower = 0;
-        if (globalProps) {
-            const totalVestingFund = parseFloat(String(globalProps.total_vesting_fund_hive || globalProps.total_vesting_fund_steem || globalProps.total_vesting_fund_blurt || "0").split(' ')[0]);
-            const totalVestingShares = parseFloat(String(globalProps.total_vesting_shares).split(' ')[0]);
 
+        if (props) {
+            const totalVests = parseFloat(acc.vesting_shares.split(' ')[0]);
+            const totalFund = parseFloat(props.total_vesting_fund_steem || props.total_vesting_fund_hive || props.total_vesting_fund_blurt || '0');
+            const totalVestingShares = parseFloat(props.total_vesting_shares.split(' ')[0]);
             if (totalVestingShares > 0) {
-                stakedPower = (vestingShares * totalVestingFund) / totalVestingShares;
+                stakedPower = (totalVests * totalFund) / totalVestingShares;
             }
-        } else {
-            // Fallback approximation
-            stakedPower = vestingShares / 1950;
         }
 
-        console.log(`Gravity: Balances for ${username}:`, { primary: primaryStr, secondary: secondaryStr, staked: stakedPower });
+        const primaryStr = acc[config.api.balanceFields.primary] || '0';
+        const secondaryStr = config.api.balanceFields.secondary ? acc[config.api.balanceFields.secondary] || '0' : '0';
+
+        // Power down info
+        const nextWithdrawal = acc.next_vesting_withdrawal;
+        const powerDownActive = nextWithdrawal && !nextWithdrawal.startsWith('1969') && !nextWithdrawal.startsWith('1970');
+        let powerDownAmount = 0;
+        if (powerDownActive && props) {
+            const withdrawRateVests = parseFloat(acc.vesting_withdraw_rate.split(' ')[0]);
+            const totalFund = parseFloat(props.total_vesting_fund_steem || props.total_vesting_fund_hive || props.total_vesting_fund_blurt || '0');
+            const totalVestingShares = parseFloat(props.total_vesting_shares.split(' ')[0]);
+            powerDownAmount = (withdrawRateVests * totalFund) / totalVestingShares;
+        }
 
         return {
             primary: parseFloat(String(primaryStr).split(' ')[0]),
             secondary: parseFloat(String(secondaryStr).split(' ')[0]),
-            staked: stakedPower
+            staked: stakedPower,
+            powerDownActive,
+            nextPowerDown: nextWithdrawal,
+            powerDownAmount: powerDownAmount
         };
     } catch (error) {
         console.error(`Error fetching balance for ${username} on ${chain}:`, error);
@@ -189,15 +203,19 @@ export const validateAccountKeys = async (chain: Chain, username: string, keys: 
         const accountData = await fetchAccountData(chain, username);
         if (!accountData) return { valid: false, error: "Account not found or network error" };
 
+        const config = getChainConfig(chain);
+        const prefix = config.addressPrefix;
         let errors: string[] = [];
 
         const verifyKey = (keyStr: string, auths: [string, number][], type: string) => {
             try {
-                let publicKeys: string[] = [];
-                // Use HivePrivateKey for generic WIF parsing on graphene chains
-                publicKeys = [HivePrivateKey.fromString(keyStr).createPublic().toString()];
+                // Get public key and replace default prefix if needed
+                let pub = HivePrivateKey.fromString(keyStr).createPublic().toString();
+                if (prefix !== 'STM' && pub.startsWith('STM')) {
+                    pub = prefix + pub.substring(3);
+                }
 
-                const found = auths.some(auth => publicKeys.includes(auth[0]));
+                const found = auths.some(auth => auth[0] === pub);
                 if (!found) errors.push(`${type} key does not match account`);
             } catch (e) {
                 errors.push(`Invalid ${type} key format`);
@@ -208,7 +226,10 @@ export const validateAccountKeys = async (chain: Chain, username: string, keys: 
         if (keys.posting) verifyKey(keys.posting, accountData.posting.key_auths, "Posting");
         if (keys.memo && keys.memo !== accountData.memo_key) {
             try {
-                const pub = HivePrivateKey.fromString(keys.memo).createPublic().toString();
+                let pub = HivePrivateKey.fromString(keys.memo).createPublic().toString();
+                if (prefix !== 'STM' && pub.startsWith('STM')) {
+                    pub = prefix + pub.substring(3);
+                }
                 if (pub !== accountData.memo_key) errors.push("Memo key does not match");
             } catch (e) { errors.push("Invalid Memo key format"); }
         }
@@ -298,12 +319,11 @@ export const broadcastCustomJson = async (chain: Chain, username: string, key: s
         const required_posting_auths = keyType === 'Posting' ? [username] : [];
 
         if (chain === Chain.HIVE) {
-            // MANUAL BROADCAST for Reliability in Service Worker (Fixes 'Illegal invocation' fetch error)
             const op: any = ['custom_json', {
                 required_auths,
                 required_posting_auths,
                 id,
-                json
+                json: typeof json === 'string' ? json : JSON.stringify(json)
             }];
             const result = await broadcastHiveTransaction(nodeUrl, [op], key);
             return { success: true, txId: result.id, opResult: result };
@@ -314,6 +334,9 @@ export const broadcastCustomJson = async (chain: Chain, username: string, key: s
             const result = await client.broadcast.json({ id, json, required_auths, required_posting_auths }, privateKey);
             return { success: true, txId: result.id };
         } else if (chain === Chain.BLURT) {
+            const config = getChainConfig(Chain.BLURT);
+            blurt.config.set('address_prefix', config.addressPrefix);
+            blurt.config.set('chain_id', config.chainId);
             blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
             const result = await new Promise<any>((resolve, reject) => {
                 blurt.broadcast.customJson(key, required_auths, required_posting_auths, id, json, (err: any, res: any) => {
@@ -328,6 +351,29 @@ export const broadcastCustomJson = async (chain: Chain, username: string, key: s
     }
 };
 
+const formatChainError = (error: any): string => {
+    const msg = error.message || String(error);
+
+    // Handle "min_delegation" error
+    if (msg.includes('op.vesting_shares >= min_delegation')) {
+        try {
+            const match = msg.match(/minimum delegation amount of ({.*})/);
+            if (match && match[1]) {
+                const data = JSON.parse(match[1]);
+                const amount = (parseFloat(data.amount) / Math.pow(10, data.precision)).toFixed(6);
+                return `Delegation too small. Minimum required: ${amount} VESTS (roughly 35 BLURT/BP)`;
+            }
+        } catch (e) { }
+        return "Delegation amount is too small. Please enter a larger amount (at least ~35 BP for Blurt).";
+    }
+
+    // Handle other common errors
+    if (msg.includes('balance')) return "Insufficient balance for this operation.";
+    if (msg.includes('authority')) return "Missing required authority. Check your Active key.";
+
+    return msg;
+};
+
 export const broadcastOperations = async (
     chain: Chain,
     activeKey: string,
@@ -337,28 +383,17 @@ export const broadcastOperations = async (
 
     try {
         if (chain === Chain.HIVE) {
-            // FULLY MANUAL APPROACH
-            // Use broadcastHiveTransaction
             const result = await broadcastHiveTransaction(nodeUrl, operations, activeKey);
-
-            return {
-                success: true,
-                txId: result.id,
-                opResult: result
-            };
-
+            return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const key = SteemPrivateKey.fromString(activeKey);
-
             const result = await client.broadcast.sendOperations(operations, key);
-
-            return {
-                success: true,
-                txId: result.id,
-                opResult: result
-            };
+            return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
+            const config = getChainConfig(Chain.BLURT);
+            blurt.config.set('address_prefix', config.addressPrefix);
+            blurt.config.set('chain_id', config.chainId);
             blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
             const result = await new Promise<any>((resolve, reject) => {
                 blurt.broadcast.send({ extensions: [], operations: operations }, [activeKey], (err: any, res: any) => {
@@ -370,7 +405,7 @@ export const broadcastOperations = async (
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
         console.error("Broadcast Ops Error:", e);
-        return { success: false, error: e.message || "Broadcast failed" };
+        return { success: false, error: formatChainError(e) };
     }
 };
 
@@ -406,9 +441,16 @@ export const broadcastPowerUp = async (chain: Chain, username: string, activeKey
     return broadcastOperations(chain, activeKey, [op]);
 };
 
-export const broadcastPowerDown = async (chain: Chain, username: string, activeKey: string, amountPower: number): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+export const broadcastPowerDown = async (chain: Chain, username: string, activeKey: string, amountPower: number | string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     try {
-        const vestingShares = amountPower === 0 ? "0.000000 VESTS" : await convertToVests(chain, amountPower);
+        let vestingShares: string;
+        if (typeof amountPower === 'string' && amountPower.includes('VESTS')) {
+            vestingShares = amountPower;
+        } else {
+            const numericAmount = typeof amountPower === 'string' ? parseFloat(amountPower) : amountPower;
+            vestingShares = numericAmount === 0 ? "0.000000 VESTS" : await convertToVests(chain, numericAmount);
+        }
+
         const op: any = ['withdraw_vesting', {
             account: username,
             vesting_shares: vestingShares
@@ -419,9 +461,16 @@ export const broadcastPowerDown = async (chain: Chain, username: string, activeK
     }
 };
 
-export const broadcastDelegation = async (chain: Chain, username: string, activeKey: string, delegatee: string, amountPower: number): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+export const broadcastDelegation = async (chain: Chain, username: string, activeKey: string, delegatee: string, amountPower: number | string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     try {
-        const vestingShares = amountPower === 0 ? "0.000000 VESTS" : await convertToVests(chain, amountPower);
+        let vestingShares: string;
+        if (typeof amountPower === 'string' && amountPower.includes('VESTS')) {
+            vestingShares = amountPower;
+        } else {
+            const numericAmount = typeof amountPower === 'string' ? parseFloat(amountPower) : amountPower;
+            vestingShares = numericAmount === 0 ? "0.000000 VESTS" : await convertToVests(chain, numericAmount);
+        }
+
         const op: any = ['delegate_vesting_shares', {
             delegator: username,
             delegatee: delegatee,
@@ -572,109 +621,85 @@ export const signMessage = (
     _useLegacySigner: boolean = false
 ): { success: boolean; result?: string; publicKey?: string; error?: string } => {
     try {
-        let key: any;
-        let buf: Buffer;
+        if (chain === Chain.HIVE || chain === Chain.STEEM || chain === Chain.BLURT) {
+            const key = HivePrivateKey.fromString(keyStr);
+            const prefix = getChainConfig(chain).addressPrefix;
 
-        // Check if message is a serialized Buffer (common in DApp requests for binary signing)
-        try {
-            if (typeof message === 'string' && message.includes('"type":"Buffer"') && message.includes('"data":[')) {
-                const parsed = JSON.parse(message);
-                if (parsed.type === 'Buffer' && Array.isArray(parsed.data)) {
-                    buf = Buffer.from(parsed.data);
-                } else {
-                    buf = Buffer.from(message);
-                }
-            } else if (typeof message === 'object') {
+            // Convert message to buffer
+            let msgBuf: Buffer;
+            if (typeof message === 'object' && !Buffer.isBuffer(message)) {
                 if ((message as any).type === 'Buffer' && Array.isArray((message as any).data)) {
-                    buf = Buffer.from((message as any).data);
-                } else {
-                    // If it's a plain object, stringify it
-                    buf = Buffer.from(JSON.stringify(message));
-                }
-            } else {
-                buf = Buffer.from(message);
-            }
-        } catch (e) {
-            buf = Buffer.from(message);
-        }
-
-        let signature = "";
-        let publicKey = "";
-
-        if (chain === Chain.HIVE) {
-            // ** LEGACY + ROBUST PAYLOAD STRATEGY **
-            // Hypothesis: dsteem works for Tribaldex (proven in Step 3572).
-            // We use dsteem for signing, but keep the robust object handling.
-
-            try {
-                const key = SteemPrivateKey.fromString(keyStr);
-
-                let msgBuf: Buffer;
-                // Robust normalization (PeakD sends Objects, Tribaldex sends Strings)
-                if (typeof message === 'object' && !Buffer.isBuffer(message) && !((message as any).type === 'Buffer')) {
-                    msgBuf = Buffer.from(JSON.stringify(message));
-                } else if (typeof message === 'object' && (message as any).type === 'Buffer' && Array.isArray((message as any).data)) {
                     msgBuf = Buffer.from((message as any).data);
                 } else {
-                    msgBuf = Buffer.isBuffer(message) ? message : Buffer.from(message);
+                    msgBuf = Buffer.from(JSON.stringify(message));
                 }
-
-                // Use dhive's cryptoUtils for reliable SHA256 (same algorithm), but dsteem for signing
-                const hash = cryptoUtils.sha256(msgBuf);
-                const sig = key.sign(hash);
-
-                signature = sig.toString(); // dsteem signature (Legacy Hex)
-                publicKey = key.createPublic().toString();
-
-
-            } catch (e) {
-                console.error("dsteem signing failed:", e);
-                throw e;
+            } else if (Buffer.isBuffer(message)) {
+                msgBuf = message;
+            } else if (typeof message === 'string') {
+                // CRITICAL FIX: Check if the string is a JSON-serialized Buffer
+                // This happens when dApps send Buffer objects through chrome.runtime.sendMessage
+                try {
+                    const parsed = JSON.parse(message);
+                    if (parsed.type === 'Buffer' && Array.isArray(parsed.data)) {
+                        msgBuf = Buffer.from(parsed.data);
+                    } else {
+                        msgBuf = Buffer.from(message);
+                    }
+                } catch (e) {
+                    // Not JSON, treat as regular string
+                    msgBuf = Buffer.from(message);
+                }
+            } else {
+                msgBuf = Buffer.from(String(message));
             }
-        }
-        else if (chain === Chain.STEEM) {
-            key = SteemPrivateKey.fromString(keyStr);
-            signature = key.sign(cryptoUtils.sha256(buf)).toString();
-            publicKey = key.createPublic().toString();
-        }
-        else if (chain === Chain.BLURT) {
-            // Use native blurt library for signing to ensure full compatibility
-            // (prefixes, hashing, signature format)
-            try {
-                // @ts-ignore
-                if (blurt.auth && blurt.auth.sign) {
-                    // blurt.auth.sign returns hex string usually? or Signature object?
-                    // Expected: blurt.auth.sign(message, keyWif)
-                    // @ts-ignore
-                    signature = blurt.auth.sign(message, keyStr);
-                } else {
-                    // Fallback to manual if method signature differs
-                    key = HivePrivateKey.fromString(keyStr);
-                    signature = key.sign(cryptoUtils.sha256(buf)).toString();
-                }
 
-                // Public Key Generation (also native)
-                // @ts-ignore
-                if (blurt.auth && blurt.auth.wifToPublic) {
-                    // @ts-ignore
-                    publicKey = blurt.auth.wifToPublic(keyStr);
-                } else {
-                    key = HivePrivateKey.fromString(keyStr);
-                    publicKey = key.createPublic().toString().replace(/^STM/, 'BLT');
+            // Hash and sign
+            // BLURT IMAGE UPLOAD: The img-upload server expects signatures over:
+            // SHA256('ImageSigningChallenge' + imageBuffer)
+
+            // Special handling for Blurt Hex Strings (some dApps send images as hex)
+            if (chain === Chain.BLURT && typeof message === 'string' && message.length > 200 && /^[0-9a-fA-F]+$/.test(message)) {
+                try {
+                    msgBuf = Buffer.from(message, 'hex');
+                } catch (e) {
+                    // Fallback to standard conversion if hex fails
                 }
-            } catch (err) {
-                // Final verify fallback
-                key = HivePrivateKey.fromString(keyStr);
-                signature = key.sign(cryptoUtils.sha256(buf)).toString();
-                publicKey = key.createPublic().toString().replace(/^STM/, 'BLT');
             }
-        }
-        else {
+
+            let hash: Buffer;
+
+            // We detect image uploads by checking if it's a large binary buffer (> 200 bytes is safe threshold for image)
+            if (chain === Chain.BLURT && msgBuf.length > 200) {
+                // Check if the buffer already starts with 'ImageSigningChallenge'
+                const challengePrefix = Buffer.from('ImageSigningChallenge', 'utf-8');
+                const alreadyHasPrefix = msgBuf.slice(0, challengePrefix.length).equals(challengePrefix);
+
+                if (alreadyHasPrefix) {
+                    // dApp already included the prefix, just hash it
+                    hash = cryptoUtils.sha256(msgBuf);
+                } else {
+                    // Prepend the challenge string required by Blurt's image upload server
+                    const combined = Buffer.concat([challengePrefix, msgBuf]);
+                    hash = cryptoUtils.sha256(combined);
+                }
+            } else {
+                // Standard message signing
+                hash = cryptoUtils.sha256(msgBuf);
+            }
+
+            const sig = key.sign(hash);
+            const signature = sig.toString();
+
+            // Get public key with correct prefix
+            let publicKey = key.createPublic().toString();
+            if (prefix !== 'STM' && publicKey.startsWith('STM')) {
+                publicKey = prefix + publicKey.substring(3);
+            }
+
+            return { success: true, result: signature, publicKey };
+        } else {
             return { success: false, error: "Chain not supported" };
         }
-
-        return { success: true, result: signature, publicKey };
-
     } catch (e: any) {
         return { success: false, error: e.message };
     }

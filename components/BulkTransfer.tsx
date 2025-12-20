@@ -31,7 +31,7 @@ export const BulkTransfer: React.FC<BulkTransferProps> = ({ chain, accounts, ref
 
                 {/* Chain Selector Tabs */}
                 <div className="flex p-1 bg-dark-800 rounded-xl mb-4 border border-dark-700">
-                    {[Chain.HIVE, Chain.STEEM, Chain.BLURT].map((c) => (
+                    {[Chain.BLURT, Chain.HIVE, Chain.STEEM].map((c) => (
                         <button
                             key={c}
                             onClick={() => onChangeChain && onChangeChain(c)}

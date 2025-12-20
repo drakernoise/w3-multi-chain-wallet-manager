@@ -132,12 +132,21 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
     const getDescription = () => {
         if (type === 'powerup') return t('power.powerup_desc').replace('{token}', getTokenSymbol()).replace('{power}', getPowerSymbol());
         if (type === 'powerdown') return t('power.powerdown_desc').replace('{power}', getPowerSymbol());
-        return t('power.delegate_desc').replace('{power}', getPowerSymbol());
+
+        const baseDesc = t('power.delegate_desc').replace('{power}', getPowerSymbol());
+        return (
+            <>
+                <p className="mb-2">{baseDesc}</p>
+                <div className="bg-blue-900/20 border border-blue-500/30 p-2 rounded text-[10px] text-blue-300">
+                    <p><strong>Note:</strong> Delegation is <strong>NOT additive</strong>. This value will be the <strong>new total</strong>. Set to 0 to remove delegation.</p>
+                </div>
+            </>
+        );
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-dark-800 rounded-2xl border border-dark-700 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-dark-800 rounded-2xl border border-dark-700 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto my-auto">
                 {/* Header */}
                 <div className="p-6 border-b border-dark-700">
                     <div className="flex justify-between items-center">
@@ -161,14 +170,40 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                         <div className="text-xs text-slate-400 mb-1">{t('power.from_account')}</div>
                         <div className="text-white font-bold">@{account.name}</div>
                         <div className="text-xs text-slate-400 mt-1">{account.chain}</div>
-                        {account.stakedBalance !== undefined && (
-                            <div className="mt-3 pt-3 border-t border-dark-700">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-400">{t('power.available_power').replace('{power}', getPowerSymbol())}</span>
-                                    <span className="text-sm font-bold text-blue-400">{account.stakedBalance.toFixed(3)} {getPowerSymbol()}</span>
-                                </div>
+
+                        <div className="mt-3 pt-3 border-t border-dark-700 space-y-2">
+                            {/* Liquid Balance (Always relevant for Power Up) */}
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-400">{t('power.available_token').replace('{token}', getTokenSymbol())}</span>
+                                <span className="text-sm font-bold text-green-400">{(account.balance || 0).toFixed(3)} {getTokenSymbol()}</span>
                             </div>
-                        )}
+
+                            {/* Staked Power (Relevant for Delegation/PowerDown) */}
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-400">{t('power.available_power').replace('{power}', getPowerSymbol())}</span>
+                                <span className="text-sm font-bold text-blue-400">{(account.stakedBalance || 0).toFixed(3)} {getPowerSymbol()}</span>
+                            </div>
+
+                            {/* Active Power Down Info */}
+                            {account.powerDownActive && (
+                                <div className="pt-2 mt-2 border-t border-dark-700/50">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs text-yellow-500 font-medium">{t('power.active_powerdown') || "Active Power Down"}</span>
+                                        <span className="text-xs font-bold text-yellow-400">~{(account.powerDownAmount || 0).toFixed(3)} {getPowerSymbol()}/week</span>
+                                    </div>
+                                    {account.nextPowerDown && (
+                                        <div className="text-[10px] text-slate-500 text-right mt-1">
+                                            {t('power.next_withdrawal') || "Next:"} {new Date(account.nextPowerDown).toLocaleDateString()}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {!account.powerDownActive && type === 'powerdown' && (
+                                <div className="text-[10px] text-slate-500 italic mt-2">
+                                    {t('power.no_active_powerdown') || "No active power downs"}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Recipient (for Power Up) */}
@@ -287,7 +322,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
 
                     {/* Error */}
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm">
+                        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm break-all max-h-32 overflow-y-auto custom-scrollbar">
                             {error}
                         </div>
                     )}
@@ -309,7 +344,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                         >
                             {t('common.cancel')}
                         </button>
-                        {type === 'powerdown' && !isStoppingPowerDown && (
+                        {type === 'powerdown' && !isStoppingPowerDown && account.powerDownActive && (
                             <button
                                 type="button"
                                 onClick={handleStopPowerDown}

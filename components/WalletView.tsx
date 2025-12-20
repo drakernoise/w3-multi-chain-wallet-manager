@@ -62,7 +62,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
 
       {/* Chain Selector Tabs */}
       <div className="flex p-1 bg-dark-800 rounded-xl mb-6 border border-dark-700">
-        {[Chain.HIVE, Chain.STEEM, Chain.BLURT].map((c) => (
+        {[Chain.BLURT, Chain.HIVE, Chain.STEEM].map((c) => (
           <button
             key={c}
             onClick={() => onChainChange(c)}

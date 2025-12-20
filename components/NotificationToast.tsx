@@ -25,14 +25,15 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({ message, t
                 ${bgColors[type]} 
                 text-white text-xs font-bold px-6 py-3 rounded-xl shadow-2xl border border-opacity-50
                 animate-bounce-in pointer-events-auto flex items-center gap-2 backdrop-blur-md
+                max-w-[85vw]
             `}>
                 {type === 'success' && (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                 )}
                 {type === 'error' && (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 )}
-                <span>{message}</span>
+                <span className="break-all line-clamp-4 overflow-y-auto max-h-32 custom-scrollbar pr-1">{message}</span>
             </div>
         </div>
     );

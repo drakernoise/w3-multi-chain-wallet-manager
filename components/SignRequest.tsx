@@ -243,7 +243,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 const to = request.params[1] || account.name; // Already sanitized in Background
                 let amount = request.params[2];
                 if (amount && !amount.includes(' ')) {
-                    const symbol = account.chain === 'HIVE' ? 'HIVE' : account.chain === 'STEEM' ? 'STEEM' : 'BLURT';
+                    const symbol = account.chain === Chain.HIVE ? 'HIVE' : account.chain === Chain.STEEM ? 'STEEM' : 'BLURT';
                     amount = `${parseFloat(amount).toFixed(3)} ${symbol}`;
                 }
                 const response = await broadcastPowerUp(account.chain, account.name, account.activeKey!, to, amount);
@@ -479,9 +479,14 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                                 <p className="text-xs text-slate-500 mb-1">{t('sign.json_payload')}</p>
                                 <div className="bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-60 overflow-y-auto custom-scrollbar">
                                     <pre className="text-[10px] text-green-400 whitespace-pre-wrap break-all font-mono">
-                                        {typeof request.params[3] === 'string'
-                                            ? JSON.stringify(JSON.parse(request.params[3]), null, 2)
-                                            : JSON.stringify(request.params[3], null, 2)}
+                                        {(() => {
+                                            try {
+                                                const data = typeof request.params[3] === 'string' ? JSON.parse(request.params[3]) : request.params[3];
+                                                return JSON.stringify(data, null, 2);
+                                            } catch (e) {
+                                                return String(request.params[3]);
+                                            }
+                                        })()}
                                     </pre>
                                 </div>
                             </div>
