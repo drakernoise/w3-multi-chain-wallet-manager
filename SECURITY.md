@@ -1,5 +1,9 @@
 # Security Policy
 
+**Languages:** [🇬🇧 English](SECURITY.md) | [🇪🇸 Español](SECURITY.es.md) | [🇫🇷 Français](SECURITY.fr.md) | [🇩🇪 Deutsch](SECURITY.de.md) | [🇮🇹 Italiano](SECURITY.it.md)
+
+---
+
 ## 🔐 Security Overview
 
 Gravity Wallet is a browser extension that handles sensitive cryptographic operations and private keys. We take security very seriously and appreciate the security research community's efforts to help keep our users safe.
