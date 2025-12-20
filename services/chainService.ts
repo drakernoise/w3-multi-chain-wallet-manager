@@ -53,9 +53,13 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
         extensions: []
     };
 
-    // 3. Sign (Offline using dhive crypto)
+    // 3. Sign with HF26-compatible serialization
+    // Hive mainnet chain ID (required for HF26+)
+    const HIVE_CHAIN_ID = 'beeab0de00000000000000000000000000000000000000000000000000000000';
     const privateKey = HivePrivateKey.fromString(key);
-    const signedTx = cryptoUtils.signTransaction(tx, [privateKey]);
+
+    // Use signTransaction with explicit chain ID for HF26 compatibility
+    const signedTx = cryptoUtils.signTransaction(tx, [privateKey], Buffer.from(HIVE_CHAIN_ID, 'hex'));
 
     // 4. Broadcast Synchronous
     const broadcastResponse = await fetch(nodeUrl, {
