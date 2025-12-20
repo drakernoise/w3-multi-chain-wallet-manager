@@ -1,114 +1,91 @@
-# Release v1.0.4 - Blurt Production Ready
+# Release v1.0.4 - Hive & Blurt Production Ready
 
-## 🎉 Major Milestone: Blurt Fully Functional
+## 🎉 Major Milestone: Dual Chain Mastery
 
-This release marks full compatibility with the Blurt blockchain ecosystem. All core features have been tested and verified across multiple frontends.
+This release marks a significant leap forward, achieving **full stability and compatibility with both Hive (HF26) and Blurt ecosystems**. 
 
-## ✨ New Features & Fixes
+We have successfully resolved complex serialization and broadcasting issues that were affecting Hive operations, particularly on `hive.blog`, while maintaining the robust Blurt support established previously.
+
+## ✨ Hive Critical Fixes (HF26)
+
+### HF26 Hardfork Compatibility & Voting
+- **Fixed:** "Missing Posting Authority" errors during voting and broadcasting.
+- **Solution:** Implemented explicit Chain ID enforcement (`beeab0de...`) for all transaction signatures, required by Hive's HF26 standard.
+- **Status:** ✅ Confirmed working on Hive.blog, Ecency, PeakD.
+
+### Custom JSON & Notifications (Mark as Read)
+- **Fixed:** `custom_json` serialization errors causing "Mark as Read" to fail on Hive.blog.
+- **Fixed:** Case-sensitivity issue where `posting` key type (lowercase) was not recognized, defaulting to Active key and causing authority mismatch.
+- **Added:** Robust sanitization middleware that ensures `required_auths` and `required_posting_auths` are always valid arrays.
+- **Status:** ✅ Confirmed working for notifications on Hive.blog.
+
+## ✨ Blurt Stability (Recap)
 
 ### Blurt Image Upload
-- **Fixed:** JSON-serialized Buffer deserialization issue
-- **Fixed:** Duplicate `ImageSigningChallenge` prefix handling
-- **Status:** ✅ Working on BeBlurt, Blurt.blog, blurb, app.blurt.blog
+- **Fixed:** Buffer deserialization and prefix handling for image uploads.
+- **Status:** ✅ Working on BeBlurt, Blurt.blog, blurb, app.blurt.blog.
 
-### Blurt Power Delegation
-- **Fixed:** Delegation operations now work correctly
-- **Added:** Minimum delegation validation (35 BP minimum)
-- **Status:** ✅ Working on BlurtWallet.com
-
-### UI Improvements
-- **Fixed:** Modal overflow issues on smaller screens
-- **Updated:** PowerModal, ManageAccountModal, ImportModal with `max-h-[90vh]`
-- **Status:** ✅ All modals now properly constrained
+### Blurt Delegation
+- **Fixed:** Delegation logic and validation.
+- **Status:** ✅ Working on BlurtWallet.com.
 
 ## 🧪 Tested Frontends
 
-| Feature | BeBlurt | Blurt.blog | blurb | blurtbb | app.blurt.blog | BlurtWallet |
-|---------|---------|------------|-------|---------|----------------|-------------|
-| Image Upload | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Vote | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Mark as Read | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
-| Login/Wallet | ✅ | ✅ | ✅ | N/A | ✅ | ✅ |
-| Transfer | N/A | ✅ | N/A | N/A | N/A | ✅ |
-| Post/Comment | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Power Up/Down | N/A | ✅ | N/A | N/A | N/A | ✅ |
-| Stop PD | N/A | ✅ | N/A | N/A | N/A | ✅ |
-| Delegation | N/A | N/A | N/A | N/A | N/A | ✅ |
-| Delegate RC | N/A | N/A | N/A | N/A | N/A | N/A |
-| Claim Rewards | ✅ | ✅ | N/A | N/A | N/A | ✅ |
+### Hive Ecosystem
+| Feature | Hive.blog | PeakD | Ecency | Splinterlands |
+|---------|-----------|-------|--------|---------------|
+| Vote | ✅ | ✅ | ✅ | ✅ |
+| Mark as Read | ✅ | ✅ | ✅ | ✅ |
+| Login | ✅ | ✅ | ✅ | ✅ |
+| Custom JSON | ✅ | ✅ | ✅ | ✅ |
+| Transfers | ✅ | ✅ | ✅ | ⚠️ WIP |
 
-**Legend:** ✅ Working | N/A Not Available/Not Tested
+### Blurt Ecosystem
+| Feature | BeBlurt | Blurt.blog | blurb | BlurtWallet |
+|---------|---------|------------|-------|-------------|
+| Image Upload | ✅ | ✅ | ✅ | N/A |
+| Vote | ✅ | ✅ | ✅ | N/A |
+| Operations | ✅ | ✅ | ✅ | ✅ |
 
-## 📦 Installation
+**Legend:** ✅ Working | ⚠️ WIP (Work in Progress) | N/A Not Available
 
-### From Source
-```bash
-git clone https://github.com/drakernoise/w3-multi-chain-wallet-manager.git
-cd w3-multi-chain-wallet-manager
-npm install
-npm run build
-```
+## 🔧 Technical Deep Dive
 
-### Load in Browser
-1. Open Chrome/Brave
-2. Go to `chrome://extensions`
-3. Enable "Developer mode"
-4. Click "Load unpacked"
-5. Select the `dist` folder
-
-## 🔧 Technical Details
-
-### Modified Files
-- `services/chainService.ts` - Buffer handling and ImageSigningChallenge logic
-- `components/PowerModal.tsx` - Overflow prevention
-- `components/ManageAccountModal.tsx` - Overflow prevention
-- `components/ImportModal.tsx` - Overflow prevention
-
-### Key Changes
+### Hive HF26 Serialization
 ```typescript
-// Detect JSON-serialized Buffers
-if (typeof message === 'string') {
-    const parsed = JSON.parse(message);
-    if (parsed.type === 'Buffer' && Array.isArray(parsed.data)) {
-        msgBuf = Buffer.from(parsed.data);
-    }
-}
-
-// Check for existing ImageSigningChallenge prefix
-const alreadyHasPrefix = msgBuf.slice(0, challengePrefix.length).equals(challengePrefix);
-if (alreadyHasPrefix) {
-    hash = cryptoUtils.sha256(msgBuf);
-} else {
-    const combined = Buffer.concat([challengePrefix, msgBuf]);
-    hash = cryptoUtils.sha256(combined);
-}
+// Explicit Chain ID required for HF26 signatures
+const HIVE_CHAIN_ID = 'beeab0de...';
+const signedTx = cryptoUtils.signTransaction(tx, [privateKey], Buffer.from(HIVE_CHAIN_ID, 'hex'));
 ```
 
-## 🐛 Known Issues
-- **BlurtBB:** Limited functionality (frontend-specific limitations)
-- **Mark as Read:** Not implemented (requires notification API integration)
-- **RC Delegation:** Not available on Blurt (Hive-only feature)
+### Custom JSON Sanitization
+```typescript
+// Case-insensitive key detection & robust array enforcement
+const normalizedKeyType = (keyType || '').toLowerCase();
+const cleanPayload = {
+    required_auths: Array.isArray(p.required_auths) ? p.required_auths : [],
+    required_posting_auths: Array.isArray(p.required_posting_auths) ? p.required_posting_auths : [],
+    // ...
+};
+```
 
-## 🚀 Next Steps
-- Hive frontend compatibility testing
-- Steem frontend compatibility testing
-- Additional UI/UX improvements
+## 🐛 Known Issues & Next Steps
+- **Splinterlands Transfers:** Internal transfers (DEC/SPS) currently showing "Invalid operation" - Under investigation.
+- **Steem:** Initial compatibility testing scheduled for next release cycle.
+- **UI:** Minor cosmetic updates planned for settings menu.
 
 ## 📝 Changelog
 
-### Added
-- Automated backup script (`scripts/backup.ps1`, `scripts/backup.sh`)
-- JSON-serialized Buffer detection and parsing
-- ImageSigningChallenge prefix detection
-
 ### Fixed
-- Blurt image upload on all frontends
-- Blurt delegation minimum amount validation
-- Modal overflow on smaller screens
+- **Hive:** HF26 transaction signature compatibility (Mainnet Chain ID).
+- **Hive:** Custom JSON broadcasting (Mark as Read/Notifications).
+- **Core:** Case-insensitive handling of key roles (`posting` vs `Posting`).
+- **Core:** Sanitization of `custom_json` payloads to prevent undefined array length errors.
+- **Blurt:** Image upload buffer handling.
 
-### Changed
-- Improved error messages for delegation failures
-- Enhanced buffer handling in `signMessage` function
+### Added
+- **Dev:** Automated backup scripts (`scripts/backup.ps1`).
+- **Dev:** Enhanced debug logging (now cleaned up for production).
 
 ## 👥 Contributors
 - @drakernoise
@@ -118,4 +95,4 @@ MIT
 
 ---
 
-**Full Changelog**: https://github.com/drakernoise/w3-multi-chain-wallet-manager/compare/v1.0.3...v1.0.4-blurt-stable
+**Full Changelog**: https://github.com/drakernoise/w3-multi-chain-wallet-manager/compare/v1.0.3...v1.0.4
