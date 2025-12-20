@@ -330,6 +330,19 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
 
                             return ['comment', cleanPayload];
                         }
+
+                        // Sanitize custom_json operations
+                        if (op[0] === 'custom_json') {
+                            const payload = op[1];
+                            const cleanPayload = {
+                                required_auths: Array.isArray(payload.required_auths) ? payload.required_auths : [],
+                                required_posting_auths: Array.isArray(payload.required_posting_auths) ? payload.required_posting_auths : [],
+                                id: payload.id || '',
+                                json: typeof payload.json === 'string' ? payload.json : JSON.stringify(payload.json || {})
+                            };
+                            return ['custom_json', cleanPayload];
+                        }
+
                         return op;
                     });
                 }
