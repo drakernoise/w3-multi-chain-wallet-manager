@@ -23,20 +23,25 @@ dist-ssr
 *.sln
 *.sw?
 
-# Binaries
+# Binaries & Archives
 *.zip
+*.tar.gz
 
-# Temporary
+# Temporary & Debug
 temp_recovery/
+debug/
+test_migration_output*.txt
 
 # Secrets
 .env
+.env.local
+.env.*
 
 # Security Audits & Releases (Non-Source)
 release/
 tests/
 
-# Managed Scripts
+# Managed Scripts & Utils
 backup.bat
 
 # Empty Translation Dir
