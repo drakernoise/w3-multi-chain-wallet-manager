@@ -34,20 +34,30 @@ We have successfully resolved complex serialization and broadcasting issues that
 ### Hive Ecosystem
 | Feature | Hive.blog | PeakD | Ecency | Splinterlands |
 |---------|-----------|-------|--------|---------------|
+| Login | ✅ | ✅ | ✅ | ✅ |
+| Image Upload | N/A | N/A | N/A | N/A |
 | Vote | ✅ | ✅ | ✅ | ✅ |
 | Mark as Read | ✅ | ✅ | ✅ | ✅ |
-| Login | ✅ | ✅ | ✅ | ✅ |
-| Custom JSON | ✅ | ✅ | ✅ | ✅ |
-| Transfers | ✅ | ✅ | ✅ | ⚠️ WIP |
+| Post/Comment | ✅ | ✅ | ✅ | N/A |
+| Transfer | ✅ | ✅ | ✅ | ⚠️ |
+| Power Up/Down | ✅ | ✅ | ✅ | N/A |
+| Delegation | ✅ | ✅ | ✅ | N/A |
+| Claim Rewards | ✅ | ✅ | ✅ | ✅ |
 
 ### Blurt Ecosystem
-| Feature | BeBlurt | Blurt.blog | blurb | BlurtWallet |
-|---------|---------|------------|-------|-------------|
-| Image Upload | ✅ | ✅ | ✅ | N/A |
-| Vote | ✅ | ✅ | ✅ | N/A |
-| Operations | ✅ | ✅ | ✅ | ✅ |
+| Feature | BeBlurt | Blurt.blog | blurb | Blurtbb | app.blurt.blog | BlurtWallet |
+|---------|---------|------------|-------|---------|----------------|-------------|
+| Login | ✅ | ✅ | ✅ | N/A | ✅ | ✅ |
+| Image Upload | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
+| Vote | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
+| Mark as Read | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
+| Post/Comment | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
+| Transfer | N/A | ✅ | N/A | N/A | N/A | ✅ |
+| Power Up/Down | N/A | ✅ | N/A | N/A | N/A | ✅ |
+| Delegation | N/A | N/A | N/A | N/A | N/A | ✅ |
+| Claim Rewards | ✅ | ✅ | N/A | N/A | N/A | ✅ |
 
-**Legend:** ✅ Working | ⚠️ WIP (Work in Progress) | N/A Not Available
+**Legend:** ✅ Working | ⚠️ WIP (Work in Progress) | N/A Not Available/Not Tested
 
 ## 🔧 Technical Deep Dive
 
