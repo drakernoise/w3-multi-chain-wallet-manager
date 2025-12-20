@@ -3,10 +3,35 @@
 Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **Steem**, and **Blurt** blockchains. It allows you to manage accounts, transfer funds, sign transactions, and interact with Web3 dApps seamlessly.
 
 <div align="center">
+
+[![Version](https://img.shields.io/badge/version-1.0.4-blue.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Security](https://img.shields.io/badge/security-policy-red.svg)](SECURITY.md)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-success.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/security/dependabot)
+[![Code Scanning](https://img.shields.io/badge/code%20scanning-enabled-success.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/security/code-scanning)
+
+[![Blurt](https://img.shields.io/badge/Blurt-✓%20Tested-orange.svg)](https://blurt.blog)
+[![Hive](https://img.shields.io/badge/Hive-✓%20Supported-red.svg)](https://hive.io)
+[![Steem](https://img.shields.io/badge/Steem-✓%20Supported-blue.svg)](https://steem.com)
+
+[![GitHub stars](https://img.shields.io/github/stars/drakernoise/w3-multi-chain-wallet-manager?style=social)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/drakernoise/w3-multi-chain-wallet-manager?style=social)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/network/members)
+
   <img src="public/logowallet_big.png" alt="Gravity Wallet Banner" width="300" />
 </div>
 
+---
 
+## 📚 Quick Links
+
+- 📖 [**Documentation**](https://github.com/drakernoise/w3-multi-chain-wallet-manager/wiki) - Complete user guide and tutorials
+- 🔐 [**Security Policy**](SECURITY.md) - Report vulnerabilities and security best practices
+- 📋 [**Changelog**](https://github.com/drakernoise/w3-multi-chain-wallet-manager/releases) - Version history and release notes
+- 🐛 [**Report Issues**](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues) - Bug reports and feature requests
+- 💬 [**Discussions**](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions) - Community support and ideas
+- 🔒 [**Privacy Policy**](PRIVACY.md) - How we handle your data
+
+---
 
 ## Features
 
@@ -64,4 +89,58 @@ This extension requires the following permissions:
 
 See [PRIVACY.md](PRIVACY.md) for details. We do not track you.
 
+---
 
+## 🤝 Contributing
+
+We welcome contributions! Here's how you can help:
+
+1. **Report Bugs**: Open an [issue](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues) with details
+2. **Suggest Features**: Share your ideas in [discussions](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions)
+3. **Submit Pull Requests**: Fork, code, test, and submit a PR
+4. **Security**: Report vulnerabilities privately to `drakernoise@protonmail.com`
+
+Please read our [Security Policy](SECURITY.md) before reporting security issues.
+
+## 🛣️ Roadmap
+
+- [x] ✅ Multi-chain support (Hive, Steem, Blurt)
+- [x] ✅ Blurt full compatibility (v1.0.4)
+- [ ] 🔄 Hive frontend testing and optimization
+- [ ] 🔄 Steem frontend testing and optimization
+- [ ] 📱 Mobile browser support
+- [ ] 🔐 Hardware wallet integration (Ledger/Trezor)
+- [ ] 🔑 Biometric authentication
+- [ ] 🌐 Multi-language support
+- [ ] 📊 Advanced analytics dashboard
+
+## 💬 Support
+
+Need help? Here are your options:
+
+- 📖 **Documentation**: Check our [Wiki](https://github.com/drakernoise/w3-multi-chain-wallet-manager/wiki)
+- 💬 **Community**: Join [GitHub Discussions](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions)
+- 🐛 **Bug Reports**: Open an [Issue](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues)
+- 🔐 **Security**: Email `drakernoise@protonmail.com`
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## ⚠️ Disclaimer
+
+**USE AT YOUR OWN RISK.** This is beta software. Always:
+- ✅ Backup your private keys securely
+- ✅ Test with small amounts first
+- ✅ Verify transaction details before confirming
+- ✅ Keep your browser and extension updated
+
+---
+
+<div align="center">
+
+**Made with ❤️ for the Graphene blockchain community**
+
+[Report Bug](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues) · [Request Feature](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions) · [Documentation](https://github.com/drakernoise/w3-multi-chain-wallet-manager/wiki)
+
+</div>
