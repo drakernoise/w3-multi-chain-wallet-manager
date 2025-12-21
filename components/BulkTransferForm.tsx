@@ -324,31 +324,8 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                     {/* Token Selector & Balance Row */}
                     {(chain === Chain.HIVE || chain === Chain.STEEM) && (
                         <div className="flex items-center justify-between bg-dark-900/50 p-2 rounded-lg border border-dark-700">
-                            <div className="flex items-center gap-3">
-                                <span className="text-xs text-slate-400 font-bold">{t('bulk.asset')}</span>
-                                <div className="flex gap-2">
-                                    <select
-                                        value={selectedToken}
-                                        onChange={(e) => setSelectedToken(e.target.value)}
-                                        className="bg-dark-800 text-white border border-dark-600 rounded px-3 py-1 text-xs font-mono outline-none focus:border-blue-500 cursor-pointer hover:bg-dark-700 transition-colors"
-                                    >
-                                        {chain === Chain.HIVE ? (
-                                            <>
-                                                <option value="HIVE">HIVE</option>
-                                                <option value="HBD">HBD</option>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <option value="STEEM">STEEM</option>
-                                                <option value="SBD">SBD</option>
-                                            </>
-                                        )}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Balance */}
-                            <div className="text-[10px] text-slate-400">
+                            {/* Balance - Now Right Aligned/Full Width since selector is moved */}
+                            <div className="text-[10px] text-slate-400 w-full text-right">
                                 {t('bulk.available')} <span className="text-green-400 font-bold font-mono">
                                     {((selectedToken === 'HBD' || selectedToken === 'SBD') ? account.secondaryBalance : account.balance)?.toFixed(3)}
                                 </span> {selectedToken}
@@ -390,7 +367,29 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                         }}
                                         className="w-full bg-dark-950 border border-dark-600 rounded-lg p-3 text-lg font-mono text-white focus:border-blue-500 outline-none transition-colors"
                                     />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">{selectedToken}</span>
+                                    <div className="absolute right-1 top-1 bottom-1 flex items-center">
+                                        {(chain === Chain.HIVE || chain === Chain.STEEM) ? (
+                                            <select
+                                                value={selectedToken}
+                                                onChange={(e) => setSelectedToken(e.target.value)}
+                                                className="h-full bg-dark-800 text-xs font-bold text-white border-l border-dark-600 rounded-r-lg px-2 outline-none cursor-pointer hover:bg-dark-700"
+                                            >
+                                                {chain === Chain.HIVE ? (
+                                                    <>
+                                                        <option value="HIVE">HIVE</option>
+                                                        <option value="HBD">HBD</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="STEEM">STEEM</option>
+                                                        <option value="SBD">SBD</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                        ) : (
+                                            <span className="px-3 text-xs font-bold text-slate-500">{selectedToken}</span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -477,7 +476,29 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                                     }}
                                                     className="w-full bg-dark-950 border border-dark-600 rounded-lg px-3 py-2 text-xs outline-none text-white placeholder-slate-600 font-mono"
                                                 />
-                                                <span className="absolute right-2 top-2 text-[10px] text-slate-500">{selectedToken}</span>
+                                                <div className="absolute right-1 top-1 bottom-1 flex items-center">
+                                                    {(chain === Chain.HIVE || chain === Chain.STEEM) ? (
+                                                        <select
+                                                            value={selectedToken}
+                                                            onChange={(e) => setSelectedToken(e.target.value)}
+                                                            className="h-full bg-dark-800 text-xs font-bold text-white border-l border-dark-600 rounded-r-lg px-2 outline-none cursor-pointer hover:bg-dark-700"
+                                                        >
+                                                            {chain === Chain.HIVE ? (
+                                                                <>
+                                                                    <option value="HIVE">HIVE</option>
+                                                                    <option value="HBD">HBD</option>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <option value="STEEM">STEEM</option>
+                                                                    <option value="SBD">SBD</option>
+                                                                </>
+                                                            )}
+                                                        </select>
+                                                    ) : (
+                                                        <span className="px-3 text-xs font-bold text-slate-500">{selectedToken}</span>
+                                                    )}
+                                                </div>
                                             </div>
                                             <button
                                                 onClick={() => removeRow(idx)}
