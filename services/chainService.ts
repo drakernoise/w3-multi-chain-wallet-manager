@@ -595,9 +595,13 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
             if (json.result) return json.result.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
         }
         if (chain === Chain.STEEM) {
-            const client = new SteemClient(node);
-            const history = await client.database.call('get_account_history', [username, -1, 500]);
-            return history.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
+            const response = await fetch(node, {
+                method: 'POST',
+                body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 500], id: 1 }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const json = await response.json();
+            if (json.result) return json.result.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
         }
         if (chain === Chain.BLURT) {
             const response = await fetch(node, { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 500], id: 1 }), headers: { 'Content-Type': 'application/json' } });
