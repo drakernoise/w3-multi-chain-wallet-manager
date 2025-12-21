@@ -190,7 +190,7 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                     </div>
                     <div className="flex justify-between border-b border-dark-700 pb-2 mb-2">
                         <span className="text-slate-500">{t('transfer.total_amount')}</span>
-                        <span className="text-blue-400 font-bold">{totalAmount.toFixed(3)} {chain}</span>
+                        <span className="text-blue-400 font-bold">{totalAmount.toFixed(3)} {selectedToken}</span>
                     </div>
 
                     <p className="text-slate-500 mb-1 font-bold">{t('bulk.recipients')} {recipientsList.length}</p>
@@ -216,7 +216,7 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                     </div>
                     <div className="flex justify-between border-b border-dark-700 pb-2 mb-2">
                         <span className="text-slate-500">{t('transfer.total_amount')}</span>
-                        <span className="text-blue-400 font-bold">{totalAmount.toFixed(3)} {chain}</span>
+                        <span className="text-blue-400 font-bold">{totalAmount.toFixed(3)} {selectedToken}</span>
                     </div>
 
                     <p className="text-slate-500 mb-1 font-bold">{t('transfer.operations')} ({items.length})</p>
