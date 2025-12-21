@@ -405,12 +405,21 @@ export const broadcastOperations = async (
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             const config = getChainConfig(Chain.BLURT);
+            console.log("[DEBUG] Blurt Config:", config.addressPrefix, config.chainId);
             blurt.config.set('address_prefix', config.addressPrefix);
             blurt.config.set('chain_id', config.chainId);
             blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
+
+            const privateKey = blurt.PrivateKey.fromString(activeKey);
+
             const result = await new Promise<any>((resolve, reject) => {
-                blurt.broadcast.send({ extensions: [], operations: operations }, [activeKey], (err: any, res: any) => {
-                    if (err) reject(err); else resolve(res);
+                blurt.broadcast.send({ extensions: [], operations: operations }, [privateKey], (err: any, res: any) => {
+                    if (err) {
+                        console.error("[DEBUG] Blurt Broadcast Error:", err);
+                        reject(err);
+                    } else {
+                        resolve(res);
+                    }
                 });
             });
             return { success: true, txId: result.id, opResult: result };
