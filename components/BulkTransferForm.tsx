@@ -327,28 +327,23 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                             <div className="flex items-center gap-3">
                                 <span className="text-xs text-slate-400 font-bold">{t('bulk.asset')}</span>
                                 <div className="flex gap-2">
-                                    <label className="flex items-center gap-1 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="token"
-                                            value={chain === Chain.HIVE ? "HIVE" : "STEEM"}
-                                            checked={selectedToken === "HIVE" || selectedToken === "STEEM"}
-                                            onChange={() => setSelectedToken(chain === Chain.HIVE ? "HIVE" : "STEEM")}
-                                            className="accent-blue-500"
-                                        />
-                                        <span className="text-[10px] text-white font-mono">{chain === Chain.HIVE ? "HIVE" : "STEEM"}</span>
-                                    </label>
-                                    <label className="flex items-center gap-1 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="token"
-                                            value={chain === Chain.HIVE ? "HBD" : "SBD"}
-                                            checked={selectedToken === "HBD" || selectedToken === "SBD"}
-                                            onChange={() => setSelectedToken(chain === Chain.HIVE ? "HBD" : "SBD")}
-                                            className="accent-blue-500"
-                                        />
-                                        <span className="text-[10px] text-white font-mono">{chain === Chain.HIVE ? "HBD" : "SBD"}</span>
-                                    </label>
+                                    <select
+                                        value={selectedToken}
+                                        onChange={(e) => setSelectedToken(e.target.value)}
+                                        className="bg-dark-800 text-white border border-dark-600 rounded px-3 py-1 text-xs font-mono outline-none focus:border-blue-500 cursor-pointer hover:bg-dark-700 transition-colors"
+                                    >
+                                        {chain === Chain.HIVE ? (
+                                            <>
+                                                <option value="HIVE">HIVE</option>
+                                                <option value="HBD">HBD</option>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <option value="STEEM">STEEM</option>
+                                                <option value="SBD">SBD</option>
+                                            </>
+                                        )}
+                                    </select>
                                 </div>
                             </div>
 
