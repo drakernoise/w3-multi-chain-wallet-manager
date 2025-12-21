@@ -3,7 +3,7 @@ const path = require('path');
 
 const vendorPath = path.join(__dirname, '../dist/assets/vendor.js');
 
-const POLYFILL = 'var window = window || self; var global = global || self; ';
+const POLYFILL = 'var window = window || self; var global = global || self; var exports = exports || {}; ';
 
 function patch(filePath) {
     try {
