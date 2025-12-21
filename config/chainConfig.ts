@@ -120,8 +120,8 @@ export const CHAIN_CONFIGS: Record<Chain, ChainConfig> = {
         addressPrefix: 'STM',
         chainId: '0000000000000000000000000000000000000000000000000000000000000000',
         rpcNodes: [
-            'https://api.steemit.com',
-            'https://api.steem.fans'
+            'https://api.steem.fans',
+            'https://api.steemit.com'
         ],
         explorerUrl: {
             transaction: 'https://steemit.com/tx/{tx}',

@@ -604,7 +604,7 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
             const json = await response.json();
             if (json.result) return json.result.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
         }
-    } catch (e) { console.error("Fetch History Error:", e); }
+    } catch (e: any) { console.error("Fetch History Error:", JSON.stringify(e, null, 2) || e); }
     return [];
 };
 
