@@ -344,10 +344,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
 
                     <div>
                         <label className="text-xs text-slate-400 uppercase font-bold mb-1 block">{t('bulk.memo')} {t('transfer.optional')}</label>
-                        <input
+                        <textarea
                             value={memo}
                             onChange={(e) => setMemo(e.target.value)}
-                            className="w-full bg-dark-900 border border-dark-600 rounded-lg py-2 px-3 text-sm focus:border-blue-500 outline-none"
+                            rows={3}
+                            className="w-full bg-dark-900 border border-dark-600 rounded-lg py-2 px-3 text-sm focus:border-blue-500 outline-none resize-none custom-scrollbar"
                             placeholder={t('transfer.memo_placeholder')}
                         />
                     </div>
