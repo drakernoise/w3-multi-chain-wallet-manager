@@ -405,15 +405,22 @@ export const broadcastOperations = async (
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             const config = getChainConfig(Chain.BLURT);
-            console.log("[DEBUG] Blurt Config (dsteem):", config.addressPrefix, config.chainId);
+            console.log("[DEBUG] Blurt Config (blurtjs):", config.addressPrefix, config.chainId);
 
-            const client = new SteemClient(nodeUrl, {
-                chainId: config.chainId,
-                addressPrefix: config.addressPrefix
+            blurt.config.set('address_prefix', config.addressPrefix);
+            blurt.config.set('chain_id', config.chainId);
+            blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
+
+            const result = await new Promise<any>((resolve, reject) => {
+                blurt.broadcast.send({ extensions: [], operations: operations }, [activeKey], (err: any, res: any) => {
+                    if (err) {
+                        console.error("[DEBUG] Blurt Broadcast Error:", err);
+                        reject(err);
+                    } else {
+                        resolve(res);
+                    }
+                });
             });
-
-            const key = SteemPrivateKey.fromString(activeKey);
-            const result = await client.broadcast.sendOperations(operations, key);
 
             return { success: true, txId: result.id, opResult: result };
         }
