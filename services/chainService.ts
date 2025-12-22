@@ -299,7 +299,9 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const privateKey = SteemPrivateKey.fromString(key);
+            console.log("[DEBUG] Steem Vote:", voter, author, permlink, weight);
             const result = await client.broadcast.vote({ voter, author, permlink, weight }, privateKey);
+            console.log("[DEBUG] Steem Vote Result:", JSON.stringify(result));
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
@@ -401,7 +403,9 @@ export const broadcastOperations = async (
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const key = SteemPrivateKey.fromString(activeKey);
+            console.log("[DEBUG] Steem Ops:", JSON.stringify(operations));
             const result = await client.broadcast.sendOperations(operations, key);
+            console.log("[DEBUG] Steem Result:", JSON.stringify(result));
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             const config = getChainConfig(Chain.BLURT);
