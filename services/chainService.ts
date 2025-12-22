@@ -406,6 +406,7 @@ export const broadcastOperations = async (
         } else if (chain === Chain.BLURT) {
             const config = getChainConfig(Chain.BLURT);
             console.log("[DEBUG] Blurt Config (blurtjs):", config.addressPrefix, config.chainId);
+            console.log("[DEBUG] Blurt Ops:", JSON.stringify(operations));
 
             blurt.config.set('address_prefix', config.addressPrefix);
             blurt.config.set('chain_id', config.chainId);
