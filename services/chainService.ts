@@ -583,6 +583,7 @@ export interface HistoryItem {
 export const fetchAccountHistory = async (chain: Chain, username: string): Promise<HistoryItem[]> => {
     const node = getActiveNode(chain);
     const processOp = (op: any, timestamp: string, trx_id: string): HistoryItem | null => {
+        if (!op || !Array.isArray(op) || op.length < 2) return null;
         const type = op[0];
         const data = op[1];
         if (type === 'transfer') {
@@ -649,7 +650,7 @@ export const signMessage = (
 
             // Convert message to buffer
             let msgBuf: Buffer;
-            if (typeof message === 'object' && !Buffer.isBuffer(message)) {
+            if (typeof message === 'object' && message !== null && !Buffer.isBuffer(message)) {
                 if ((message as any).type === 'Buffer' && Array.isArray((message as any).data)) {
                     msgBuf = Buffer.from((message as any).data);
                 } else {
