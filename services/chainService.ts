@@ -300,7 +300,7 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
             const client = new SteemClient(nodeUrl);
             const privateKey = SteemPrivateKey.fromString(key);
             const result = await client.broadcast.vote({ voter, author, permlink, weight }, privateKey);
-            return { success: true, txId: result.id };
+            return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
             const result = await new Promise<any>((resolve, reject) => {
@@ -308,7 +308,7 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
                     if (err) reject(err); else resolve(res);
                 });
             });
-            return { success: true, txId: result.id };
+            return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
