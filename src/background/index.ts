@@ -42,6 +42,7 @@ function detectChainFromUrl(url: string = ""): string | null {
 
 // Listen for messages from Content Script or Popup
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
+    if (!request) return false;
     // console.log("Gravity Debug: MESSAGE RECEIVED", request.type, request.method); // Debug only
     // console.log("Gravity: MSG", request.type, request.method); // Debug only
 
