@@ -396,28 +396,40 @@ export const broadcastOperations = async (
 ): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const nodeUrl = getActiveNode(chain);
 
+    // Clean operations from frontend-specific properties (like __config, __rshares)
+    const cleanOperations = operations.map(op => {
+        if (Array.isArray(op) && op.length >= 2 && typeof op[1] === 'object') {
+            const data = { ...op[1] };
+            Object.keys(data).forEach(key => {
+                if (key.startsWith('__')) delete data[key];
+            });
+            return [op[0], data];
+        }
+        return op;
+    });
+
     try {
         if (chain === Chain.HIVE) {
-            const result = await broadcastHiveTransaction(nodeUrl, operations, activeKey);
+            const result = await broadcastHiveTransaction(nodeUrl, cleanOperations, activeKey);
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const key = SteemPrivateKey.fromString(activeKey);
-            console.log("[DEBUG] Steem Ops:", JSON.stringify(operations));
-            const result = await client.broadcast.sendOperations(operations, key);
+            console.log("[DEBUG] Steem Ops (Cleaned):", JSON.stringify(cleanOperations));
+            const result = await client.broadcast.sendOperations(cleanOperations, key);
             console.log("[DEBUG] Steem Result:", JSON.stringify(result));
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             const config = getChainConfig(Chain.BLURT);
             console.log("[DEBUG] Blurt Config (blurtjs):", config.addressPrefix, config.chainId);
-            console.log("[DEBUG] Blurt Ops:", JSON.stringify(operations));
+            console.log("[DEBUG] Blurt Ops (Cleaned):", JSON.stringify(cleanOperations));
 
             blurt.config.set('address_prefix', config.addressPrefix);
             blurt.config.set('chain_id', config.chainId);
             blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
 
             const result = await new Promise<any>((resolve, reject) => {
-                blurt.broadcast.send({ extensions: [], operations: operations }, [activeKey], (err: any, res: any) => {
+                blurt.broadcast.send({ extensions: [], operations: cleanOperations }, [activeKey], (err: any, res: any) => {
                     if (err) {
                         console.error("[DEBUG] Blurt Broadcast Error:", err);
                         reject(err);
