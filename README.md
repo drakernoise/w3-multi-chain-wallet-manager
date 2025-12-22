@@ -4,7 +4,7 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-1.0.4-blue.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/releases)
+[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Security](https://img.shields.io/badge/security-policy-red.svg)](SECURITY.md)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-success.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/security/dependabot)
@@ -106,8 +106,8 @@ Please read our [Security Policy](SECURITY.md) before reporting security issues.
 
 - [x] ✅ Multi-chain support (Hive, Steem, Blurt)
 - [x] ✅ Blurt full compatibility (v1.0.4)
-- [ ] 🔄 Hive frontend testing and optimization
-- [ ] 🔄 Steem frontend testing and optimization
+- [x] ✅ Hive full compatibility (v1.0.5)
+- [x] ✅ Steem full compatibility (v1.0.5)
 - [ ] 📱 Mobile browser support
 - [ ] 🔐 Hardware wallet integration (Ledger/Trezor)
 - [ ] 🔑 Biometric authentication

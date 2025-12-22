@@ -11,6 +11,7 @@ Common issues and their solutions for Gravity Wallet.
 5. [Balance & Display Problems](#balance--display-problems)
 6. [Performance Issues](#performance-issues)
 7. [Error Messages](#error-messages)
+8. [Recent Fixes (v1.0.5)](#recent-fixes-v105)
 
 ---
 
@@ -412,6 +413,23 @@ npm run build
 
 - **GitHub Discussions**: [Ask questions](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions)
 - **Community**: [@gravitywallet on Hive](https://peakd.com/@gravitywallet)
+
+---
+
+## Recent Fixes (v1.0.5)
+
+### Steem History Not Loading
+**Fix**: Resolved a conflict in the Service Worker where `dsteem` was failing due to missing `exports` polyfill. 
+**Status**: ✅ Fully operational. If history still doesn't load, refresh the page or restart the browser.
+
+### "broadcastPayload undefined" / Operation Fails
+**Cause**: Some frontends (like Steemit.com) inyect properties like `__config` into transactions. These are non-standard and rejected by strict RPC nodes or libraries.
+**Fix**: Added a sanitization layer that automatically cleans operations before signing.
+**Status**: ✅ Fixed in v1.0.5.
+
+### Blurt Node Timeouts
+**Fix**: Updated default RPC nodes to `rpc.beblurt.com`. 
+**Status**: ✅ Connectivity restored.
 
 ---
 

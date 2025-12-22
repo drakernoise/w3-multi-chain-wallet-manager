@@ -4,7 +4,7 @@
  * This script provides a standard-compliant API for interacting with Graphene-based blockchains
  * (Hive, Blurt, Steem). It implements compatibility with Hive Keychain and WhaleVault APIs.
  * 
- * @version 1.0.4
+ * @version 1.0.5
  */
 
 // Prevent multiple injections
@@ -13,7 +13,7 @@ if (!(window as any)._gravityProvider) {
     // Configuration
     const PROVIDER_CONFIG = {
         name: 'Gravity',
-        version: '1.0.4',
+        version: '1.0.5',
         messageType: 'gravity_request',
         responseType: 'gravity_response'
     } as const;
