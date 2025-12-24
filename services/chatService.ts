@@ -129,8 +129,12 @@ class ChatService {
         return this.rooms;
     }
 
-    public createRoom(name: string) {
-        this.socket?.emit('create_room', { name });
+    public createRoom(name: string, isPrivate: boolean = false) {
+        this.socket?.emit('create_room', { name, isPrivate });
+    }
+
+    public inviteUser(roomId: string, targetUsername: string) {
+        this.socket?.emit('invite_user', { roomId, targetUsername });
     }
 
     public closeRoom(roomId: string) {

@@ -21,13 +21,15 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     // Create Room State
     const [isCreating, setIsCreating] = useState(false);
     const [newRoomName, setNewRoomName] = useState('');
+    const [isPrivateRoom, setIsPrivateRoom] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const handleCreateRoom = () => {
         if (newRoomName.trim().length < 3) return;
-        chatService.createRoom(newRoomName.trim());
+        chatService.createRoom(newRoomName.trim(), isPrivateRoom);
         setNewRoomName('');
+        setIsPrivateRoom(false);
         setIsCreating(false);
     };
 
@@ -219,8 +221,18 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     if (e.key === 'Escape') setIsCreating(false);
                                 }}
                             />
+                            <div className="flex items-center mb-2">
+                                <input
+                                    type="checkbox"
+                                    id="privateRoom"
+                                    className="mr-2"
+                                    checked={isPrivateRoom}
+                                    onChange={(e) => setIsPrivateRoom(e.target.checked)}
+                                />
+                                <label htmlFor="privateRoom" className="text-xs text-slate-300">Private (Invite Only)</label>
+                            </div>
                             <div className="flex gap-2 justify-end">
-                                <button onClick={() => setIsCreating(false)} className="text-xs text-slate-400 hover:text-white">Cancel</button>
+                                <button onClick={() => { setIsCreating(false); setIsPrivateRoom(false); }} className="text-xs text-slate-400 hover:text-white">Cancel</button>
                                 <button onClick={handleCreateRoom} className="text-xs bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-white">Create</button>
                             </div>
                         </div>
@@ -289,10 +301,23 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 <button onClick={() => setActiveRoomId(null)} className="md:hidden text-slate-400 hover:text-white mr-2">←</button>
                                 <h3 className="font-bold flex items-center gap-2">
                                     {rooms.find(r => r.id === activeRoomId)?.type === 'public' && <span className="text-slate-400">#</span>}
+                                    {rooms.find(r => r.id === activeRoomId)?.type === 'private' && <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>}
                                     {rooms.find(r => r.id === activeRoomId)?.name.replace(user.username, '').replace(' & ', '').replace(user.username, '').trim()}
                                 </h3>
                             </div>
                             <div className="flex gap-4 items-center">
+                                {/* Invite Action for Private Rooms */}
+                                {rooms.find(r => r.id === activeRoomId)?.type === 'private' && rooms.find(r => r.id === activeRoomId)?.owner === user.id && (
+                                    <button
+                                        onClick={() => {
+                                            const target = prompt('Enter username to invite:');
+                                            if (target) chatService.inviteUser(activeRoomId!, target);
+                                        }}
+                                        className="text-purple-400 hover:text-purple-300 text-xs flex items-center gap-1 border border-purple-900/50 bg-purple-900/20 px-2 py-1 rounded"
+                                    >
+                                        + Invite
+                                    </button>
+                                )}
                                 {/* Owner Actions */}
                                 {rooms.find(r => r.id === activeRoomId)?.owner === user.id && rooms.find(r => r.id === activeRoomId)?.id !== 'global-lobby' && (
                                     <button

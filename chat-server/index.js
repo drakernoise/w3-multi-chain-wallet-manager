@@ -199,7 +199,7 @@ io.on('connection', (socket) => {
     // --- 5. Custom Rooms (User Created) ---
     socket.on('create_room', (data) => {
         if (!socket.user) return;
-        const { name } = data;
+        const { name, isPrivate } = data;
 
         if (!name || name.length < 3) {
             socket.emit('error', 'Room name too short');
@@ -210,7 +210,7 @@ io.on('connection', (socket) => {
         const newRoom = {
             id: newId,
             name,
-            type: 'public',
+            type: isPrivate ? 'private' : 'public',
             owner: socket.user.id, // Only owner can close
             members: [socket.user.id],
             admins: [socket.user.id],
@@ -219,11 +219,50 @@ io.on('connection', (socket) => {
 
         rooms[newId] = newRoom;
 
-        // Broadcast to existing socket to join immediately
+        // Broadcast to owner
         socket.join(newId);
+        socket.emit('room_added', newRoom);
 
-        // Broadcast to ALL users so they see the new public room
-        io.emit('room_added', newRoom);
+        // If public, broadcast to everyone else
+        if (!isPrivate) {
+            socket.broadcast.emit('room_added', newRoom);
+        }
+    });
+
+    socket.on('invite_user', (data) => {
+        if (!socket.user) return;
+        const { roomId, targetUsername } = data;
+        const room = rooms[roomId];
+
+        if (!room) return;
+        if (room.owner !== socket.user.id) {
+            socket.emit('error', 'Only owner can invite');
+            return;
+        }
+
+        const targetUserId = usernames[targetUsername.toLowerCase()];
+        if (!targetUserId) {
+            socket.emit('error', 'User not found');
+            return;
+        }
+
+        // Add to members
+        if (!room.members.includes(targetUserId)) {
+            room.members.push(targetUserId);
+        }
+
+        // Notify Target
+        // Match connectedSockets (socketId -> userId)
+        Object.keys(connectedSockets).forEach(sId => {
+            if (connectedSockets[sId] === targetUserId) {
+                const s = io.sockets.sockets.get(sId);
+                if (s) {
+                    s.join(roomId);
+                    s.emit('room_added', room);
+                }
+            }
+        });
+        socket.emit('success', `Invited ${targetUsername}`);
     });
 
     socket.on('close_room', (roomId) => {
