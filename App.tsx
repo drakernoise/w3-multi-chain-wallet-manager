@@ -512,6 +512,8 @@ function AppContent() {
           {currentView === ViewState.MANAGE && (
             <ManageWallets
               accounts={walletState.accounts}
+              walletState={walletState}
+              setWalletState={setWalletState}
               onEdit={(acc) => setManagingAccount(acc)}
               onImport={() => setShowImport(true)}
             />

@@ -2336,9 +2336,86 @@ const TOTPSetupModal = ({ accounts, onClose, onComplete }) => {
   ] }) });
 };
 
-const ManageWallets = ({ accounts, onEdit, onImport }) => {
+const BiometricSetupModal = ({ accounts, setWalletState, onClose, onComplete }) => {
+  useTranslation();
+  const [step, setStep] = reactExports.useState("intro");
+  const [error, setError] = reactExports.useState("");
+  const handleSetup = async () => {
+    setStep("loading");
+    setError("");
+    try {
+      const isAvailable = await isBiometricsAvailable();
+      if (!isAvailable) {
+        setStep("error");
+        setError("Biometrics not supported on this device or browser context.");
+        return;
+      }
+      const success = await registerBiometrics();
+      if (success) {
+        await enablePasswordless(accounts);
+        setWalletState((prev) => ({
+          ...prev,
+          useBiometrics: true
+        }));
+        setStep("success");
+        setTimeout(() => {
+          onComplete();
+        }, 1500);
+      } else {
+        setStep("error");
+        setError("Registration failed. Please try again.");
+      }
+    } catch (e) {
+      setStep("error");
+      setError(e.message || "An unexpected error occurred.");
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 z-50 bg-dark-900/90 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in text-white text-center", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-600 rounded-2xl p-8 w-full max-w-sm shadow-2xl", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-end mb-2 absolute top-4 right-4", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) }) }),
+    step === "intro" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-6", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center mx-auto mb-2 border border-blue-500/20 shadow-[0_0_20px_rgba(37,99,235,0.1)]", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-10 h-10 text-blue-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147l.156-.471m-1.284 8.761a20.003 20.003 0 007.544 6.799" }) }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black mb-2", children: "Enable Biometrics" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-400", children: "Use your fingerprint or face scan to unlock your wallet faster and more securely." })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: handleSetup,
+          className: "w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg active:scale-95",
+          children: "Setup Now"
+        }
+      )
+    ] }),
+    step === "loading" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-12 space-y-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-blue-400 font-bold animate-pulse", children: "Waiting for system..." })
+    ] }),
+    step === "success" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-8 space-y-4 animate-bounce-in", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/30", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-10 h-10 text-green-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 3, d: "M5 13l4 4L19 7" }) }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-2xl font-black text-white", children: "Verified!" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-slate-400", children: "Biometrics enabled successfully." })
+    ] }),
+    step === "error" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "py-8 space-y-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-10 h-10 text-red-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" }) }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-bold text-white mb-2", children: "Error" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-400 text-sm", children: error }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => setStep("intro"),
+          className: "w-full bg-dark-700 hover:bg-dark-600 text-white font-bold py-3 rounded-xl mt-4",
+          children: "Try Again"
+        }
+      )
+    ] })
+  ] }) });
+};
+
+const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport }) => {
   const { t } = useTranslation();
   const [showTOTP, setShowTOTP] = reactExports.useState(false);
+  const [showBio, setShowBio] = reactExports.useState(false);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full space-y-4", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center p-4 border-b border-dark-700", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-lg font-bold", children: t("settings.accounts_title") }),
@@ -2375,20 +2452,35 @@ const ManageWallets = ({ accounts, onEdit, onImport }) => {
         }
       )
     ] }, `${acc.chain}-${acc.name}-${idx}`)) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 pt-2 border-t border-dark-700 mt-auto", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-3", children: "Security" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 pt-2 border-t border-dark-700 mt-auto space-y-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: "Security" }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs(
         "button",
         {
           onClick: () => setShowTOTP(true),
-          className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-lg flex items-center gap-3 transition-colors text-left",
+          className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
           children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }) }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Authenticator App (2FA)" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Configure Aegis, Google Auth, or Authy" })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Enable Aegis, Google Auth, or Authy" })
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 text-slate-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 5l7 7-7 7" }) })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useTOTP ? "bg-green-500/20 text-green-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useTOTP ? "Enabled" : "Off" })
+          ]
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => setShowBio(true),
+          className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:bg-rose-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147l.156-.471m-1.284 8.761a20.003 20.003 0 007.544 6.799" }) }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Fingerprint / FaceID" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Fast biometric unlock" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useBiometrics ? "bg-green-500/20 text-green-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useBiometrics ? "Enabled" : "Off" })
           ]
         }
       )
@@ -2399,6 +2491,16 @@ const ManageWallets = ({ accounts, onEdit, onImport }) => {
         accounts,
         onClose: () => setShowTOTP(false),
         onComplete: () => setShowTOTP(false)
+      }
+    ),
+    showBio && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      BiometricSetupModal,
+      {
+        accounts,
+        walletState,
+        setWalletState,
+        onClose: () => setShowBio(false),
+        onComplete: () => setShowBio(false)
       }
     )
   ] });
@@ -6461,6 +6563,8 @@ function AppContent() {
           ManageWallets,
           {
             accounts: walletState.accounts,
+            walletState,
+            setWalletState,
             onEdit: (acc) => setManagingAccount(acc),
             onImport: () => setShowImport(true)
           }
