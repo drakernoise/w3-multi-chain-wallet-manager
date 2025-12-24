@@ -796,25 +796,41 @@ const registerBiometrics = async () => {
   try {
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
+    const host = window.location.hostname || "";
     const publicKeyCredentialCreationOptions = {
       challenge,
       rp: {
-        name: "Web3 Multi-Chain Wallet",
-        id: window.location.hostname
-        // In an extension, this handles the chrome-extension:// origin
+        name: "Gravity Wallet",
+        id: host === "localhost" || !host ? void 0 : host
       },
       user: {
         id: new Uint8Array(16),
-        // User ID should be consistent
         name: "wallet_owner",
-        displayName: "Wallet Owner"
+        displayName: "Gravity Wallet Owner"
       },
-      pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-      // ES256
+      pubKeyCredParams: [
+        { alg: -7, type: "public-key" },
+        // ES256
+        { alg: -257, type: "public-key" },
+        // RS256
+        { alg: -35, type: "public-key" },
+        // ES384
+        { alg: -36, type: "public-key" },
+        // ES512
+        { alg: -37, type: "public-key" },
+        // PS256
+        { alg: -38, type: "public-key" },
+        // PS384
+        { alg: -39, type: "public-key" },
+        // PS512
+        { alg: -8, type: "public-key" }
+        // Ed25519
+      ],
       authenticatorSelection: {
         authenticatorAttachment: "platform",
-        // Forces TouchID/FaceID/Hello
-        userVerification: "required"
+        userVerification: "required",
+        residentKey: "preferred",
+        requireResidentKey: false
       },
       timeout: 6e4,
       attestation: "none"

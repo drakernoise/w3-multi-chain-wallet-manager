@@ -33,11 +33,12 @@ export const registerBiometrics = async (): Promise<boolean> => {
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
 
+    const host = window.location.hostname || "";
     const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
       challenge,
       rp: {
         name: "Gravity Wallet",
-        // Removing ID allows it to default to the extension origin correctly
+        id: (host === "localhost" || !host) ? undefined : host,
       },
       user: {
         id: new Uint8Array(16),
@@ -45,12 +46,20 @@ export const registerBiometrics = async (): Promise<boolean> => {
         displayName: "Gravity Wallet Owner"
       },
       pubKeyCredParams: [
-        { alg: -7, type: "public-key" },  // ES256 (Most common for mobile/modern)
-        { alg: -257, type: "public-key" } // RS256 (Common for Windows Hello)
+        { alg: -7, type: "public-key" },    // ES256
+        { alg: -257, type: "public-key" },  // RS256
+        { alg: -35, type: "public-key" },   // ES384
+        { alg: -36, type: "public-key" },   // ES512
+        { alg: -37, type: "public-key" },   // PS256
+        { alg: -38, type: "public-key" },   // PS384
+        { alg: -39, type: "public-key" },   // PS512
+        { alg: -8, type: "public-key" },    // Ed25519
       ],
       authenticatorSelection: {
         authenticatorAttachment: "platform",
-        userVerification: "required"
+        userVerification: "required",
+        residentKey: "preferred",
+        requireResidentKey: false
       },
       timeout: 60000,
       attestation: "none"
