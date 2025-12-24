@@ -24,8 +24,9 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 
 ## 📚 Quick Links
 
-- 📖 [**Documentation**](https://github.com/drakernoise/w3-multi-chain-wallet-manager/wiki) - Complete user guide and tutorials
+- 📖 [**Documentation**](docs/AUTHENTICATION_GUIDE.md) - User guides and tutorials
 - 🔐 [**Security Policy**](SECURITY.md) - Report vulnerabilities and security best practices
+- 🛡️ [**Authentication Guide**](docs/AUTHENTICATION_GUIDE.md) - 2FA, Biometrics & Passwordless setup
 - 📋 [**Changelog**](https://github.com/drakernoise/w3-multi-chain-wallet-manager/releases) - Version history and release notes
 - 🐛 [**Report Issues**](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues) - Bug reports and feature requests
 - 💬 [**Discussions**](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions) - Community support and ideas
@@ -42,6 +43,9 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 *   **Bulk Transfers**: Send funds to multiple recipients in a single transaction.
 *   **Transaction Analysis**: View and analyze your transaction history.
 *   **Secure**:
+    *   **2FA Support**: Integration with TOTP apps (Aegis, Google Auth).
+    *   **Password Strength Meter**: Real-time feedback on password security.
+    *   **Biometric Unlock**: Support for FaceID/TouchID/Windows Hello.
     *   AES-256 encryption for your vault.
     *   Auto-lock mechanism.
     *   Detailed transaction confirmations.
@@ -108,10 +112,12 @@ Please read our [Security Policy](SECURITY.md) before reporting security issues.
 - [x] ✅ Blurt full compatibility (v1.0.4)
 - [x] ✅ Hive full compatibility (v1.0.5)
 - [x] ✅ Steem full compatibility (v1.0.5)
-- [ ] 📱 Mobile browser support
+- [x] 📱 Authenticator App Support (Aegis/Google Auth)
+- [x] 🔐 Password Strength Indicator
+- [x] 🔑 Biometric authentication (WebAuthn)
+- [x] 🌐 Multi-language support (EN, ES, FR, DE, IT)
 - [ ] 🔐 Hardware wallet integration (Ledger/Trezor)
-- [ ] 🔑 Biometric authentication
-- [ ] 🌐 Multi-language support
+- [ ] 📱 Mobile browser support
 - [ ] 📊 Advanced analytics dashboard
 
 ## 💬 Support
