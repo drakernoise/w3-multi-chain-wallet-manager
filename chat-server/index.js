@@ -4,6 +4,10 @@ const http = require('http');
 const { Server } = require("socket.io");
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
+
+const DB_PATH = path.join(__dirname, 'chat_db.json');
 
 const app = express();
 app.use(cors());
@@ -17,13 +21,9 @@ const io = new Server(server, {
 });
 
 // --- Gravity Chat State ---
-// Users: { id: string, username: string, publicKey: string, rooms: string[] }
-// Mapped by UserID (UUID)
-const users = {};
-const usernames = {}; // username -> userId (for uniqueness check)
-
-// Rooms: { id: string, name: string, type: 'public'|'private'|'dm', members: string[], owner: string, admins: string[] }
-const rooms = {
+let users = {};
+let usernames = {};
+let rooms = {
     'global-lobby': {
         id: 'global-lobby',
         name: 'Global Lobby',
@@ -31,10 +31,38 @@ const rooms = {
         type: 'public',
         owner: 'system',
         admins: [],
-        members: [], // Public room usually doesn't need persistent members list if open, but good for tracking
+        members: [],
+        bans: [],
+        mutes: [],
         messages: []
     }
 };
+
+function loadData() {
+    try {
+        if (fs.existsSync(DB_PATH)) {
+            const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+            users = data.users || {};
+            usernames = data.usernames || {};
+            // Merge rooms with default global-lobby
+            rooms = { ...rooms, ...(data.rooms || {}) };
+            console.log('Loaded chat data from disk.');
+        }
+    } catch (err) {
+        console.error('Failed to load data:', err);
+    }
+}
+
+function saveData() {
+    try {
+        const data = { users, usernames, rooms };
+        fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+    } catch (err) {
+        console.error('Failed to save data:', err);
+    }
+}
+
+loadData();
 
 const connectedSockets = {}; // socketId -> userId
 
@@ -85,6 +113,8 @@ io.on('connection', (socket) => {
         socket.user = newUser;
         connectedSockets[socket.id] = newId;
 
+        saveData();
+
         socket.emit('auth_success', {
             id: newId,
             username,
@@ -93,7 +123,11 @@ io.on('connection', (socket) => {
 
         // Auto-join Global Lobby
         socket.join('global-lobby');
-        socket.emit('joined_room', { roomId: 'global-lobby', roomData: rooms['global-lobby'] });
+        const lobbyData = {
+            ...rooms['global-lobby'],
+            memberDetails: rooms['global-lobby'].members.map(id => ({ id, username: users[id]?.username }))
+        };
+        socket.emit('joined_room', { roomId: 'global-lobby', roomData: lobbyData });
     });
 
     // --- 2. User Discovery ---
@@ -115,15 +149,26 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
         if (!room) return;
 
-        // Check permissions (bans, private rooms, etc)
-        // For public rooms, anyone can join
-        // For DMs, must be member
+        // Check for bans
+        if (room.bans && room.bans.includes(socket.user.id)) {
+            socket.emit('error', 'You are banned from this room');
+            return;
+        }
 
         socket.join(roomId);
+        // Track member
+        if (!room.members.includes(socket.user.id)) {
+            room.members.push(socket.user.id);
+            saveData();
+            // Notify others a new member joined
+            io.to(roomId).emit('member_joined', { roomId, userId: socket.user.id, username: socket.user.username });
+        }
+
         // Send history
         socket.emit('room_history', {
             roomId,
-            messages: room.messages.slice(-50)
+            messages: room.messages.slice(-50),
+            memberDetails: room.members.map(id => ({ id, username: users[id]?.username }))
         });
     });
 
@@ -133,6 +178,12 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
 
         if (!room) return;
+
+        // Check for mutes
+        if (room.mutes && room.mutes.includes(socket.user.id)) {
+            socket.emit('error', 'You are muted in this room');
+            return;
+        }
 
         const msg = {
             id: uuidv4(),
@@ -144,6 +195,8 @@ io.on('connection', (socket) => {
 
         room.messages.push(msg);
         if (room.messages.length > 200) room.messages.shift();
+
+        saveData();
 
         io.to(roomId).emit('new_message', { roomId, message: msg });
     });
@@ -177,6 +230,8 @@ io.on('connection', (socket) => {
         };
 
         rooms[newRoomId] = newRoom;
+
+        saveData();
 
         // Notify both users
         // Use io.to() with socket IDs. We need to find target's socket(s)
@@ -214,10 +269,14 @@ io.on('connection', (socket) => {
             owner: socket.user.id, // Only owner can close
             members: [socket.user.id],
             admins: [socket.user.id],
+            bans: [],
+            mutes: [],
             messages: []
         };
 
         rooms[newId] = newRoom;
+
+        saveData();
 
         // Broadcast to owner
         socket.join(newId);
@@ -235,8 +294,8 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
 
         if (!room) return;
-        if (room.owner !== socket.user.id) {
-            socket.emit('error', 'Only owner can invite');
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) {
+            socket.emit('error', 'Unauthorized');
             return;
         }
 
@@ -249,10 +308,10 @@ io.on('connection', (socket) => {
         // Add to members
         if (!room.members.includes(targetUserId)) {
             room.members.push(targetUserId);
+            saveData();
         }
 
         // Notify Target
-        // Match connectedSockets (socketId -> userId)
         Object.keys(connectedSockets).forEach(sId => {
             if (connectedSockets[sId] === targetUserId) {
                 const s = io.sockets.sockets.get(sId);
@@ -263,6 +322,81 @@ io.on('connection', (socket) => {
             }
         });
         socket.emit('success', `Invited ${targetUsername}`);
+    });
+
+    // --- 6. Moderation ---
+    socket.on('kick_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        // Notify the user they were kicked
+        io.to(roomId).emit('user_kicked', { roomId, userId: targetUserId });
+
+        // Find their sockets and force leave
+        Object.keys(connectedSockets).forEach(sId => {
+            if (connectedSockets[sId] === targetUserId) {
+                const s = io.sockets.sockets.get(sId);
+                if (s) s.leave(roomId);
+            }
+        });
+    });
+
+    socket.on('ban_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        if (!room.bans.includes(targetUserId)) {
+            room.bans.push(targetUserId);
+            saveData();
+        }
+
+        io.to(roomId).emit('user_banned', { roomId, userId: targetUserId });
+
+        // Force leave
+        Object.keys(connectedSockets).forEach(sId => {
+            if (connectedSockets[sId] === targetUserId) {
+                const s = io.sockets.sockets.get(sId);
+                if (s) s.leave(roomId);
+            }
+        });
+    });
+
+    socket.on('unban_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        room.bans = room.bans.filter(id => id !== targetUserId);
+        saveData();
+    });
+
+    socket.on('mute_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        if (!room.mutes.includes(targetUserId)) {
+            room.mutes.push(targetUserId);
+            saveData();
+        }
+        io.to(roomId).emit('user_muted', { roomId, userId: targetUserId });
+    });
+
+    socket.on('unmute_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        room.mutes = room.mutes.filter(id => id !== targetUserId);
+        saveData();
+        io.to(roomId).emit('user_unmuted', { roomId, userId: targetUserId });
     });
 
     socket.on('close_room', (roomId) => {
@@ -285,6 +419,8 @@ io.on('connection', (socket) => {
 
         // Delete Room
         delete rooms[roomId];
+
+        saveData();
 
         // Notify all clients to remove from list and kick users
         io.to(roomId).emit('room_closed', roomId);

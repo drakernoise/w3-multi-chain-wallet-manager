@@ -22,6 +22,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [isCreating, setIsCreating] = useState(false);
     const [newRoomName, setNewRoomName] = useState('');
     const [isPrivateRoom, setIsPrivateRoom] = useState(false);
+    const [showParticipants, setShowParticipants] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -71,13 +72,21 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         const handleSearch = (e: any) => {
             setSearchResults(e.detail);
         };
+        const handleKicked = (e: any) => {
+            if (e.detail.roomId === activeRoomId) {
+                setActiveRoomId(null);
+                alert('You have been removed from this room.');
+            }
+        };
         window.addEventListener('chat-search-results', handleSearch);
+        window.addEventListener('chat-room-kicked', handleKicked);
 
         // Connect
         chatService.init();
 
         return () => {
             window.removeEventListener('chat-search-results', handleSearch);
+            window.removeEventListener('chat-room-kicked', handleKicked);
         };
     }, [activeRoomId]);
 
@@ -254,14 +263,14 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 {/* Room List */}
                 <div className="flex-1 overflow-y-auto px-2 space-y-1">
                     <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 py-2 mt-2">Rooms</div>
-                    {rooms.filter(r => r.type === 'public').map(room => (
+                    {rooms.filter(r => r.type === 'public' || r.type === 'private').map(room => (
                         <div
                             key={room.id}
                             onClick={() => setActiveRoomId(room.id)}
                             className={`p-3 rounded-lg cursor-pointer flex flex-col transition-colors ${activeRoomId === room.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'hover:bg-dark-700 text-slate-300'}`}
                         >
                             <div className="font-bold text-sm flex items-center gap-2">
-                                <span className="opacity-70 text-xs">#</span> {room.name}
+                                <span className="opacity-70 text-xs">{room.type === 'public' ? '#' : '🔒'}</span> {room.name}
                             </div>
                         </div>
                     ))}
@@ -306,6 +315,13 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 </h3>
                             </div>
                             <div className="flex gap-4 items-center">
+                                <button
+                                    onClick={() => setShowParticipants(!showParticipants)}
+                                    className={`p-2 rounded-lg transition-colors ${showParticipants ? 'bg-dark-600 text-purple-400' : 'text-slate-400 hover:bg-dark-700'}`}
+                                    title="View Members"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                </button>
                                 {/* Invite Action for Private Rooms */}
                                 {rooms.find(r => r.id === activeRoomId)?.type === 'private' && rooms.find(r => r.id === activeRoomId)?.owner === user.id && (
                                     <button
@@ -385,6 +401,51 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     </>
                 )}
             </div>
+
+            {/* User List Sidebar (Participants) */}
+            {activeRoomId && showParticipants && (
+                <div className="w-64 bg-dark-800 border-l border-dark-700 flex flex-col animate-slideInRight">
+                    <div className="p-4 border-b border-dark-700 flex justify-between items-center bg-dark-900/50">
+                        <span className="font-bold text-[10px] uppercase tracking-wider text-slate-500">Participants</span>
+                        <button onClick={() => setShowParticipants(false)} className="text-slate-500 hover:text-white">✕</button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {rooms.find(r => r.id === activeRoomId)?.memberDetails?.map(member => (
+                            <div key={member.id} className="flex flex-col gap-2 p-2 rounded hover:bg-dark-700/50 transition-colors border border-transparent hover:border-dark-600">
+                                <div className="flex justify-between items-center">
+                                    <span className={`text-sm ${member.id === user?.id ? 'text-purple-400 font-bold' : 'text-slate-300'}`}>
+                                        @{member.username}
+                                        {rooms.find(r => r.id === activeRoomId)?.owner === member.id && <span className="ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400">Owner</span>}
+                                    </span>
+                                </div>
+                                {/* Mod Controls */}
+                                {rooms.find(r => r.id === activeRoomId)?.owner === user?.id && member.id !== user?.id && (
+                                    <div className="flex gap-1 mt-1">
+                                        <button
+                                            onClick={() => chatService.muteUser(activeRoomId, member.id)}
+                                            className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors"
+                                        >
+                                            Mute
+                                        </button>
+                                        <button
+                                            onClick={() => { if (confirm('Kick user?')) chatService.kickUser(activeRoomId, member.id) }}
+                                            className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors"
+                                        >
+                                            Kick
+                                        </button>
+                                        <button
+                                            onClick={() => { if (confirm('Ban user permanently?')) chatService.banUser(activeRoomId, member.id) }}
+                                            className="flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold"
+                                        >
+                                            Ban
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

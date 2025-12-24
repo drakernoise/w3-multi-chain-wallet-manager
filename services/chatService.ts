@@ -21,6 +21,8 @@ export interface ChatRoom {
     type: 'public' | 'private' | 'dm';
     owner?: string;
     messages: ChatMessage[];
+    members?: string[];
+    memberDetails?: ChatUser[];
     unreadCount?: number;
 }
 
@@ -72,11 +74,23 @@ class ChatService {
             this.handleNewMessage(data.roomId, data.message);
         });
 
-        this.socket.on('room_history', (data: { roomId: string, messages: ChatMessage[] }) => {
+        this.socket.on('room_history', (data: { roomId: string, messages: ChatMessage[], memberDetails: ChatUser[] }) => {
             const room = this.rooms.find(r => r.id === data.roomId);
             if (room) {
                 room.messages = data.messages;
+                room.memberDetails = data.memberDetails;
                 if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]); // Trigger re-render
+            }
+        });
+
+        this.socket.on('member_joined', (data: { roomId: string, userId: string, username: string }) => {
+            const room = this.rooms.find(r => r.id === data.roomId);
+            if (room) {
+                if (!room.memberDetails) room.memberDetails = [];
+                if (!room.memberDetails.find(u => u.id === data.userId)) {
+                    room.memberDetails.push({ id: data.userId, username: data.username });
+                    if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+                }
             }
         });
 
@@ -90,6 +104,26 @@ class ChatService {
                 unreadCount: 0
             });
             if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+        });
+
+        this.socket.on('room_removed', (roomId: string) => {
+            this.rooms = this.rooms.filter(r => r.id !== roomId);
+            if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+        });
+
+        this.socket.on('user_kicked', (data: { roomId: string, userId: string }) => {
+            if (data.userId === this.userId) {
+                if (this.onError) this.onError(`You were kicked from room`);
+                // UI should react by closing the room
+                window.dispatchEvent(new CustomEvent('chat-room-kicked', { detail: data }));
+            }
+        });
+
+        this.socket.on('user_banned', (data: { roomId: string, userId: string }) => {
+            if (data.userId === this.userId) {
+                if (this.onError) this.onError(`You were BANNED from room`);
+                window.dispatchEvent(new CustomEvent('chat-room-kicked', { detail: data }));
+            }
         });
 
         this.socket.on('error', (msg: string) => {
@@ -139,6 +173,22 @@ class ChatService {
 
     public closeRoom(roomId: string) {
         this.socket?.emit('close_room', roomId);
+    }
+
+    public kickUser(roomId: string, targetUserId: string) {
+        this.socket?.emit('kick_user', { roomId, targetUserId });
+    }
+
+    public banUser(roomId: string, targetUserId: string) {
+        this.socket?.emit('ban_user', { roomId, targetUserId });
+    }
+
+    public muteUser(roomId: string, targetUserId: string) {
+        this.socket?.emit('mute_user', { roomId, targetUserId });
+    }
+
+    public unmuteUser(roomId: string, targetUserId: string) {
+        this.socket?.emit('unmute_user', { roomId, targetUserId });
     }
 
     public getCurrentUser(): ChatUser | null {
