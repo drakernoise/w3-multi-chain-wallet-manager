@@ -15,6 +15,7 @@ import { ReceiveModal } from './components/ReceiveModal';
 import { HistoryModal } from './components/HistoryModal';
 import { SignRequest } from './components/SignRequest';
 import { HelpView } from './components/HelpView';
+import { ChatView } from './components/ChatView'; // Added
 import { NotificationToast } from './components/NotificationToast'; // Added
 import { detectWeb3Context, fetchBalances as serviceFetchBalances, broadcastTransfer } from './services/chainService';
 import { saveVault, getVault, clearCryptoCache, tryRestoreSession } from './services/cryptoService';
@@ -528,6 +529,14 @@ function AppContent() {
 
           {currentView === ViewState.HELP && (
             <HelpView />
+          )}
+
+          {currentView === ViewState.CHAT && (
+            <ChatView
+              account={walletState.accounts.find(a => a.chain === activeChain) || walletState.accounts[0]}
+              activeChain={activeChain}
+              onClose={() => setCurrentView(ViewState.LANDING)}
+            />
           )}
         </div>
       </main>

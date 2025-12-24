@@ -10,7 +10,8 @@ export enum ViewState {
   BULK = 'BULK',
   MULTISIG = 'MULTISIG',
   MANAGE = 'MANAGE',
-  HELP = 'HELP'
+  HELP = 'HELP',
+  CHAT = 'CHAT'
 }
 
 export interface Account {
