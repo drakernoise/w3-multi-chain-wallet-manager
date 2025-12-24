@@ -21,28 +21,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t } = useTranslation();
 
   return (
-    <aside className="w-16 bg-dark-800 border-r border-dark-700 flex flex-col items-center py-4 gap-6 shrink-0 z-20">
-
+    <aside className="w-16 h-full bg-dark-800 border-r border-dark-700 flex flex-col items-center py-4 shrink-0 z-20 overflow-hidden">
       {/* App Logo */}
       <img
         src="/logowallet.png"
         alt="Gravity"
         onClick={() => onChangeView(ViewState.LANDING)}
-        className="w-10 h-10 object-contain mb-2 drop-shadow-md hover:scale-110 transition-transform cursor-pointer"
+        className="w-10 h-10 object-contain mb-6 drop-shadow-md hover:scale-110 transition-transform cursor-pointer shrink-0"
       />
 
-      {/* Home Icon */}
-      <NavIcon
-        active={currentView === ViewState.LANDING}
-        onClick={() => onChangeView(ViewState.LANDING)}
-        icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />}
-        label={t('sidebar.home') || "Home"}
-      />
+      {/* Middle Scrollable Section */}
+      <div className="flex-1 w-full flex flex-col items-center gap-4 overflow-y-auto overflow-x-hidden custom-scrollbar no-scrollbar scroll-smooth py-2">
+        <NavIcon
+          active={currentView === ViewState.LANDING}
+          onClick={() => onChangeView(ViewState.LANDING)}
+          icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />}
+          label={t('sidebar.home') || "Home"}
+        />
 
-      <div className="h-px w-8 bg-dark-600" />
+        <div className="h-px w-8 bg-dark-600 shrink-0" />
 
-      {/* Feature Navigation */}
-      <div className="flex flex-col gap-4 w-full items-center flex-1">
         <NavIcon
           active={currentView === ViewState.WALLET}
           onClick={() => onChangeView(ViewState.WALLET)}
@@ -67,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />}
           label={"Chat"}
         />
-        <div className="h-px w-8 bg-dark-600 my-1" />
+        <div className="h-px w-8 bg-dark-600 my-1 shrink-0" />
         <NavIcon
           active={currentView === ViewState.MANAGE}
           onClick={() => onChangeView(ViewState.MANAGE)}
@@ -76,37 +74,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       </div>
 
-      <div className="mt-auto flex flex-col items-center gap-2 mb-2">
+      {/* Fixed Bottom Section */}
+      <div className="mt-auto flex flex-col items-center gap-2 pt-4 bg-dark-800 w-full shrink-0 border-t border-dark-700/50">
         <NavIcon
           active={currentView === ViewState.HELP}
           onClick={() => onChangeView(ViewState.HELP)}
           icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
           label={t('help.title') || "Help"}
         />
-
-        {/* Language Toggle */}
         <LanguageToggle direction="right-up" />
-      </div>
-
-      {/* Pin/Detach Button */}
-      {onToggleDetach && (
+        {onToggleDetach && (
+          <button
+            onClick={onToggleDetach}
+            className={`p-2 transition-colors ${isDetached ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
+            title={isDetached ? t('sidebar.dock') : t('sidebar.pin')}
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" /></svg>
+          </button>
+        )}
         <button
-          onClick={onToggleDetach}
-          className={`mb-2 p-2 transition-colors ${isDetached ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}`}
-          title={isDetached ? t('sidebar.dock') : t('sidebar.pin')}
+          onClick={onLock}
+          className="text-slate-500 hover:text-red-400 transition-colors p-2 mb-2"
+          title={t('sidebar.lock') || "Lock Wallet"}
         >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" /></svg>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
         </button>
-      )}
-
-      {/* Lock Button */}
-      <button
-        onClick={onLock}
-        className="mb-2 text-slate-500 hover:text-red-400 transition-colors p-2"
-        title={t('sidebar.lock') || "Lock Wallet"}
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-      </button>
+      </div>
 
     </aside>
   );

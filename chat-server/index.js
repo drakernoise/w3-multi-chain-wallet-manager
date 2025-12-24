@@ -440,7 +440,8 @@ function getAvailableRooms(userId) {
     ).map(r => ({
         id: r.id,
         name: r.name,
-        type: r.type
+        type: r.type,
+        owner: r.owner
     }));
 }
 

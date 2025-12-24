@@ -427,7 +427,7 @@ function AppContent() {
   }
 
   return (
-    <div className="flex h-full bg-dark-900 text-slate-200 font-sans">
+    <div className="flex h-full w-full bg-dark-900 text-slate-200 font-sans overflow-hidden">
       <Sidebar
         currentView={currentView}
         onChangeView={setCurrentView}
@@ -443,7 +443,7 @@ function AppContent() {
         onToggleDetach={handleToggleDetach}
       />
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative bg-dark-900">
         <header className="h-14 border-b border-dark-700 flex items-center justify-between px-4 bg-dark-800 shadow-md z-10">
           <div className="flex items-center gap-2">
             {currentView === ViewState.LANDING ? (
@@ -452,6 +452,8 @@ function AppContent() {
               <h1 className="font-bold tracking-wider text-sm text-slate-200">{t('settings.title').toUpperCase()}</h1>
             ) : currentView === ViewState.HELP ? (
               <h1 className="font-bold tracking-wider text-sm text-slate-200">{t('help.title').toUpperCase()}</h1>
+            ) : currentView === ViewState.CHAT ? (
+              <h1 className="font-bold tracking-wider text-sm text-purple-400">GRAVITY CHAT</h1>
             ) : (
               <>
                 <img
@@ -464,19 +466,21 @@ function AppContent() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {web3Context && currentView !== ViewState.LANDING && isContextRelevant(web3Context, activeChain) && (
+            {currentView !== ViewState.CHAT && web3Context && currentView !== ViewState.LANDING && isContextRelevant(web3Context, activeChain) && (
               <div className="text-xs bg-green-900/50 text-green-400 px-2 py-1 rounded border border-green-800 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                 {web3Context}
               </div>
             )}
-            <button
-              onClick={() => setShowImport(true)}
-              className="text-xs bg-dark-700 hover:bg-dark-600 px-2 py-1 rounded text-slate-300 transition-colors"
-              title={t('header.add')}
-            >
-              {t('header.add')}
-            </button>
+            {currentView !== ViewState.CHAT && (
+              <button
+                onClick={() => setShowImport(true)}
+                className="text-xs bg-dark-700 hover:bg-dark-600 px-2 py-1 rounded text-slate-300 transition-colors"
+                title={t('header.add')}
+              >
+                {t('header.add')}
+              </button>
+            )}
           </div>
         </header>
 

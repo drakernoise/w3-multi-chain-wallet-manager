@@ -1,0 +1,51 @@
+{
+  "users": {
+    "be540518-835f-4f9c-a7e8-8d5d41bd6338": {
+      "id": "be540518-835f-4f9c-a7e8-8d5d41bd6338",
+      "username": "drakernoise",
+      "rooms": [
+        "global-lobby"
+      ]
+    }
+  },
+  "usernames": {
+    "drakernoise": "be540518-835f-4f9c-a7e8-8d5d41bd6338"
+  },
+  "rooms": {
+    "global-lobby": {
+      "id": "global-lobby",
+      "name": "Global Lobby",
+      "desc": "Official Gravity Community",
+      "type": "public",
+      "owner": "system",
+      "admins": [],
+      "members": [],
+      "bans": [],
+      "mutes": [],
+      "messages": []
+    },
+    "25e84d0a-abda-4f10-bda1-5364976c35d2": {
+      "id": "25e84d0a-abda-4f10-bda1-5364976c35d2",
+      "name": "Testing",
+      "type": "private",
+      "owner": "be540518-835f-4f9c-a7e8-8d5d41bd6338",
+      "members": [
+        "be540518-835f-4f9c-a7e8-8d5d41bd6338"
+      ],
+      "admins": [
+        "be540518-835f-4f9c-a7e8-8d5d41bd6338"
+      ],
+      "bans": [],
+      "mutes": [],
+      "messages": [
+        {
+          "id": "11b71193-3f2e-40d5-8286-454e7a5c3208",
+          "senderId": "be540518-835f-4f9c-a7e8-8d5d41bd6338",
+          "senderName": "drakernoise",
+          "content": "testing",
+          "timestamp": "2025-12-24T18:46:27.039Z"
+        }
+      ]
+    }
+  }
+}
