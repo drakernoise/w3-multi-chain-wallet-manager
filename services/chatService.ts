@@ -44,8 +44,8 @@ class ChatService {
     public init() {
         if (this.socket) return;
 
-        // Connect to production server or fallback to localhost
-        const BACKEND_URL = 'http://localhost:3030'; // Temporarily localhost until deployed
+        // Connect to production server on Render
+        const BACKEND_URL = 'https://gravity-chat-serve.onrender.com';
         this.socket = io(BACKEND_URL);
 
         this.socket.on('connect', () => {

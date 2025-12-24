@@ -1242,7 +1242,8 @@ class ChatService {
   }
   init() {
     if (this.socket) return;
-    this.socket = lookup("http://localhost:3030");
+    const BACKEND_URL = "https://gravity-chat-serve.onrender.com";
+    this.socket = lookup(BACKEND_URL);
     this.socket.on("connect", () => {
       console.log("Connected to Chat Server");
       this.tryAutoLogin();
