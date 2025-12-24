@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: gravity-chat-server
+    env: node
+    region: frankfurt # Or your preferred region
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    rootDirectory: chat-server # IMPORTANT: Points to the subfolder
+    envVars:
+      - key: NODE_VERSION
+        value: 18.16.0
+      - key: DB_PATH
+        value: /opt/render/project/src/chat-server/data/ # Path for persistence if adding a disk later
