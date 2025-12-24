@@ -7,10 +7,15 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'chat_db.json');
+const STORAGE_DIR = process.env.DB_PATH || __dirname;
+const DB_PATH = path.join(STORAGE_DIR, 'chat_db.json');
 
 const app = express();
 app.use(cors());
+
+// Health check for cloud deployment services (like Render/Railway)
+app.get('/', (req, res) => res.send('Gravity Chat Server is Online'));
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok', timestamp: new Date() }));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -445,7 +450,7 @@ function getAvailableRooms(userId) {
     }));
 }
 
-const PORT = 3030;
+const PORT = process.env.PORT || 3030;
 server.listen(PORT, () => {
-    console.log(`Gravity Chat Server (Standalone) running on port ${PORT}`);
+    console.log(`Gravity Chat Server running on port ${PORT}`);
 });

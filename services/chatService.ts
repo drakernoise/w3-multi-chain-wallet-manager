@@ -44,8 +44,9 @@ class ChatService {
     public init() {
         if (this.socket) return;
 
-        // Connect to local server for now (or production URL)
-        this.socket = io('http://localhost:3030');
+        // Connect to production server or fallback to localhost
+        const BACKEND_URL = 'http://localhost:3030'; // Temporarily localhost until deployed
+        this.socket = io(BACKEND_URL);
 
         this.socket.on('connect', () => {
             console.log('Connected to Chat Server');
