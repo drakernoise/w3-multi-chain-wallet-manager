@@ -90,39 +90,38 @@ function AppContent() {
         // Try to restore crypto session first
         const restored = await tryRestoreSession();
 
-        chrome.storage.session.get(['session_accounts'], (res: any) => {
-          if (res.session_accounts && res.session_accounts.length > 0) {
-
-            if (restored) {
-              setWalletState(prev => ({ ...prev, accounts: res.session_accounts }));
-              setIsLocked(false);
-              setTimeout(fetchBalances, 500);
-            } else {
-              console.warn("Session accounts found but crypto key missing. Forcing re-login.");
-              chrome.storage.session.remove('session_accounts');
+        await new Promise<void>((resolve) => {
+          chrome.storage.session.get(['session_accounts'], (res: any) => {
+            if (res.session_accounts && res.session_accounts.length > 0) {
+              if (restored) {
+                setWalletState(prev => ({ ...prev, accounts: res.session_accounts }));
+                setIsLocked(false);
+                setTimeout(fetchBalances, 500);
+              } else {
+                console.warn("Session accounts found but crypto key missing. Forcing re-login.");
+                chrome.storage.session.remove('session_accounts');
+              }
             }
-
-            setIsDataLoaded(true);
-            return;
-          }
-          setIsDataLoaded(true);
+            resolve();
+          });
         });
-      } else {
-        setIsDataLoaded(true);
       }
 
       // Also load walletConfig
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(['walletConfig'], (result: any) => {
-          if (result.walletConfig) {
-            setWalletState(prev => ({
-              ...prev,
-              encryptedMaster: result.walletConfig.encryptedMaster,
-              useGoogleAuth: result.walletConfig.useGoogleAuth,
-              useBiometrics: result.walletConfig.useBiometrics,
-              useTOTP: result.walletConfig.useTOTP
-            }));
-          }
+        await new Promise<void>((resolve) => {
+          chrome.storage.local.get(['walletConfig'], (result: any) => {
+            if (result.walletConfig) {
+              setWalletState(prev => ({
+                ...prev,
+                encryptedMaster: result.walletConfig.encryptedMaster,
+                useGoogleAuth: result.walletConfig.useGoogleAuth,
+                useBiometrics: result.walletConfig.useBiometrics,
+                useTOTP: result.walletConfig.useTOTP
+              }));
+            }
+            resolve();
+          });
         });
       }
 
@@ -130,6 +129,7 @@ function AppContent() {
       if (context) setWeb3Context(context);
 
       benchmarkNodes();
+      setIsDataLoaded(true);
     };
     loadState();
   }, []);

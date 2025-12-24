@@ -5660,6 +5660,7 @@ const ChatView = ({ onClose }) => {
   const [isRegistering, setIsRegistering] = reactExports.useState(false);
   const [usernameInput, setUsernameInput] = reactExports.useState("");
   const [regError, setRegError] = reactExports.useState(null);
+  const [socketStatus, setSocketStatus] = reactExports.useState("disconnected");
   const [rooms, setRooms] = reactExports.useState([]);
   const [activeRoomId, setActiveRoomId] = reactExports.useState(null);
   const [messages, setMessages] = reactExports.useState([]);
@@ -5682,13 +5683,16 @@ const ChatView = ({ onClose }) => {
     setIsCreating(false);
   };
   reactExports.useEffect(() => {
+    setSocketStatus(chatService.getCurrentUser() ? "authenticated" : "connecting");
     const existing = chatService.getCurrentUser();
     if (existing) {
       setUser(existing);
+      setSocketStatus("authenticated");
     }
     chatService.onAuthSuccess = (u) => {
       setUser(u);
       setIsRegistering(false);
+      setSocketStatus("authenticated");
     };
     chatService.onRoomUpdated = (updatedRooms) => {
       setRooms(updatedRooms);
@@ -5798,6 +5802,12 @@ const ChatView = ({ onClose }) => {
     setSearchQuery("");
     setSearchResults([]);
   };
+  if (!user && socketStatus === "connecting") {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-slate-400 animate-pulse font-medium", children: "Connecting to Gravity Chat..." })
+    ] });
+  }
   if (!user) {
     return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6 animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-sm bg-dark-800 p-8 rounded-2xl border border-dark-700 shadow-xl text-center", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-8 h-8", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" }) }) }),
@@ -5927,7 +5937,7 @@ const ChatView = ({ onClose }) => {
       ] })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `flex-1 flex flex-col bg-dark-900 ${!activeRoomId ? "hidden md:flex" : "flex"}`, children: !activeRoomId ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 flex flex-col items-center justify-center text-slate-600 opacity-50", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-16 h-16 mb-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.5, d: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-16 h-16 mb-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.5, d: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8S21 7.582 21 12z" }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Select a room to start chatting" })
     ] }) : (() => {
       const room = rooms.find((r) => r.id === activeRoomId);
@@ -6001,7 +6011,7 @@ const ChatView = ({ onClose }) => {
           }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: messagesEndRef })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-2 md:p-3 bg-dark-800 border-t border-dark-700 shadow-[0_-4px_10px_rgba(0,0,0,0.3)]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 bg-dark-900 border border-dark-600 rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-purple-500/50 transition-all", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-2 md:p-3 bg-dark-800 border-t border-dark-700", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 bg-dark-900 border border-dark-600 rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-purple-500/50 transition-all", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "input",
             {
@@ -6036,33 +6046,12 @@ const ChatView = ({ onClose }) => {
           rooms.find((r) => r.id === activeRoomId)?.owner === member.id && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400", children: "Owner" })
         ] }) }),
         rooms.find((r) => r.id === activeRoomId)?.owner === user?.id && member.id !== user?.id && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1 mt-1", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => {
-                chatService.muteUser(activeRoomId, member.id);
-                setNotification({ msg: `User @${member.username} muted`, type: "info" });
-              },
-              className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors",
-              children: "Mute"
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => setChatModal({ type: "confirm_kick", data: member }),
-              className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors",
-              children: "Kick"
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => setChatModal({ type: "confirm_ban", data: member }),
-              className: "flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold",
-              children: "Ban"
-            }
-          )
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
+            chatService.muteUser(activeRoomId, member.id);
+            setNotification({ msg: `User @${member.username} muted`, type: "info" });
+          }, className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors", children: "Mute" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_kick", data: member }), className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors", children: "Kick" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_ban", data: member }), className: "flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold", children: "Ban" })
         ] })
       ] }, member.id)) })
     ] }),
@@ -6075,48 +6064,23 @@ const ChatView = ({ onClose }) => {
           chatModal.type === "confirm_kick" && `Kick @${chatModal.data?.username}?`,
           chatModal.type === "confirm_ban" && `Ban @${chatModal.data?.username}?`
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm text-slate-400 mb-6", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm text-slate-400 mb-6 font-medium", children: [
           chatModal.type === "invite" && "Type the username of the person you want to invite to this private room.",
           chatModal.type === "confirm_delete" && "This action is permanent. All messages and room history will be lost.",
           chatModal.type === "confirm_kick" && "This user will be removed from the room but can rejoin if it is a public room.",
           chatModal.type === "confirm_ban" && "This user will be permanently banned from this room."
         ] }),
-        chatModal.type === "invite" && /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            autoFocus: true,
-            className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-2 text-white mb-6 outline-none focus:border-purple-500",
-            placeholder: "Username...",
-            value: modalInput,
-            onChange: (e) => setModalInput(e.target.value),
-            onKeyDown: (e) => e.key === "Enter" && handleModalAction()
-          }
-        ),
+        chatModal.type === "invite" && /* @__PURE__ */ jsxRuntimeExports.jsx("input", { autoFocus: true, className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-2 text-white mb-6 outline-none focus:border-purple-500", placeholder: "Username...", value: modalInput, onChange: (e) => setModalInput(e.target.value), onKeyDown: (e) => e.key === "Enter" && handleModalAction() }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => {
-                setChatModal(null);
-                setModalInput("");
-              },
-              className: "flex-1 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-slate-300 font-bold transition-all",
-              children: "Cancel"
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: handleModalAction,
-              className: `flex-1 py-2 rounded-lg font-bold transition-all ${chatModal.type === "invite" ? "bg-purple-600 hover:bg-purple-500" : "bg-red-600 hover:bg-red-500"} text-white`,
-              children: chatModal.type === "invite" ? "Invite" : "Confirm"
-            }
-          )
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
+            setChatModal(null);
+            setModalInput("");
+          }, className: "flex-1 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-slate-300 font-bold transition-all", children: "Cancel" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: handleModalAction, className: `flex-1 py-2 rounded-lg font-bold transition-all ${chatModal.type === "invite" ? "bg-purple-600 hover:bg-purple-500" : "bg-red-600 hover:bg-red-500"} text-white`, children: chatModal.type === "invite" ? "Invite" : "Confirm" })
         ] })
       ] })
     ] }),
     notification && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed bottom-20 left-1/2 -translate-x-1/2 z-[200] max-w-[90%] w-auto animate-slideUp", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `px-4 py-3 rounded-xl border shadow-2xl flex items-center gap-3 ${notification.type === "error" ? "bg-red-900/90 border-red-500 text-red-100" : notification.type === "success" ? "bg-green-900/90 border-green-500 text-green-100" : notification.type === "warning" ? "bg-orange-900/90 border-orange-500 text-orange-100" : "bg-blue-900/90 border-blue-500 text-blue-100"}`, children: [
-      notification.type === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 shrink-0", fill: "currentColor", viewBox: "0 0 20 20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { fillRule: "evenodd", d: "M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z", clipRule: "evenodd" }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-medium", children: notification.msg }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setNotification(null), className: "ml-2 hover:opacity-70 transition-opacity", children: "✕" })
     ] }) })
@@ -6191,40 +6155,42 @@ function AppContent() {
       }
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
         const restored = await tryRestoreSession();
-        chrome.storage.session.get(["session_accounts"], (res) => {
-          if (res.session_accounts && res.session_accounts.length > 0) {
-            if (restored) {
-              setWalletState((prev) => ({ ...prev, accounts: res.session_accounts }));
-              setIsLocked(false);
-              setTimeout(fetchBalances$1, 500);
-            } else {
-              console.warn("Session accounts found but crypto key missing. Forcing re-login.");
-              chrome.storage.session.remove("session_accounts");
+        await new Promise((resolve) => {
+          chrome.storage.session.get(["session_accounts"], (res) => {
+            if (res.session_accounts && res.session_accounts.length > 0) {
+              if (restored) {
+                setWalletState((prev) => ({ ...prev, accounts: res.session_accounts }));
+                setIsLocked(false);
+                setTimeout(fetchBalances$1, 500);
+              } else {
+                console.warn("Session accounts found but crypto key missing. Forcing re-login.");
+                chrome.storage.session.remove("session_accounts");
+              }
             }
-            setIsDataLoaded(true);
-            return;
-          }
-          setIsDataLoaded(true);
+            resolve();
+          });
         });
-      } else {
-        setIsDataLoaded(true);
       }
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(["walletConfig"], (result) => {
-          if (result.walletConfig) {
-            setWalletState((prev) => ({
-              ...prev,
-              encryptedMaster: result.walletConfig.encryptedMaster,
-              useGoogleAuth: result.walletConfig.useGoogleAuth,
-              useBiometrics: result.walletConfig.useBiometrics,
-              useTOTP: result.walletConfig.useTOTP
-            }));
-          }
+        await new Promise((resolve) => {
+          chrome.storage.local.get(["walletConfig"], (result) => {
+            if (result.walletConfig) {
+              setWalletState((prev) => ({
+                ...prev,
+                encryptedMaster: result.walletConfig.encryptedMaster,
+                useGoogleAuth: result.walletConfig.useGoogleAuth,
+                useBiometrics: result.walletConfig.useBiometrics,
+                useTOTP: result.walletConfig.useTOTP
+              }));
+            }
+            resolve();
+          });
         });
       }
       const context = detectWeb3Context();
       if (context) setWeb3Context(context);
       benchmarkNodes();
+      setIsDataLoaded(true);
     };
     loadState();
   }, []);

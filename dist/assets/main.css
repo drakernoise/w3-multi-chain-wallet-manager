@@ -1323,6 +1323,10 @@ video {
 .border-orange-500\/30 {
   border-color: rgb(249 115 22 / 0.3);
 }
+.border-purple-500 {
+  --tw-border-opacity: 1;
+  border-color: rgb(168 85 247 / var(--tw-border-opacity, 1));
+}
 .border-purple-500\/30 {
   border-color: rgb(168 85 247 / 0.3);
 }
@@ -2143,11 +2147,6 @@ video {
 .shadow-2xl {
   --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
   --tw-shadow-colored: 0 25px 50px -12px var(--tw-shadow-color);
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
-}
-.shadow-\[0_-4px_10px_rgba\(0\2c 0\2c 0\2c 0\.3\)\] {
-  --tw-shadow: 0 -4px 10px rgba(0,0,0,0.3);
-  --tw-shadow-colored: 0 -4px 10px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 .shadow-\[0_0_10px_rgba\(37\2c 99\2c 235\2c 0\.2\)\] {
