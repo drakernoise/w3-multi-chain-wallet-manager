@@ -19,6 +19,7 @@ export interface ChatRoom {
     id: string;
     name: string;
     type: 'public' | 'private' | 'dm';
+    owner?: string;
     messages: ChatMessage[];
     unreadCount?: number;
 }
@@ -126,6 +127,14 @@ class ChatService {
 
     public getRooms() {
         return this.rooms;
+    }
+
+    public createRoom(name: string) {
+        this.socket?.emit('create_room', { name });
+    }
+
+    public closeRoom(roomId: string) {
+        this.socket?.emit('close_room', roomId);
     }
 
     public getCurrentUser(): ChatUser | null {

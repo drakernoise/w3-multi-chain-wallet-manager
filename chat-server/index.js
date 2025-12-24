@@ -171,6 +171,7 @@ io.on('connection', (socket) => {
             id: newRoomId,
             name: `${socket.user.username} & ${targetUser.username}`, // Dynamic name usually handled by client
             type: 'dm',
+            owner: socket.user.id,
             members: [socket.user.id, targetUserId],
             messages: []
         };
@@ -193,6 +194,63 @@ io.on('connection', (socket) => {
                 s.emit('room_added', newRoom);
             }
         });
+    });
+
+    // --- 5. Custom Rooms (User Created) ---
+    socket.on('create_room', (data) => {
+        if (!socket.user) return;
+        const { name } = data;
+
+        if (!name || name.length < 3) {
+            socket.emit('error', 'Room name too short');
+            return;
+        }
+
+        const newId = uuidv4();
+        const newRoom = {
+            id: newId,
+            name,
+            type: 'public',
+            owner: socket.user.id, // Only owner can close
+            members: [socket.user.id],
+            admins: [socket.user.id],
+            messages: []
+        };
+
+        rooms[newId] = newRoom;
+
+        // Broadcast to existing socket to join immediately
+        socket.join(newId);
+
+        // Broadcast to ALL users so they see the new public room
+        io.emit('room_added', newRoom);
+    });
+
+    socket.on('close_room', (roomId) => {
+        if (!socket.user) return;
+        const room = rooms[roomId];
+
+        if (!room) return;
+
+        // Security Check
+        // global-lobby cannot be closed
+        if (room.id === 'global-lobby') {
+            socket.emit('error', 'Cannot close Global Lobby');
+            return;
+        }
+
+        if (room.owner !== socket.user.id) {
+            socket.emit('error', 'Only the room creator can close this room.');
+            return;
+        }
+
+        // Delete Room
+        delete rooms[roomId];
+
+        // Notify all clients to remove from list and kick users
+        io.to(roomId).emit('room_closed', roomId);
+        io.in(roomId).socketsLeave(roomId); // Force all sockets to leave
+        io.emit('room_removed', roomId); // Update lists for everyone
     });
 
     socket.on('disconnect', () => {

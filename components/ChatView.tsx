@@ -18,7 +18,18 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<ChatUser[]>([]);
 
+    // Create Room State
+    const [isCreating, setIsCreating] = useState(false);
+    const [newRoomName, setNewRoomName] = useState('');
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const handleCreateRoom = () => {
+        if (newRoomName.trim().length < 3) return;
+        chatService.createRoom(newRoomName.trim());
+        setNewRoomName('');
+        setIsCreating(false);
+    };
 
     // Init & Listeners
     useEffect(() => {
@@ -173,16 +184,47 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </div>
 
                 {/* Search */}
-                <div className="p-3">
-                    <div className="relative">
-                        <input
-                            className="w-full bg-dark-900 border border-dark-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 outline-none"
-                            placeholder="Find ID or Room..."
-                            value={searchQuery}
-                            onChange={(e) => handleSearchUsers(e.target.value)}
-                        />
-                        <svg className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                {/* Search & Create */}
+                <div className="p-3 space-y-2">
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <input
+                                className="w-full bg-dark-900 border border-dark-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 outline-none"
+                                placeholder="Find ID or Room..."
+                                value={searchQuery}
+                                onChange={(e) => handleSearchUsers(e.target.value)}
+                            />
+                            <svg className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+                        <button
+                            onClick={() => setIsCreating(true)}
+                            className="bg-dark-700 hover:bg-dark-600 border border-dark-600 text-white p-2 rounded-lg transition-colors"
+                            title="Create Room"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                        </button>
                     </div>
+
+                    {/* Create Room Form */}
+                    {isCreating && (
+                        <div className="bg-dark-800 p-3 rounded-lg border border-dark-600 animate-fadeIn">
+                            <input
+                                autoFocus
+                                className="w-full bg-dark-900 border border-dark-700 rounded p-2 text-sm mb-2"
+                                placeholder="Room Name..."
+                                value={newRoomName}
+                                onChange={(e) => setNewRoomName(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleCreateRoom();
+                                    if (e.key === 'Escape') setIsCreating(false);
+                                }}
+                            />
+                            <div className="flex gap-2 justify-end">
+                                <button onClick={() => setIsCreating(false)} className="text-xs text-slate-400 hover:text-white">Cancel</button>
+                                <button onClick={handleCreateRoom} className="text-xs bg-purple-600 hover:bg-purple-500 px-3 py-1 rounded text-white">Create</button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Search Results */}
                     {searchResults.length > 0 && (
@@ -250,7 +292,22 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     {rooms.find(r => r.id === activeRoomId)?.name.replace(user.username, '').replace(' & ', '').replace(user.username, '').trim()}
                                 </h3>
                             </div>
-                            <div className="flex gap-4">
+                            <div className="flex gap-4 items-center">
+                                {/* Owner Actions */}
+                                {rooms.find(r => r.id === activeRoomId)?.owner === user.id && rooms.find(r => r.id === activeRoomId)?.id !== 'global-lobby' && (
+                                    <button
+                                        onClick={() => {
+                                            if (confirm('Delete this room permanently?')) {
+                                                chatService.closeRoom(activeRoomId!);
+                                                setActiveRoomId(null);
+                                            }
+                                        }}
+                                        className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1 border border-red-900/50 bg-red-900/20 px-2 py-1 rounded"
+                                    >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        Close
+                                    </button>
+                                )}
                                 <button onClick={onClose} className="text-slate-400 hover:text-white hidden md:block">✕</button>
                             </div>
                         </div>
