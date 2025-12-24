@@ -35,6 +35,7 @@ export interface WalletState {
   encryptedMaster: boolean;
   useGoogleAuth: boolean;
   useBiometrics: boolean;
+  useTOTP?: boolean;
 }
 
 export interface Vault {

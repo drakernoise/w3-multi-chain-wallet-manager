@@ -120,7 +120,7 @@ export const CHAIN_CONFIGS: Record<Chain, ChainConfig> = {
         secondaryToken: 'SBD',
         vestingToken: 'VESTS',
         addressPrefix: 'STM',
-        chainId: '0000000000000000000000000000000000000000000000000000000000000000',
+        chainId: '79276aea5d4877d9a25892eaa01b0adf019d3e5cb12a97478df3298ccdd6a698',
         rpcNodes: [
             'https://api.steem.fans',
             'https://api.steemit.com'

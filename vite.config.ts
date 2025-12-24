@@ -40,6 +40,7 @@ export default defineConfig({
     target: 'esnext',
     outDir: 'dist',
     sourcemap: false,
+    minify: false, // Prevent mangling of legacy libraries
     chunkSizeWarningLimit: 2500,
     commonjsOptions: {
       transformMixedEsModules: true,

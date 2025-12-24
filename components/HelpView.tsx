@@ -116,6 +116,72 @@ export const HelpView: React.FC = () => {
                 </h3>
                 <p className="text-sm leading-relaxed text-slate-400">{t('help.security_desc')}</p>
             </section>
+
+            {/* Authenticator & Advanced Config */}
+            <section className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-lg mt-6">
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    Two-Factor Authentication
+                </h3>
+
+                <div className="space-y-6">
+                    <div>
+                        <h4 className="font-bold text-sm text-blue-400 mb-2">Can I use multiple apps? (Aegis + Google Auth)</h4>
+                        <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                            Yes! You can have the same code generated on multiple devices or apps simultaneously.
+                            To do this:
+                        </p>
+                        <ol className="list-decimal list-inside text-xs text-slate-300 space-y-2 ml-2">
+                            <li><span className="text-slate-400">Go to Settings &gt; Authenticator App to reveal the QR Code.</span></li>
+                            <li><span className="text-slate-400">Scan this <strong>same QR code</strong> with Aegis.</span></li>
+                            <li><span className="text-slate-400">Scan it <strong>again</strong> with Google Authenticator.</span></li>
+                            <li><span className="text-slate-400">Both apps will now generate identical codes that work for unlocking.</span></li>
+                        </ol>
+                    </div>
+
+                    <div className="border-t border-dark-700 pt-4">
+                        <h4 className="font-bold text-sm text-purple-400 mb-2">Visual Guides</h4>
+                        <p className="text-xs text-slate-400 mb-4">
+                            How to configure your wallet securely:
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="bg-dark-900 p-2 rounded-lg border border-dark-700">
+                                <div className="aspect-video bg-dark-800 rounded flex items-center justify-center mb-2 overflow-hidden">
+                                    {/* Placeholder for GIF */}
+                                    {/* To enable this, place 'setup_2fa.gif' in public/images/help/ */}
+                                    <img
+                                        src="/images/help/setup_2fa.gif"
+                                        alt="2FA Setup Animation"
+                                        className="w-full h-full object-cover opacity-80"
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgY2xhc3M9InRleHQtc2xhdGUtNzAwIj48cGF0aCBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjEiIGQ9Ik0xNSAxMGEzIDMgMCAxMTYgMCAzIDMgMCAwMS02IDB6Ii8+PHBhdGggc3Ryb2tlPSJjdXJyZW50Q29xvciIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjEiIGQ9Ik0yLjQ1OCAxMmMyLjUxOS02Ljg3NiA5LjY3Mi02Ljg3NiAxOS4wODQgMG0tMi40NTggNmMtMi41MTkgNi44NzYtOS42NzIgNi44NzYtMTkuMDg0IDAiLz48L3N2Zz4=';
+                                            (e.target as HTMLImageElement).classList.add('p-8');
+                                        }}
+                                    />
+                                </div>
+                                <span className="text-[10px] text-slate-500 font-mono block text-center">setup_2fa.gif</span>
+                            </div>
+
+                            <div className="bg-dark-900 p-2 rounded-lg border border-dark-700">
+                                <div className="aspect-video bg-dark-800 rounded flex items-center justify-center mb-2 overflow-hidden">
+                                    {/* Placeholder for GIF */}
+                                    <img
+                                        src="/images/help/multi_chain.gif"
+                                        alt="Multi Chain Animation"
+                                        className="w-full h-full object-cover opacity-80"
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgY2xhc3M9InRleHQtc2xhdGUtNzAwIj48cGF0aCBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjEiIGQ9Ik0xMyAxMFYzbC05IDExaDd2N2w5LTExaC03eiIvPjwvc3ZnPg==';
+                                            (e.target as HTMLImageElement).classList.add('p-8');
+                                        }}
+                                    />
+                                </div>
+                                <span className="text-[10px] text-slate-500 font-mono block text-center">multi_chain.gif</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     );
 };

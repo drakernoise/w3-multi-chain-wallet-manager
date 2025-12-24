@@ -1,4 +1,4 @@
-import { Vault } from '../types';
+import { Vault, Account } from '../types';
 
 declare const chrome: any;
 
@@ -186,6 +186,25 @@ export async function initVaultWithGeneratedKey(pin?: string): Promise<{ vault: 
   await saveVault(internalKey, emptyVault);
 
   return { vault: emptyVault, internalKey };
+}
+
+// Migrate current vault to Passwordless (Device Key) mode
+export async function enablePasswordless(accounts: Account[]): Promise<void> {
+  const internalKey = Array.from(window.crypto.getRandomValues(new Uint8Array(32)))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+
+  // 1. Store the key as device auth
+  await storeInternalKey(internalKey);
+
+  // 2. Re-encrypt the vault with this new key
+  // We must set cachedKey manually so saveVault doesn't error or use old cache
+  const salt = window.crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  const key = await getKey(internalKey, salt);
+  cachedKey = key;
+  cachedSalt = salt;
+
+  const vault: Vault = { accounts, lastUpdated: Date.now() };
+  await saveVault(internalKey, vault);
 }
 
 export async function saveVault(password: string, vault: Vault): Promise<void> {

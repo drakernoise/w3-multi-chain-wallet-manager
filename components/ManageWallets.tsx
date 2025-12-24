@@ -1,6 +1,8 @@
 import React from 'react';
 import { Account, Chain } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
+import { TOTPSetupModal } from './TOTPSetupModal';
+import { useState } from 'react';
 
 interface ManageWalletsProps {
   accounts: Account[];
@@ -10,6 +12,7 @@ interface ManageWalletsProps {
 
 export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, onEdit, onImport }) => {
   const { t } = useTranslation();
+  const [showTOTP, setShowTOTP] = useState(false);
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -55,6 +58,31 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, onEdit, 
           ))
         )}
       </div>
+
+      <div className="p-4 pt-2 border-t border-dark-700 mt-auto">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Security</h3>
+        <button
+          onClick={() => setShowTOTP(true)}
+          className="w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-lg flex items-center gap-3 transition-colors text-left"
+        >
+          <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm">Authenticator App (2FA)</div>
+            <div className="text-[10px] text-slate-500">Configure Aegis, Google Auth, or Authy</div>
+          </div>
+          <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+
+      {showTOTP && (
+        <TOTPSetupModal
+          accounts={accounts}
+          onClose={() => setShowTOTP(false)}
+          onComplete={() => setShowTOTP(false)}
+        />
+      )}
     </div>
   );
 };

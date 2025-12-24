@@ -1,9 +1,10 @@
 import { Chain } from '../types';
 import { PrivateKey as HivePrivateKey, cryptoUtils } from '@hiveio/dhive';
 import { Client as SteemClient, PrivateKey as SteemPrivateKey } from 'dsteem';
+// @ts-ignore
+import blurt from '@blurtfoundation/blurtjs';
 import { getActiveNode } from './nodeService';
 import { getChainConfig } from '../config/chainConfig';
-import * as blurt from '@blurtfoundation/blurtjs';
 
 export interface ChainAccountData {
     name: string;
@@ -41,7 +42,13 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
 
     // 2. Prepare Transaction Data
     const ref_block_num = props.head_block_number & 0xFFFF;
-    const ref_block_prefix = Buffer.from(props.head_block_id, 'hex').readUInt32LE(4);
+
+    // BROWSER-COMPATIBLE: Use Uint8Array + DataView instead of Buffer
+    // Buffer.from() is not available in browser/Service Worker environments
+    const hexBytes = props.head_block_id.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16));
+    const blockIdBuffer = new Uint8Array(hexBytes);
+    const dataView = new DataView(blockIdBuffer.buffer);
+    const ref_block_prefix = dataView.getUint32(4, true); // true = little-endian
     // 1 min expiration is standard for interactive signing
     const expiration = new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5);
 
@@ -53,9 +60,19 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
         extensions: []
     };
 
-    // 3. Sign (Offline using dhive crypto)
+    // 3. Sign with HF26-compatible serialization
+    // Hive mainnet chain ID (required for HF26+)
+    const HIVE_CHAIN_ID = 'beeab0de00000000000000000000000000000000000000000000000000000000';
     const privateKey = HivePrivateKey.fromString(key);
-    const signedTx = cryptoUtils.signTransaction(tx, [privateKey]);
+
+    // BROWSER-COMPATIBLE: Convert chainId hex string to Uint8Array, then to Buffer
+    // dhive includes a Buffer polyfill, so Buffer.from() works in the browser
+    const chainIdHexBytes = HIVE_CHAIN_ID.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16));
+    const chainIdUint8 = new Uint8Array(chainIdHexBytes);
+    const chainIdBuffer = Buffer.from(chainIdUint8);
+
+    // Use signTransaction with explicit chain ID for HF26 compatibility
+    const signedTx = cryptoUtils.signTransaction(tx, [privateKey], chainIdBuffer);
 
     // 4. Broadcast Synchronous
     const broadcastResponse = await fetch(nodeUrl, {
@@ -77,6 +94,213 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
     return broadcastResult.result; // Returns { id: "txid", block_num: 123, ... }
 };
 
+
+
+// --- HELPER: Manual Fetch for BLURT ---
+// CRITICAL FIX: @blurtfoundation/blurtjs doesn't work in the browser (not packaged as ES6 module)
+// WORKAROUND: Use dhive to sign with STEEM symbol, then replace with BLURT after signing
+// This works because STEEM and BLURT both have 3 decimals (identical serialization)
+const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key: string): Promise<any> => {
+    // IMPORT SAFETY: Ensure we get the correct 'blurt' instance from CommonJS bundle
+    // @ts-ignore
+    const blurtInstance = blurt.default || blurt;
+
+    // Configure Blurt globally - FORCE set before every transaction to avoid stale state
+    const BLURT_CHAIN_ID = 'cd8d90f29ae273abec3eaa7731e25934c63eb654d55080caff2ebb7f5df6381f';
+    const BLURT_PREFIX = 'BLT';
+
+    // DEBUG: Check environment
+    console.log('[Blurt] Environment:', {
+        hasBuffer: typeof Buffer !== 'undefined',
+        hasWindow: typeof window !== 'undefined',
+        blurtConfigChainId: blurtInstance.config.get('chain_id')
+    });
+
+    // Ensure config is set on the instance
+    blurtInstance.config.set('address_prefix', BLURT_PREFIX);
+    blurtInstance.config.set('chain_id', BLURT_CHAIN_ID);
+
+    // DEBUG: Verify config was set
+    const currentChainId = blurtInstance.config.get('chain_id');
+
+    if (currentChainId !== BLURT_CHAIN_ID) {
+        console.warn('[Blurt] WARNING: Chain ID mismatch! Forcing config set again.');
+        blurtInstance.config.set('chain_id', BLURT_CHAIN_ID);
+    }
+
+    // 1. Get Dynamic Global Properties
+    const propsResponse = await fetch(nodeUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'condenser_api.get_dynamic_global_properties',
+            params: [],
+            id: 1
+        }),
+        headers: { 'Content-Type': 'application/json' }
+    });
+    const propsJson = await propsResponse.json();
+    if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
+    const props = propsJson.result;
+
+    // 2. Prepare Transaction Data
+    const ref_block_num = props.head_block_number & 0xFFFF;
+
+    // BROWSER-COMPATIBLE: Use Uint8Array + DataView instead of Buffer
+    const hexBytes = props.head_block_id.match(/.{1,2}/g)!.map((byte: string) => parseInt(byte, 16));
+    const blockIdBuffer = new Uint8Array(hexBytes);
+    const dataView = new DataView(blockIdBuffer.buffer);
+    const ref_block_prefix = dataView.getUint32(4, true); // true = little-endian
+
+    // 1 min expiration - ensure strict format
+    // some nodes are picky about the Z or milliseconds, but standard ISO slice is usually safe.
+    const expiration = new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5);
+
+    const tx = {
+        ref_block_num,
+        ref_block_prefix,
+        expiration,
+        operations,
+        extensions: []
+    };
+
+    // CRITICAL FIX: Sanitize operations to ensure no JSON-serialized Buffers remain
+    // This matches the logic from signMessage that resolved previous serialization issues
+    const sanitizeValue = (value: any): any => {
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                if (parsed && parsed.type === 'Buffer' && Array.isArray(parsed.data)) {
+                    return Buffer.from(parsed.data).toString('utf-8'); // Or 'hex' if preferred, but usually string
+                }
+            } catch (e) {
+                // Not JSON
+            }
+        }
+        if (typeof value === 'object' && value !== null) {
+            if (value.type === 'Buffer' && Array.isArray(value.data)) {
+                return Buffer.from(value.data);
+            }
+            if (Array.isArray(value)) {
+                return value.map(sanitizeValue);
+            }
+            const cleanObj: any = {};
+            for (const k in value) {
+                cleanObj[k] = sanitizeValue(value[k]);
+            }
+            return cleanObj;
+        }
+        return value;
+    };
+
+    tx.operations = tx.operations.map(sanitizeValue);
+
+    console.log('[Blurt] Signing Transaction Data:', JSON.stringify(tx, null, 2));
+
+    // 3. Sign using blurtjs directly
+    // Ensure key is private key object if possible, or string
+    let privateKey = key;
+
+    const signedTx = blurtInstance.auth.signTransaction(tx, [privateKey]);
+
+    // DEBUG: Verify Signature Locally and Recover Key
+    if (signedTx.signatures && signedTx.signatures.length > 0) {
+        // CRITICAL FIX: Ensure signatures are hex strings, not Buffers
+        // Vite/Polyfills might return Buffers which JSON.stringify serializes as {type:'Buffer', data:...}
+        // The RPC node expects hex strings.
+        signedTx.signatures = signedTx.signatures.map((sig: any) => {
+            if (typeof sig === 'string') return sig;
+            if (Buffer.isBuffer(sig)) return sig.toString('hex');
+            // Handle JSON-serialized Buffer { type: 'Buffer', data: [...] }
+            if (sig && sig.type === 'Buffer' && Array.isArray(sig.data)) {
+                return Buffer.from(sig.data).toString('hex');
+            }
+            // Handle Uint8Array or other array-likes
+            if (ArrayBuffer.isView(sig)) {
+                return Buffer.from(sig.buffer, sig.byteOffset, sig.byteLength).toString('hex');
+            }
+            return String(sig);
+        });
+
+        const sigHex = signedTx.signatures[0];
+        console.log('[Blurt] Generated Signature:', sigHex);
+
+        try {
+            // 1. Calculate Digest (uses blurtInstance internal config)
+            // @ts-ignore
+            const serializer = blurtInstance.auth.serializer;
+            // @ts-ignore
+            const digest = blurtInstance.auth.transactionDigest(tx);
+
+            console.log('---------------- BLURT DIAGNOSTICS ----------------');
+            console.log('[Blurt] Config ChainID:', blurtInstance.config.get('chain_id'));
+            console.log('[Blurt] Expected ChainID:', BLURT_CHAIN_ID);
+            console.log('[Blurt] Ref Block Num:', ref_block_num);
+            console.log('[Blurt] Ref Block Prefix:', ref_block_prefix);
+            console.log('[Blurt] Expiration:', expiration);
+
+            // Log serialized buffer
+            try {
+                // @ts-ignore
+                const buf = serializer.toBuffer(serializer.types.transaction, tx);
+                console.log('[Blurt] Serialized Tx Buffer (Hex):', buf.toString('hex'));
+            } catch (e) { console.error('[Blurt] Serializer Error:', e); }
+
+            console.log('[Blurt] Tx Digest (Hex):', digest.toString('hex'));
+            console.log('---------------------------------------------------');
+
+            // 2. Recover Public Key using this digest
+            // @ts-ignore
+            const Signature = blurtInstance.auth.ecc.Signature;
+
+            // Handle potential Buffer input for fromHex/fromBuffer
+            const sig = Buffer.isBuffer(sigHex) || (typeof sigHex === 'object')
+                ? Signature.fromBuffer(Buffer.from(sigHex, 'hex')) // Re-bufferize if needed or handle appropriately
+                : Signature.fromHex(sigHex);
+
+            const recoveredPubKey = sig.recover(digest).toString();
+            console.log('[Blurt] Recovered PubKey:', recoveredPubKey);
+
+            // 3. Expected Public Key
+            // @ts-ignore
+            const expectedPubKey = blurtInstance.auth.wifToPublic(key);
+            console.log('[Blurt] Expected PubKey:', expectedPubKey);
+
+            if (recoveredPubKey !== expectedPubKey) {
+                console.error('[Blurt] CRITICAL: Signature mismatch! The library might be using the wrong Chain ID internally.');
+                console.error('[Blurt] Diagnostic: Check if "Serialized Tx Buffer" matches what the tests produce.');
+            } else {
+                console.log('[Blurt] Signature verification PASSED locally.');
+            }
+
+        } catch (e) {
+            console.error('[Blurt] Verification Debug Error:', e);
+        }
+    } else {
+        console.warn('[Blurt] No signature generated!');
+    }
+
+    // 4. Broadcast Synchronous
+    const broadcastResponse = await fetch(nodeUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'condenser_api.broadcast_transaction_synchronous',
+            params: [signedTx],
+            id: 1
+        }),
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+    const broadcastResult = await broadcastResponse.json();
+    if (broadcastResult.error) {
+        console.error('[Blurt] Broadcast Error Response:', JSON.stringify(broadcastResult));
+        console.error('[Blurt] Tx Signed Content:', JSON.stringify(signedTx));
+        throw new Error(broadcastResult.error.message || JSON.stringify(broadcastResult.error));
+    }
+
+    return broadcastResult.result;
+};
 
 // --- PUBLIC API ---
 
@@ -270,16 +494,9 @@ export const broadcastTransfer = async (
             return { success: true, txId: result.id };
         }
         else if (chain === Chain.BLURT) {
-            const config = getChainConfig(Chain.BLURT);
-            blurt.config.set('address_prefix', config.addressPrefix);
-            blurt.config.set('chain_id', config.chainId);
-            blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
-            const result = await new Promise<any>((resolve, reject) => {
-                blurt.broadcast.transfer(activeKey, from, to, `${formattedAmount} BLURT`, memo, (err: any, res: any) => {
-                    if (err) reject(err); else resolve(res);
-                });
-            });
-            return { success: true, txId: result.id };
+            const transfer = ['transfer', { from, to, amount: `${formattedAmount} ${symbol}`, memo }];
+            const result = await broadcastBlurtTransaction(nodeUrl, [transfer], activeKey);
+            return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
@@ -298,19 +515,14 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const privateKey = SteemPrivateKey.fromString(key);
+            console.log("[DEBUG] Steem Vote:", voter, author, permlink, weight);
             const result = await client.broadcast.vote({ voter, author, permlink, weight }, privateKey);
-            return { success: true, txId: result.id };
+            console.log("[DEBUG] Steem Vote Result:", JSON.stringify(result));
+            return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
-            const config = getChainConfig(Chain.BLURT);
-            blurt.config.set('address_prefix', config.addressPrefix);
-            blurt.config.set('chain_id', config.chainId);
-            blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
-            const result = await new Promise<any>((resolve, reject) => {
-                blurt.broadcast.vote(key, voter, author, permlink, weight, (err: any, res: any) => {
-                    if (err) reject(err); else resolve(res);
-                });
-            });
-            return { success: true, txId: result.id };
+            const vote = ['vote', { voter, author, permlink, weight }];
+            const result = await broadcastBlurtTransaction(nodeUrl, [vote], key);
+            return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
@@ -321,16 +533,24 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
 export const broadcastCustomJson = async (chain: Chain, username: string, key: string, id: string, json: string, keyType: 'Posting' | 'Active'): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const nodeUrl = getActiveNode(chain);
     try {
-        const required_auths = keyType === 'Active' ? [username] : [];
-        const required_posting_auths = keyType === 'Posting' ? [username] : [];
+        // Ensure keyType is valid, default to 'Posting' if undefined
+        const validKeyType = (keyType === 'Active' || keyType === 'Posting') ? keyType : 'Posting';
+
+        // Ensure these are always arrays, never undefined
+        const required_auths = validKeyType === 'Active' ? [username] : [];
+        const required_posting_auths = validKeyType === 'Posting' ? [username] : [];
 
         if (chain === Chain.HIVE) {
+            // Ensure json is a string
+            const jsonString = typeof json === 'string' ? json : JSON.stringify(json);
+
             const op: any = ['custom_json', {
-                required_auths,
-                required_posting_auths,
-                id,
-                json: typeof json === 'string' ? json : JSON.stringify(json)
+                required_auths: required_auths,  // Explicitly set
+                required_posting_auths: required_posting_auths,  // Explicitly set
+                id: id,
+                json: jsonString
             }];
+
             const result = await broadcastHiveTransaction(nodeUrl, [op], key);
             return { success: true, txId: result.id, opResult: result };
 
@@ -340,19 +560,22 @@ export const broadcastCustomJson = async (chain: Chain, username: string, key: s
             const result = await client.broadcast.json({ id, json, required_auths, required_posting_auths }, privateKey);
             return { success: true, txId: result.id };
         } else if (chain === Chain.BLURT) {
-            const config = getChainConfig(Chain.BLURT);
-            blurt.config.set('address_prefix', config.addressPrefix);
-            blurt.config.set('chain_id', config.chainId);
-            blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
-            const result = await new Promise<any>((resolve, reject) => {
-                blurt.broadcast.customJson(key, required_auths, required_posting_auths, id, json, (err: any, res: any) => {
-                    if (err) reject(err); else resolve(res);
-                });
-            });
-            return { success: true, txId: result.id };
+            const op: any = ['custom_json', {
+                required_auths: required_auths,
+                required_posting_auths: required_posting_auths,
+                id: id,
+                json: json // custom_json usually expects string in simple serialize, but dsteem might want parsed? 
+                // Manual build: json should be string
+            }];
+            // Ensure json is a string
+            op[1].json = typeof json === 'string' ? json : JSON.stringify(json);
+
+            const result = await broadcastBlurtTransaction(nodeUrl, [op], key);
+            return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
+        console.error('Custom JSON Error:', e);
         return { success: false, error: e.message || "Custom JSON failed" };
     }
 };
@@ -377,11 +600,6 @@ const formatChainError = (error: any): string => {
     if (msg.includes('balance')) return "Insufficient balance for this operation.";
     if (msg.includes('authority')) return "Missing required authority. Check your Active key.";
 
-    // Handle signature errors with hints
-    if (msg.includes('Error Signature') || msg.includes('32602')) {
-        return "Signature Error (-32602). This often happens if the data sent by the website is malformed or if there is a mismatch in serialization. Please try reloading the website.";
-    }
-
     return msg;
 };
 
@@ -392,89 +610,31 @@ export const broadcastOperations = async (
 ): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const nodeUrl = getActiveNode(chain);
 
+    // Clean operations from frontend-specific properties (like __config, __rshares)
+    const cleanOperations = operations.map(op => {
+        if (Array.isArray(op) && op.length >= 2 && typeof op[1] === 'object') {
+            const data = { ...op[1] };
+            Object.keys(data).forEach(key => {
+                if (key.startsWith('__')) delete data[key];
+            });
+            return [op[0], data];
+        }
+        return op;
+    });
+
     try {
         if (chain === Chain.HIVE) {
-            const result = await broadcastHiveTransaction(nodeUrl, operations, activeKey);
+            const result = await broadcastHiveTransaction(nodeUrl, cleanOperations, activeKey);
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const key = SteemPrivateKey.fromString(activeKey);
-            const result = await client.broadcast.sendOperations(operations, key);
+            console.log("[DEBUG] Steem Ops (Cleaned):", JSON.stringify(cleanOperations));
+            const result = await client.broadcast.sendOperations(cleanOperations, key);
+            console.log("[DEBUG] Steem Result:", JSON.stringify(result));
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
-            const config = getChainConfig(Chain.BLURT);
-            blurt.config.set('address_prefix', config.addressPrefix);
-            blurt.config.set('chain_id', config.chainId);
-            blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
-
-            // VALIDATION & CLEANUP: Some dApps (like BeBlurt) might send malformed metadata
-            const cleanOperations = operations.map(op => {
-                const opName = op[0];
-                const opData = { ...op[1] }; // Shallow copy to avoid mutating original
-
-                // 1. Handle Metadata Fields
-                const metadataFields = ['json_metadata', 'posting_json_metadata'];
-                metadataFields.forEach(field => {
-                    if (opData[field] !== undefined && opData[field] !== null) {
-                        // If it's an object, stringify it
-                        if (typeof opData[field] === 'object') {
-                            try {
-                                opData[field] = JSON.stringify(opData[field]);
-                            } catch (e) {
-                                console.error(`[ChainService] Failed to stringify ${field}:`, e);
-                            }
-                        }
-                    } else {
-                        // Ensure it's at least an empty string if referenced by dApp but null/undefined
-                        // Actually, better to just leave it if it's not there, but some nodes prefer ""
-                        if (opName === 'comment' && field === 'json_metadata') {
-                            opData[field] = "";
-                        }
-                    }
-                });
-
-                // 2. Extra safety for 'tags' (Common issue with BeBlurt and similar dApps)
-                // If 'tags' exists as a top-level field, it MUST be moved to json_metadata
-                if (opData.tags) {
-                    try {
-                        let meta = {};
-                        if (opData.json_metadata) {
-                            try {
-                                meta = typeof opData.json_metadata === 'string'
-                                    ? JSON.parse(opData.json_metadata)
-                                    : opData.json_metadata;
-                            } catch (e) { /* ignore parse error, use empty */ }
-                        }
-                        // Merge tags into metadata
-                        (meta as any).tags = opData.tags;
-                        opData.json_metadata = JSON.stringify(meta);
-                        delete opData.tags;
-                    } catch (e) {
-                        console.error("[ChainService] Error merging tags into metadata:", e);
-                    }
-                }
-
-                // 3. Ensure extensions is an array
-                if (opData.extensions !== undefined && !Array.isArray(opData.extensions)) {
-                    opData.extensions = [];
-                }
-
-                return [opName, opData];
-            });
-
-            const result = await new Promise<any>((resolve, reject) => {
-                blurt.broadcast.send({ extensions: [], operations: cleanOperations }, [activeKey], (err: any, res: any) => {
-                    if (err) {
-                        console.error("[ChainService] Blurt Broadcast Error:", err);
-                        console.error("[ChainService] Failed Payload:", JSON.stringify(cleanOperations));
-                        reject(err);
-                    } else {
-                        // Success log is fine but keep it brief
-                        console.log("[ChainService] Blurt Success:", res.id);
-                        resolve(res);
-                    }
-                });
-            });
+            const result = await broadcastBlurtTransaction(nodeUrl, cleanOperations, activeKey);
             return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };
@@ -636,6 +796,7 @@ export interface HistoryItem {
 export const fetchAccountHistory = async (chain: Chain, username: string): Promise<HistoryItem[]> => {
     const node = getActiveNode(chain);
     const processOp = (op: any, timestamp: string, trx_id: string): HistoryItem | null => {
+        if (!op || !Array.isArray(op) || op.length < 2) return null;
         const type = op[0];
         const data = op[1];
         if (type === 'transfer') {
@@ -666,7 +827,7 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
             const json = await response.json();
             if (json.result) return json.result.map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h: any) => h !== null).reverse();
         }
-    } catch (e) { console.error("Fetch History Error:", e); }
+    } catch (e: any) { console.error("Fetch History Error:", JSON.stringify(e, null, 2) || e); }
     return [];
 };
 
@@ -702,7 +863,7 @@ export const signMessage = (
 
             // Convert message to buffer
             let msgBuf: Buffer;
-            if (typeof message === 'object' && !Buffer.isBuffer(message)) {
+            if (typeof message === 'object' && message !== null && !Buffer.isBuffer(message)) {
                 if ((message as any).type === 'Buffer' && Array.isArray((message as any).data)) {
                     msgBuf = Buffer.from((message as any).data);
                 } else {

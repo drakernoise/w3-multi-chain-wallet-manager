@@ -118,7 +118,8 @@ function AppContent() {
               ...prev,
               encryptedMaster: result.walletConfig.encryptedMaster,
               useGoogleAuth: result.walletConfig.useGoogleAuth,
-              useBiometrics: result.walletConfig.useBiometrics
+              useBiometrics: result.walletConfig.useBiometrics,
+              useTOTP: result.walletConfig.useTOTP
             }));
           }
         });
@@ -138,13 +139,14 @@ function AppContent() {
       const config = {
         encryptedMaster: walletState.encryptedMaster,
         useGoogleAuth: walletState.useGoogleAuth,
-        useBiometrics: walletState.useBiometrics
+        useBiometrics: walletState.useBiometrics,
+        useTOTP: walletState.useTOTP
       };
       if (typeof chrome !== 'undefined' && chrome.storage) {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
 
   // 3. Save Vault when accounts change
   useEffect(() => {
