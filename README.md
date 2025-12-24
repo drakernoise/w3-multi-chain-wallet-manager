@@ -42,6 +42,7 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 *   **Sleek UI**: Modern, dark-themed interface with real-time feedback.
 *   **Bulk Transfers**: Send funds to multiple recipients in a single transaction.
 *   **Transaction Analysis**: View and analyze your transaction history.
+*   **Secure Messenger**: 🔒 Encrypted on-chain chat for Hive, Steem, and Blurt.
 *   **Secure**:
     *   **2FA Support**: Integration with TOTP apps (Aegis, Google Auth).
     *   **Password Strength Meter**: Real-time feedback on password security.
@@ -116,6 +117,7 @@ Please read our [Security Policy](SECURITY.md) before reporting security issues.
 - [x] 🔐 Password Strength Indicator
 - [x] 🔑 Biometric authentication (WebAuthn)
 - [x] 🌐 Multi-language support (EN, ES, FR, DE, IT)
+- [x] 💬 Secure Blockchain Messenger (Encrypted Memos)
 - [ ] 🔐 Hardware wallet integration (Ledger/Trezor)
 - [ ] 📱 Mobile browser support
 - [ ] 📊 Advanced analytics dashboard
