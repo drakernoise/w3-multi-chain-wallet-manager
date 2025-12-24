@@ -1,228 +1,307 @@
-import React, { useState, useEffect } from 'react';
-import { Account, Chain } from '../types';
-import { fetchMessages, ChatMessage, decodeMessage, encodeMessage } from '../services/messagingService';
-import { fetchAccountData, broadcastTransfer } from '../services/chainService';
-import { useTranslation } from '../contexts/LanguageContext';
+import React, { useState, useEffect, useRef } from 'react';
+import { chatService, ChatRoom, ChatMessage, ChatUser } from '../services/chatService';
 
-interface ChatProps {
-    account: Account;
-    activeChain: Chain;
-    onClose: () => void;
-}
+export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+    // Identity State
+    const [user, setUser] = useState<ChatUser | null>(null);
+    const [isRegistering, setIsRegistering] = useState(false);
+    const [usernameInput, setUsernameInput] = useState('');
+    const [regError, setRegError] = useState<string | null>(null);
 
-export const ChatView: React.FC<ChatProps> = ({ account, activeChain, onClose }) => {
-    const { } = useTranslation();
+    // Chat State
+    const [rooms, setRooms] = useState<ChatRoom[]>([]);
+    const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
-    const [newMessage, setNewMessage] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSending, setIsSending] = useState(false);
-    const [memoKey, setMemoKey] = useState<string | null>(null);
+    const [inputText, setInputText] = useState('');
 
-    // Load Messages
-    useEffect(() => {
-        loadMessages();
-    }, [account, activeChain]);
+    // Search State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<ChatUser[]>([]);
 
-    // Load Memo Key
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Init & Listeners
     useEffect(() => {
-        // Fix: Use correct property from Account interface. account.memoKey exists in types.ts
-        if (account && account.memoKey) {
-            setMemoKey(account.memoKey);
+        // Check if already logged in
+        const existing = chatService.getCurrentUser();
+        if (existing) {
+            setUser(existing);
+        } else {
+            // Service tries auto-login on init
+            // We can listen for success
         }
-    }, [account]);
 
+        chatService.onAuthSuccess = (u) => {
+            setUser(u);
+            setIsRegistering(false);
+        };
 
-    const loadMessages = async () => {
-        if (!account) return;
-        setIsLoading(true);
-        try {
-            const msgs = await fetchMessages(activeChain, account.name);
-            setMessages(msgs);
-        } catch (e) {
-            console.error("Failed to load messages", e);
-        } finally {
-            setIsLoading(false);
+        chatService.onRoomUpdated = (updatedRooms) => {
+            setRooms(updatedRooms);
+            // If active room exists, update active room messages reference if needed
+            // But active room is just an ID. 
+        };
+
+        chatService.onMessage = (roomId, msg) => {
+            if (roomId === activeRoomId) {
+                setMessages(prev => [...prev, msg]);
+                scrollToBottom();
+            }
+        };
+
+        chatService.onError = (err) => {
+            setRegError(err);
+            setIsRegistering(false);
+        };
+
+        // Custom event for search results
+        const handleSearch = (e: any) => {
+            setSearchResults(e.detail);
+        };
+        window.addEventListener('chat-search-results', handleSearch);
+
+        // Connect
+        chatService.init();
+
+        return () => {
+            window.removeEventListener('chat-search-results', handleSearch);
+        };
+    }, [activeRoomId]);
+
+    // Effect to load messages when active room changes
+    useEffect(() => {
+        if (activeRoomId) {
+            const room = rooms.find(r => r.id === activeRoomId);
+            if (room) {
+                setMessages(room.messages);
+                scrollToBottom();
+            }
+        }
+    }, [activeRoomId, rooms]);
+
+    const scrollToBottom = () => {
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    };
+
+    const handleRegister = () => {
+        if (usernameInput.trim().length < 3) {
+            setRegError("Username must be at least 3 chars");
+            return;
+        }
+        setIsRegistering(true);
+        setRegError(null);
+        chatService.register(usernameInput.trim());
+    };
+
+    const handleSend = () => {
+        if (!activeRoomId || !inputText.trim()) return;
+        chatService.sendMessage(activeRoomId, inputText);
+        setInputText('');
+    };
+
+    const handleSearchUsers = (q: string) => {
+        setSearchQuery(q);
+        if (q.length > 1) {
+            chatService.searchUsers(q);
+        } else {
+            setSearchResults([]);
         }
     };
 
-    const handleSendMessage = async () => {
-        if (!processMessage() || !selectedPeer || !memoKey) return;
-        setIsSending(true);
-
-        try {
-            // 1. Get Peer's Public Memo Key
-            const peerData = await fetchAccountData(activeChain, selectedPeer);
-            if (!peerData) throw new Error("Peer not found");
-            const peerPubKey = peerData.memo_key;
-
-            // 2. Encrypt
-            const encrypted = encodeMessage(memoKey, peerPubKey, newMessage);
-
-            // 3. Broadcast (0.001 transfer)
-            // Using Active Key (required for transfer)
-            if (!account.activeKey) {
-                alert("Active Key required to send messages (transfers)");
-                return;
-            }
-
-            const result = await broadcastTransfer(
-                activeChain,
-                account.name,
-                account.activeKey,
-                selectedPeer,
-                "0.001", // Minimum amount usually
-                encrypted
-            );
-
-            if (result.success) {
-                setNewMessage('');
-                loadMessages(); // Refresh
-            } else {
-                alert("Failed to send: " + result.error);
-            }
-
-        } catch (e: any) {
-            alert("Error: " + e.message);
-        } finally {
-            setIsSending(false);
-        }
+    const startDM = (targetId: string) => {
+        chatService.createDM(targetId);
+        setSearchQuery('');
+        setSearchResults([]);
     };
 
-    // Group messages by Peer
-    const conversations = messages.reduce((acc, msg) => {
-        const peer = msg.type === 'sent' ? msg.to : msg.from;
-        if (!acc[peer]) acc[peer] = [];
-        acc[peer].push(msg);
-        return acc;
-    }, {} as Record<string, ChatMessage[]>);
+    // --- Render: Login Screen ---
+    if (!user) {
+        return (
+            <div className="flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6 animate-fadeIn">
+                <div className="w-full max-w-sm bg-dark-800 p-8 rounded-2xl border border-dark-700 shadow-xl text-center">
+                    <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-400">
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Gravity Chat</h2>
+                    <p className="text-slate-400 text-sm mb-6">Create a unique username to join the community. This ID is separate from your wallets.</p>
 
-    const sortedPeers = Object.keys(conversations).sort((a, b) => {
-        // Sort by latest message timestamp (desc)
-        const lastA = conversations[a][0].timestamp; // Assuming fetchMessages returns reverse order
-        const lastB = conversations[b][0].timestamp;
-        return lastA > lastB ? -1 : 1;
-    });
-
-    // Helper for input
-    const processMessage = () => newMessage.trim().length > 0;
-
-    return (
-        <div className="flex flex-col h-full bg-dark-900 text-white relative">
-            <div className="flex items-center justify-between p-4 border-b border-dark-700 bg-dark-800">
-                <h2 className="text-lg font-bold">Secure Messages</h2>
-                <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-
-            <div className="flex flex-1 overflow-hidden">
-                {/* Peer List */}
-                <div className={`w-1/3 border-r border-dark-700 overflow-y-auto ${selectedPeer ? 'hidden md:block' : 'w-full'}`}>
-                    {isLoading && <div className="p-4 text-center text-slate-500">Loading...</div>}
-                    {!isLoading && sortedPeers.length === 0 && (
-                        <div className="p-8 text-center text-slate-500 text-sm">
-                            No encrypted messages found. <br />
-                            Start a conversation by sending 0.001 {activeChain} with an encrypted memo.
+                    {regError && (
+                        <div className="bg-red-500/10 text-red-400 text-xs p-3 rounded-lg mb-4 border border-red-500/20">
+                            {regError}
                         </div>
                     )}
 
-                    {/* New Chat Button */}
-                    <div className="p-2">
+                    <input
+                        className="w-full bg-dark-900 border border-dark-600 rounded-xl px-4 py-3 text-white mb-4 focus:ring-2 focus:ring-purple-500 outline-none transition-all placeholder-slate-600"
+                        placeholder="Choose a username..."
+                        value={usernameInput}
+                        onChange={(e) => setUsernameInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
+                    />
+
+                    <button
+                        onClick={handleRegister}
+                        disabled={isRegistering}
+                        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-95 shadow-lg shadow-purple-900/20"
+                    >
+                        {isRegistering ? 'Joining...' : 'Join Chat'}
+                    </button>
+
+                    <button onClick={onClose} className="mt-4 text-slate-500 text-xs hover:text-white">Cancel</button>
+                </div>
+            </div>
+        );
+    }
+
+    // --- Render: Main Chat ---
+    return (
+        <div className="flex h-full bg-dark-900 text-white overflow-hidden animate-fadeIn">
+            {/* Left Sidebar: Rooms & Search */}
+            <div className={`w-80 flex flex-col border-r border-dark-700 bg-dark-850 ${activeRoomId ? 'hidden md:flex' : 'flex w-full'}`}>
+                {/* Header */}
+                <div className="p-4 border-b border-dark-700 flex justify-between items-center bg-dark-800">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold">
+                            {user.username.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-sm">{user.username}</span>
+                            <span className="text-[10px] text-green-400 flex items-center gap-1">● Online</span>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="md:hidden text-slate-400">✕</button>
+                </div>
+
+                {/* Search */}
+                <div className="p-3">
+                    <div className="relative">
                         <input
-                            className="w-full bg-dark-800 border border-dark-600 rounded p-2 text-sm text-white placeholder-slate-500"
-                            placeholder="Enter username to chat..."
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    setSelectedPeer(e.currentTarget.value);
-                                    e.currentTarget.value = '';
-                                }
-                            }}
+                            className="w-full bg-dark-900 border border-dark-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 outline-none"
+                            placeholder="Find ID or Room..."
+                            value={searchQuery}
+                            onChange={(e) => handleSearchUsers(e.target.value)}
                         />
+                        <svg className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                     </div>
 
-                    {sortedPeers.map(peer => (
+                    {/* Search Results */}
+                    {searchResults.length > 0 && (
+                        <div className="mt-2 bg-dark-800 border border-dark-700 rounded-lg shadow-lg overflow-hidden">
+                            {searchResults.map(u => (
+                                <div key={u.id} onClick={() => startDM(u.id)} className="p-2 hover:bg-dark-700 cursor-pointer flex justify-between items-center group">
+                                    <span className="text-sm">@{u.username}</span>
+                                    <span className="text-xs text-purple-400 opacity-0 group-hover:opacity-100">Message</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Room List */}
+                <div className="flex-1 overflow-y-auto px-2 space-y-1">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 py-2 mt-2">Rooms</div>
+                    {rooms.filter(r => r.type === 'public').map(room => (
                         <div
-                            key={peer}
-                            onClick={() => setSelectedPeer(peer)}
-                            className={`p-3 border-b border-dark-700 cursor-pointer hover:bg-dark-700 ${selectedPeer === peer ? 'bg-blue-900/20 border-l-4 border-blue-500' : ''}`}
+                            key={room.id}
+                            onClick={() => setActiveRoomId(room.id)}
+                            className={`p-3 rounded-lg cursor-pointer flex flex-col transition-colors ${activeRoomId === room.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'hover:bg-dark-700 text-slate-300'}`}
                         >
-                            <div className="font-bold text-sm">@{peer}</div>
-                            <div className="text-xs text-slate-400 truncate">
-                                {conversations[peer][0].isEncrypted ? '🔒 Encrypted Message' : conversations[peer][0].message}
+                            <div className="font-bold text-sm flex items-center gap-2">
+                                <span className="opacity-70 text-xs">#</span> {room.name}
                             </div>
                         </div>
                     ))}
-                </div>
 
-                {/* Chat Window */}
-                <div className={`flex-1 flex flex-col ${!selectedPeer ? 'hidden md:flex bg-dark-900 justify-center items-center text-slate-600' : ''}`}>
-                    {!selectedPeer ? (
-                        <div>Select a conversation</div>
-                    ) : (
-                        <>
-                            {/* Header */}
-                            <div className="p-3 bg-dark-800 border-b border-dark-700 flex justify-between items-center">
-                                <button onClick={() => setSelectedPeer(null)} className="md:hidden text-slate-400 mr-2">←</button>
-                                <span className="font-bold">@{selectedPeer}</span>
-                                <span className="text-xs text-green-400 flex items-center gap-1">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span> On-Chain
-                                </span>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 py-2 mt-4">Direct Messages</div>
+                    {rooms.filter(r => r.type === 'dm').map(room => (
+                        <div
+                            key={room.id}
+                            onClick={() => setActiveRoomId(room.id)}
+                            className={`p-3 rounded-lg cursor-pointer flex flex-col transition-colors ${activeRoomId === room.id ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-dark-700 text-slate-300'}`}
+                        >
+                            <div className="font-bold text-sm flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                {room.name.replace(user.username, '').replace(' & ', '').trim() || 'Chat'}
                             </div>
+                        </div>
+                    ))}
 
-                            {/* Messages */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col-reverse">
-                                {/* Note: Standard array map displays top-down, but chat is usually bottom-up. 
-                                     fetchMessages returns [newest, ..., oldest].
-                                     So we map normally? No, newest is usually at bottom.
-                                     Let's reverse for display.
-                                 */}
-                                {(conversations[selectedPeer] || []).map((msg) => {
-                                    const decrypted = msg.isEncrypted && memoKey
-                                        ? decodeMessage(msg.message, memoKey)
-                                        : (msg.isEncrypted ? "*** Locked (Missing Memo Key) ***" : msg.message);
-
-                                    return (
-                                        <div key={msg.id} className={`max-w-[80%] p-3 rounded-lg text-sm ${msg.type === 'sent' ? 'self-end bg-blue-600 text-white' : 'self-start bg-dark-700 text-slate-200'}`}>
-                                            {decrypted.startsWith('***') ? <span className="text-yellow-400 text-xs">{decrypted}</span> : decrypted}
-                                            <div className={`text-[10px] mt-1 opacity-70 ${msg.type === 'sent' ? 'text-blue-200' : 'text-slate-400'}`}>
-                                                {new Date(msg.timestamp + 'Z').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                {msg.isEncrypted && ' 🔒'}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Input */}
-                            <div className="p-3 bg-dark-800 border-t border-dark-700">
-                                {!memoKey && (
-                                    <div className="mb-2 text-xs text-red-400 bg-red-900/20 p-2 rounded">
-                                        ⚠️ Access Restricted: Import your <b>Memo Key</b> in Settings to read/write encrypted messages.
-                                    </div>
-                                )}
-                                <div className="flex gap-2">
-                                    <input
-                                        className="flex-1 bg-dark-900 border border-dark-600 rounded-full px-4 py-2 text-sm text-white focus:border-blue-500 outline-none"
-                                        placeholder={memoKey ? "Type an encrypted message..." : "Memo Key missing"}
-                                        value={newMessage}
-                                        onChange={(e) => setNewMessage(e.target.value)}
-                                        disabled={!memoKey || isSending}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                    />
-                                    <button
-                                        onClick={handleSendMessage}
-                                        disabled={!memoKey || isSending || !newMessage.trim()}
-                                        className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-full w-10 h-10 flex items-center justify-center disabled:opacity-50 transition-colors"
-                                    >
-                                        {isSending ? '...' : '➤'}
-                                    </button>
-                                </div>
-                                <div className="text-[10px] text-slate-500 mt-1 text-center">
-                                    Cost: 0.001 {activeChain} • Messages are public (encrypted) on blockchain.
-                                </div>
-                            </div>
-                        </>
+                    {rooms.length === 0 && (
+                        <div className="text-xs text-slate-500 p-4 text-center italic">No active conversations.</div>
                     )}
                 </div>
+            </div>
+
+            {/* Right: Active Chat Area */}
+            <div className={`flex-1 flex flex-col bg-dark-900 ${!activeRoomId ? 'hidden md:flex' : 'flex'}`}>
+                {!activeRoomId ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-600 opacity-50">
+                        <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                        <p>Select a room to start chatting</p>
+                    </div>
+                ) : (
+                    <>
+                        {/* Chat Header */}
+                        <div className="h-14 border-b border-dark-700 flex items-center px-6 bg-dark-800 justify-between">
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => setActiveRoomId(null)} className="md:hidden text-slate-400 hover:text-white mr-2">←</button>
+                                <h3 className="font-bold flex items-center gap-2">
+                                    {rooms.find(r => r.id === activeRoomId)?.type === 'public' && <span className="text-slate-400">#</span>}
+                                    {rooms.find(r => r.id === activeRoomId)?.name.replace(user.username, '').replace(' & ', '').replace(user.username, '').trim()}
+                                </h3>
+                            </div>
+                            <div className="flex gap-4">
+                                <button onClick={onClose} className="text-slate-400 hover:text-white hidden md:block">✕</button>
+                            </div>
+                        </div>
+
+                        {/* Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                            {messages.map((msg, i) => {
+                                const isMe = msg.senderId === user.id;
+                                const showAvatar = i === 0 || messages[i - 1].senderId !== msg.senderId;
+
+                                return (
+                                    <div key={msg.id || i} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                        <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold ${showAvatar ? (isMe ? 'bg-purple-600' : 'bg-slate-600') : 'opacity-0'}`}>
+                                            {msg.senderName.substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <div className={`flex flex-col max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}>
+                                            {showAvatar && <span className="text-[10px] text-slate-400 mb-1 px-1">{msg.senderName}</span>}
+                                            <div className={`px-4 py-2 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-purple-600 text-white rounded-tr-sm' : 'bg-dark-700 text-slate-200 rounded-tl-sm'}`}>
+                                                {msg.content}
+                                            </div>
+                                            <span className="text-[10px] text-slate-600 mt-1 px-1">
+                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Input Area */}
+                        <div className="p-4 bg-dark-800 border-t border-dark-700">
+                            <div className="flex items-center gap-2 bg-dark-900 border border-dark-600 rounded-xl px-2 py-2 focus-within:ring-2 focus-within:ring-purple-500/50 transition-all">
+                                <input
+                                    className="flex-1 bg-transparent px-2 text-white placeholder-slate-500 outline-none text-sm"
+                                    placeholder={`Message ${rooms.find(r => r.id === activeRoomId)?.type === 'public' ? '#' + rooms.find(r => r.id === activeRoomId)?.name : 'User'}...`}
+                                    value={inputText}
+                                    onChange={(e) => setInputText(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                />
+                                <button
+                                    onClick={handleSend}
+                                    disabled={!inputText.trim()}
+                                    className="p-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:bg-dark-700"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

@@ -533,8 +533,6 @@ function AppContent() {
 
           {currentView === ViewState.CHAT && (
             <ChatView
-              account={walletState.accounts.find(a => a.chain === activeChain) || walletState.accounts[0]}
-              activeChain={activeChain}
               onClose={() => setCurrentView(ViewState.LANDING)}
             />
           )}
