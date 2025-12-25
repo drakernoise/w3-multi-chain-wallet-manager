@@ -265,18 +265,6 @@ io.on('connection', (socket) => {
             return;
         }
 
-        if (!usernameRegex.test(cleanUsername)) {
-            socket.emit('error', 'Username contains invalid characters');
-            return;
-        }
-
-        if (reservedNames.includes(cleanUsername.toLowerCase())) {
-            socket.emit('error', 'Username is reserved');
-            return;
-        }
-
-        const existingStoredId = usernames[cleanUsername.toLowerCase()];
-
         // RED TEAM EMERGENCY HATCH: Allow resetting a username with a special prefix
         // Usage: Register as "!RESET!myname" to delete "myname" from DB
         if (cleanUsername.startsWith('!RESET!')) {
@@ -293,6 +281,18 @@ io.on('connection', (socket) => {
                 return;
             }
         }
+
+        if (!usernameRegex.test(cleanUsername)) {
+            socket.emit('error', 'Username contains invalid characters');
+            return;
+        }
+
+        if (reservedNames.includes(cleanUsername.toLowerCase())) {
+            socket.emit('error', 'Username is reserved');
+            return;
+        }
+
+        const existingStoredId = usernames[cleanUsername.toLowerCase()];
 
         if (existingStoredId && existingStoredId !== existingId) {
             // Check if the user object actually exists
