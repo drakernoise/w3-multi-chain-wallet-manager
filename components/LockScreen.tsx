@@ -351,19 +351,21 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
       <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
         <button
           onClick={() => {
-            if (typeof chrome !== 'undefined' && chrome.action) {
-              chrome.action.getUserSettings().then((settings: any) => {
-                chrome.action.setUserSettings({
-                  isOnToolbar: !settings.isOnToolbar
-                });
+            if (typeof chrome !== 'undefined' && chrome.windows) {
+              chrome.windows.create({
+                url: chrome.runtime.getURL('index.html'),
+                type: 'popup',
+                width: 400,
+                height: 600
               });
             }
           }}
           className="p-2 rounded-lg bg-dark-700/50 hover:bg-dark-600/50 border border-dark-600 transition-colors"
-          title="Pin/Unpin Extension"
+          title="Open in New Window"
         >
           <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12l4-4m-4 4l4 4m10-4l-4-4m4 4l-4 4" transform="rotate(45 12 12)" />
+            <circle cx="12" cy="8" r="2" fill="currentColor" />
           </svg>
         </button>
         <LanguageToggle />
