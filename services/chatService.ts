@@ -241,10 +241,10 @@ class ChatService {
                 // AUTO-REPAIR: If we have a name, try to re-register as fresh user
                 if (storedName && !storedName.startsWith('!RESET!')) {
                     console.log(`Auto-repairing identity for ${storedName}...`);
-                    // We need a small delay to ensure cleanup is done and server is ready
+                    // Increased delay to ensure server cleanup is fully complete
                     setTimeout(() => {
                         this.register(storedName).catch(console.error);
-                    }, 500);
+                    }, 2000); // 2 seconds to allow server to persist reset
                     return;
                 }
             }

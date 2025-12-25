@@ -1392,7 +1392,7 @@ class ChatService {
           console.log(`Auto-repairing identity for ${storedName}...`);
           setTimeout(() => {
             this.register(storedName).catch(console.error);
-          }, 500);
+          }, 2e3);
           return;
         }
       }
