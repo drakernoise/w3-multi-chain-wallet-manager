@@ -63,6 +63,6 @@
     "<all_urls>"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://gravity-chat-serve.onrender.com wss://gravity-chat-serve.onrender.com"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://gravity-chat-serve.onrender.com wss://gravity-chat-serve.onrender.com https://api.hive.blog https://api.steemit.com https://rpc.blurt.world https://anyx.io https://api.openhive.network"
   }
 }
