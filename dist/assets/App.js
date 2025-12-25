@@ -1,5 +1,5 @@
 import { r as reactExports, j as jsxRuntimeExports } from './vendor.js';
-import { j as isBiometricsAvailable, k as getTOTPSecret, v as verifyTOTP, l as hasPinProtectedKey, m as getInternalKey, u as unlockVault, n as initVaultWithGeneratedKey, o as loadInternalKeyWithPin, p as initVault, q as authenticateWithGoogle, r as authenticateWithDevice, t as hasTOTPConfigured, V as ViewState, C as Chain, w as generateSetup, x as saveTOTPSecret, y as enablePasswordless, z as registerBiometrics, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, A as broadcastSavingsDeposit, B as broadcastSavingsWithdraw, D as fetchAccountData, E as broadcastRCDelegate, F as broadcastRCUndelegate, G as broadcastBulkTransfer, H as validateUsername, I as validatePrivateKey, J as verifyKeyAgainstChain, K as validateAccountKeys, L as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, M as chatService, N as saveVault, O as fetchBalances, P as clearCryptoCache, Q as getVault, R as tryRestoreSession, S as detectWeb3Context, T as benchmarkNodes } from './chainService.js';
+import { j as isBiometricsAvailable, k as hasPinProtectedKey, l as getTOTPSecret, v as verifyTOTP, m as getInternalKey, u as unlockVault, n as initVaultWithGeneratedKey, o as loadInternalKeyWithPin, p as initVault, q as authenticateWithGoogle, r as authenticateWithDevice, t as hasTOTPConfigured, V as ViewState, C as Chain, w as generateSetup, x as saveTOTPSecret, y as enablePasswordless, z as registerBiometrics, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, A as broadcastSavingsDeposit, B as broadcastSavingsWithdraw, D as fetchAccountData, E as broadcastRCDelegate, F as broadcastRCUndelegate, G as broadcastBulkTransfer, H as validateUsername, I as validatePrivateKey, J as verifyKeyAgainstChain, K as validateAccountKeys, L as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, M as chatService, N as saveVault, O as fetchBalances, P as clearCryptoCache, Q as getVault, R as tryRestoreSession, S as detectWeb3Context, T as benchmarkNodes } from './chainService.js';
 
 const calculatePasswordStrength = (password) => {
   let score = 0;
@@ -2244,7 +2244,15 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
   const [showResetConfirmation, setShowResetConfirmation] = reactExports.useState(false);
   reactExports.useEffect(() => {
     isBiometricsAvailable();
-  }, []);
+    if (!isFirstRun) {
+      hasPinProtectedKey().then((hasPin) => {
+        if (hasPin) {
+          setPinMode("unlock");
+          setShowPinModal(true);
+        }
+      });
+    }
+  }, [isFirstRun]);
   reactExports.useEffect(() => {
     if (lockReason) setError(lockReason);
   }, [lockReason]);

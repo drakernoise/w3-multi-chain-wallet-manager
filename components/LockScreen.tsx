@@ -36,7 +36,17 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
   useEffect(() => {
     // We just check if it's available for potential later use or settings
     isBiometricsAvailable();
-  }, []);
+
+    // UX IMPROVEMENT: If we have a PIN setup, prompt for it immediately!
+    if (!isFirstRun) {
+      hasPinProtectedKey().then(hasPin => {
+        if (hasPin) {
+          setPinMode('unlock');
+          setShowPinModal(true);
+        }
+      });
+    }
+  }, [isFirstRun]);
 
   // Update error if lockReason changes
   useEffect(() => {
