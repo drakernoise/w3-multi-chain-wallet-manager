@@ -977,7 +977,7 @@ async function initVaultWithGeneratedKey(pin) {
   if (pin) {
     await saveInternalKeyWithPin(internalKey, pin);
   } else {
-    await storeInternalKey(internalKey);
+    throw new Error("Security Violation: Cannot initialize vault without a PIN or password protection.");
   }
   const emptyVault = { accounts: [], lastUpdated: Date.now() };
   const salt = window.crypto.getRandomValues(new Uint8Array(SALT_LEN));
@@ -1238,30 +1238,62 @@ class ChatService {
   onRoomUpdated = null;
   onRoomAdded = null;
   onAuthSuccess = null;
+  onAuthenticated = null;
+  // Alias for AuthSuccess
   onError = null;
   onStatusChange = null;
   rooms = [];
-  constructor() {
-  }
+  serverUrl = "https://gravity-chat-serve.onrender.com";
   init() {
-    if (this.socket) return;
-    const BACKEND_URL = "https://gravity-chat-serve.onrender.com";
-    this.socket = lookup(BACKEND_URL, {
-      reconnectionAttempts: 7,
-      timeout: 3e4,
+    if (this.socket?.connected) return;
+    this.socket = lookup(this.serverUrl, {
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1e3,
       autoConnect: true
     });
-    this.socket.on("connect", () => {
+    this.socket.on("connect", async () => {
       console.log("Connected to Chat Server");
       if (this.onStatusChange) this.onStatusChange("connected");
-      this.tryAutoLogin();
+      window.dispatchEvent(new Event("chat-connected"));
+      const storedUser = localStorage.getItem("gravity_chat_username");
+      const storedKey = localStorage.getItem("gravity_chat_priv");
+      if (storedUser && storedKey) {
+        console.log("Auto-logging in as", storedUser);
+        try {
+          const storedId = localStorage.getItem("gravity_chat_id");
+          if (storedId) {
+            await this.authenticateWithSignature(storedId, storedKey);
+          } else {
+            console.warn("No ID found, cannot auto-login securely.");
+          }
+        } catch (e) {
+          console.error("Auto-login failed", e);
+        }
+      }
     });
+    this.setupListeners();
+  }
+  setupListeners() {
+    if (!this.socket) return;
     this.socket.on("disconnect", () => {
       if (this.onStatusChange) this.onStatusChange("disconnected");
+      window.dispatchEvent(new Event("chat-disconnected"));
     });
     this.socket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err);
       if (this.onStatusChange) this.onStatusChange("disconnected", err.message);
+    });
+    this.socket.on("auth_challenge", async (data) => {
+      console.log("Received auth challenge");
+      const storedKey = localStorage.getItem("gravity_chat_priv");
+      if (storedKey) {
+        try {
+          const signature = await this.signChallenge(data.challenge, storedKey);
+          this.socket?.emit("verify_signature", { signature });
+        } catch (e) {
+          console.error("Auto-signing challenge failed", e);
+        }
+      }
     });
     this.socket.on("auth_success", (data) => {
       this.userId = data.id;
@@ -1271,9 +1303,11 @@ class ChatService {
         messages: [],
         unreadCount: 0
       }));
+      localStorage.setItem("gravity_chat_id", data.id);
+      localStorage.setItem("gravity_chat_username", data.username);
       if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
+      if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
       if (this.onRoomUpdated) this.onRoomUpdated(this.rooms);
-      this.saveIdentity(data.id, data.username);
     });
     this.socket.on("new_message", (data) => {
       this.handleNewMessage(data.roomId, data.message);
@@ -1296,13 +1330,9 @@ class ChatService {
         }
       }
     });
-    this.socket.on("room_added", (roomData) => {
+    this.socket.on("room_joined", (roomData) => {
       if (this.rooms.find((r) => r.id === roomData.id)) return;
-      const newRoom = {
-        ...roomData,
-        messages: [],
-        unreadCount: 0
-      };
+      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
       this.rooms.push(newRoom);
       if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
       if (this.onRoomAdded) this.onRoomAdded(newRoom);
@@ -1324,94 +1354,51 @@ class ChatService {
       }
     });
     this.socket.on("error", (msg) => {
+      console.error("Socket Error:", msg);
       if (this.onError) this.onError(msg);
     });
     this.socket.on("search_results", (results) => {
       window.dispatchEvent(new CustomEvent("chat-search-results", { detail: results }));
     });
-    this.socket.on("auth_challenge", async (data) => {
-      console.log("Received auth challenge from server");
-      window.dispatchEvent(new CustomEvent("chat-auth-challenge", { detail: data }));
-    });
-    this.socket.on("user_online", (userId) => {
-      this.handleUserStatusChange(userId, true);
-    });
-    this.socket.on("user_offline", (userId) => {
-      this.handleUserStatusChange(userId, false);
-    });
+    this.socket.on("user_online", (userId) => this.handleUserStatusChange(userId, true));
+    this.socket.on("user_offline", (userId) => this.handleUserStatusChange(userId, false));
   }
-  handleUserStatusChange(userId, isOnline) {
-    let updated = false;
-    this.rooms.forEach((room) => {
-      const member = room.memberDetails?.find((m) => m.id === userId);
-      if (member) {
-        member.isOnline = isOnline;
-        updated = true;
-      }
-    });
-    if (updated && this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+  // --- CRYPTO & AUTH ---
+  async generateAndSaveIdentity() {
+    const keyPair = await crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["sign", "verify"]
+    );
+    const exportedPub = await crypto.subtle.exportKey("spki", keyPair.publicKey);
+    const exportedPriv = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+    const publicKeyHex = this.bufferToHex(new Uint8Array(exportedPub));
+    const privateKeyHex = this.bufferToHex(new Uint8Array(exportedPriv));
+    localStorage.setItem("gravity_chat_priv", privateKeyHex);
+    localStorage.setItem("gravity_chat_pub", publicKeyHex);
+    return { publicKey: publicKeyHex, privateKey: privateKeyHex };
   }
-  // Enhanced Security: Authenticate with cryptographic signature
-  async authenticateWithSignature(userId, privateKeyHex) {
-    return new Promise((resolve, reject) => {
-      if (!this.socket) {
-        reject(new Error("Socket not initialized"));
-        return;
-      }
-      this.socket.emit("request_challenge", { userId });
-      const challengeHandler = async (event) => {
-        const { challenge } = event.detail;
-        try {
-          const signature = await this.signChallenge(challenge, privateKeyHex);
-          this.socket?.emit("verify_signature", { signature });
-          const successHandler = () => {
-            window.removeEventListener("chat-auth-challenge", challengeHandler);
-            resolve();
-          };
-          this.socket?.once("auth_success", successHandler);
-          const errorHandler = (msg) => {
-            window.removeEventListener("chat-auth-challenge", challengeHandler);
-            reject(new Error(msg));
-          };
-          this.socket?.once("error", errorHandler);
-        } catch (err) {
-          window.removeEventListener("chat-auth-challenge", challengeHandler);
-          reject(err);
-        }
-      };
-      window.addEventListener("chat-auth-challenge", challengeHandler, { once: true });
-    });
+  async authenticateWithSignature(userId, _privateKeyHex) {
+    if (!this.socket) return;
+    this.socket.emit("request_challenge", { userId });
   }
-  // Sign challenge using ECDSA with SubtleCrypto
   async signChallenge(challenge, privateKeyHex) {
-    try {
-      const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
-      const privateKey = await crypto.subtle.importKey(
-        "pkcs8",
-        privateKeyBuffer,
-        {
-          name: "ECDSA",
-          namedCurve: "P-256"
-          // secp256r1, adjust if using secp256k1
-        },
-        false,
-        ["sign"]
-      );
-      const encoder = new TextEncoder();
-      const data = encoder.encode(challenge);
-      const signature = await crypto.subtle.sign(
-        {
-          name: "ECDSA",
-          hash: { name: "SHA-256" }
-        },
-        privateKey,
-        data
-      );
-      return this.bufferToHex(new Uint8Array(signature));
-    } catch (err) {
-      console.error("Error signing challenge:", err);
-      throw new Error("Failed to sign challenge");
-    }
+    const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
+    const privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      privateKeyBuffer,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"]
+    );
+    const encoder = new TextEncoder();
+    const data = encoder.encode(challenge);
+    const signature = await crypto.subtle.sign(
+      { name: "ECDSA", hash: { name: "SHA-256" } },
+      privateKey,
+      data
+    );
+    return this.bufferToHex(new Uint8Array(signature));
   }
   hexToBuffer(hex) {
     const bytes = new Uint8Array(hex.length / 2);
@@ -1423,76 +1410,79 @@ class ChatService {
   bufferToHex(buffer) {
     return Array.from(buffer).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
-  register(username) {
-    if (!this.socket) this.init();
-    this.socket?.emit("register", { username });
-  }
-  sendMessage(roomId, content) {
-    this.socket?.emit("send_message", { roomId, content });
-  }
-  joinRoom(roomId) {
-    this.socket?.emit("join_room", roomId);
-  }
-  createDM(targetUserId) {
-    this.socket?.emit("create_dm", targetUserId);
-  }
-  searchUsers(query) {
-    this.socket?.emit("search_users", query);
-  }
-  getRooms() {
-    return this.rooms;
-  }
+  // --- PUBLIC METHODS ---
   createRoom(name, isPrivate = false) {
     this.socket?.emit("create_room", { name, isPrivate });
-  }
-  inviteUser(roomId, targetUsername) {
-    this.socket?.emit("invite_user", { roomId, targetUsername });
-  }
-  closeRoom(roomId) {
-    this.socket?.emit("close_room", roomId);
-  }
-  kickUser(roomId, targetUserId) {
-    this.socket?.emit("kick_user", { roomId, targetUserId });
-  }
-  banUser(roomId, targetUserId) {
-    this.socket?.emit("ban_user", { roomId, targetUserId });
-  }
-  muteUser(roomId, targetUserId) {
-    this.socket?.emit("mute_user", { roomId, targetUserId });
-  }
-  unmuteUser(roomId, targetUserId) {
-    this.socket?.emit("unmute_user", { roomId, targetUserId });
   }
   getCurrentUser() {
     if (this.userId && this.username) return { id: this.userId, username: this.username };
     return null;
   }
-  logout() {
-    if (typeof chrome !== "undefined" && chrome.storage) {
-      chrome.storage.local.remove(["gravity_chat_id", "gravity_chat_username"]);
+  async register(username) {
+    if (!this.socket) await this.init();
+    const keys = await this.generateAndSaveIdentity();
+    localStorage.setItem("gravity_chat_username", username);
+    this.socket?.emit("register", { username, publicKey: keys.publicKey });
+  }
+  async sendMessage(roomId, content) {
+    if (!this.socket) return;
+    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+    if (!privateKeyHex) {
+      if (this.onError) this.onError("Security Error: No identity found. Please re-login.");
+      return;
     }
+    try {
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = content + timestamp;
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      this.socket.emit("send_message", {
+        roomId,
+        content,
+        timestamp,
+        signature
+      });
+    } catch (err) {
+      console.error("Failed to sign message:", err);
+      if (this.onError) this.onError("Failed to securely sign message.");
+    }
+  }
+  joinRoom(roomId) {
+    this.socket?.emit("join_room", roomId);
+  }
+  createDM(targetId) {
+    this.socket?.emit("create_dm", targetId);
+  }
+  searchUsers(query) {
+    this.socket?.emit("search_users", query);
+  }
+  inviteUser(roomId, user) {
+    this.socket?.emit("invite_user", { roomId, targetUsername: user });
+  }
+  closeRoom(roomId) {
+    this.socket?.emit("close_room", roomId);
+  }
+  kickUser(roomId, userId) {
+    this.socket?.emit("kick_user", { roomId, targetUserId: userId });
+  }
+  banUser(roomId, userId) {
+    this.socket?.emit("ban_user", { roomId, targetUserId: userId });
+  }
+  muteUser(roomId, userId) {
+    this.socket?.emit("mute_user", { roomId, targetUserId: userId });
+  }
+  unmuteUser(roomId, userId) {
+    this.socket?.emit("unmute_user", { roomId, targetUserId: userId });
+  }
+  logout() {
+    localStorage.removeItem("gravity_chat_id");
+    localStorage.removeItem("gravity_chat_username");
+    localStorage.removeItem("gravity_chat_priv");
+    localStorage.removeItem("gravity_chat_pub");
     this.userId = null;
     this.username = null;
     this.rooms = [];
     this.socket?.disconnect();
     this.socket = null;
-  }
-  saveIdentity(id, username) {
-    if (typeof chrome !== "undefined" && chrome.storage) {
-      chrome.storage.local.set({ gravity_chat_id: id, gravity_chat_username: username });
-    }
-  }
-  tryAutoLogin() {
-    if (typeof chrome !== "undefined" && chrome.storage) {
-      chrome.storage.local.get(["gravity_chat_id", "gravity_chat_username"], (res) => {
-        if (res.gravity_chat_id && res.gravity_chat_username) {
-          this.socket?.emit("register", {
-            existingId: res.gravity_chat_id,
-            username: res.gravity_chat_username
-          });
-        }
-      });
-    }
   }
   handleNewMessage(roomId, message) {
     const room = this.rooms.find((r) => r.id === roomId);
@@ -1501,6 +1491,17 @@ class ChatService {
       if (this.onMessage) this.onMessage(roomId, message);
       if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
     }
+  }
+  handleUserStatusChange(userId, isOnline) {
+    let updated = false;
+    this.rooms.forEach((room) => {
+      const member = room.memberDetails?.find((m) => m.id === userId);
+      if (member) {
+        member.isOnline = isOnline;
+        updated = true;
+      }
+    });
+    if (updated && this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
   }
 }
 const chatService = new ChatService();
