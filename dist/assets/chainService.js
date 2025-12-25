@@ -1323,6 +1323,18 @@ class ChatService {
         }
       }
     });
+    this.socket.on("room_added", (roomData) => {
+      console.log(`🆕 room_added event received:`, roomData);
+      if (this.rooms.find((r) => r.id === roomData.id)) {
+        console.log(`⚠️ Room ${roomData.name} already exists, skipping`);
+        return;
+      }
+      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
+      this.rooms.push(newRoom);
+      console.log(`✅ Added room to local list. Total rooms: ${this.rooms.length}`);
+      if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+      if (this.onRoomAdded) this.onRoomAdded(newRoom);
+    });
     this.socket.on("room_joined", (roomData) => {
       if (this.rooms.find((r) => r.id === roomData.id)) return;
       const newRoom = { ...roomData, messages: [], unreadCount: 0 };
