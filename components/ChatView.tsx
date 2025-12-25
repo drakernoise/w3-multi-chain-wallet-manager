@@ -127,6 +127,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     // Effect to load messages when active room changes
     useEffect(() => {
         if (activeRoomId) {
+            chatService.joinRoom(activeRoomId); // Fetch history and presence
             const room = rooms.find(r => r.id === activeRoomId);
             if (room) {
                 setMessages(room.messages);
@@ -541,7 +542,8 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         {rooms.find(r => r.id === activeRoomId)?.memberDetails?.map(member => (
                             <div key={member.id} className="flex flex-col gap-2 p-2 rounded hover:bg-dark-700/50 transition-colors border border-transparent hover:border-dark-600">
                                 <div className="flex justify-between items-center">
-                                    <span className={`text-sm ${member.id === user?.id ? 'text-purple-400 font-bold' : 'text-slate-300'}`}>
+                                    <span className={`text-sm flex items-center gap-2 ${member.id === user?.id ? 'text-purple-400 font-bold' : 'text-slate-300'}`}>
+                                        <div className={`w-2 h-2 rounded-full ${member.isOnline ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]' : 'bg-slate-600'}`} title={member.isOnline ? 'Online' : 'Offline'}></div>
                                         @{member.username}
                                         {rooms.find(r => r.id === activeRoomId)?.owner === member.id && <span className="ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400">Owner</span>}
                                     </span>

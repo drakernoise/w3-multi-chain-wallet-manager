@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 export interface ChatUser {
     id: string;
     username: string;
+    isOnline?: boolean;
 }
 
 export interface ChatMessage {
@@ -162,6 +163,27 @@ class ChatService {
             // This will be handled by the authenticateWithSignature method
             window.dispatchEvent(new CustomEvent('chat-auth-challenge', { detail: data }));
         });
+        // User Presence
+        this.socket.on('user_online', (userId: string) => {
+            this.handleUserStatusChange(userId, true);
+        });
+
+        this.socket.on('user_offline', (userId: string) => {
+            this.handleUserStatusChange(userId, false);
+        });
+    }
+
+    private handleUserStatusChange(userId: string, isOnline: boolean) {
+        let updated = false;
+        this.rooms.forEach(room => {
+            const member = room.memberDetails?.find(m => m.id === userId);
+            if (member) {
+                member.isOnline = isOnline;
+                updated = true;
+            }
+        });
+        // If the user came online, they might have sent messages or joined, but for now we just update presence UI
+        if (updated && this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
     }
 
     // Enhanced Security: Authenticate with cryptographic signature

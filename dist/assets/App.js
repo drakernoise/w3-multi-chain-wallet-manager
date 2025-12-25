@@ -2657,7 +2657,7 @@ const Sidebar = ({
   onToggleDetach
 }) => {
   const { t } = useTranslation();
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "w-16 h-full bg-dark-800 border-r border-dark-700 flex flex-col items-center py-4 shrink-0 z-20 overflow-hidden", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "w-16 h-full bg-dark-800 border-r border-dark-700 flex flex-col items-center py-4 shrink-0 z-20", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       "img",
       {
@@ -6366,6 +6366,7 @@ const ChatView = ({ onClose }) => {
   }, [notification]);
   reactExports.useEffect(() => {
     if (activeRoomId) {
+      chatService.joinRoom(activeRoomId);
       const room = rooms.find((r) => r.id === activeRoomId);
       if (room) {
         setMessages(room.messages);
@@ -6708,7 +6709,8 @@ const ChatView = ({ onClose }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setShowParticipants(false), className: "text-slate-500 hover:text-white", children: "✕" })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar", children: rooms.find((r) => r.id === activeRoomId)?.memberDetails?.map((member) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-2 p-2 rounded hover:bg-dark-700/50 transition-colors border border-transparent hover:border-dark-600", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-between items-center", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-sm ${member.id === user?.id ? "text-purple-400 font-bold" : "text-slate-300"}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-between items-center", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-sm flex items-center gap-2 ${member.id === user?.id ? "text-purple-400 font-bold" : "text-slate-300"}`, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-2 h-2 rounded-full ${member.isOnline ? "bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]" : "bg-slate-600"}`, title: member.isOnline ? "Online" : "Offline" }),
           "@",
           member.username,
           rooms.find((r) => r.id === activeRoomId)?.owner === member.id && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400", children: "Owner" })

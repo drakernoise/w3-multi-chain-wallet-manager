@@ -1333,6 +1333,23 @@ class ChatService {
       console.log("Received auth challenge from server");
       window.dispatchEvent(new CustomEvent("chat-auth-challenge", { detail: data }));
     });
+    this.socket.on("user_online", (userId) => {
+      this.handleUserStatusChange(userId, true);
+    });
+    this.socket.on("user_offline", (userId) => {
+      this.handleUserStatusChange(userId, false);
+    });
+  }
+  handleUserStatusChange(userId, isOnline) {
+    let updated = false;
+    this.rooms.forEach((room) => {
+      const member = room.memberDetails?.find((m) => m.id === userId);
+      if (member) {
+        member.isOnline = isOnline;
+        updated = true;
+      }
+    });
+    if (updated && this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
   }
   // Enhanced Security: Authenticate with cryptographic signature
   async authenticateWithSignature(userId, privateKeyHex) {

@@ -158,15 +158,18 @@ io.on('connection', (socket) => {
         connectedSockets[socket.id] = user.id;
         delete authChallenges[socket.id];
 
+        const availableRooms = getAvailableRooms(user.id);
+
         socket.emit('auth_success', {
             id: user.id,
             username: user.username,
-            rooms: getAvailableRooms(user.id)
+            rooms: availableRooms
         });
 
-        // Auto-join their rooms
-        user.rooms.forEach(roomId => {
-            socket.join(roomId);
+        // Auto-join ALL available rooms (public + private memberships)
+        availableRooms.forEach(r => {
+            socket.join(r.id);
+            socket.to(r.id).emit('user_online', user.id);
         });
     });
 
@@ -180,13 +183,21 @@ io.on('connection', (socket) => {
             if (user) {
                 socket.user = user;
                 connectedSockets[socket.id] = user.id;
+
+                const availableRooms = getAvailableRooms(user.id);
                 socket.emit('auth_success', {
                     id: user.id,
                     username: user.username,
-                    rooms: getAvailableRooms(user.id)
+                    rooms: availableRooms
+                });
+
+                // Auto-join ALL available rooms
+                availableRooms.forEach(r => {
+                    socket.join(r.id);
                 });
                 return;
-            } else if (username) {
+            }
+            if (username) {
                 // If ID is provided but user record is lost, check if the username matches the ID in usernames map
                 const storedId = usernames[username.toLowerCase()];
                 if (storedId === existingId) {
@@ -202,10 +213,18 @@ io.on('connection', (socket) => {
                     saveData();
                     socket.user = newUser;
                     connectedSockets[socket.id] = existingId;
+
+                    const availableRooms = getAvailableRooms(existingId);
                     socket.emit('auth_success', {
                         id: existingId,
                         username,
-                        rooms: getAvailableRooms(existingId)
+                        rooms: availableRooms
+                    });
+
+                    // Auto-join ALL available rooms
+                    availableRooms.forEach(r => {
+                        socket.join(r.id);
+                        socket.to(r.id).emit('user_online', existingId);
                     });
                     return;
                 }
@@ -249,9 +268,15 @@ io.on('connection', (socket) => {
 
         // Auto-join Global Lobby
         socket.join('global-lobby');
+        socket.to('global-lobby').emit('user_online', newId);
+
         const lobbyData = {
             ...rooms['global-lobby'],
-            memberDetails: rooms['global-lobby'].members.map(id => ({ id, username: users[id]?.username }))
+            memberDetails: rooms['global-lobby'].members.map(id => ({
+                id,
+                username: users[id]?.username,
+                isOnline: Object.values(connectedSockets).includes(id)
+            }))
         };
         socket.emit('joined_room', { roomId: 'global-lobby', roomData: lobbyData });
     });
@@ -294,7 +319,11 @@ io.on('connection', (socket) => {
         socket.emit('room_history', {
             roomId,
             messages: room.messages.slice(-50),
-            memberDetails: room.members.map(id => ({ id, username: users[id]?.username }))
+            memberDetails: room.members.map(id => ({
+                id,
+                username: users[id]?.username,
+                isOnline: Object.values(connectedSockets).includes(id)
+            }))
         });
     });
 
@@ -552,6 +581,17 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('room_closed', roomId);
         io.in(roomId).socketsLeave(roomId); // Force all sockets to leave
         io.emit('room_removed', roomId); // Update lists for everyone
+    });
+
+    socket.on('disconnecting', () => {
+        if (socket.user) {
+            // socket.rooms is a Set containing the socket ID and joined rooms
+            for (const roomId of socket.rooms) {
+                if (roomId !== socket.id) {
+                    socket.to(roomId).emit('user_offline', socket.user.id);
+                }
+            }
+        }
     });
 
     socket.on('disconnect', () => {

@@ -21,7 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t } = useTranslation();
 
   return (
-    <aside className="w-16 h-full bg-dark-800 border-r border-dark-700 flex flex-col items-center py-4 shrink-0 z-20 overflow-hidden">
+    <aside className="w-16 h-full bg-dark-800 border-r border-dark-700 flex flex-col items-center py-4 shrink-0 z-20">
       {/* App Logo */}
       <img
         src="/logowallet.png"
