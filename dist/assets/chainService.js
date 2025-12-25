@@ -1262,11 +1262,11 @@ class ChatService {
   }
   init() {
     if (this.socket) return;
-    const BACKEND_URL = "https://gravity-chat-server.onrender.com";
+    const BACKEND_URL = "https://gravity-chat-serve.onrender.com";
     this.socket = lookup(BACKEND_URL, {
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 5,
-      timeout: 2e4
+      reconnectionAttempts: 7,
+      timeout: 3e4,
+      autoConnect: true
     });
     this.socket.on("connect", () => {
       console.log("Connected to Chat Server");
@@ -1278,7 +1278,7 @@ class ChatService {
     });
     this.socket.on("connect_error", (err) => {
       console.error("Socket connection error:", err);
-      if (this.onStatusChange) this.onStatusChange("disconnected");
+      if (this.onStatusChange) this.onStatusChange("disconnected", err.message);
     });
     this.socket.on("auth_success", (data) => {
       this.userId = data.id;

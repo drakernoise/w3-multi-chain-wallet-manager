@@ -63,6 +63,6 @@
     "<all_urls>"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://gravity-chat-serve.onrender.com wss://gravity-chat-serve.onrender.com"
   }
 }

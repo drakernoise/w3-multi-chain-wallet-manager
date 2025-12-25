@@ -8,6 +8,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [usernameInput, setUsernameInput] = useState('');
     const [regError, setRegError] = useState<string | null>(null);
     const [socketStatus, setSocketStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'authenticated'>('disconnected');
+    const [lastError, setLastError] = useState<string | null>(null);
 
     // Chat State
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
@@ -56,8 +57,9 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             setSocketStatus('authenticated');
         };
 
-        chatService.onStatusChange = (status) => {
+        chatService.onStatusChange = (status, errMsg) => {
             setSocketStatus(status as any);
+            if (errMsg) setLastError(errMsg);
         };
 
         chatService.onRoomUpdated = (updatedRooms) => {
@@ -204,9 +206,10 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                         </div>
                         <p className="text-red-400 font-bold mb-1">Connection Failed</p>
-                        <p className="text-[10px] text-slate-500 mb-6">Could not reach the chat server.</p>
+                        <p className="text-[10px] text-slate-500 mb-2">Could not reach the chat server.</p>
+                        {lastError && <p className="text-[9px] text-red-500/70 mb-6 italic max-w-xs">{lastError}</p>}
                         <button
-                            onClick={() => { setSocketStatus('connecting'); chatService.init(); }}
+                            onClick={() => { setSocketStatus('connecting'); setLastError(null); chatService.init(); }}
                             className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-xl font-bold transition-all active:scale-95 mb-4"
                         >
                             Retry Connection

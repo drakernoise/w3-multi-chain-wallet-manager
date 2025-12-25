@@ -5772,6 +5772,7 @@ const ChatView = ({ onClose }) => {
   const [usernameInput, setUsernameInput] = reactExports.useState("");
   const [regError, setRegError] = reactExports.useState(null);
   const [socketStatus, setSocketStatus] = reactExports.useState("disconnected");
+  const [lastError, setLastError] = reactExports.useState(null);
   const [rooms, setRooms] = reactExports.useState([]);
   const [activeRoomId, setActiveRoomId] = reactExports.useState(null);
   const [messages, setMessages] = reactExports.useState([]);
@@ -5806,8 +5807,9 @@ const ChatView = ({ onClose }) => {
       setIsRegistering(false);
       setSocketStatus("authenticated");
     };
-    chatService.onStatusChange = (status) => {
+    chatService.onStatusChange = (status, errMsg) => {
       setSocketStatus(status);
+      if (errMsg) setLastError(errMsg);
     };
     chatService.onRoomUpdated = (updatedRooms) => {
       setRooms(updatedRooms);
@@ -5926,12 +5928,14 @@ const ChatView = ({ onClose }) => {
       ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 text-red-500", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-8 h-8", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" }) }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-400 font-bold mb-1", children: "Connection Failed" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 mb-6", children: "Could not reach the chat server." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 mb-2", children: "Could not reach the chat server." }),
+        lastError && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[9px] text-red-500/70 mb-6 italic max-w-xs", children: lastError }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(
           "button",
           {
             onClick: () => {
               setSocketStatus("connecting");
+              setLastError(null);
               chatService.init();
             },
             className: "bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-xl font-bold transition-all active:scale-95 mb-4",
