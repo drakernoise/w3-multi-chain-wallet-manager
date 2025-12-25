@@ -1295,6 +1295,7 @@ class ChatService {
         messages: [],
         unreadCount: 0
       }));
+      console.log(`✅ Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map((r) => r.name));
       localStorage.setItem("gravity_chat_id", data.id);
       localStorage.setItem("gravity_chat_username", data.username);
       if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });

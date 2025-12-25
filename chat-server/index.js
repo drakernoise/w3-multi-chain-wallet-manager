@@ -748,7 +748,7 @@ io.on('connection', (socket) => {
 
 function getAvailableRooms(userId) {
     // Return Public Rooms + Private Rooms user is member of
-    return Object.values(rooms).filter(r =>
+    const available = Object.values(rooms).filter(r =>
         r.type === 'public' || r.members?.includes(userId)
     ).map(r => ({
         id: r.id,
@@ -756,6 +756,9 @@ function getAvailableRooms(userId) {
         type: r.type,
         owner: r.owner
     }));
+
+    console.log(`📋 getAvailableRooms for ${userId}: ${available.length} rooms`);
+    return available;
 }
 
 const PORT = process.env.PORT || 3030;
