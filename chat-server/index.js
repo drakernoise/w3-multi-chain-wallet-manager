@@ -18,6 +18,38 @@ app.use(cors());
 app.get('/', (req, res) => res.send('Gravity Chat Server is Online'));
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok', timestamp: new Date() }));
 
+// Admin endpoint to reset database (protected by secret)
+app.post('/admin/reset', (req, res) => {
+    const secret = req.query.secret || req.headers['x-admin-secret'];
+    if (secret !== 'gravity-admin-2024') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Reset all data
+    users = {};
+    usernames = {};
+    rooms = {
+        'global-lobby': {
+            id: 'global-lobby',
+            name: 'Global Lobby',
+            desc: 'Official Gravity Community',
+            type: 'public',
+            owner: 'system',
+            admins: [],
+            members: [],
+            bans: [],
+            mutes: [],
+            messages: []
+        }
+    };
+
+    // Save clean state
+    saveData();
+
+    console.log('🔥 Database reset by admin');
+    res.json({ success: true, message: 'Database reset successfully' });
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
