@@ -104,11 +104,14 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
     }
   };
 
-  const performSetupWithoutPassword = async (method: 'Google' | 'Device') => {
+  const [pendingMethod, setPendingMethod] = useState<'Google' | 'Device' | null>(null);
+
+  const performSetupWithPin = async (method: 'Google' | 'Device', pin: string) => {
     try {
-      setStatusMessage(`Initializing Passwordless Vault (${method})...`);
-      // We generate a high-entropy key and store it locally
-      const { vault } = await initVaultWithGeneratedKey();
+      setIsLoading(true);
+      setStatusMessage(`Initializing Protected Vault (${method})...`);
+
+      const { vault } = await initVaultWithGeneratedKey(pin);
 
       setWalletState(prev => ({
         ...prev,
@@ -126,22 +129,6 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
     }
   };
 
-  const performLegacyUnlock = async (methodName: string) => {
-    const internalKey = await getInternalKey();
-    if (internalKey) {
-      const vault = await unlockVault(internalKey);
-      setIsLoading(false);
-      if (vault) {
-        onUnlock(vault.accounts);
-      } else {
-        setError(t('lock.error_decrypt_failed', { method: methodName }));
-      }
-    } else {
-      setIsLoading(false);
-      setError(t('lock.error_no_auth_data', { method: methodName }));
-    }
-  };
-
   const handleDeviceAuth = async () => {
     setError("");
     setIsLoading(true);
@@ -150,7 +137,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
     if (user) {
       if (isFirstRun) {
-        await performSetupWithoutPassword('Device');
+        setIsLoading(false);
+        setPendingMethod('Device');
+        setPinMode('create');
+        setPinValue('');
+        setShowPinModal(true);
       } else {
         const hasPin = await hasPinProtectedKey();
         if (hasPin) {
@@ -176,7 +167,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
     if (user) {
       if (isFirstRun) {
-        await performSetupWithoutPassword('Google');
+        setIsLoading(false);
+        setPendingMethod('Google');
+        setPinMode('create');
+        setPinValue('');
+        setShowPinModal(true);
       } else {
         const hasPin = await hasPinProtectedKey();
         if (hasPin) {
@@ -191,6 +186,22 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
     } else {
       setIsLoading(false);
       setError(t('lock.error_auth_failed', { method: 'Google' }));
+    }
+  };
+
+  const performLegacyUnlock = async (methodName: string) => {
+    const internalKey = await getInternalKey();
+    if (internalKey) {
+      const vault = await unlockVault(internalKey);
+      setIsLoading(false);
+      if (vault) {
+        onUnlock(vault.accounts);
+      } else {
+        setError(t('lock.error_decrypt_failed', { method: methodName }));
+      }
+    } else {
+      setIsLoading(false);
+      setError(t('lock.error_no_auth_data', { method: methodName }));
     }
   };
 
@@ -240,13 +251,21 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
       setIsLoading(true);
       setShowPinModal(false);
 
-      try {
-        const { vault } = await initVaultWithGeneratedKey(pinValue);
-        setWalletState(prev => ({ ...prev, encryptedMaster: true, useGoogleAuth: true }));
-        onUnlock(vault.accounts);
-      } catch (e) {
-        setError(t('lock.error_init_pin_failed'));
-        setIsLoading(false);
+      if (pendingMethod) {
+        await performSetupWithPin(pendingMethod, pinValue);
+        setPendingMethod(null);
+      } else {
+        // Normal password mode initialization with PIN? 
+        // Currently initVault(password) doesn't use PIN.
+        // But we can support it if needed.
+        try {
+          const { vault } = await initVaultWithGeneratedKey(pinValue);
+          setWalletState(prev => ({ ...prev, encryptedMaster: true }));
+          onUnlock(vault.accounts);
+        } catch (e) {
+          setError(t('lock.error_init_pin_failed'));
+          setIsLoading(false);
+        }
       }
     } else {
       setIsLoading(true);

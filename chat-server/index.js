@@ -277,8 +277,15 @@ io.on('connection', (socket) => {
 
         const existingStoredId = usernames[cleanUsername.toLowerCase()];
         if (existingStoredId && existingStoredId !== existingId) {
-            socket.emit('error', 'Username already taken by another user');
-            return;
+            // Check if the user object actually exists
+            if (!users[existingStoredId]) {
+                console.log(`Cleaning up orphaned username during registration: ${cleanUsername}`);
+                delete usernames[cleanUsername.toLowerCase()];
+                // Continue registration as if it didn't exist
+            } else {
+                socket.emit('error', 'Username already taken by another user');
+                return;
+            }
         }
 
         // Create New User
