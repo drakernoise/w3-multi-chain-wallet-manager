@@ -183,10 +183,23 @@ class ChatService {
             // If identity is lost on server, clear local stale data so user can re-register
             if (msg.includes('User not found') || msg.includes('no public key registered')) {
                 console.warn("Server identity lost. Clearing local chat identity.");
+
+                const storedName = localStorage.getItem('gravity_chat_username');
+
                 localStorage.removeItem('gravity_chat_id');
                 localStorage.removeItem('gravity_chat_priv');
                 localStorage.removeItem('gravity_chat_pub');
                 // Keep username for convenience
+
+                // AUTO-REPAIR: If we have a name, try to re-register as fresh user
+                if (storedName && !storedName.startsWith('!RESET!')) {
+                    console.log(`Auto-repairing identity for ${storedName}...`);
+                    // We need a small delay to ensure cleanup is done and server is ready
+                    setTimeout(() => {
+                        this.register(storedName).catch(console.error);
+                    }, 500);
+                    return;
+                }
             }
 
             if (this.onError) this.onError(msg);
