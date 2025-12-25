@@ -6356,6 +6356,7 @@ const ChatView = ({ onClose }) => {
       }
     };
     chatService.onRoomUpdated = (updatedRooms) => {
+      console.log(`🔄 ChatView: Updating rooms state with ${updatedRooms.length} rooms`, updatedRooms);
       setRooms(updatedRooms);
     };
     chatService.onMessage = (roomId, msg) => {
