@@ -6359,12 +6359,6 @@ const ChatView = ({ onClose }) => {
       console.log(`🔄 ChatView: Updating rooms state with ${updatedRooms.length} rooms`, updatedRooms);
       setRooms(updatedRooms);
     };
-    chatService.onMessage = (roomId, msg) => {
-      if (roomId === activeRoomId) {
-        setMessages((prev) => [...prev, msg]);
-        scrollToBottom();
-      }
-    };
     chatService.onError = (err) => {
       setNotification({ msg: err, type: "error" });
       setIsRegistering(false);
@@ -6380,10 +6374,17 @@ const ChatView = ({ onClose }) => {
     };
     window.addEventListener("chat-search-results", handleSearch);
     window.addEventListener("chat-room-kicked", handleKicked);
-    chatService.init();
     return () => {
       window.removeEventListener("chat-search-results", handleSearch);
       window.removeEventListener("chat-room-kicked", handleKicked);
+    };
+  }, []);
+  reactExports.useEffect(() => {
+    chatService.onMessage = (roomId, msg) => {
+      if (roomId === activeRoomId) {
+        setMessages((prev) => [...prev, msg]);
+        scrollToBottom();
+      }
     };
   }, [activeRoomId]);
   reactExports.useEffect(() => {

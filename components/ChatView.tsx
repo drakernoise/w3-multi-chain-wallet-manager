@@ -41,7 +41,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         setIsCreating(false);
     };
 
-    // Init & Listeners
+    // Init & Listeners (ONCE on mount)
     useEffect(() => {
         chatService.init(); // CRITICAL: Start connection
         setSocketStatus(chatService.getCurrentUser() ? 'authenticated' : 'connecting');
@@ -62,16 +62,13 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         chatService.onStatusChange = (status, errMsg) => {
             setSocketStatus(status as any);
             if (errMsg) setLastError(errMsg);
-            // If the server explicitly says "Username already taken" or "Session expired", we should allow the user to see the Choose Username screen
             if (errMsg && (errMsg.includes('taken') || errMsg.includes('expired'))) {
                 setIsRegistering(false);
             }
         };
 
         chatService.onRoomAdded = (room) => {
-            // Update local room list
             setRooms(prev => {
-                // Prevent duplicates
                 if (prev.find(r => r.id === room.id)) return prev;
                 return [...prev, room];
             });
@@ -88,13 +85,6 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         chatService.onRoomUpdated = (updatedRooms) => {
             console.log(`🔄 ChatView: Updating rooms state with ${updatedRooms.length} rooms`, updatedRooms);
             setRooms(updatedRooms);
-        };
-
-        chatService.onMessage = (roomId, msg) => {
-            if (roomId === activeRoomId) {
-                setMessages(prev => [...prev, msg]);
-                scrollToBottom();
-            }
         };
 
         chatService.onError = (err) => {
@@ -115,12 +105,19 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         window.addEventListener('chat-search-results', handleSearch);
         window.addEventListener('chat-room-kicked', handleKicked);
 
-        // Connect
-        chatService.init();
-
         return () => {
             window.removeEventListener('chat-search-results', handleSearch);
             window.removeEventListener('chat-room-kicked', handleKicked);
+        };
+    }, []); // Empty deps - run ONCE
+
+    // Handle messages for active room
+    useEffect(() => {
+        chatService.onMessage = (roomId, msg) => {
+            if (roomId === activeRoomId) {
+                setMessages(prev => [...prev, msg]);
+                scrollToBottom();
+            }
         };
     }, [activeRoomId]);
 
