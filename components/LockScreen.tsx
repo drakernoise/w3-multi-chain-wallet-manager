@@ -347,8 +347,25 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
         </div>
       )}
 
-      {/* Language Toggle */}
-      <div className="absolute top-4 right-4 z-50">
+      {/* Language Toggle & Pin Button */}
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+        <button
+          onClick={() => {
+            if (typeof chrome !== 'undefined' && chrome.action) {
+              chrome.action.getUserSettings().then((settings: any) => {
+                chrome.action.setUserSettings({
+                  isOnToolbar: !settings.isOnToolbar
+                });
+              });
+            }
+          }}
+          className="p-2 rounded-lg bg-dark-700/50 hover:bg-dark-600/50 border border-dark-600 transition-colors"
+          title="Pin/Unpin Extension"
+        >
+          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+          </svg>
+        </button>
         <LanguageToggle />
       </div>
 

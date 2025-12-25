@@ -2519,7 +2519,26 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
         )
       ] })
     ] }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute top-4 right-4 z-50", children: /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageToggle, {}) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute top-4 right-4 z-50 flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => {
+            if (typeof chrome !== "undefined" && chrome.action) {
+              chrome.action.getUserSettings().then((settings) => {
+                chrome.action.setUserSettings({
+                  isOnToolbar: !settings.isOnToolbar
+                });
+              });
+            }
+          },
+          className: "p-2 rounded-lg bg-dark-700/50 hover:bg-dark-600/50 border border-dark-600 transition-colors",
+          title: "Pin/Unpin Extension",
+          children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 text-slate-400", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" }) })
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageToggle, {})
+    ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-24 h-24 bg-gradient-to-tr from-blue-600/20 to-purple-600/20 rounded-3xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(37,99,235,0.2)] border border-white/10 backdrop-blur-md animate-float", children: /* @__PURE__ */ jsxRuntimeExports.jsx("img", { src: "/logowallet.png", alt: "Gravity Wallet", className: "w-16 h-16 object-contain drop-shadow-lg" }) }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-3xl font-black mb-2 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400", children: "Gravity Wallet" }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-slate-500 text-sm mb-8", children: isFirstRun ? t("lock.create_title") : t("lock.unlock_title") }),
