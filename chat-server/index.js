@@ -555,10 +555,10 @@ io.on('connection', (socket) => {
 
     // --- 5. Custom Rooms (User Created) ---
     socket.on('create_room', (data) => {
-        console.log(`📝 create_room request:`, { user: socket.user?.username, data });
+        console.log('[CREATE_ROOM] Request:', { user: socket.user?.username, data });
 
         if (!socket.user) {
-            console.error(`❌ create_room REJECTED: No authenticated user on socket ${socket.id}`);
+            console.error('[CREATE_ROOM] REJECTED: No authenticated user on socket', socket.id);
             socket.emit('error', 'You must be logged in to create a room');
             return;
         }
@@ -586,17 +586,17 @@ io.on('connection', (socket) => {
         rooms[newId] = newRoom;
         saveData();
 
-        console.log(`✅ Room created: ${name} (${isPrivate ? 'private' : 'public'}) by ${socket.user.username}`);
+        console.log('[CREATE_ROOM] Room created:', name, isPrivate ? 'private' : 'public', 'by', socket.user.username);
 
         // Broadcast to owner
         socket.join(newId);
         socket.emit('room_added', newRoom);
-        console.log(`📤 Emitted room_added to creator ${socket.user.username}`);
+        console.log('[CREATE_ROOM] Emitted room_added to creator', socket.user.username);
 
         // If public, broadcast to everyone else
         if (!isPrivate) {
             socket.broadcast.emit('room_added', newRoom);
-            console.log(`📢 Broadcasted public room to all users`);
+            console.log('[CREATE_ROOM] Broadcasted public room to all users');
         }
     });
 
@@ -767,7 +767,7 @@ function getAvailableRooms(userId) {
         owner: r.owner
     }));
 
-    console.log(`📋 getAvailableRooms for ${userId}: ${available.length} rooms`);
+    console.log('[GET_ROOMS] Available rooms for', userId, ':', available.length, 'rooms');
     return available;
 }
 
