@@ -6335,6 +6335,10 @@ const ChatView = ({ onClose }) => {
       }
     };
     chatService.onRoomAdded = (room) => {
+      setRooms((prev) => {
+        if (prev.find((r) => r.id === room.id)) return prev;
+        return [...prev, room];
+      });
       if (room.type === "dm" || room.type === "private") {
         setNotification({
           msg: t("chat.invited_to", { room: room.name }),

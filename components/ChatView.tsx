@@ -69,6 +69,13 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         };
 
         chatService.onRoomAdded = (room) => {
+            // Update local room list
+            setRooms(prev => {
+                // Prevent duplicates
+                if (prev.find(r => r.id === room.id)) return prev;
+                return [...prev, room];
+            });
+
             if (room.type === 'dm' || room.type === 'private') {
                 setNotification({
                     msg: t('chat.invited_to', { room: room.name }),
