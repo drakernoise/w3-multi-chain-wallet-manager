@@ -1420,9 +1420,19 @@ class ChatService {
   }
   async register(username) {
     if (!this.socket) await this.init();
+    const storedUser = this.getStoredUsername();
+    const storedKey = this.getStoredPrivateKey();
+    const storedId = localStorage.getItem("gravity_chat_id");
+    if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey && storedId) {
+      console.log("Identity found for this user, attempting secure login instead of register...");
+      return this.authenticateWithSignature(storedId, storedKey);
+    }
     const keys = await this.generateAndSaveIdentity();
     localStorage.setItem("gravity_chat_username", username);
-    this.socket?.emit("register", { username, publicKey: keys.publicKey });
+    this.socket?.emit("register", {
+      username,
+      publicKey: keys.publicKey
+    });
   }
   async sendMessage(roomId, content) {
     if (!this.socket) return;
@@ -1491,6 +1501,12 @@ class ChatService {
       if (this.onMessage) this.onMessage(roomId, message);
       if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
     }
+  }
+  getStoredPrivateKey() {
+    return localStorage.getItem("gravity_chat_priv");
+  }
+  getStoredUsername() {
+    return localStorage.getItem("gravity_chat_username");
   }
   handleUserStatusChange(userId, isOnline) {
     let updated = false;

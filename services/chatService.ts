@@ -283,9 +283,25 @@ class ChatService {
 
     public async register(username: string) {
         if (!this.socket) await this.init();
+
+        const storedUser = this.getStoredUsername();
+        const storedKey = this.getStoredPrivateKey();
+        const storedId = localStorage.getItem('gravity_chat_id');
+
+        // FIXED: If we already have keys for this username, don't register, just LOGIN
+        if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey && storedId) {
+            console.log("Identity found for this user, attempting secure login instead of register...");
+            return this.authenticateWithSignature(storedId, storedKey);
+        }
+
+        // Generate new keys for BRAND NEW registration
         const keys = await this.generateAndSaveIdentity();
         localStorage.setItem('gravity_chat_username', username);
-        this.socket?.emit('register', { username, publicKey: keys.publicKey });
+
+        this.socket?.emit('register', {
+            username,
+            publicKey: keys.publicKey
+        });
     }
 
     public async sendMessage(roomId: string, content: string) {
@@ -343,6 +359,14 @@ class ChatService {
             if (this.onMessage) this.onMessage(roomId, message);
             if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
         }
+    }
+
+    private getStoredPrivateKey(): string | null {
+        return localStorage.getItem('gravity_chat_priv');
+    }
+
+    private getStoredUsername(): string | null {
+        return localStorage.getItem('gravity_chat_username');
     }
 
     private handleUserStatusChange(userId: string, isOnline: boolean) {
