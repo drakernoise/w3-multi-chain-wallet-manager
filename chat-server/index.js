@@ -271,10 +271,32 @@ io.on('connection', (socket) => {
             const targetName = cleanUsername.replace('!RESET!', '').trim();
             if (usernames[targetName.toLowerCase()]) {
                 const idToDelete = usernames[targetName.toLowerCase()];
+
+                // DEEP CLEANUP: Remove user from all rooms and delete owned rooms
+                if (idToDelete) {
+                    Object.keys(rooms).forEach(roomId => {
+                        const room = rooms[roomId];
+                        // Remove from members
+                        if (room.members) {
+                            room.members = room.members.filter(m => m !== idToDelete);
+                        }
+                        // Remove from admins
+                        if (room.admins) {
+                            room.admins = room.admins.filter(a => a !== idToDelete);
+                        }
+                        // If owner, delete the room (unless it's global-lobby)
+                        if (room.owner === idToDelete && roomId !== 'global-lobby') {
+                            console.log(`Deleting orphan room ${roomId} owned by ${targetName}`);
+                            delete rooms[roomId];
+                            io.emit('room_removed', roomId);
+                        }
+                    });
+                    delete users[idToDelete];
+                }
+
                 delete usernames[targetName.toLowerCase()];
-                if (idToDelete) delete users[idToDelete];
                 saveData();
-                socket.emit('error', `ADMIN: Force cleared user '${targetName}'. You can now register it.`);
+                socket.emit('error', `ADMIN: User '${targetName}' and their owned rooms fully purged. Register now.`);
                 return;
             } else {
                 socket.emit('error', `ADMIN: User '${targetName}' not found.`);
