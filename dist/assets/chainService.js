@@ -1288,6 +1288,10 @@ class ChatService {
       }
     });
     this.socket.on("auth_success", (data) => {
+      if (this.userId === data.id && this.rooms.length > 0) {
+        console.log(`⚠️ Ignoring duplicate auth_success for ${data.username}`);
+        return;
+      }
       this.userId = data.id;
       this.username = data.username;
       this.rooms = data.rooms.map((r) => ({

@@ -83,7 +83,8 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         };
 
         chatService.onRoomUpdated = (updatedRooms) => {
-            console.log(`🔄 ChatView: Updating rooms state with ${updatedRooms.length} rooms`, updatedRooms);
+            console.log(`🔄 ChatView: Updating rooms state with ${updatedRooms.length} rooms`);
+            console.trace('Stack trace:'); // This will show us WHO is calling this
             setRooms(updatedRooms);
         };
 
