@@ -357,7 +357,8 @@ io.on('connection', (socket) => {
             id: newId,
             username,
             publicKey, // stored for future auth challenges
-            rooms: ['global-lobby']
+            rooms: ['global-lobby'],
+            pendingInvites: [] // Store invites received while offline
         };
 
         users[newId] = newUser;
@@ -368,11 +369,21 @@ io.on('connection', (socket) => {
 
         saveData();
 
+        // Send pending invites if any
+        const pendingInvites = newUser.pendingInvites || [];
+
         socket.emit('auth_success', {
             id: newId,
             username,
-            rooms: getAvailableRooms(newId)
+            rooms: getAvailableRooms(newId),
+            pendingInvites: pendingInvites
         });
+
+        // Clear pending invites after sending
+        if (pendingInvites.length > 0) {
+            newUser.pendingInvites = [];
+            saveData();
+        }
 
         // Auto-join Global Lobby
         socket.join('global-lobby');
@@ -623,16 +634,34 @@ io.on('connection', (socket) => {
             saveData();
         }
 
-        // Notify Target
-        Object.keys(connectedSockets).forEach(sId => {
-            if (connectedSockets[sId] === targetUserId) {
+        // Check if target user is online
+        const targetSockets = Object.keys(connectedSockets).filter(sId => connectedSockets[sId] === targetUserId);
+
+        if (targetSockets.length > 0) {
+            // User is online - notify immediately
+            targetSockets.forEach(sId => {
                 const s = io.sockets.sockets.get(sId);
                 if (s) {
                     s.join(roomId);
                     s.emit('room_added', room);
                 }
+            });
+        } else {
+            // User is offline - store invite for later
+            const targetUser = users[targetUserId];
+            if (targetUser) {
+                if (!targetUser.pendingInvites) targetUser.pendingInvites = [];
+                targetUser.pendingInvites.push({
+                    roomId: room.id,
+                    roomName: room.name,
+                    invitedBy: socket.user.username,
+                    timestamp: Date.now()
+                });
+                saveData();
+                console.log('[INVITE] Stored pending invite for offline user', targetUsername);
             }
-        });
+        }
+
         socket.emit('success', `Invited ${targetUsername}`);
     });
 

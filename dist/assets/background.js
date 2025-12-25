@@ -93,6 +93,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ack: true });
     return false;
   }
+  if (request.type === "UPDATE_BADGE") {
+    const count = request.count || 0;
+    chrome.action.setBadgeText({ text: count > 0 ? String(count) : "" });
+    chrome.action.setBadgeBackgroundColor({ color: "#9333EA" });
+    sendResponse({ ack: true });
+    return false;
+  }
 });
 async function tryAutoSign(request, sender) {
   try {

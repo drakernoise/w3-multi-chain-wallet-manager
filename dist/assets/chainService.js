@@ -1300,6 +1300,21 @@ class ChatService {
         unreadCount: 0
       }));
       console.log(`✅ Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map((r) => r.name));
+      if (data.pendingInvites && data.pendingInvites.length > 0) {
+        console.log(`📬 Received ${data.pendingInvites.length} pending invites`);
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage({
+            type: "UPDATE_BADGE",
+            count: data.pendingInvites.length
+          }).catch(() => {
+          });
+        }
+        data.pendingInvites.forEach((invite) => {
+          if (this.onError) {
+            this.onError(`You were invited to "${invite.roomName}" by ${invite.invitedBy}`);
+          }
+        });
+      }
       localStorage.setItem("gravity_chat_id", data.id);
       localStorage.setItem("gravity_chat_username", data.username);
       if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
@@ -1312,9 +1327,12 @@ class ChatService {
     this.socket.on("room_history", (data) => {
       const room = this.rooms.find((r) => r.id === data.roomId);
       if (room) {
+        const hadMessages = room.messages.length > 0;
         room.messages = data.messages;
         room.memberDetails = data.memberDetails;
-        if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+        if (!hadMessages && data.messages.length > 0) {
+          if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+        }
       }
     });
     this.socket.on("member_joined", (data) => {

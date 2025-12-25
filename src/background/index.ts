@@ -147,6 +147,15 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         sendResponse({ ack: true });
         return false;
     }
+
+    // Badge update for chat notifications
+    if (request.type === 'UPDATE_BADGE') {
+        const count = request.count || 0;
+        chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
+        chrome.action.setBadgeBackgroundColor({ color: '#9333EA' }); // Purple
+        sendResponse({ ack: true });
+        return false;
+    }
 });
 
 
