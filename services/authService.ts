@@ -1,12 +1,17 @@
 // Mock service for Google Identity API
 export const authenticateWithGoogle = async (): Promise<{ id: string, email: string } | null> => {
   return new Promise((resolve) => {
-    // Simulate network delay
     setTimeout(() => {
-      resolve({
-        id: 'google_user_123',
-        email: 'user@example.com'
-      });
+      resolve({ id: 'google_user_123', email: 'user@example.com' });
+    }, 1000);
+  });
+};
+
+// Mock service for generic Device Authentication (Passwordless Secure Key)
+export const authenticateWithDevice = async (): Promise<{ id: string } | null> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ id: 'device_user_123' });
     }, 1000);
   });
 };

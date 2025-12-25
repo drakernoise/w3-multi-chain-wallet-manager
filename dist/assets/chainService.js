@@ -785,10 +785,14 @@ const signMessage = (chain, message, keyStr, _useLegacySigner = false) => {
 const authenticateWithGoogle = async () => {
   return new Promise((resolve) => {
     setTimeout(() => {
-      resolve({
-        id: "google_user_123",
-        email: "user@example.com"
-      });
+      resolve({ id: "google_user_123", email: "user@example.com" });
+    }, 1e3);
+  });
+};
+const authenticateWithDevice = async () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ id: "device_user_123" });
     }, 1e3);
   });
 };
@@ -1413,4 +1417,4 @@ class ChatService {
 }
 const chatService = new ChatService();
 
-export { broadcastSavingsDeposit as A, broadcastSavingsWithdraw as B, Chain as C, fetchAccountData as D, broadcastRCDelegate as E, broadcastRCUndelegate as F, broadcastBulkTransfer as G, validateUsername as H, validatePrivateKey as I, verifyKeyAgainstChain as J, validateAccountKeys as K, fetchAccountHistory as L, chatService as M, saveVault as N, fetchBalances as O, clearCryptoCache as P, getVault as Q, tryRestoreSession as R, detectWeb3Context as S, benchmarkNodes as T, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, isBiometricsAvailable as j, getTOTPSecret as k, hasPinProtectedKey as l, initVaultWithGeneratedKey as m, loadInternalKeyWithPin as n, getInternalKey as o, initVault as p, enablePasswordless as q, registerBiometrics as r, signMessage as s, authenticateWithGoogle as t, unlockVault as u, verifyTOTP as v, authenticateWithBiometrics as w, hasTOTPConfigured as x, generateSetup as y, saveTOTPSecret as z };
+export { saveTOTPSecret as A, broadcastSavingsDeposit as B, Chain as C, broadcastSavingsWithdraw as D, fetchAccountData as E, broadcastRCDelegate as F, broadcastRCUndelegate as G, broadcastBulkTransfer as H, validateUsername as I, validatePrivateKey as J, verifyKeyAgainstChain as K, validateAccountKeys as L, fetchAccountHistory as M, chatService as N, saveVault as O, fetchBalances as P, clearCryptoCache as Q, getVault as R, tryRestoreSession as S, detectWeb3Context as T, benchmarkNodes as U, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, isBiometricsAvailable as j, getTOTPSecret as k, hasPinProtectedKey as l, initVaultWithGeneratedKey as m, loadInternalKeyWithPin as n, getInternalKey as o, initVault as p, enablePasswordless as q, registerBiometrics as r, signMessage as s, authenticateWithGoogle as t, unlockVault as u, verifyTOTP as v, authenticateWithDevice as w, authenticateWithBiometrics as x, hasTOTPConfigured as y, generateSetup as z };

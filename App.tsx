@@ -39,7 +39,8 @@ function AppContent() {
     accounts: [],
     encryptedMaster: false,
     useGoogleAuth: false,
-    useBiometrics: false
+    useBiometrics: false,
+    useDeviceAuth: false
   });
 
   const [activeChain, setActiveChain] = useState<Chain>(Chain.HIVE);
@@ -81,7 +82,8 @@ function AppContent() {
           accounts: [], // Keys are encrypted
           encryptedMaster: true,
           useGoogleAuth: false,
-          useBiometrics: false
+          useBiometrics: false,
+          useDeviceAuth: false
         }));
       }
 
@@ -117,6 +119,7 @@ function AppContent() {
                 encryptedMaster: result.walletConfig.encryptedMaster,
                 useGoogleAuth: result.walletConfig.useGoogleAuth,
                 useBiometrics: result.walletConfig.useBiometrics,
+                useDeviceAuth: result.walletConfig.useDeviceAuth,
                 useTOTP: result.walletConfig.useTOTP
               }));
             }
@@ -141,13 +144,14 @@ function AppContent() {
         encryptedMaster: walletState.encryptedMaster,
         useGoogleAuth: walletState.useGoogleAuth,
         useBiometrics: walletState.useBiometrics,
+        useDeviceAuth: walletState.useDeviceAuth,
         useTOTP: walletState.useTOTP
       };
       if (typeof chrome !== 'undefined' && chrome.storage) {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, isDataLoaded]);
 
   // 3. Save Vault when accounts change
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { r as reactExports, j as jsxRuntimeExports } from './vendor.js';
-import { j as isBiometricsAvailable, k as getTOTPSecret, v as verifyTOTP, l as hasPinProtectedKey, m as initVaultWithGeneratedKey, n as loadInternalKeyWithPin, u as unlockVault, o as getInternalKey, r as registerBiometrics, p as initVault, q as enablePasswordless, t as authenticateWithGoogle, w as authenticateWithBiometrics, x as hasTOTPConfigured, V as ViewState, C as Chain, y as generateSetup, z as saveTOTPSecret, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, A as broadcastSavingsDeposit, B as broadcastSavingsWithdraw, D as fetchAccountData, E as broadcastRCDelegate, F as broadcastRCUndelegate, G as broadcastBulkTransfer, H as validateUsername, I as validatePrivateKey, J as verifyKeyAgainstChain, K as validateAccountKeys, L as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, M as chatService, N as saveVault, O as fetchBalances, P as clearCryptoCache, Q as getVault, R as tryRestoreSession, S as detectWeb3Context, T as benchmarkNodes } from './chainService.js';
+import { j as isBiometricsAvailable, k as getTOTPSecret, v as verifyTOTP, l as hasPinProtectedKey, m as initVaultWithGeneratedKey, n as loadInternalKeyWithPin, u as unlockVault, o as getInternalKey, r as registerBiometrics, p as initVault, q as enablePasswordless, t as authenticateWithGoogle, w as authenticateWithDevice, x as authenticateWithBiometrics, y as hasTOTPConfigured, V as ViewState, C as Chain, z as generateSetup, A as saveTOTPSecret, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, B as broadcastSavingsDeposit, D as broadcastSavingsWithdraw, E as fetchAccountData, F as broadcastRCDelegate, G as broadcastRCUndelegate, H as broadcastBulkTransfer, I as validateUsername, J as validatePrivateKey, K as verifyKeyAgainstChain, L as validateAccountKeys, M as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, N as chatService, O as saveVault, P as fetchBalances, Q as clearCryptoCache, R as getVault, S as tryRestoreSession, T as detectWeb3Context, U as benchmarkNodes } from './chainService.js';
 
 const calculatePasswordStrength = (password) => {
   let score = 0;
@@ -1757,6 +1757,26 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
       setError("Authenticator not configured. Please unlock with password and configure it in Settings.");
     }
   };
+  const handleDeviceAuth = async () => {
+    setError("");
+    setIsLoading(true);
+    setStatusMessage("Verifying Device...");
+    const user = await authenticateWithDevice();
+    if (user) {
+      const hasPin = await hasPinProtectedKey();
+      if (hasPin) {
+        setIsLoading(false);
+        setPinMode("unlock");
+        setPinValue("");
+        setShowPinModal(true);
+      } else {
+        await performLegacyUnlock();
+      }
+    } else {
+      setIsLoading(false);
+      setError("Device authentication failed");
+    }
+  };
   const handleGoogleAuth = async () => {
     setError("");
     setIsLoading(true);
@@ -1981,18 +2001,33 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
             onKeyDown: (e) => e.key === "Enter" && handlePasswordSubmit()
           }
         ),
-        isFirstRun && biometricsAvailable && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 px-1 py-1", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              type: "checkbox",
-              id: "bioSetup",
-              checked: enableBiometrics,
-              onChange: (e) => setEnableBiometrics(e.target.checked),
-              className: "accent-blue-500 w-4 h-4 rounded cursor-pointer"
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { htmlFor: "bioSetup", className: "text-xs text-slate-400 cursor-pointer select-none", children: "Enable Biometric Unlock (TouchID / FaceID)" })
+        isFirstRun && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2 px-1 py-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "checkbox",
+                id: "googleSetup",
+                checked: walletState.useGoogleAuth,
+                onChange: (e) => setWalletState((prev) => ({ ...prev, useGoogleAuth: e.target.checked })),
+                className: "accent-blue-500 w-4 h-4 rounded cursor-pointer"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { htmlFor: "googleSetup", className: "text-[10px] text-slate-400 cursor-pointer select-none", children: "Enable Google Authentication" })
+          ] }),
+          biometricsAvailable && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "checkbox",
+                id: "bioSetup",
+                checked: enableBiometrics,
+                onChange: (e) => setEnableBiometrics(e.target.checked),
+                className: "accent-blue-500 w-4 h-4 rounded cursor-pointer"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { htmlFor: "bioSetup", className: "text-[10px] text-slate-400 cursor-pointer select-none", children: "Enable Biometric (TouchID/Hello)" })
+          ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(
           "button",
@@ -2008,16 +2043,28 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 flex items-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full border-t border-dark-700" }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "relative flex justify-center text-xs uppercase", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "bg-dark-800 px-2 text-slate-500", children: isFirstRun ? t("lock.or_sign_up") : t("lock.or_unlock") }) })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-2", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
           "button",
           {
             onClick: handleGoogleAuth,
             disabled: isLoading,
-            className: "bg-white hover:bg-slate-50 text-gray-700 border border-gray-300 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-70",
+            className: "bg-white hover:bg-slate-50 text-gray-700 border border-gray-300 rounded-lg py-2 transition-colors flex flex-col items-center justify-center gap-1 text-[10px] disabled:opacity-50",
             children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("img", { src: "https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png", alt: "Google", className: "w-4 h-4" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Google" })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("img", { src: "https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png", alt: "Google", className: "w-3 h-3" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold", children: "Google" })
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: handleDeviceAuth,
+            disabled: isLoading,
+            className: "bg-dark-700 hover:bg-dark-600 text-white rounded-lg py-2 transition-colors flex flex-col items-center justify-center gap-1 text-[10px] border border-dark-600",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3 text-blue-400", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold uppercase tracking-tighter", children: "Device" })
             ]
           }
         ),
@@ -2026,10 +2073,10 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
           {
             onClick: handleBiometricAuth,
             disabled: isFirstRun || isLoading,
-            className: `bg-dark-700 text-white font-medium py-2.5 rounded-lg hover:bg-dark-600 transition-colors flex items-center justify-center gap-2 text-sm ${isFirstRun ? "opacity-50 cursor-not-allowed" : ""}`,
+            className: `bg-dark-700 text-amber-400 rounded-lg py-2 hover:bg-dark-600 transition-colors flex flex-col items-center justify-center gap-1 text-[10px] border border-dark-600 ${isFirstRun ? "opacity-30" : ""}`,
             children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 text-rose-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147l.156-.471m-1.284 8.761a20.003 20.003 0 007.544 6.799" }) }),
-              "Biometrics"
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147l.156-.471m-1.284 8.761a20.003 20.003 0 007.544 6.799" }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold uppercase tracking-tighter", children: "Bio" })
             ]
           }
         ) : /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -2037,10 +2084,10 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
           {
             onClick: handleTOTPAuth,
             disabled: isLoading,
-            className: "bg-dark-700 text-slate-300 font-medium py-2.5 rounded-lg hover:bg-dark-600 transition-colors flex items-center justify-center gap-2 text-sm",
+            className: "bg-dark-700 text-slate-300 rounded-lg py-2 hover:bg-dark-600 transition-colors flex flex-col items-center justify-center gap-1 text-[10px] border border-dark-600",
             children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 text-blue-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }),
-              "TOTP"
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3 text-blue-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold uppercase", children: "TOTP" })
             ]
           }
         )
@@ -2515,6 +2562,21 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
               /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Enable Aegis, Google Auth, or Authy" })
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useTOTP ? "bg-green-500/20 text-green-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useTOTP ? "Enabled" : "Off" })
+          ]
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => setWalletState((prev) => ({ ...prev, useDeviceAuth: !prev.useDeviceAuth })),
+          className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" }) }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Device Auth" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Persistent secure device key" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useDeviceAuth ? "bg-blue-500/20 text-blue-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useDeviceAuth ? "Enabled" : "Off" })
           ]
         }
       ),
@@ -6190,7 +6252,8 @@ function AppContent() {
     accounts: [],
     encryptedMaster: false,
     useGoogleAuth: false,
-    useBiometrics: false
+    useBiometrics: false,
+    useDeviceAuth: false
   });
   const [activeChain, setActiveChain] = reactExports.useState(Chain.HIVE);
   const [currentView, setCurrentView] = reactExports.useState(ViewState.LANDING);
@@ -6222,7 +6285,8 @@ function AppContent() {
           // Keys are encrypted
           encryptedMaster: true,
           useGoogleAuth: false,
-          useBiometrics: false
+          useBiometrics: false,
+          useDeviceAuth: false
         }));
       }
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
@@ -6252,6 +6316,7 @@ function AppContent() {
                 encryptedMaster: result.walletConfig.encryptedMaster,
                 useGoogleAuth: result.walletConfig.useGoogleAuth,
                 useBiometrics: result.walletConfig.useBiometrics,
+                useDeviceAuth: result.walletConfig.useDeviceAuth,
                 useTOTP: result.walletConfig.useTOTP
               }));
             }
@@ -6272,13 +6337,14 @@ function AppContent() {
         encryptedMaster: walletState.encryptedMaster,
         useGoogleAuth: walletState.useGoogleAuth,
         useBiometrics: walletState.useBiometrics,
+        useDeviceAuth: walletState.useDeviceAuth,
         useTOTP: walletState.useTOTP
       };
       if (typeof chrome !== "undefined" && chrome.storage) {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, isDataLoaded]);
   reactExports.useEffect(() => {
     if (!isLocked && needsSave && walletState.encryptedMaster) {
       const vault = { accounts: walletState.accounts, lastUpdated: Date.now() };

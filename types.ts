@@ -36,6 +36,7 @@ export interface WalletState {
   encryptedMaster: boolean;
   useGoogleAuth: boolean;
   useBiometrics: boolean;
+  useDeviceAuth: boolean;
   useTOTP?: boolean;
 }
 

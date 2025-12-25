@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { WalletState } from '../types';
-import { authenticateWithBiometrics, registerBiometrics, isBiometricsAvailable, authenticateWithGoogle } from '../services/authService';
+import { authenticateWithBiometrics, registerBiometrics, isBiometricsAvailable, authenticateWithGoogle, authenticateWithDevice } from '../services/authService';
 import { initVault, initVaultWithGeneratedKey, unlockVault, getInternalKey, hasPinProtectedKey, loadInternalKeyWithPin, enablePasswordless } from '../services/cryptoService';
 import { verifyTOTP, hasTOTPConfigured, getTOTPSecret } from '../services/totpService';
 import { calculatePasswordStrength, getStrengthLabel } from '../utils/passwordStrength';
@@ -122,6 +122,28 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
       // But maybe we fallback to "Google" mock if it was setting it up? 
       // No, let's just say "Not configured".
       setError("Authenticator not configured. Please unlock with password and configure it in Settings.");
+    }
+  };
+
+  const handleDeviceAuth = async () => {
+    setError("");
+    setIsLoading(true);
+    setStatusMessage("Verifying Device...");
+    const user = await authenticateWithDevice();
+
+    if (user) {
+      const hasPin = await hasPinProtectedKey();
+      if (hasPin) {
+        setIsLoading(false);
+        setPinMode('unlock');
+        setPinValue('');
+        setShowPinModal(true);
+      } else {
+        await performLegacyUnlock();
+      }
+    } else {
+      setIsLoading(false);
+      setError("Device authentication failed");
     }
   };
 
@@ -398,18 +420,35 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
             />
           )}
 
-          {isFirstRun && biometricsAvailable && (
-            <div className="flex items-center gap-2 px-1 py-1">
-              <input
-                type="checkbox"
-                id="bioSetup"
-                checked={enableBiometrics}
-                onChange={(e) => setEnableBiometrics(e.target.checked)}
-                className="accent-blue-500 w-4 h-4 rounded cursor-pointer"
-              />
-              <label htmlFor="bioSetup" className="text-xs text-slate-400 cursor-pointer select-none">
-                Enable Biometric Unlock (TouchID / FaceID)
-              </label>
+          {isFirstRun && (
+            <div className="space-y-2 px-1 py-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="googleSetup"
+                  checked={walletState.useGoogleAuth}
+                  onChange={(e) => setWalletState(prev => ({ ...prev, useGoogleAuth: e.target.checked }))}
+                  className="accent-blue-500 w-4 h-4 rounded cursor-pointer"
+                />
+                <label htmlFor="googleSetup" className="text-[10px] text-slate-400 cursor-pointer select-none">
+                  Enable Google Authentication
+                </label>
+              </div>
+
+              {biometricsAvailable && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="bioSetup"
+                    checked={enableBiometrics}
+                    onChange={(e) => setEnableBiometrics(e.target.checked)}
+                    className="accent-blue-500 w-4 h-4 rounded cursor-pointer"
+                  />
+                  <label htmlFor="bioSetup" className="text-[10px] text-slate-400 cursor-pointer select-none">
+                    Enable Biometric (TouchID/Hello)
+                  </label>
+                </div>
+              )}
             </div>
           )}
 
@@ -429,33 +468,45 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
           </span></div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
+          {/* Google */}
           <button
             onClick={handleGoogleAuth}
             disabled={isLoading}
-            className="bg-white hover:bg-slate-50 text-gray-700 border border-gray-300 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-70"
+            className="bg-white hover:bg-slate-50 text-gray-700 border border-gray-300 rounded-lg py-2 transition-colors flex flex-col items-center justify-center gap-1 text-[10px] disabled:opacity-50"
           >
-            <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google" className="w-4 h-4" />
-            <span>Google</span>
+            <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google" className="w-3 h-3" />
+            <span className="font-bold">Google</span>
           </button>
 
+          {/* Device Auth */}
+          <button
+            onClick={handleDeviceAuth}
+            disabled={isLoading}
+            className="bg-dark-700 hover:bg-dark-600 text-white rounded-lg py-2 transition-colors flex flex-col items-center justify-center gap-1 text-[10px] border border-dark-600"
+          >
+            <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+            <span className="font-bold uppercase tracking-tighter">Device</span>
+          </button>
+
+          {/* Biometrics or TOTP */}
           {(biometricsAvailable && (walletState.useBiometrics || isFirstRun)) ? (
             <button
               onClick={handleBiometricAuth}
               disabled={isFirstRun || isLoading}
-              className={`bg-dark-700 text-white font-medium py-2.5 rounded-lg hover:bg-dark-600 transition-colors flex items-center justify-center gap-2 text-sm ${isFirstRun ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`bg-dark-700 text-amber-400 rounded-lg py-2 hover:bg-dark-600 transition-colors flex flex-col items-center justify-center gap-1 text-[10px] border border-dark-600 ${isFirstRun ? 'opacity-30' : ''}`}
             >
-              <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147l.156-.471m-1.284 8.761a20.003 20.003 0 007.544 6.799" /></svg>
-              Biometrics
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147l.156-.471m-1.284 8.761a20.003 20.003 0 007.544 6.799" /></svg>
+              <span className="font-bold uppercase tracking-tighter">Bio</span>
             </button>
           ) : (
             <button
               onClick={handleTOTPAuth}
               disabled={isLoading}
-              className="bg-dark-700 text-slate-300 font-medium py-2.5 rounded-lg hover:bg-dark-600 transition-colors flex items-center justify-center gap-2 text-sm"
+              className="bg-dark-700 text-slate-300 rounded-lg py-2 hover:bg-dark-600 transition-colors flex flex-col items-center justify-center gap-1 text-[10px] border border-dark-600"
             >
-              <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-              TOTP
+              <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              <span className="font-bold uppercase">TOTP</span>
             </button>
           )}
         </div>
