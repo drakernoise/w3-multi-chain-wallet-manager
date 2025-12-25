@@ -1508,7 +1508,12 @@ class ChatService {
     try {
       const timestamp = (/* @__PURE__ */ new Date()).toISOString();
       const messageToSign = content + timestamp;
+      const publicKeyHex = localStorage.getItem("gravity_chat_pub");
+      console.log("[SIGN] Public Key (first 20):", publicKeyHex?.substring(0, 20));
+      console.log("[SIGN] Private Key (first 20):", privateKeyHex?.substring(0, 20));
+      console.log("[SIGN] Message to sign:", messageToSign);
       const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      console.log("[SIGN] Signature (first 20):", signature?.substring(0, 20));
       this.socket.emit("send_message", {
         roomId,
         content,

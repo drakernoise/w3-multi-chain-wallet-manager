@@ -491,6 +491,13 @@ io.on('connection', (socket) => {
         // --- SECURITY: VERIFY CRYPTOGRAPHIC SIGNATURE ---
         // Verify that the signature matches: content + timestamp
         const messageToVerify = content + timestamp;
+
+        // Debug logging
+        console.log('[VERIFY] User:', socket.user.username);
+        console.log('[VERIFY] Public Key (first 20):', socket.user.publicKey?.substring(0, 20));
+        console.log('[VERIFY] Message to verify:', messageToVerify);
+        console.log('[VERIFY] Signature (first 20):', signature?.substring(0, 20));
+
         const isValid = verifySignature(socket.user.publicKey, messageToVerify, signature);
 
         if (!isValid) {
