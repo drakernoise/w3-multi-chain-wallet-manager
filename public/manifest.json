@@ -63,6 +63,6 @@
     "<all_urls>"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://gravity-chat-serve.onrender.com wss://gravity-chat-serve.onrender.com https://api.hive.blog https://api.steemit.com https://rpc.blurt.world https://anyx.io https://api.openhive.network"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://gravity-chat-serve.onrender.com wss://gravity-chat-serve.onrender.com https://api.hive.blog https://api.openhive.network https://anyx.io https://hive-api.arcange.eu https://api.deathwing.me https://techcoderx.com https://api.steemit.com https://api.steem.fans https://api.steememory.com https://rpc.blurt.world https://rpc.beblurt.com https://blurt-rpc.saboin.com https://kentzz.blurt.world"
   }
 }
