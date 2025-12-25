@@ -2524,21 +2524,11 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
         "button",
         {
           onClick: () => {
-            if (typeof chrome !== "undefined" && chrome.windows) {
-              chrome.windows.create({
-                url: chrome.runtime.getURL("index.html"),
-                type: "popup",
-                width: 400,
-                height: 600
-              });
-            }
+            window.dispatchEvent(new CustomEvent("toggle-detach"));
           },
-          className: "p-2 rounded-lg bg-dark-700/50 hover:bg-dark-600/50 border border-dark-600 transition-colors",
-          title: "Open in New Window",
-          children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-4 h-4 text-slate-400", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 12h14M5 12l4-4m-4 4l4 4m10-4l-4-4m4 4l-4 4", transform: "rotate(45 12 12)" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "12", cy: "8", r: "2", fill: "currentColor" })
-          ] })
+          className: "p-2 text-slate-500 hover:text-slate-300 transition-colors",
+          title: "Pin/Unpin Extension",
+          children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" }) })
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageToggle, {})

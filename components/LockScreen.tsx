@@ -351,22 +351,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
       <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
         <button
           onClick={() => {
-            if (typeof chrome !== 'undefined' && chrome.windows) {
-              chrome.windows.create({
-                url: chrome.runtime.getURL('index.html'),
-                type: 'popup',
-                width: 400,
-                height: 600
-              });
-            }
+            // Toggle detached mode - same as Sidebar
+            window.dispatchEvent(new CustomEvent('toggle-detach'));
           }}
-          className="p-2 rounded-lg bg-dark-700/50 hover:bg-dark-600/50 border border-dark-600 transition-colors"
-          title="Open in New Window"
+          className="p-2 text-slate-500 hover:text-slate-300 transition-colors"
+          title="Pin/Unpin Extension"
         >
-          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12l4-4m-4 4l4 4m10-4l-4-4m4 4l-4 4" transform="rotate(45 12 12)" />
-            <circle cx="12" cy="8" r="2" fill="currentColor" />
-          </svg>
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" /></svg>
         </button>
         <LanguageToggle />
       </div>

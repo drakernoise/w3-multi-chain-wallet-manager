@@ -126,17 +126,32 @@ function verifySignature(publicKeyHex, challenge, signatureHex) {
     try {
         const publicKeyBuffer = Buffer.from(publicKeyHex, 'hex');
         const signatureBuffer = Buffer.from(signatureHex, 'hex');
-        const verify = crypto.createVerify('SHA256');
-        verify.update(challenge);
-        const publicKeyPem = `-----BEGIN PUBLIC KEY-----
-${publicKeyBuffer.toString('base64')}
------END PUBLIC KEY-----`;
-        return verify.verify(publicKeyPem, signatureBuffer);
+
+        // Import the public key as ECDSA (P-256)
+        const publicKey = crypto.createPublicKey({
+            key: publicKeyBuffer,
+            format: 'der',
+            type: 'spki'
+        });
+
+        // Verify using ECDSA with SHA-256
+        const isValid = crypto.verify(
+            'sha256',
+            Buffer.from(challenge, 'utf8'),
+            {
+                key: publicKey,
+                dsaEncoding: 'ieee-p1363' // Web Crypto uses IEEE P1363 format
+            },
+            signatureBuffer
+        );
+
+        return isValid;
     } catch (err) {
         console.error('Signature verification error:', err);
         return false;
     }
 }
+
 
 // Helper: Generate random challenge for authentication
 function generateChallenge() {
