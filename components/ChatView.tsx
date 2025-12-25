@@ -40,6 +40,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     // Init & Listeners
     useEffect(() => {
+        chatService.init(); // CRITICAL: Start connection
         setSocketStatus(chatService.getCurrentUser() ? 'authenticated' : 'connecting');
 
         // Check if already logged in
@@ -195,7 +196,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <>
                         <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                         <p className="text-slate-400 animate-pulse font-medium">Connecting to Gravity Chat...</p>
-                        <p className="text-[10px] text-slate-600 mt-2 max-w-[200px]">The server might be waking up (this can take up to 30 seconds on free instances).</p>
+                        <p className="text-[10px] text-slate-600 mt-2 max-w-[200px]">Establishing secure connection with Gravity Servers.</p>
                     </>
                 ) : (
                     <>

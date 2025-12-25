@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { WalletState } from '../types';
-import { authenticateWithBiometrics, registerBiometrics, isBiometricsAvailable } from '../services/authService';
+import { authenticateWithBiometrics, registerBiometrics, isBiometricsAvailable, authenticateWithGoogle } from '../services/authService';
 import { initVault, initVaultWithGeneratedKey, unlockVault, getInternalKey, hasPinProtectedKey, loadInternalKeyWithPin, enablePasswordless } from '../services/cryptoService';
 import { verifyTOTP, hasTOTPConfigured, getTOTPSecret } from '../services/totpService';
 import { calculatePasswordStrength, getStrengthLabel } from '../utils/passwordStrength';
@@ -90,7 +90,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
         ...prev,
         encryptedMaster: true,
         useBiometrics: bioSuccess,
-        useDeviceAuth: bioSuccess
+        useGoogleAuth: bioSuccess
       }));
 
       setIsLoading(false);
@@ -125,6 +125,28 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
     }
   };
 
+  const handleGoogleAuth = async () => {
+    setError("");
+    setIsLoading(true);
+    setStatusMessage("Connecting to Google...");
+    const user = await authenticateWithGoogle();
+
+    if (user) {
+      const hasPin = await hasPinProtectedKey();
+      if (hasPin) {
+        setIsLoading(false);
+        setPinMode('unlock');
+        setPinValue('');
+        setShowPinModal(true);
+      } else {
+        await performLegacyUnlock();
+      }
+    } else {
+      setIsLoading(false);
+      setError("Google authentication failed");
+    }
+  };
+
   const performLegacyUnlock = async () => {
     const internalKey = await getInternalKey();
     if (internalKey) {
@@ -137,7 +159,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
       }
     } else {
       setIsLoading(false);
-      setError("No Device Auth data found. Try Password.");
+      setError("No Google Auth data found. Try Password.");
     }
   };
 
@@ -216,7 +238,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
       try {
         const { vault } = await initVaultWithGeneratedKey(pinValue);
-        setWalletState(prev => ({ ...prev, encryptedMaster: true, useDeviceAuth: true }));
+        setWalletState(prev => ({ ...prev, encryptedMaster: true, useGoogleAuth: true }));
         onUnlock(vault.accounts);
       } catch (e) {
         setError("Failed to initialize PIN wallet.");
@@ -261,7 +283,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
             </h3>
             <p className="text-xs text-slate-400 mb-6 text-center">
               {pinMode === 'create'
-                ? 'Set a 6-digit PIN to encrypt your wallet key. You will need this to login with Biometrics/Device Auth.'
+                ? 'Set a 6-digit PIN to encrypt your wallet key. You will need this to login with Google/Biometrics.'
                 : pinMode === 'totp' ? 'Enter the 6-digit code from your Aegis/Auth app.' : 'Enter your 6-digit PIN to decrypt your wallet.'}
             </p>
 
@@ -409,14 +431,12 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={handleTOTPAuth}
+            onClick={handleGoogleAuth}
             disabled={isLoading}
             className="bg-white hover:bg-slate-50 text-gray-700 border border-gray-300 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-70"
           >
-            <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center">
-              <svg className="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-            </div>
-            <span>Authenticator</span>
+            <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google" className="w-4 h-4" />
+            <span>Google</span>
           </button>
 
           {(biometricsAvailable && (walletState.useBiometrics || isFirstRun)) ? (
@@ -429,9 +449,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
               Biometrics
             </button>
           ) : (
-            <button disabled className="bg-dark-700 text-slate-600 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm cursor-not-allowed opacity-50">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-              N/A
+            <button
+              onClick={handleTOTPAuth}
+              disabled={isLoading}
+              className="bg-dark-700 text-slate-300 font-medium py-2.5 rounded-lg hover:bg-dark-600 transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              TOTP
             </button>
           )}
         </div>

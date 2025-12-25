@@ -1592,10 +1592,6 @@ video {
 .bg-rose-500\/10 {
   background-color: rgb(244 63 94 / 0.1);
 }
-.bg-slate-200 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(226 232 240 / var(--tw-bg-opacity, 1));
-}
 .bg-slate-500 {
   --tw-bg-opacity: 1;
   background-color: rgb(100 116 139 / var(--tw-bg-opacity, 1));

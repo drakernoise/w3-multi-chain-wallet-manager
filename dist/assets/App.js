@@ -1,5 +1,5 @@
 import { r as reactExports, j as jsxRuntimeExports } from './vendor.js';
-import { j as isBiometricsAvailable, k as getTOTPSecret, v as verifyTOTP, l as hasPinProtectedKey, m as initVaultWithGeneratedKey, n as loadInternalKeyWithPin, u as unlockVault, o as getInternalKey, r as registerBiometrics, p as initVault, q as enablePasswordless, t as hasTOTPConfigured, w as authenticateWithBiometrics, V as ViewState, C as Chain, x as generateSetup, y as saveTOTPSecret, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, z as broadcastSavingsDeposit, A as broadcastSavingsWithdraw, B as fetchAccountData, D as broadcastRCDelegate, E as broadcastRCUndelegate, F as broadcastBulkTransfer, G as validateUsername, H as validatePrivateKey, I as verifyKeyAgainstChain, J as validateAccountKeys, K as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, L as chatService, M as saveVault, N as fetchBalances, O as clearCryptoCache, P as getVault, Q as tryRestoreSession, R as detectWeb3Context, S as benchmarkNodes } from './chainService.js';
+import { j as isBiometricsAvailable, k as getTOTPSecret, v as verifyTOTP, l as hasPinProtectedKey, m as initVaultWithGeneratedKey, n as loadInternalKeyWithPin, u as unlockVault, o as getInternalKey, r as registerBiometrics, p as initVault, q as enablePasswordless, t as authenticateWithGoogle, w as authenticateWithBiometrics, x as hasTOTPConfigured, V as ViewState, C as Chain, y as generateSetup, z as saveTOTPSecret, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, A as broadcastSavingsDeposit, B as broadcastSavingsWithdraw, D as fetchAccountData, E as broadcastRCDelegate, F as broadcastRCUndelegate, G as broadcastBulkTransfer, H as validateUsername, I as validatePrivateKey, J as verifyKeyAgainstChain, K as validateAccountKeys, L as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, M as chatService, N as saveVault, O as fetchBalances, P as clearCryptoCache, Q as getVault, R as tryRestoreSession, S as detectWeb3Context, T as benchmarkNodes } from './chainService.js';
 
 const calculatePasswordStrength = (password) => {
   let score = 0;
@@ -1731,7 +1731,7 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
         ...prev,
         encryptedMaster: true,
         useBiometrics: bioSuccess,
-        useDeviceAuth: bioSuccess
+        useGoogleAuth: bioSuccess
       }));
       setIsLoading(false);
       onUnlock([]);
@@ -1757,6 +1757,26 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
       setError("Authenticator not configured. Please unlock with password and configure it in Settings.");
     }
   };
+  const handleGoogleAuth = async () => {
+    setError("");
+    setIsLoading(true);
+    setStatusMessage("Connecting to Google...");
+    const user = await authenticateWithGoogle();
+    if (user) {
+      const hasPin = await hasPinProtectedKey();
+      if (hasPin) {
+        setIsLoading(false);
+        setPinMode("unlock");
+        setPinValue("");
+        setShowPinModal(true);
+      } else {
+        await performLegacyUnlock();
+      }
+    } else {
+      setIsLoading(false);
+      setError("Google authentication failed");
+    }
+  };
   const performLegacyUnlock = async () => {
     const internalKey = await getInternalKey();
     if (internalKey) {
@@ -1769,7 +1789,7 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
       }
     } else {
       setIsLoading(false);
-      setError("No Device Auth data found. Try Password.");
+      setError("No Google Auth data found. Try Password.");
     }
   };
   const handleBiometricAuth = async () => {
@@ -1831,7 +1851,7 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
       setShowPinModal(false);
       try {
         const { vault } = await initVaultWithGeneratedKey(pinValue);
-        setWalletState((prev) => ({ ...prev, encryptedMaster: true, useDeviceAuth: true }));
+        setWalletState((prev) => ({ ...prev, encryptedMaster: true, useGoogleAuth: true }));
         onUnlock(vault.accounts);
       } catch (e) {
         setError("Failed to initialize PIN wallet.");
@@ -1863,7 +1883,7 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 relative overflow-hidden", children: [
     showPinModal && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 z-50 bg-dark-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-fade-in", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 p-6 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-sm", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-bold text-white mb-2 text-center", children: pinMode === "create" ? "Create Security PIN" : pinMode === "totp" ? "Authenticator Code" : "Enter Security PIN" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6 text-center", children: pinMode === "create" ? "Set a 6-digit PIN to encrypt your wallet key. You will need this to login with Biometrics/Device Auth." : pinMode === "totp" ? "Enter the 6-digit code from your Aegis/Auth app." : "Enter your 6-digit PIN to decrypt your wallet." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6 text-center", children: pinMode === "create" ? "Set a 6-digit PIN to encrypt your wallet key. You will need this to login with Google/Biometrics." : pinMode === "totp" ? "Enter the 6-digit code from your Aegis/Auth app." : "Enter your 6-digit PIN to decrypt your wallet." }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "input",
         {
@@ -1992,12 +2012,12 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
           "button",
           {
-            onClick: handleTOTPAuth,
+            onClick: handleGoogleAuth,
             disabled: isLoading,
             className: "bg-white hover:bg-slate-50 text-gray-700 border border-gray-300 font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-70",
             children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3 text-slate-600", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }) }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Authenticator" })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("img", { src: "https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png", alt: "Google", className: "w-4 h-4" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Google" })
             ]
           }
         ),
@@ -2012,10 +2032,18 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
               "Biometrics"
             ]
           }
-        ) : /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { disabled: true, className: "bg-dark-700 text-slate-600 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm cursor-not-allowed opacity-50", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }),
-          "N/A"
-        ] })
+        ) : /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: handleTOTPAuth,
+            disabled: isLoading,
+            className: "bg-dark-700 text-slate-300 font-medium py-2.5 rounded-lg hover:bg-dark-600 transition-colors flex items-center justify-center gap-2 text-sm",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 text-blue-500", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }),
+              "TOTP"
+            ]
+          }
+        )
       ] }),
       statusMessage && !error && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-center text-xs text-blue-400 mt-2 animate-pulse", children: statusMessage }),
       error && !showPinModal && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-center text-xs text-red-400 mt-2 flex flex-col items-center gap-1", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: error }) }),
@@ -5704,6 +5732,7 @@ const ChatView = ({ onClose }) => {
     setIsCreating(false);
   };
   reactExports.useEffect(() => {
+    chatService.init();
     setSocketStatus(chatService.getCurrentUser() ? "authenticated" : "connecting");
     const existing = chatService.getCurrentUser();
     if (existing) {
@@ -5831,7 +5860,7 @@ const ChatView = ({ onClose }) => {
       socketStatus === "connecting" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-slate-400 animate-pulse font-medium", children: "Connecting to Gravity Chat..." }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-600 mt-2 max-w-[200px]", children: "The server might be waking up (this can take up to 30 seconds on free instances)." })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-600 mt-2 max-w-[200px]", children: "Establishing secure connection with Gravity Servers." })
       ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 text-red-500", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-8 h-8", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" }) }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-400 font-bold mb-1", children: "Connection Failed" }),
@@ -6160,7 +6189,7 @@ function AppContent() {
   const [walletState, setWalletState] = reactExports.useState({
     accounts: [],
     encryptedMaster: false,
-    useDeviceAuth: false,
+    useGoogleAuth: false,
     useBiometrics: false
   });
   const [activeChain, setActiveChain] = reactExports.useState(Chain.HIVE);
@@ -6192,7 +6221,7 @@ function AppContent() {
           accounts: [],
           // Keys are encrypted
           encryptedMaster: true,
-          useDeviceAuth: false,
+          useGoogleAuth: false,
           useBiometrics: false
         }));
       }
@@ -6221,8 +6250,7 @@ function AppContent() {
               setWalletState((prev) => ({
                 ...prev,
                 encryptedMaster: result.walletConfig.encryptedMaster,
-                useDeviceAuth: result.walletConfig.useDeviceAuth || result.walletConfig.useGoogleAuth,
-                // Migration
+                useGoogleAuth: result.walletConfig.useGoogleAuth,
                 useBiometrics: result.walletConfig.useBiometrics,
                 useTOTP: result.walletConfig.useTOTP
               }));
@@ -6242,7 +6270,7 @@ function AppContent() {
     if (isDataLoaded) {
       const config = {
         encryptedMaster: walletState.encryptedMaster,
-        useDeviceAuth: walletState.useDeviceAuth,
+        useGoogleAuth: walletState.useGoogleAuth,
         useBiometrics: walletState.useBiometrics,
         useTOTP: walletState.useTOTP
       };
@@ -6250,7 +6278,7 @@ function AppContent() {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useDeviceAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
   reactExports.useEffect(() => {
     if (!isLocked && needsSave && walletState.encryptedMaster) {
       const vault = { accounts: walletState.accounts, lastUpdated: Date.now() };

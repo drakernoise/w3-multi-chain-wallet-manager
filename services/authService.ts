@@ -1,8 +1,12 @@
-// Service for Device and Biometric Authentication
-export const authenticateWithDevice = async (): Promise<{ id: string } | null> => {
+// Mock service for Google Identity API
+export const authenticateWithGoogle = async (): Promise<{ id: string, email: string } | null> => {
   return new Promise((resolve) => {
+    // Simulate network delay
     setTimeout(() => {
-      resolve({ id: 'device_user_123' });
+      resolve({
+        id: 'google_user_123',
+        email: 'user@example.com'
+      });
     }, 1000);
   });
 };
