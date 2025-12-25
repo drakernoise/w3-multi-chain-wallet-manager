@@ -34,6 +34,10 @@ test_migration_output*.txt
 test_*.cjs
 test_*.html
 test_*.js
+test-*.js
+test-*.cjs
+scripts/test-*.js
+scripts/test-*.cjs
 
 # Secrets
 .env

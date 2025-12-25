@@ -6,10 +6,19 @@
       "rooms": [
         "global-lobby"
       ]
+    },
+    "693a7eda-db3d-4056-b5c7-0539b231c193": {
+      "id": "693a7eda-db3d-4056-b5c7-0539b231c193",
+      "username": "red_teamer_255",
+      "publicKey": "3059301306072a8648ce3d020106082a8648ce3d03010703420004daef38046a8c78810373107f68bfb7caf1729fa432cd13e654ab79759dcf94a99b33743b5c5dcf6833bb5da07f1149c63c57d4fe5929021a4b2eef692a6a70dd",
+      "rooms": [
+        "global-lobby"
+      ]
     }
   },
   "usernames": {
-    "drakernoise": "be540518-835f-4f9c-a7e8-8d5d41bd6338"
+    "drakernoise": "be540518-835f-4f9c-a7e8-8d5d41bd6338",
+    "red_teamer_255": "693a7eda-db3d-4056-b5c7-0539b231c193"
   },
   "rooms": {
     "global-lobby": {
@@ -22,7 +31,32 @@
       "members": [],
       "bans": [],
       "mutes": [],
-      "messages": []
+      "messages": [
+        {
+          "id": "59c59a5d-ab2a-4507-8b94-3d0d16a9c5f2",
+          "senderId": "693a7eda-db3d-4056-b5c7-0539b231c193",
+          "senderName": "red_teamer_255",
+          "content": "Mensaje legítimo firmado",
+          "timestamp": "2025-12-25T13:09:09.334Z",
+          "isVerified": true
+        },
+        {
+          "id": "3093f536-4fe3-4c28-8e93-bf0c22487913",
+          "senderId": "693a7eda-db3d-4056-b5c7-0539b231c193",
+          "senderName": "red_teamer_255",
+          "content": "&lt;img src=x onerror=alert(&#039;hacked&#039;)&gt;",
+          "timestamp": "2025-12-25T13:09:12.346Z",
+          "isVerified": true
+        },
+        {
+          "id": "3bfbc98e-f990-4c91-a544-d94d8995255e",
+          "senderId": "693a7eda-db3d-4056-b5c7-0539b231c193",
+          "senderName": "red_teamer_255",
+          "content": "msg1",
+          "timestamp": "2025-12-25T13:09:13.844Z",
+          "isVerified": true
+        }
+      ]
     },
     "25e84d0a-abda-4f10-bda1-5364976c35d2": {
       "id": "25e84d0a-abda-4f10-bda1-5364976c35d2",

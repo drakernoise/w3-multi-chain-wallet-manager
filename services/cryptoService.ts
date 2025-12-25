@@ -169,10 +169,12 @@ export async function initVaultWithGeneratedKey(pin?: string): Promise<{ vault: 
     .map(b => b.toString(16).padStart(2, '0')).join('');
 
   // SAVE THE KEY
+  // SAVE THE KEY
   if (pin) {
     await saveInternalKeyWithPin(internalKey, pin);
   } else {
-    await storeInternalKey(internalKey); // Legacy/Insecure fallback
+    // RED TEAM FIX: Never store keys in plain text.
+    throw new Error("Security Violation: Cannot initialize vault without a PIN or password protection.");
   }
 
   const emptyVault: Vault = { accounts: [], lastUpdated: Date.now() };

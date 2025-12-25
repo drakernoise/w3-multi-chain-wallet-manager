@@ -290,8 +290,24 @@ class ChatService {
         this.socket?.emit('register', { username });
     }
 
-    public sendMessage(roomId: string, content: string) {
-        this.socket?.emit('send_message', { roomId, content });
+    public async sendMessage(roomId: string, content: string, privateKeyHex: string) {
+        if (!this.socket) return;
+
+        try {
+            const timestamp = new Date().toISOString();
+            const messageToSign = content + timestamp;
+            const signature = await this.signChallenge(messageToSign, privateKeyHex);
+
+            this.socket.emit('send_message', {
+                roomId,
+                content,
+                timestamp,
+                signature
+            });
+        } catch (err) {
+            console.error('Failed to sign message:', err);
+            if (this.onError) this.onError('Failed to securely sign message.');
+        }
     }
 
     public joinRoom(roomId: string) {

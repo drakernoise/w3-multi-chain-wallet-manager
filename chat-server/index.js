@@ -72,34 +72,23 @@ loadData();
 
 const connectedSockets = {}; // socketId -> userId
 const authChallenges = {}; // socketId -> { challenge, timestamp }
+const lastMessageTime = {}; // userId -> timestamp
 
 // Helper: Verify ECDSA signature
 function verifySignature(publicKeyHex, challenge, signatureHex) {
     try {
-        // Convert hex strings to buffers
         const publicKeyBuffer = Buffer.from(publicKeyHex, 'hex');
         const signatureBuffer = Buffer.from(signatureHex, 'hex');
-
-        // Create verifier
         const verify = crypto.createVerify('SHA256');
         verify.update(challenge);
-
-        // Construct public key in PEM format for ECDSA secp256k1
-        // The publicKeyHex should be 65 bytes (130 hex chars) for uncompressed key
         const publicKeyPem = `-----BEGIN PUBLIC KEY-----
 ${publicKeyBuffer.toString('base64')}
 -----END PUBLIC KEY-----`;
-
         return verify.verify(publicKeyPem, signatureBuffer);
     } catch (err) {
         console.error('Signature verification error:', err);
         return false;
     }
-}
-
-// Generate authentication challenge
-function generateChallenge() {
-    return crypto.randomBytes(32).toString('hex');
 }
 
 io.on('connection', (socket) => {
@@ -231,13 +220,32 @@ io.on('connection', (socket) => {
             }
         }
 
-        // Helper: Validate username
-        if (!username || username.length < 3) {
+        // --- SECURITY: Username Validation (Red Team: Prevent Social Engineering) ---
+        const cleanUsername = username ? username.trim() : '';
+        const reservedNames = ['admin', 'system', 'gravity', 'mod', 'staff', 'support', 'official'];
+        const usernameRegex = /^[a-zA-Z0-9_]+$/; // Alphanumeric and underscores only
+
+        if (!cleanUsername || cleanUsername.length < 3) {
             socket.emit('error', 'Username too short');
             return;
         }
 
-        const existingStoredId = usernames[username.toLowerCase()];
+        if (cleanUsername.length > 20) {
+            socket.emit('error', 'Username too long (max 20)');
+            return;
+        }
+
+        if (!usernameRegex.test(cleanUsername)) {
+            socket.emit('error', 'Username contains invalid characters');
+            return;
+        }
+
+        if (reservedNames.includes(cleanUsername.toLowerCase())) {
+            socket.emit('error', 'Username is reserved');
+            return;
+        }
+
+        const existingStoredId = usernames[cleanUsername.toLowerCase()];
         if (existingStoredId && existingStoredId !== existingId) {
             socket.emit('error', 'Username already taken by another user');
             return;
@@ -329,30 +337,69 @@ io.on('connection', (socket) => {
 
     socket.on('send_message', (data) => {
         if (!socket.user) return;
-        const { roomId, content } = data;
-        const room = rooms[roomId];
 
-        if (!room) return;
-
-        // Check for mutes
-        if (room.mutes && room.mutes.includes(socket.user.id)) {
-            socket.emit('error', 'You are muted in this room');
+        const now = Date.now();
+        // Rate limiting
+        if (lastMessageTime[socket.user.id] && (now - lastMessageTime[socket.user.id] < 1000)) {
+            socket.emit('error', 'Rate limit exceeded. Please wait 1s.');
             return;
         }
+        lastMessageTime[socket.user.id] = now;
+
+        let { roomId, content, timestamp, signature } = data;
+
+        // --- SECURITY: Input Validation ---
+        if (!roomId || typeof content !== 'string' || content.trim().length === 0) return;
+        if (!signature || !timestamp) {
+            socket.emit('error', 'Security error: Message must be signed.');
+            return;
+        }
+
+        // --- SECURITY: Replay Attack Protection ---
+        const msgTime = new Date(timestamp).getTime();
+        if (Math.abs(now - msgTime) > 60000) { // 60s window
+            socket.emit('error', 'Security error: Message timestamp expired (Replay attack?)');
+            return;
+        }
+
+        const room = rooms[roomId];
+        if (!room) return;
+
+        // --- SECURITY: Check Membership ---
+        const isMember = room.type === 'public' || room.members?.includes(socket.user.id);
+        if (!isMember) {
+            socket.emit('error', 'Unauthorized: Not a member');
+            return;
+        }
+
+        // --- SECURITY: VERIFY CRYPTOGRAPHIC SIGNATURE ---
+        // Verify that the signature matches: content + timestamp
+        const messageToVerify = content + timestamp;
+        const isValid = verifySignature(socket.user.publicKey, messageToVerify, signature);
+
+        if (!isValid) {
+            console.error(`🚨 Cryptographic Spoofing Attempt detected from ${socket.user.username}`);
+            socket.emit('error', 'Security error: Invalid cryptographic signature.');
+            return;
+        }
+
+        // --- SECURITY: Sanitization (XSS) ---
+        const sanitizedContent = content
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 
         const msg = {
             id: uuidv4(),
             senderId: socket.user.id,
             senderName: socket.user.username,
-            content,
-            timestamp: new Date().toISOString()
+            content: sanitizedContent,
+            timestamp: new Date().toISOString(),
+            isVerified: true // Mark as cryptographically verified
         };
 
         room.messages.push(msg);
         if (room.messages.length > 200) room.messages.shift();
-
         saveData();
-
         io.to(roomId).emit('new_message', { roomId, message: msg });
     });
 

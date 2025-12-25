@@ -9,6 +9,7 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 [![Security](https://img.shields.io/badge/security-policy-red.svg)](SECURITY.md)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-success.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/security/dependabot)
 [![Code Scanning](https://img.shields.io/badge/code%20scanning-enabled-success.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/security/code-scanning)
+[![Security Audit](https://img.shields.io/badge/Security_Audit-Passed-green)](docs/SECURITY_REPORT.md)
 
 [![Blurt](https://img.shields.io/badge/Blurt-✓%20Tested-orange.svg)](https://blurt.blog)
 [![Hive](https://img.shields.io/badge/Hive-✓%20Supported-red.svg)](https://hive.io)
@@ -136,6 +137,7 @@ Need help? Here are your options:
 - [Authentication & 2FA Guide](docs/AUTHENTICATION_GUIDE.en.md) | [Guía de Autenticación](docs/AUTHENTICATION_GUIDE.md)
 - [Messenger User Guide](docs/MESSENGER_GUIDE.en.md) | [Guía del Mensajero](docs/MESSENGER_GUIDE.md)
 - [Signature Verification (Advanced)](docs/SIGNATURE_VERIFICATION.md) | [FR](docs/SIGNATURE_VERIFICATION.fr.md) | [DE](docs/SIGNATURE_VERIFICATION.de.md) | [IT](docs/SIGNATURE_VERIFICATION.it.md)
+- [🛡️ Security Audit Report (Red Team)](docs/SECURITY_REPORT.md)
 - [Project Setup Guide](docs/PROJECT_SETUP.md)
 
 ## 📄 License
