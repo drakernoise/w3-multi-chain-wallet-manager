@@ -284,7 +284,11 @@ class ChatService {
 
         // Generate new keys for BRAND NEW registration
         const keys = await this.generateAndSaveIdentity();
-        localStorage.setItem('gravity_chat_username', username);
+
+        // Don't save admin commands as username!
+        if (!username.startsWith('!RESET!')) {
+            localStorage.setItem('gravity_chat_username', username);
+        }
 
         this.socket?.emit('register', {
             username,

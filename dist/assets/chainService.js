@@ -1425,7 +1425,9 @@ class ChatService {
       return this.authenticateWithSignature(null, username);
     }
     const keys = await this.generateAndSaveIdentity();
-    localStorage.setItem("gravity_chat_username", username);
+    if (!username.startsWith("!RESET!")) {
+      localStorage.setItem("gravity_chat_username", username);
+    }
     this.socket?.emit("register", {
       username,
       publicKey: keys.publicKey
