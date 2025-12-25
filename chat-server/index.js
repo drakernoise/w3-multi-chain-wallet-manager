@@ -6,6 +6,7 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const STORAGE_DIR = process.env.DB_PATH || __dirname;
 const DB_PATH = path.join(STORAGE_DIR, 'chat_db.json');
@@ -70,9 +71,104 @@ function saveData() {
 loadData();
 
 const connectedSockets = {}; // socketId -> userId
+const authChallenges = {}; // socketId -> { challenge, timestamp }
+
+// Helper: Verify ECDSA signature
+function verifySignature(publicKeyHex, challenge, signatureHex) {
+    try {
+        // Convert hex strings to buffers
+        const publicKeyBuffer = Buffer.from(publicKeyHex, 'hex');
+        const signatureBuffer = Buffer.from(signatureHex, 'hex');
+
+        // Create verifier
+        const verify = crypto.createVerify('SHA256');
+        verify.update(challenge);
+
+        // Construct public key in PEM format for ECDSA secp256k1
+        // The publicKeyHex should be 65 bytes (130 hex chars) for uncompressed key
+        const publicKeyPem = `-----BEGIN PUBLIC KEY-----
+${publicKeyBuffer.toString('base64')}
+-----END PUBLIC KEY-----`;
+
+        return verify.verify(publicKeyPem, signatureBuffer);
+    } catch (err) {
+        console.error('Signature verification error:', err);
+        return false;
+    }
+}
+
+// Generate authentication challenge
+function generateChallenge() {
+    return crypto.randomBytes(32).toString('hex');
+}
 
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
+
+    // --- 0. Challenge-Response Authentication (Optional Enhanced Security) ---
+    socket.on('request_challenge', (data) => {
+        const { userId } = data;
+        const user = users[userId];
+
+        if (!user || !user.publicKey) {
+            socket.emit('error', 'User not found or no public key registered');
+            return;
+        }
+
+        const challenge = generateChallenge();
+        authChallenges[socket.id] = {
+            challenge,
+            userId,
+            timestamp: Date.now()
+        };
+
+        // Challenge expires in 5 minutes
+        setTimeout(() => {
+            delete authChallenges[socket.id];
+        }, 5 * 60 * 1000);
+
+        socket.emit('auth_challenge', { challenge });
+    });
+
+    socket.on('verify_signature', (data) => {
+        const { signature } = data;
+        const challengeData = authChallenges[socket.id];
+
+        if (!challengeData) {
+            socket.emit('error', 'No active challenge or challenge expired');
+            return;
+        }
+
+        const user = users[challengeData.userId];
+        if (!user) {
+            socket.emit('error', 'User not found');
+            return;
+        }
+
+        const isValid = verifySignature(user.publicKey, challengeData.challenge, signature);
+
+        if (!isValid) {
+            socket.emit('error', 'Invalid signature');
+            delete authChallenges[socket.id];
+            return;
+        }
+
+        // Signature verified - authenticate user
+        socket.user = user;
+        connectedSockets[socket.id] = user.id;
+        delete authChallenges[socket.id];
+
+        socket.emit('auth_success', {
+            id: user.id,
+            username: user.username,
+            rooms: getAvailableRooms(user.id)
+        });
+
+        // Auto-join their rooms
+        user.rooms.forEach(roomId => {
+            socket.join(roomId);
+        });
+    });
 
     // --- 1. Registration / Login ---
     socket.on('register', (data) => {

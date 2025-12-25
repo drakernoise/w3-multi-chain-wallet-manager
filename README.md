@@ -42,11 +42,11 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 *   **Sleek UI**: Modern, dark-themed interface with real-time feedback.
 *   **Bulk Transfers**: Send funds to multiple recipients in a single transaction.
 *   **Transaction Analysis**: View and analyze your transaction history.
-*   **Secure Messenger**: 🔒 Encrypted on-chain chat for Hive, Steem, and Blurt.
+*   **Secure Messenger**: 🔒 On-chain chat for Hive, Steem, and Blurt with real-time notifications.
 *   **Secure**:
+    *   **Passwordless Flow**: Setup your wallet using Google OAuth or Device local keys (TPM/Secure Enclave).
     *   **2FA Support**: Integration with TOTP apps (Aegis, Google Auth).
     *   **Password Strength Meter**: Real-time feedback on password security.
-    *   **Biometric Unlock**: Support for FaceID/TouchID/Windows Hello.
     *   AES-256 encryption for your vault.
     *   Auto-lock mechanism.
     *   Detailed transaction confirmations.
@@ -130,6 +130,13 @@ Need help? Here are your options:
 - 💬 **Community**: Join [GitHub Discussions](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions)
 - 🐛 **Bug Reports**: Open an [Issue](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues)
 - 🔐 **Security**: Email `drakernoise@protonmail.com`
+
+## 📄 Help & Documentation
+
+- [Authentication & 2FA Guide](docs/AUTHENTICATION_GUIDE.en.md) | [Guía de Autenticación](docs/AUTHENTICATION_GUIDE.md)
+- [Messenger User Guide](docs/MESSENGER_GUIDE.en.md) | [Guía del Mensajero](docs/MESSENGER_GUIDE.md)
+- [Signature Verification (Advanced)](docs/SIGNATURE_VERIFICATION.md) | [FR](docs/SIGNATURE_VERIFICATION.fr.md) | [DE](docs/SIGNATURE_VERIFICATION.de.md) | [IT](docs/SIGNATURE_VERIFICATION.it.md)
+- [Project Setup Guide](docs/PROJECT_SETUP.md)
 
 ## 📄 License
 

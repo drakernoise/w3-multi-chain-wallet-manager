@@ -155,6 +155,112 @@ class ChatService {
             // For now we will broadcast custom event
             window.dispatchEvent(new CustomEvent('chat-search-results', { detail: results }));
         });
+
+        // Challenge-Response Authentication
+        this.socket.on('auth_challenge', async (data: { challenge: string }) => {
+            console.log('Received auth challenge from server');
+            // This will be handled by the authenticateWithSignature method
+            window.dispatchEvent(new CustomEvent('chat-auth-challenge', { detail: data }));
+        });
+    }
+
+    // Enhanced Security: Authenticate with cryptographic signature
+    public async authenticateWithSignature(userId: string, privateKeyHex: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            if (!this.socket) {
+                reject(new Error('Socket not initialized'));
+                return;
+            }
+
+            // Request challenge from server
+            this.socket.emit('request_challenge', { userId });
+
+            // Listen for challenge
+            const challengeHandler = async (event: any) => {
+                const { challenge } = event.detail;
+
+                try {
+                    // Sign the challenge with private key
+                    const signature = await this.signChallenge(challenge, privateKeyHex);
+
+                    // Send signature to server for verification
+                    this.socket?.emit('verify_signature', { signature });
+
+                    // Wait for auth_success
+                    const successHandler = () => {
+                        window.removeEventListener('chat-auth-challenge', challengeHandler);
+                        resolve();
+                    };
+
+                    this.socket?.once('auth_success', successHandler);
+
+                    // Handle errors
+                    const errorHandler = (msg: string) => {
+                        window.removeEventListener('chat-auth-challenge', challengeHandler);
+                        reject(new Error(msg));
+                    };
+
+                    this.socket?.once('error', errorHandler);
+                } catch (err) {
+                    window.removeEventListener('chat-auth-challenge', challengeHandler);
+                    reject(err);
+                }
+            };
+
+            window.addEventListener('chat-auth-challenge', challengeHandler, { once: true });
+        });
+    }
+
+    // Sign challenge using ECDSA with SubtleCrypto
+    private async signChallenge(challenge: string, privateKeyHex: string): Promise<string> {
+        try {
+            // Convert hex private key to buffer
+            const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
+
+            // Import private key for signing
+            const privateKey = await crypto.subtle.importKey(
+                'pkcs8',
+                privateKeyBuffer,
+                {
+                    name: 'ECDSA',
+                    namedCurve: 'P-256' // secp256r1, adjust if using secp256k1
+                },
+                false,
+                ['sign']
+            );
+
+            // Sign the challenge
+            const encoder = new TextEncoder();
+            const data = encoder.encode(challenge);
+            const signature = await crypto.subtle.sign(
+                {
+                    name: 'ECDSA',
+                    hash: { name: 'SHA-256' }
+                },
+                privateKey,
+                data
+            );
+
+            // Convert signature to hex
+            return this.bufferToHex(new Uint8Array(signature));
+        } catch (err) {
+            console.error('Error signing challenge:', err);
+            throw new Error('Failed to sign challenge');
+        }
+    }
+
+    private hexToBuffer(hex: string): ArrayBuffer {
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < hex.length; i += 2) {
+            bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+        }
+        return bytes.buffer;
+    }
+
+    private bufferToHex(buffer: Uint8Array): string {
+        return Array.from(buffer)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
     }
 
     public register(username: string) {

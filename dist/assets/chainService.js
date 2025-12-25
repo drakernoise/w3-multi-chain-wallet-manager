@@ -847,24 +847,6 @@ const registerBiometrics = async () => {
     return false;
   }
 };
-const authenticateWithBiometrics = async () => {
-  try {
-    const challenge = new Uint8Array(32);
-    window.crypto.getRandomValues(challenge);
-    const publicKeyCredentialRequestOptions = {
-      challenge,
-      timeout: 6e4,
-      userVerification: "required"
-    };
-    const assertion = await navigator.credentials.get({
-      publicKey: publicKeyCredentialRequestOptions
-    });
-    return !!assertion;
-  } catch (error) {
-    console.error("Biometric auth failed:", error);
-    return false;
-  }
-};
 
 const SALT_LEN = 16;
 const IV_LEN = 12;
@@ -1347,6 +1329,82 @@ class ChatService {
     this.socket.on("search_results", (results) => {
       window.dispatchEvent(new CustomEvent("chat-search-results", { detail: results }));
     });
+    this.socket.on("auth_challenge", async (data) => {
+      console.log("Received auth challenge from server");
+      window.dispatchEvent(new CustomEvent("chat-auth-challenge", { detail: data }));
+    });
+  }
+  // Enhanced Security: Authenticate with cryptographic signature
+  async authenticateWithSignature(userId, privateKeyHex) {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        reject(new Error("Socket not initialized"));
+        return;
+      }
+      this.socket.emit("request_challenge", { userId });
+      const challengeHandler = async (event) => {
+        const { challenge } = event.detail;
+        try {
+          const signature = await this.signChallenge(challenge, privateKeyHex);
+          this.socket?.emit("verify_signature", { signature });
+          const successHandler = () => {
+            window.removeEventListener("chat-auth-challenge", challengeHandler);
+            resolve();
+          };
+          this.socket?.once("auth_success", successHandler);
+          const errorHandler = (msg) => {
+            window.removeEventListener("chat-auth-challenge", challengeHandler);
+            reject(new Error(msg));
+          };
+          this.socket?.once("error", errorHandler);
+        } catch (err) {
+          window.removeEventListener("chat-auth-challenge", challengeHandler);
+          reject(err);
+        }
+      };
+      window.addEventListener("chat-auth-challenge", challengeHandler, { once: true });
+    });
+  }
+  // Sign challenge using ECDSA with SubtleCrypto
+  async signChallenge(challenge, privateKeyHex) {
+    try {
+      const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
+      const privateKey = await crypto.subtle.importKey(
+        "pkcs8",
+        privateKeyBuffer,
+        {
+          name: "ECDSA",
+          namedCurve: "P-256"
+          // secp256r1, adjust if using secp256k1
+        },
+        false,
+        ["sign"]
+      );
+      const encoder = new TextEncoder();
+      const data = encoder.encode(challenge);
+      const signature = await crypto.subtle.sign(
+        {
+          name: "ECDSA",
+          hash: { name: "SHA-256" }
+        },
+        privateKey,
+        data
+      );
+      return this.bufferToHex(new Uint8Array(signature));
+    } catch (err) {
+      console.error("Error signing challenge:", err);
+      throw new Error("Failed to sign challenge");
+    }
+  }
+  hexToBuffer(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    }
+    return bytes.buffer;
+  }
+  bufferToHex(buffer) {
+    return Array.from(buffer).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
   register(username) {
     if (!this.socket) this.init();
@@ -1430,4 +1488,4 @@ class ChatService {
 }
 const chatService = new ChatService();
 
-export { saveTOTPSecret as A, broadcastSavingsDeposit as B, Chain as C, broadcastSavingsWithdraw as D, fetchAccountData as E, broadcastRCDelegate as F, broadcastRCUndelegate as G, broadcastBulkTransfer as H, validateUsername as I, validatePrivateKey as J, verifyKeyAgainstChain as K, validateAccountKeys as L, fetchAccountHistory as M, chatService as N, saveVault as O, fetchBalances as P, clearCryptoCache as Q, getVault as R, tryRestoreSession as S, detectWeb3Context as T, benchmarkNodes as U, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, isBiometricsAvailable as j, getTOTPSecret as k, hasPinProtectedKey as l, initVaultWithGeneratedKey as m, loadInternalKeyWithPin as n, getInternalKey as o, initVault as p, enablePasswordless as q, registerBiometrics as r, signMessage as s, authenticateWithGoogle as t, unlockVault as u, verifyTOTP as v, authenticateWithDevice as w, authenticateWithBiometrics as x, hasTOTPConfigured as y, generateSetup as z };
+export { broadcastSavingsDeposit as A, broadcastSavingsWithdraw as B, Chain as C, fetchAccountData as D, broadcastRCDelegate as E, broadcastRCUndelegate as F, broadcastBulkTransfer as G, validateUsername as H, validatePrivateKey as I, verifyKeyAgainstChain as J, validateAccountKeys as K, fetchAccountHistory as L, chatService as M, saveVault as N, fetchBalances as O, clearCryptoCache as P, getVault as Q, tryRestoreSession as R, detectWeb3Context as S, benchmarkNodes as T, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, isBiometricsAvailable as j, getTOTPSecret as k, hasPinProtectedKey as l, getInternalKey as m, initVaultWithGeneratedKey as n, loadInternalKeyWithPin as o, initVault as p, authenticateWithGoogle as q, authenticateWithDevice as r, signMessage as s, hasTOTPConfigured as t, unlockVault as u, verifyTOTP as v, generateSetup as w, saveTOTPSecret as x, enablePasswordless as y, registerBiometrics as z };

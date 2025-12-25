@@ -24,6 +24,8 @@ Gravity Wallet es una extensión de navegador de última generación diseñada p
 *   **Detección de Fraude:** Alertas inteligentes ante comportamientos sospechosos o transacciones inusuales.
 
 ### ⚡ Herramientas Avanzadas
+*   **Messenger Seguro:** 🔒 Chat en cadena para Hive, Steem y Blurt con notificaciones en tiempo real.
+*   **Configuración Sin Contraseña:** Crea tu billetera sin complicaciones usando Google OAuth o llaves de hardware (Device).
 *   **Power Up / Power Down:** Gestiona tu stake directamente desde la extensión.
 *   **Delegaciones:** Delega poder de voto a otros usuarios fácilmente.
 *   **Transferencias Masivas:** Envía fondos a múltiples destinatarios en una sola operación (ideal para airdrops o pagos recurrentes).
@@ -69,6 +71,13 @@ En Gravity, tu privacidad es sagrada:
 *   **Cero Rastreo:** No utilizamos Google Analytics ni scripts de seguimiento.
 *   **Cero Datos:** No recopilamos información personal. Tus claves son tuyas.
 *   **Open Source:** Todo el código es auditable por la comunidad.
+
+## 📄 Guía y Documentación
+
+- [Guía de Autenticación y 2FA](docs/AUTHENTICATION_GUIDE.md) | [English Version](docs/AUTHENTICATION_GUIDE.en.md)
+- [Guía del Mensajero](docs/MESSENGER_GUIDE.md) | [English Version](docs/MESSENGER_GUIDE.en.md)
+- [Verificación de Firma (Avanzado)](docs/SIGNATURE_VERIFICATION.md) | [FR](docs/SIGNATURE_VERIFICATION.fr.md) | [DE](docs/SIGNATURE_VERIFICATION.de.md) | [IT](docs/SIGNATURE_VERIFICATION.it.md)
+- [Guía de Instalación del Proyecto](docs/PROJECT_SETUP.md)
 
 ## 🤝 Contribuciones
 

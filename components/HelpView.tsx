@@ -75,7 +75,7 @@ export const HelpView: React.FC = () => {
 
             {/* Account Actions Section */}
             <section>
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Account Actions</h3>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">{t('help.section_actions')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {actionItems.map((item, idx) => (
                         <div key={idx} className="flex items-start gap-4 bg-dark-900/50 p-3 rounded-xl border border-dark-700/50 hover:border-dark-600 transition-colors">
@@ -93,7 +93,7 @@ export const HelpView: React.FC = () => {
 
             {/* Navigation Guide */}
             <section>
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Main Navigation</h3>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">{t('help.section_navigation')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {navItems.map((item, idx) => (
                         <div key={idx} className="flex items-start gap-4 bg-dark-900/50 p-3 rounded-xl border border-dark-700/50">
@@ -125,7 +125,7 @@ export const HelpView: React.FC = () => {
                             <span className="text-blue-400">ℹ</span> {t('help.chat_cost')}
                         </li>
                         <li className="flex gap-2">
-                            <span className="text-green-400">✓</span> Requires <strong>Memo Key</strong> (or Master Password) to read/write.
+                            <span className="text-green-400">✓</span> {t('help.chat_memo_required')}
                         </li>
                     </ul>
                 </div>
@@ -143,28 +143,27 @@ export const HelpView: React.FC = () => {
             <section className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-lg mt-6">
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                    Two-Factor Authentication
+                    {t('help.2fa_title')}
                 </h3>
 
                 <div className="space-y-6">
                     <div>
-                        <h4 className="font-bold text-sm text-blue-400 mb-2">Can I use multiple apps? (Aegis + Google Auth)</h4>
+                        <h4 className="font-bold text-sm text-blue-400 mb-2">{t('help.2fa_multi_app_question')}</h4>
                         <p className="text-xs text-slate-400 leading-relaxed mb-3">
-                            Yes! You can have the same code generated on multiple devices or apps simultaneously.
-                            To do this:
+                            {t('help.2fa_multi_app_answer')}
                         </p>
                         <ol className="list-decimal list-inside text-xs text-slate-300 space-y-2 ml-2">
-                            <li><span className="text-slate-400">Go to Settings &gt; Authenticator App to reveal the QR Code.</span></li>
-                            <li><span className="text-slate-400">Scan this <strong>same QR code</strong> with Aegis.</span></li>
-                            <li><span className="text-slate-400">Scan it <strong>again</strong> with Google Authenticator.</span></li>
-                            <li><span className="text-slate-400">Both apps will now generate identical codes that work for unlocking.</span></li>
+                            <li><span className="text-slate-400">{t('help.2fa_step1')}</span></li>
+                            <li><span className="text-slate-400">{t('help.2fa_step2')}</span></li>
+                            <li><span className="text-slate-400">{t('help.2fa_step3')}</span></li>
+                            <li><span className="text-slate-400">{t('help.2fa_step4')}</span></li>
                         </ol>
                     </div>
 
                     <div className="border-t border-dark-700 pt-4">
-                        <h4 className="font-bold text-sm text-purple-400 mb-2">Visual Guides</h4>
+                        <h4 className="font-bold text-sm text-purple-400 mb-2">{t('help.visual_guides')}</h4>
                         <p className="text-xs text-slate-400 mb-4">
-                            How to configure your wallet securely:
+                            {t('help.visual_guides_desc')}
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

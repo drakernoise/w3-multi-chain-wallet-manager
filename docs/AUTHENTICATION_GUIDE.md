@@ -9,7 +9,20 @@ La bóveda (Vault) de Gravity Wallet puede desbloquearse mediante:
 1.  **Contraseña Maestra:** Método tradicional de desencriptación.
 2.  **PIN de Seguridad (6 dígitos):** Método rápido para el día a día.
 3.  **Biometría (WebAuthn):** TouchID, FaceID o Windows Hello.
-4.  **Autenticador TOTP (Nuevo):** Aegis, Google Authenticator, Authy, etc.
+4.  **Autenticador TOTP:** Aegis, Google Authenticator, Authy, etc.
+5.  **Sin Contraseña (Google/Dispositivo):** ¡NUEVO! Regístrate y entra sin contraseña maestra usando tu cuenta de Google o llaves de hardware.
+
+---
+
+## 🚀 NUEVO: Flujo Sin Contraseña (Google & Device Key)
+
+A partir de la versión 1.0.6, puedes elegir inicializar tu billetera sin necesidad de una contraseña maestra.
+
+### Cómo funciona:
+- **Google Sign-In:** Utiliza Google OAuth para derivar una llave de encriptación segura para tu bóveda local.
+- **Device Key:** Utiliza el hardware local (TPM/Secure Enclave) para asegurar una llave maestra generada.
+
+Esto proporciona una experiencia de usuario similar a la "web2" manteniendo la seguridad no-custodia.
 
 ---
 
