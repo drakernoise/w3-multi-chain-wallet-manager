@@ -34,7 +34,7 @@ export interface WalletState {
   // encryptedMaster is now the marker that the wallet is initialized.
   // The actual keys are stored in the encrypted 'Vault'.
   encryptedMaster: boolean;
-  useGoogleAuth: boolean;
+  useDeviceAuth: boolean;
   useBiometrics: boolean;
   useTOTP?: boolean;
 }

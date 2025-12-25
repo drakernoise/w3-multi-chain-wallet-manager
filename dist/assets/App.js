@@ -1,5 +1,5 @@
 import { r as reactExports, j as jsxRuntimeExports } from './vendor.js';
-import { j as isBiometricsAvailable, k as getTOTPSecret, v as verifyTOTP, l as hasPinProtectedKey, m as initVaultWithGeneratedKey, n as loadInternalKeyWithPin, u as unlockVault, o as getInternalKey, r as registerBiometrics, p as initVault, q as hasTOTPConfigured, t as authenticateWithBiometrics, V as ViewState, C as Chain, w as generateSetup, x as saveTOTPSecret, y as enablePasswordless, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, z as broadcastSavingsDeposit, A as broadcastSavingsWithdraw, B as fetchAccountData, D as broadcastRCDelegate, E as broadcastRCUndelegate, F as broadcastBulkTransfer, G as validateUsername, H as validatePrivateKey, I as verifyKeyAgainstChain, J as validateAccountKeys, K as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, L as chatService, M as saveVault, N as fetchBalances, O as clearCryptoCache, P as getVault, Q as tryRestoreSession, R as detectWeb3Context, S as benchmarkNodes } from './chainService.js';
+import { j as isBiometricsAvailable, k as getTOTPSecret, v as verifyTOTP, l as hasPinProtectedKey, m as initVaultWithGeneratedKey, n as loadInternalKeyWithPin, u as unlockVault, o as getInternalKey, r as registerBiometrics, p as initVault, q as enablePasswordless, t as hasTOTPConfigured, w as authenticateWithBiometrics, V as ViewState, C as Chain, x as generateSetup, y as saveTOTPSecret, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, z as broadcastSavingsDeposit, A as broadcastSavingsWithdraw, B as fetchAccountData, D as broadcastRCDelegate, E as broadcastRCUndelegate, F as broadcastBulkTransfer, G as validateUsername, H as validatePrivateKey, I as verifyKeyAgainstChain, J as validateAccountKeys, K as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, L as chatService, M as saveVault, N as fetchBalances, O as clearCryptoCache, P as getVault, Q as tryRestoreSession, R as detectWeb3Context, S as benchmarkNodes } from './chainService.js';
 
 const calculatePasswordStrength = (password) => {
   let score = 0;
@@ -1719,10 +1719,14 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
         }
       }
       await initVault(password);
+      if (bioSuccess) {
+        await enablePasswordless([]);
+      }
       setWalletState((prev) => ({
         ...prev,
         encryptedMaster: true,
-        useBiometrics: bioSuccess
+        useBiometrics: bioSuccess,
+        useDeviceAuth: bioSuccess
       }));
       setIsLoading(false);
       onUnlock([]);
@@ -1760,7 +1764,7 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
       }
     } else {
       setIsLoading(false);
-      setError("No Google Auth data found. Try Password.");
+      setError("No Device Auth data found. Try Password.");
     }
   };
   const handleBiometricAuth = async () => {
@@ -1822,7 +1826,7 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
       setShowPinModal(false);
       try {
         const { vault } = await initVaultWithGeneratedKey(pinValue);
-        setWalletState((prev) => ({ ...prev, encryptedMaster: true, useGoogleAuth: true }));
+        setWalletState((prev) => ({ ...prev, encryptedMaster: true, useDeviceAuth: true }));
         onUnlock(vault.accounts);
       } catch (e) {
         setError("Failed to initialize PIN wallet.");
@@ -1854,7 +1858,7 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 relative overflow-hidden", children: [
     showPinModal && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 z-50 bg-dark-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-fade-in", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 p-6 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-sm", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-bold text-white mb-2 text-center", children: pinMode === "create" ? "Create Security PIN" : pinMode === "totp" ? "Authenticator Code" : "Enter Security PIN" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6 text-center", children: pinMode === "create" ? "Set a 6-digit PIN to encrypt your wallet key. You will need this to login with Google/Biometrics." : pinMode === "totp" ? "Enter the 6-digit code from your Aegis/Auth app." : "Enter your 6-digit PIN to decrypt your wallet." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6 text-center", children: pinMode === "create" ? "Set a 6-digit PIN to encrypt your wallet key. You will need this to login with Biometrics/Device Auth." : pinMode === "totp" ? "Enter the 6-digit code from your Aegis/Auth app." : "Enter your 6-digit PIN to decrypt your wallet." }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "input",
         {
@@ -6117,7 +6121,7 @@ function AppContent() {
   const [walletState, setWalletState] = reactExports.useState({
     accounts: [],
     encryptedMaster: false,
-    useGoogleAuth: false,
+    useDeviceAuth: false,
     useBiometrics: false
   });
   const [activeChain, setActiveChain] = reactExports.useState(Chain.HIVE);
@@ -6149,7 +6153,7 @@ function AppContent() {
           accounts: [],
           // Keys are encrypted
           encryptedMaster: true,
-          useGoogleAuth: false,
+          useDeviceAuth: false,
           useBiometrics: false
         }));
       }
@@ -6178,7 +6182,8 @@ function AppContent() {
               setWalletState((prev) => ({
                 ...prev,
                 encryptedMaster: result.walletConfig.encryptedMaster,
-                useGoogleAuth: result.walletConfig.useGoogleAuth,
+                useDeviceAuth: result.walletConfig.useDeviceAuth || result.walletConfig.useGoogleAuth,
+                // Migration
                 useBiometrics: result.walletConfig.useBiometrics,
                 useTOTP: result.walletConfig.useTOTP
               }));
@@ -6198,7 +6203,7 @@ function AppContent() {
     if (isDataLoaded) {
       const config = {
         encryptedMaster: walletState.encryptedMaster,
-        useGoogleAuth: walletState.useGoogleAuth,
+        useDeviceAuth: walletState.useDeviceAuth,
         useBiometrics: walletState.useBiometrics,
         useTOTP: walletState.useTOTP
       };
@@ -6206,7 +6211,7 @@ function AppContent() {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useDeviceAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
   reactExports.useEffect(() => {
     if (!isLocked && needsSave && walletState.encryptedMaster) {
       const vault = { accounts: walletState.accounts, lastUpdated: Date.now() };

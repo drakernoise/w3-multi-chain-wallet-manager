@@ -45,7 +45,7 @@ class ChatService {
         if (this.socket) return;
 
         // Connect to production server on Render
-        const BACKEND_URL = 'https://gravity-chat-serve.onrender.com';
+        const BACKEND_URL = 'https://gravity-chat-server.onrender.com';
         this.socket = io(BACKEND_URL);
 
         this.socket.on('connect', () => {

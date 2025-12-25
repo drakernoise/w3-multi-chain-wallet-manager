@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { WalletState } from '../types';
 import { authenticateWithBiometrics, registerBiometrics, isBiometricsAvailable } from '../services/authService';
-import { initVault, initVaultWithGeneratedKey, unlockVault, getInternalKey, hasPinProtectedKey, loadInternalKeyWithPin } from '../services/cryptoService';
+import { initVault, initVaultWithGeneratedKey, unlockVault, getInternalKey, hasPinProtectedKey, loadInternalKeyWithPin, enablePasswordless } from '../services/cryptoService';
 import { verifyTOTP, hasTOTPConfigured, getTOTPSecret } from '../services/totpService';
 import { calculatePasswordStrength, getStrengthLabel } from '../utils/passwordStrength';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -77,10 +77,15 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
       await initVault(password);
 
+      if (bioSuccess) {
+        await enablePasswordless([]); // Initialize device key storage
+      }
+
       setWalletState(prev => ({
         ...prev,
         encryptedMaster: true,
-        useBiometrics: bioSuccess
+        useBiometrics: bioSuccess,
+        useDeviceAuth: bioSuccess
       }));
 
       setIsLoading(false);
@@ -127,7 +132,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
       }
     } else {
       setIsLoading(false);
-      setError("No Google Auth data found. Try Password.");
+      setError("No Device Auth data found. Try Password.");
     }
   };
 
@@ -206,7 +211,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
       try {
         const { vault } = await initVaultWithGeneratedKey(pinValue);
-        setWalletState(prev => ({ ...prev, encryptedMaster: true, useGoogleAuth: true }));
+        setWalletState(prev => ({ ...prev, encryptedMaster: true, useDeviceAuth: true }));
         onUnlock(vault.accounts);
       } catch (e) {
         setError("Failed to initialize PIN wallet.");
@@ -251,7 +256,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
             </h3>
             <p className="text-xs text-slate-400 mb-6 text-center">
               {pinMode === 'create'
-                ? 'Set a 6-digit PIN to encrypt your wallet key. You will need this to login with Google/Biometrics.'
+                ? 'Set a 6-digit PIN to encrypt your wallet key. You will need this to login with Biometrics/Device Auth.'
                 : pinMode === 'totp' ? 'Enter the 6-digit code from your Aegis/Auth app.' : 'Enter your 6-digit PIN to decrypt your wallet.'}
             </p>
 

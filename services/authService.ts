@@ -1,12 +1,8 @@
-// Mock service for Google Identity API
-export const authenticateWithGoogle = async (): Promise<{ id: string, email: string } | null> => {
+// Service for Device and Biometric Authentication
+export const authenticateWithDevice = async (): Promise<{ id: string } | null> => {
   return new Promise((resolve) => {
-    // Simulate network delay
     setTimeout(() => {
-      resolve({
-        id: 'google_user_123',
-        email: 'user@example.com'
-      });
+      resolve({ id: 'device_user_123' });
     }, 1000);
   });
 };
@@ -34,34 +30,32 @@ export const registerBiometrics = async (): Promise<boolean> => {
     window.crypto.getRandomValues(challenge);
 
     const host = window.location.hostname || "";
+    // WebAuthn RP ID must be a valid domain. Extensions use chrome-extension://[ID]
+    // If the hostname is just the extension ID (usually 32 chars), it's not a valid RP ID.
+    const isValidDomain = host.includes('.') && host.length < 40;
+
     const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
       challenge,
       rp: {
         name: "Gravity Wallet",
-        id: (host === "localhost" || !host) ? undefined : host,
+        id: isValidDomain ? host : undefined,
       },
       user: {
-        id: new Uint8Array(16),
-        name: "wallet_owner",
+        id: window.crypto.getRandomValues(new Uint8Array(16)),
+        name: "gravity_user_" + Math.floor(Math.random() * 10000),
         displayName: "Gravity Wallet Owner"
       },
       pubKeyCredParams: [
         { alg: -7, type: "public-key" },    // ES256
         { alg: -257, type: "public-key" },  // RS256
-        { alg: -35, type: "public-key" },   // ES384
-        { alg: -36, type: "public-key" },   // ES512
-        { alg: -37, type: "public-key" },   // PS256
-        { alg: -38, type: "public-key" },   // PS384
-        { alg: -39, type: "public-key" },   // PS512
         { alg: -8, type: "public-key" },    // Ed25519
       ],
       authenticatorSelection: {
         authenticatorAttachment: "platform",
         userVerification: "required",
-        residentKey: "preferred",
-        requireResidentKey: false
+        residentKey: "preferred"
       },
-      timeout: 60000,
+      timeout: 120000,
       attestation: "none"
     };
 

@@ -38,7 +38,7 @@ function AppContent() {
   const [walletState, setWalletState] = useState<WalletState>({
     accounts: [],
     encryptedMaster: false,
-    useGoogleAuth: false,
+    useDeviceAuth: false,
     useBiometrics: false
   });
 
@@ -80,7 +80,7 @@ function AppContent() {
           ...prev,
           accounts: [], // Keys are encrypted
           encryptedMaster: true,
-          useGoogleAuth: false,
+          useDeviceAuth: false,
           useBiometrics: false
         }));
       }
@@ -115,7 +115,7 @@ function AppContent() {
               setWalletState(prev => ({
                 ...prev,
                 encryptedMaster: result.walletConfig.encryptedMaster,
-                useGoogleAuth: result.walletConfig.useGoogleAuth,
+                useDeviceAuth: result.walletConfig.useDeviceAuth || result.walletConfig.useGoogleAuth, // Migration
                 useBiometrics: result.walletConfig.useBiometrics,
                 useTOTP: result.walletConfig.useTOTP
               }));
@@ -139,7 +139,7 @@ function AppContent() {
     if (isDataLoaded) {
       const config = {
         encryptedMaster: walletState.encryptedMaster,
-        useGoogleAuth: walletState.useGoogleAuth,
+        useDeviceAuth: walletState.useDeviceAuth,
         useBiometrics: walletState.useBiometrics,
         useTOTP: walletState.useTOTP
       };
@@ -147,7 +147,7 @@ function AppContent() {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useDeviceAuth, walletState.useBiometrics, walletState.useTOTP, isDataLoaded]);
 
   // 3. Save Vault when accounts change
   useEffect(() => {

@@ -797,15 +797,16 @@ const registerBiometrics = async () => {
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
     const host = window.location.hostname || "";
+    const isValidDomain = host.includes(".") && host.length < 40;
     const publicKeyCredentialCreationOptions = {
       challenge,
       rp: {
         name: "Gravity Wallet",
-        id: host === "localhost" || !host ? void 0 : host
+        id: isValidDomain ? host : void 0
       },
       user: {
-        id: new Uint8Array(16),
-        name: "wallet_owner",
+        id: window.crypto.getRandomValues(new Uint8Array(16)),
+        name: "gravity_user_" + Math.floor(Math.random() * 1e4),
         displayName: "Gravity Wallet Owner"
       },
       pubKeyCredParams: [
@@ -813,26 +814,15 @@ const registerBiometrics = async () => {
         // ES256
         { alg: -257, type: "public-key" },
         // RS256
-        { alg: -35, type: "public-key" },
-        // ES384
-        { alg: -36, type: "public-key" },
-        // ES512
-        { alg: -37, type: "public-key" },
-        // PS256
-        { alg: -38, type: "public-key" },
-        // PS384
-        { alg: -39, type: "public-key" },
-        // PS512
         { alg: -8, type: "public-key" }
         // Ed25519
       ],
       authenticatorSelection: {
         authenticatorAttachment: "platform",
         userVerification: "required",
-        residentKey: "preferred",
-        requireResidentKey: false
+        residentKey: "preferred"
       },
-      timeout: 6e4,
+      timeout: 12e4,
       attestation: "none"
     };
     const credential = await navigator.credentials.create({
@@ -1258,7 +1248,7 @@ class ChatService {
   }
   init() {
     if (this.socket) return;
-    const BACKEND_URL = "https://gravity-chat-serve.onrender.com";
+    const BACKEND_URL = "https://gravity-chat-server.onrender.com";
     this.socket = lookup(BACKEND_URL);
     this.socket.on("connect", () => {
       console.log("Connected to Chat Server");
@@ -1401,4 +1391,4 @@ class ChatService {
 }
 const chatService = new ChatService();
 
-export { broadcastSavingsWithdraw as A, fetchAccountData as B, Chain as C, broadcastRCDelegate as D, broadcastRCUndelegate as E, broadcastBulkTransfer as F, validateUsername as G, validatePrivateKey as H, verifyKeyAgainstChain as I, validateAccountKeys as J, fetchAccountHistory as K, chatService as L, saveVault as M, fetchBalances as N, clearCryptoCache as O, getVault as P, tryRestoreSession as Q, detectWeb3Context as R, benchmarkNodes as S, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, isBiometricsAvailable as j, getTOTPSecret as k, hasPinProtectedKey as l, initVaultWithGeneratedKey as m, loadInternalKeyWithPin as n, getInternalKey as o, initVault as p, hasTOTPConfigured as q, registerBiometrics as r, signMessage as s, authenticateWithBiometrics as t, unlockVault as u, verifyTOTP as v, generateSetup as w, saveTOTPSecret as x, enablePasswordless as y, broadcastSavingsDeposit as z };
+export { broadcastSavingsWithdraw as A, fetchAccountData as B, Chain as C, broadcastRCDelegate as D, broadcastRCUndelegate as E, broadcastBulkTransfer as F, validateUsername as G, validatePrivateKey as H, verifyKeyAgainstChain as I, validateAccountKeys as J, fetchAccountHistory as K, chatService as L, saveVault as M, fetchBalances as N, clearCryptoCache as O, getVault as P, tryRestoreSession as Q, detectWeb3Context as R, benchmarkNodes as S, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, isBiometricsAvailable as j, getTOTPSecret as k, hasPinProtectedKey as l, initVaultWithGeneratedKey as m, loadInternalKeyWithPin as n, getInternalKey as o, initVault as p, enablePasswordless as q, registerBiometrics as r, signMessage as s, hasTOTPConfigured as t, unlockVault as u, verifyTOTP as v, authenticateWithBiometrics as w, generateSetup as x, saveTOTPSecret as y, broadcastSavingsDeposit as z };
