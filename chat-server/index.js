@@ -79,18 +79,41 @@ io.on('connection', (socket) => {
         const { username, publicKey, existingId } = data;
 
         // If trying to restore an existing session
-        if (existingId && users[existingId]) {
-            // Validation: In real app, challenge with signature using publicKey
-            // For MVP: Trust ID if it matches
+        if (existingId) {
             const user = users[existingId];
-            socket.user = user;
-            connectedSockets[socket.id] = user.id;
-            socket.emit('auth_success', {
-                id: user.id,
-                username: user.username,
-                rooms: getAvailableRooms(user.id)
-            });
-            return;
+            if (user) {
+                socket.user = user;
+                connectedSockets[socket.id] = user.id;
+                socket.emit('auth_success', {
+                    id: user.id,
+                    username: user.username,
+                    rooms: getAvailableRooms(user.id)
+                });
+                return;
+            } else if (username) {
+                // If ID is provided but user record is lost, check if the username matches the ID in usernames map
+                const storedId = usernames[username.toLowerCase()];
+                if (storedId === existingId) {
+                    console.log(`Recovering user record for ${username}`);
+                    // Re-create the user record
+                    const newUser = {
+                        id: existingId,
+                        username,
+                        publicKey,
+                        rooms: ['global-lobby']
+                    };
+                    users[existingId] = newUser;
+                    saveData();
+                    socket.user = newUser;
+                    connectedSockets[socket.id] = existingId;
+                    socket.emit('auth_success', {
+                        id: existingId,
+                        username,
+                        rooms: getAvailableRooms(existingId)
+                    });
+                    return;
+                }
+            }
         }
 
         // Helper: Validate username
@@ -98,8 +121,10 @@ io.on('connection', (socket) => {
             socket.emit('error', 'Username too short');
             return;
         }
-        if (usernames[username.toLowerCase()]) {
-            socket.emit('error', 'Username already taken');
+
+        const existingStoredId = usernames[username.toLowerCase()];
+        if (existingStoredId && existingStoredId !== existingId) {
+            socket.emit('error', 'Username already taken by another user');
             return;
         }
 

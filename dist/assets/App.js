@@ -5810,6 +5810,18 @@ const ChatView = ({ onClose }) => {
     chatService.onStatusChange = (status, errMsg) => {
       setSocketStatus(status);
       if (errMsg) setLastError(errMsg);
+      if (errMsg && (errMsg.includes("taken") || errMsg.includes("expired"))) {
+        setIsRegistering(false);
+      }
+    };
+    chatService.onRoomAdded = (room) => {
+      if (room.type === "dm" || room.type === "private") {
+        setNotification({
+          msg: `You were invited to ${room.name}`,
+          type: "success"
+        });
+        setTimeout(() => setNotification(null), 5e3);
+      }
     };
     chatService.onRoomUpdated = (updatedRooms) => {
       setRooms(updatedRooms);
@@ -5951,7 +5963,20 @@ const ChatView = ({ onClose }) => {
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-8 h-8", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" }) }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-2xl font-bold mb-2", children: "Gravity Chat" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-slate-400 text-sm mb-6", children: "Create a unique username to join the community. This ID is separate from your wallets." }),
-      regError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-red-500/10 text-red-400 text-xs p-3 rounded-lg mb-4 border border-red-500/20", children: regError }),
+      regError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-red-500/10 text-red-400 text-xs p-3 rounded-lg mb-4 border border-red-500/20 flex flex-col gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: regError }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => {
+              chatService.logout();
+              window.location.reload();
+            },
+            className: "bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 px-3 py-1.5 rounded text-[9px] font-black uppercase self-center transition-colors",
+            children: "Clear Stalled Identity"
+          }
+        )
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "input",
         {

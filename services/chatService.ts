@@ -34,6 +34,7 @@ class ChatService {
     // Callbacks for UI updates
     public onMessage: ((roomId: string, message: ChatMessage) => void) | null = null;
     public onRoomUpdated: ((rooms: ChatRoom[]) => void) | null = null;
+    public onRoomAdded: ((room: ChatRoom) => void) | null = null;
     public onAuthSuccess: ((user: ChatUser) => void) | null = null;
     public onError: ((err: string) => void) | null = null;
     public onStatusChange: ((status: string, errMsg?: string) => void) | null = null;
@@ -114,12 +115,14 @@ class ChatService {
             // Check if exists
             if (this.rooms.find(r => r.id === roomData.id)) return;
 
-            this.rooms.push({
+            const newRoom = {
                 ...roomData,
                 messages: [],
                 unreadCount: 0
-            });
+            };
+            this.rooms.push(newRoom);
             if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+            if (this.onRoomAdded) this.onRoomAdded(newRoom);
         });
 
         this.socket.on('room_removed', (roomId: string) => {
@@ -210,6 +213,17 @@ class ChatService {
     public getCurrentUser(): ChatUser | null {
         if (this.userId && this.username) return { id: this.userId, username: this.username };
         return null;
+    }
+
+    public logout() {
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+            chrome.storage.local.remove(['gravity_chat_id', 'gravity_chat_username']);
+        }
+        this.userId = null;
+        this.username = null;
+        this.rooms = [];
+        this.socket?.disconnect();
+        this.socket = null;
     }
 
     private saveIdentity(id: string, username: string) {

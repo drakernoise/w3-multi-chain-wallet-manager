@@ -1254,6 +1254,7 @@ class ChatService {
   // Callbacks for UI updates
   onMessage = null;
   onRoomUpdated = null;
+  onRoomAdded = null;
   onAuthSuccess = null;
   onError = null;
   onStatusChange = null;
@@ -1315,12 +1316,14 @@ class ChatService {
     });
     this.socket.on("room_added", (roomData) => {
       if (this.rooms.find((r) => r.id === roomData.id)) return;
-      this.rooms.push({
+      const newRoom = {
         ...roomData,
         messages: [],
         unreadCount: 0
-      });
+      };
+      this.rooms.push(newRoom);
       if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+      if (this.onRoomAdded) this.onRoomAdded(newRoom);
     });
     this.socket.on("room_removed", (roomId) => {
       this.rooms = this.rooms.filter((r) => r.id !== roomId);
@@ -1388,6 +1391,16 @@ class ChatService {
   getCurrentUser() {
     if (this.userId && this.username) return { id: this.userId, username: this.username };
     return null;
+  }
+  logout() {
+    if (typeof chrome !== "undefined" && chrome.storage) {
+      chrome.storage.local.remove(["gravity_chat_id", "gravity_chat_username"]);
+    }
+    this.userId = null;
+    this.username = null;
+    this.rooms = [];
+    this.socket?.disconnect();
+    this.socket = null;
   }
   saveIdentity(id, username) {
     if (typeof chrome !== "undefined" && chrome.storage) {

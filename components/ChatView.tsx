@@ -60,6 +60,20 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         chatService.onStatusChange = (status, errMsg) => {
             setSocketStatus(status as any);
             if (errMsg) setLastError(errMsg);
+            // If the server explicitly says "Username already taken" or "Session expired", we should allow the user to see the Choose Username screen
+            if (errMsg && (errMsg.includes('taken') || errMsg.includes('expired'))) {
+                setIsRegistering(false);
+            }
+        };
+
+        chatService.onRoomAdded = (room) => {
+            if (room.type === 'dm' || room.type === 'private') {
+                setNotification({
+                    msg: `You were invited to ${room.name}`,
+                    type: 'success'
+                });
+                setTimeout(() => setNotification(null), 5000);
+            }
         };
 
         chatService.onRoomUpdated = (updatedRooms) => {
@@ -233,8 +247,14 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <p className="text-slate-400 text-sm mb-6">Create a unique username to join the community. This ID is separate from your wallets.</p>
 
                     {regError && (
-                        <div className="bg-red-500/10 text-red-400 text-xs p-3 rounded-lg mb-4 border border-red-500/20">
-                            {regError}
+                        <div className="bg-red-500/10 text-red-400 text-xs p-3 rounded-lg mb-4 border border-red-500/20 flex flex-col gap-2">
+                            <span>{regError}</span>
+                            <button
+                                onClick={() => { chatService.logout(); window.location.reload(); }}
+                                className="bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 px-3 py-1.5 rounded text-[9px] font-black uppercase self-center transition-colors"
+                            >
+                                Clear Stalled Identity
+                            </button>
                         </div>
                     )}
 
