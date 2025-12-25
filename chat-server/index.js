@@ -322,6 +322,30 @@ io.on('connection', (socket) => {
                 // ... orphan cleanup logic ...
                 delete usernames[cleanUsername.toLowerCase()];
             } else {
+                // IDEMPOTENCY CHECK: Is it the same person trying to register again?
+                const existingUser = users[existingStoredId];
+                if (existingUser.publicKey === publicKey) {
+                    // It's the same key pair! Allow re-attach.
+                    console.log(`Idempotent register for ${username}. Recovering existing user.`);
+                    socket.user = existingUser;
+                    connectedSockets[socket.id] = existingStoredId;
+
+                    const roomList = getAvailableRooms(existingStoredId);
+                    socket.emit('auth_success', {
+                        id: existingStoredId,
+                        username: existingUser.username,
+                        rooms: roomList
+                    });
+
+                    // Join rooms
+                    roomList.forEach(r => {
+                        socket.join(r.id);
+                        // Notify online status
+                        socket.to(r.id).emit('user_online', existingStoredId);
+                    });
+                    return;
+                }
+
                 socket.emit('error', 'Username already taken by another user');
                 return;
             }
