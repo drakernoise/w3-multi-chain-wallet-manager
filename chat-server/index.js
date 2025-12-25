@@ -106,6 +106,11 @@ ${publicKeyBuffer.toString('base64')}
     }
 }
 
+// Helper: Generate random challenge for authentication
+function generateChallenge() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
