@@ -51,7 +51,6 @@ export const registerBiometrics = async (): Promise<boolean> => {
         { alg: -8, type: "public-key" },    // Ed25519
       ],
       authenticatorSelection: {
-        authenticatorAttachment: "platform",
         userVerification: "required",
         residentKey: "preferred"
       },

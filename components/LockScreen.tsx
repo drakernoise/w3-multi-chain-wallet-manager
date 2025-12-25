@@ -53,8 +53,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
   const handlePasswordSubmit = async () => {
     if (isFirstRun) {
-      if (password.length < 8) {
-        setError(t('lock.error_length'));
+      if (password.length < 10) {
+        setError("Password must be at least 10 characters long.");
+        return;
+      }
+      const strength = calculatePasswordStrength(password);
+      if (strength < 3) {
+        setError("Password is too weak. Please include uppercase, numbers, and symbols.");
         return;
       }
       if (password !== confirmPassword) {
@@ -342,6 +347,25 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
           )}
 
           {isFirstRun && (
+            <div className="bg-dark-900/50 border border-dark-700/50 rounded-xl p-3 mb-2 space-y-2">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Requirements</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                {[
+                  { label: "10+ Characters", met: password.length >= 10 },
+                  { label: "One Uppercase", met: /[A-Z]/.test(password) },
+                  { label: "One Number", met: /[0-9]/.test(password) },
+                  { label: "One Symbol", met: /[^A-Za-z0-9]/.test(password) }
+                ].map((req, i) => (
+                  <div key={i} className={`flex items-center gap-1.5 transition-colors ${req.met ? 'text-green-400' : 'text-slate-600'}`}>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={req.met ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} /></svg>
+                    <span className="text-[9px] font-medium leading-none">{req.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isFirstRun && (
             <input
               type="password"
               placeholder="Confirm Password"
@@ -369,8 +393,8 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
           <button
             onClick={handlePasswordSubmit}
-            disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading || (isFirstRun && (password.length < 10 || calculatePasswordStrength(password) < 3 || password !== confirmPassword))}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed"
           >
             {isLoading ? t('lock.processing') : (isFirstRun ? t('lock.create_btn') : t('lock.unlock_btn'))}
           </button>

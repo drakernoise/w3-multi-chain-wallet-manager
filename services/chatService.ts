@@ -36,6 +36,7 @@ class ChatService {
     public onRoomUpdated: ((rooms: ChatRoom[]) => void) | null = null;
     public onAuthSuccess: ((user: ChatUser) => void) | null = null;
     public onError: ((err: string) => void) | null = null;
+    public onStatusChange: ((status: string) => void) | null = null;
 
     private rooms: ChatRoom[] = [];
 
@@ -46,11 +47,25 @@ class ChatService {
 
         // Connect to production server on Render
         const BACKEND_URL = 'https://gravity-chat-server.onrender.com';
-        this.socket = io(BACKEND_URL);
+        this.socket = io(BACKEND_URL, {
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 5,
+            timeout: 20000
+        });
 
         this.socket.on('connect', () => {
             console.log('Connected to Chat Server');
+            if (this.onStatusChange) this.onStatusChange('connected');
             this.tryAutoLogin();
+        });
+
+        this.socket.on('disconnect', () => {
+            if (this.onStatusChange) this.onStatusChange('disconnected');
+        });
+
+        this.socket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err);
+            if (this.onStatusChange) this.onStatusChange('disconnected');
         });
 
         this.socket.on('auth_success', (data: any) => {

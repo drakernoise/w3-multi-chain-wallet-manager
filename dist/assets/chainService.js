@@ -818,7 +818,6 @@ const registerBiometrics = async () => {
         // Ed25519
       ],
       authenticatorSelection: {
-        authenticatorAttachment: "platform",
         userVerification: "required",
         residentKey: "preferred"
       },
@@ -1243,16 +1242,29 @@ class ChatService {
   onRoomUpdated = null;
   onAuthSuccess = null;
   onError = null;
+  onStatusChange = null;
   rooms = [];
   constructor() {
   }
   init() {
     if (this.socket) return;
     const BACKEND_URL = "https://gravity-chat-server.onrender.com";
-    this.socket = lookup(BACKEND_URL);
+    this.socket = lookup(BACKEND_URL, {
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 5,
+      timeout: 2e4
+    });
     this.socket.on("connect", () => {
       console.log("Connected to Chat Server");
+      if (this.onStatusChange) this.onStatusChange("connected");
       this.tryAutoLogin();
+    });
+    this.socket.on("disconnect", () => {
+      if (this.onStatusChange) this.onStatusChange("disconnected");
+    });
+    this.socket.on("connect_error", (err) => {
+      console.error("Socket connection error:", err);
+      if (this.onStatusChange) this.onStatusChange("disconnected");
     });
     this.socket.on("auth_success", (data) => {
       this.userId = data.id;

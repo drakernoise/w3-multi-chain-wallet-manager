@@ -55,6 +55,10 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             setSocketStatus('authenticated');
         };
 
+        chatService.onStatusChange = (status) => {
+            setSocketStatus(status as any);
+        };
+
         chatService.onRoomUpdated = (updatedRooms) => {
             setRooms(updatedRooms);
         };
@@ -183,12 +187,32 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         setSearchResults([]);
     };
 
-    // --- Render: Loading State ---
-    if (!user && socketStatus === 'connecting') {
+    // --- Render: Loading & Error States ---
+    if (!user && (socketStatus === 'connecting' || socketStatus === 'disconnected')) {
         return (
-            <div className="flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6">
-                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-slate-400 animate-pulse font-medium">Connecting to Gravity Chat...</p>
+            <div className="flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6 text-center">
+                {socketStatus === 'connecting' ? (
+                    <>
+                        <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p className="text-slate-400 animate-pulse font-medium">Connecting to Gravity Chat...</p>
+                        <p className="text-[10px] text-slate-600 mt-2 max-w-[200px]">The server might be waking up (this can take up to 30 seconds on free instances).</p>
+                    </>
+                ) : (
+                    <>
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 text-red-500">
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        </div>
+                        <p className="text-red-400 font-bold mb-1">Connection Failed</p>
+                        <p className="text-[10px] text-slate-500 mb-6">Could not reach the chat server.</p>
+                        <button
+                            onClick={() => { setSocketStatus('connecting'); chatService.init(); }}
+                            className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-xl font-bold transition-all active:scale-95 mb-4"
+                        >
+                            Retry Connection
+                        </button>
+                    </>
+                )}
+                <button onClick={onClose} className="text-slate-600 text-xs hover:text-white transition-colors mt-2 underline">Return to Wallet</button>
             </div>
         );
     }

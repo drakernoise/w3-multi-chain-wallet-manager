@@ -1698,8 +1698,13 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
   }, [pinValue, pinMode]);
   const handlePasswordSubmit = async () => {
     if (isFirstRun) {
-      if (password.length < 8) {
-        setError(t("lock.error_length"));
+      if (password.length < 10) {
+        setError("Password must be at least 10 characters long.");
+        return;
+      }
+      const strength = calculatePasswordStrength(password);
+      if (strength < 3) {
+        setError("Password is too weak. Please include uppercase, numbers, and symbols.");
         return;
       }
       if (password !== confirmPassword) {
@@ -1933,6 +1938,18 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `${getStrengthLabel(calculatePasswordStrength(password)).color.replace("bg-", "text-")} font-bold uppercase`, children: getStrengthLabel(calculatePasswordStrength(password)).label })
           ] })
         ] }),
+        isFirstRun && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900/50 border border-dark-700/50 rounded-xl p-3 mb-2 space-y-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1", children: "Requirements" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-x-4 gap-y-1", children: [
+            { label: "10+ Characters", met: password.length >= 10 },
+            { label: "One Uppercase", met: /[A-Z]/.test(password) },
+            { label: "One Number", met: /[0-9]/.test(password) },
+            { label: "One Symbol", met: /[^A-Za-z0-9]/.test(password) }
+          ].map((req, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `flex items-center gap-1.5 transition-colors ${req.met ? "text-green-400" : "text-slate-600"}`, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 3, d: req.met ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12" }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[9px] font-medium leading-none", children: req.label })
+          ] }, i)) })
+        ] }),
         isFirstRun && /* @__PURE__ */ jsxRuntimeExports.jsx(
           "input",
           {
@@ -1961,8 +1978,8 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
           "button",
           {
             onClick: handlePasswordSubmit,
-            disabled: isLoading,
-            className: "w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed",
+            disabled: isLoading || isFirstRun && (password.length < 10 || calculatePasswordStrength(password) < 3 || password !== confirmPassword),
+            className: "w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors shadow-lg disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed",
             children: isLoading ? t("lock.processing") : isFirstRun ? t("lock.create_btn") : t("lock.unlock_btn")
           }
         )
@@ -5698,6 +5715,9 @@ const ChatView = ({ onClose }) => {
       setIsRegistering(false);
       setSocketStatus("authenticated");
     };
+    chatService.onStatusChange = (status) => {
+      setSocketStatus(status);
+    };
     chatService.onRoomUpdated = (updatedRooms) => {
       setRooms(updatedRooms);
     };
@@ -5806,10 +5826,29 @@ const ChatView = ({ onClose }) => {
     setSearchQuery("");
     setSearchResults([]);
   };
-  if (!user && socketStatus === "connecting") {
-    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-slate-400 animate-pulse font-medium", children: "Connecting to Gravity Chat..." })
+  if (!user && (socketStatus === "connecting" || socketStatus === "disconnected")) {
+    return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6 text-center", children: [
+      socketStatus === "connecting" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-slate-400 animate-pulse font-medium", children: "Connecting to Gravity Chat..." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-600 mt-2 max-w-[200px]", children: "The server might be waking up (this can take up to 30 seconds on free instances)." })
+      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 text-red-500", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-8 h-8", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" }) }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-400 font-bold mb-1", children: "Connection Failed" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 mb-6", children: "Could not reach the chat server." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => {
+              setSocketStatus("connecting");
+              chatService.init();
+            },
+            className: "bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-xl font-bold transition-all active:scale-95 mb-4",
+            children: "Retry Connection"
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-600 text-xs hover:text-white transition-colors mt-2 underline", children: "Return to Wallet" })
     ] });
   }
   if (!user) {
