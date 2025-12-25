@@ -62,33 +62,12 @@ class ChatService {
             // Auto-Login Logic with Cryptographic Signature
             const storedUser = localStorage.getItem('gravity_chat_username');
             const storedKey = localStorage.getItem('gravity_chat_priv');
+            const storedId = localStorage.getItem('gravity_chat_id');
 
             if (storedUser && storedKey) {
                 console.log('Auto-logging in as', storedUser);
-                try {
-                    // Try to authenticate using the stored key
-                    // Note: The server needs to know WHO we are first to issue a challenge.
-                    // If we just connected, the server knows nothing.
-                    // We must initiate a handshake. 
-                    // However, 'register' with existing username might trigger 'User exists',
-                    // BUT our current server implementation of 'register' checks if username is taken.
-                    // Improved Flow: Send 'recover_session' or simply re-register with Public Key check?
-                    // Given current server logic:
-                    // Server expects 'register' -> if taken -> error?
-                    // Wait, server logic for existing user:
-                    // If we send { userId } it tries to restore.
-
-                    const storedId = localStorage.getItem('gravity_chat_id');
-                    if (storedId) {
-                        // Authenticate with Signature Flow
-                        await this.authenticateWithSignature(storedId, storedKey);
-                    } else {
-                        // Fallback: Re-register (might fail if taken)
-                        console.warn("No ID found, cannot auto-login securely.");
-                    }
-                } catch (e) {
-                    console.error("Auto-login failed", e);
-                }
+                // Attempt authentication. If we have ID, use it. If not, use Username (Recovery).
+                await this.authenticateWithSignature(storedId, storedUser);
             }
         });
 
@@ -232,11 +211,11 @@ class ChatService {
         return { publicKey: publicKeyHex, privateKey: privateKeyHex };
     }
 
-    public async authenticateWithSignature(userId: string, _privateKeyHex?: string): Promise<void> {
+    public async authenticateWithSignature(userId?: string | null, username?: string | null): Promise<void> {
         if (!this.socket) return;
         // Trigger server to send challenge. 
-        // Note: The actual signing happens in the 'auth_challenge' listener using the stored key.
-        this.socket.emit('request_challenge', { userId });
+        // We can now request by ID or by Username (for recovery)
+        this.socket.emit('request_challenge', { userId, username });
     }
 
     private async signChallenge(challenge: string, privateKeyHex: string): Promise<string> {
@@ -286,12 +265,11 @@ class ChatService {
 
         const storedUser = this.getStoredUsername();
         const storedKey = this.getStoredPrivateKey();
-        const storedId = localStorage.getItem('gravity_chat_id');
 
         // FIXED: If we already have keys for this username, don't register, just LOGIN
-        if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey && storedId) {
-            console.log("Identity found for this user, attempting secure login instead of register...");
-            return this.authenticateWithSignature(storedId, storedKey);
+        if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
+            console.log("Local keys found, performing cryptographic login recovery...");
+            return this.authenticateWithSignature(null, username);
         }
 
         // Generate new keys for BRAND NEW registration

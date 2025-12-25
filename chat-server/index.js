@@ -96,8 +96,15 @@ io.on('connection', (socket) => {
 
     // --- 0. Challenge-Response Authentication (Optional Enhanced Security) ---
     socket.on('request_challenge', (data) => {
-        const { userId } = data;
-        const user = users[userId];
+        const { userId, username } = data;
+        let user;
+
+        if (userId) {
+            user = users[userId];
+        } else if (username) {
+            const id = usernames[username.toLowerCase()];
+            if (id) user = users[id];
+        }
 
         if (!user || !user.publicKey) {
             socket.emit('error', 'User not found or no public key registered');
@@ -107,7 +114,7 @@ io.on('connection', (socket) => {
         const challenge = generateChallenge();
         authChallenges[socket.id] = {
             challenge,
-            userId,
+            userId: user.id,
             timestamp: Date.now()
         };
 

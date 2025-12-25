@@ -1258,18 +1258,10 @@ class ChatService {
       window.dispatchEvent(new Event("chat-connected"));
       const storedUser = localStorage.getItem("gravity_chat_username");
       const storedKey = localStorage.getItem("gravity_chat_priv");
+      const storedId = localStorage.getItem("gravity_chat_id");
       if (storedUser && storedKey) {
         console.log("Auto-logging in as", storedUser);
-        try {
-          const storedId = localStorage.getItem("gravity_chat_id");
-          if (storedId) {
-            await this.authenticateWithSignature(storedId, storedKey);
-          } else {
-            console.warn("No ID found, cannot auto-login securely.");
-          }
-        } catch (e) {
-          console.error("Auto-login failed", e);
-        }
+        await this.authenticateWithSignature(storedId, storedUser);
       }
     });
     this.setupListeners();
@@ -1378,9 +1370,9 @@ class ChatService {
     localStorage.setItem("gravity_chat_pub", publicKeyHex);
     return { publicKey: publicKeyHex, privateKey: privateKeyHex };
   }
-  async authenticateWithSignature(userId, _privateKeyHex) {
+  async authenticateWithSignature(userId, username) {
     if (!this.socket) return;
-    this.socket.emit("request_challenge", { userId });
+    this.socket.emit("request_challenge", { userId, username });
   }
   async signChallenge(challenge, privateKeyHex) {
     const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
@@ -1422,10 +1414,9 @@ class ChatService {
     if (!this.socket) await this.init();
     const storedUser = this.getStoredUsername();
     const storedKey = this.getStoredPrivateKey();
-    const storedId = localStorage.getItem("gravity_chat_id");
-    if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey && storedId) {
-      console.log("Identity found for this user, attempting secure login instead of register...");
-      return this.authenticateWithSignature(storedId, storedKey);
+    if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
+      console.log("Local keys found, performing cryptographic login recovery...");
+      return this.authenticateWithSignature(null, username);
     }
     const keys = await this.generateAndSaveIdentity();
     localStorage.setItem("gravity_chat_username", username);
