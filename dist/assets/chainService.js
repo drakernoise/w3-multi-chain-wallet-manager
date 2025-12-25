@@ -1347,6 +1347,12 @@ class ChatService {
     });
     this.socket.on("error", (msg) => {
       console.error("Socket Error:", msg);
+      if (msg.includes("User not found") || msg.includes("no public key registered")) {
+        console.warn("Server identity lost. Clearing local chat identity.");
+        localStorage.removeItem("gravity_chat_id");
+        localStorage.removeItem("gravity_chat_priv");
+        localStorage.removeItem("gravity_chat_pub");
+      }
       if (this.onError) this.onError(msg);
     });
     this.socket.on("search_results", (results) => {

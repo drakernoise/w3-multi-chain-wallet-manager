@@ -50,6 +50,21 @@ function loadData() {
             const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
             users = data.users || {};
             usernames = data.usernames || {};
+
+            // --- INTEGRITY CHECK: Cleanup orphans ---
+            let cleaned = false;
+            for (const [name, id] of Object.entries(usernames)) {
+                if (!users[id]) {
+                    delete usernames[name];
+                    cleaned = true;
+                }
+            }
+            if (cleaned) {
+                console.log("🛠️ Server Integrity Check: Orphaned usernames removed.");
+                // saveData() is called later if needed, or explicitly here if changes need to be persisted immediately.
+                // For now, we'll let the next saveData() call handle it, or if a user registers.
+            }
+
             // Merge rooms with default global-lobby
             rooms = { ...rooms, ...(data.rooms || {}) };
             console.log('Loaded chat data from disk.');
@@ -103,7 +118,15 @@ io.on('connection', (socket) => {
             user = users[userId];
         } else if (username) {
             const id = usernames[username.toLowerCase()];
-            if (id) user = users[id];
+            if (id) {
+                user = users[id];
+                // SELF-HEALING: If ID exists in index but user object is gone
+                if (!user) {
+                    console.log(`Cleaning up orphaned username: ${username}`);
+                    delete usernames[username.toLowerCase()];
+                    saveData();
+                }
+            }
         }
 
         if (!user || !user.publicKey) {

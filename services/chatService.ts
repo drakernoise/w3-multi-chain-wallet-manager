@@ -179,6 +179,16 @@ class ChatService {
 
         this.socket.on('error', (msg: string) => {
             console.error("Socket Error:", msg);
+
+            // If identity is lost on server, clear local stale data so user can re-register
+            if (msg.includes('User not found') || msg.includes('no public key registered')) {
+                console.warn("Server identity lost. Clearing local chat identity.");
+                localStorage.removeItem('gravity_chat_id');
+                localStorage.removeItem('gravity_chat_priv');
+                localStorage.removeItem('gravity_chat_pub');
+                // Keep username for convenience
+            }
+
             if (this.onError) this.onError(msg);
         });
 
