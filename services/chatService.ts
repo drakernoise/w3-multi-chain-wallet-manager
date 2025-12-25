@@ -43,6 +43,7 @@ class ChatService {
 
     private rooms: ChatRoom[] = [];
     private serverUrl = 'https://gravity-chat-serve.onrender.com';
+    private roomUpdateDebounceTimer: any = null;
 
     public init() {
         if (this.socket?.connected) return;
@@ -147,7 +148,7 @@ class ChatService {
             // Notify UI
             if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
             if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
-            if (this.onRoomUpdated) this.onRoomUpdated(this.rooms);
+            this.notifyRoomUpdate(); // Use debounced update
         });
 
         // Chat Events
@@ -164,7 +165,7 @@ class ChatService {
                 // Only trigger update if this is the first time we're loading messages
                 // to avoid infinite loops from repeated room_history events
                 if (!hadMessages && data.messages.length > 0) {
-                    if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+                    this.notifyRoomUpdate();
                 }
             }
         });
@@ -175,7 +176,7 @@ class ChatService {
                 if (!room.memberDetails) room.memberDetails = [];
                 if (!room.memberDetails.find(u => u.id === data.userId)) {
                     room.memberDetails.push({ id: data.userId, username: data.username });
-                    if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+                    this.notifyRoomUpdate();
                 }
             }
         });
@@ -191,7 +192,7 @@ class ChatService {
             const newRoom = { ...roomData, messages: [], unreadCount: 0 };
             this.rooms.push(newRoom);
             console.log(`✅ Added room to local list. Total rooms: ${this.rooms.length}`);
-            if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+            this.notifyRoomUpdate();
             if (this.onRoomAdded) this.onRoomAdded(newRoom);
         });
 
@@ -200,13 +201,13 @@ class ChatService {
             // Merge
             const newRoom = { ...roomData, messages: [], unreadCount: 0 };
             this.rooms.push(newRoom);
-            if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+            this.notifyRoomUpdate();
             if (this.onRoomAdded) this.onRoomAdded(newRoom);
         });
 
         this.socket.on('room_removed', (roomId: string) => {
             this.rooms = this.rooms.filter(r => r.id !== roomId);
-            if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+            this.notifyRoomUpdate();
         });
 
         // Moderation
@@ -236,15 +237,26 @@ class ChatService {
                 localStorage.removeItem('gravity_chat_id');
                 localStorage.removeItem('gravity_chat_priv');
                 localStorage.removeItem('gravity_chat_pub');
-                // Keep username for convenience
+
+                // CRITICAL: Disconnect socket completely to clear server-side state
+                if (this.socket) {
+                    this.socket.disconnect();
+                    this.socket = null;
+                }
+                this.userId = null;
+                this.username = null;
+                this.rooms = [];
 
                 // AUTO-REPAIR: If we have a name, try to re-register as fresh user
                 if (storedName && !storedName.startsWith('!RESET!')) {
                     console.log(`Auto-repairing identity for ${storedName}...`);
-                    // Increased delay to ensure server cleanup is fully complete
+                    // Increased delay to ensure server cleanup is fully complete AND socket reconnects
                     setTimeout(() => {
-                        this.register(storedName).catch(console.error);
-                    }, 2000); // 2 seconds to allow server to persist reset
+                        this.init(); // Reconnect socket
+                        setTimeout(() => {
+                            this.register(storedName).catch(console.error);
+                        }, 500); // Additional delay after reconnect
+                    }, 2000);
                     return;
                 }
             }
@@ -317,6 +329,18 @@ class ChatService {
 
     private bufferToHex(buffer: Uint8Array): string {
         return Array.from(buffer).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Helper to debounce room updates and prevent infinite loops
+    private notifyRoomUpdate() {
+        if (this.roomUpdateDebounceTimer) {
+            clearTimeout(this.roomUpdateDebounceTimer);
+        }
+        this.roomUpdateDebounceTimer = setTimeout(() => {
+            if (this.onRoomUpdated) {
+                this.onRoomUpdated([...this.rooms]);
+            }
+        }, 100); // 100ms debounce
     }
 
     // --- PUBLIC METHODS ---

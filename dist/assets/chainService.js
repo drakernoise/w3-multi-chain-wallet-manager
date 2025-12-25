@@ -1244,6 +1244,7 @@ class ChatService {
   onStatusChange = null;
   rooms = [];
   serverUrl = "https://gravity-chat-serve.onrender.com";
+  roomUpdateDebounceTimer = null;
   init() {
     if (this.socket?.connected) return;
     this.socket = lookup(this.serverUrl, {
@@ -1319,7 +1320,7 @@ class ChatService {
       localStorage.setItem("gravity_chat_username", data.username);
       if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
       if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
-      if (this.onRoomUpdated) this.onRoomUpdated(this.rooms);
+      this.notifyRoomUpdate();
     });
     this.socket.on("new_message", (data) => {
       this.handleNewMessage(data.roomId, data.message);
@@ -1331,7 +1332,7 @@ class ChatService {
         room.messages = data.messages;
         room.memberDetails = data.memberDetails;
         if (!hadMessages && data.messages.length > 0) {
-          if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+          this.notifyRoomUpdate();
         }
       }
     });
@@ -1341,7 +1342,7 @@ class ChatService {
         if (!room.memberDetails) room.memberDetails = [];
         if (!room.memberDetails.find((u) => u.id === data.userId)) {
           room.memberDetails.push({ id: data.userId, username: data.username });
-          if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+          this.notifyRoomUpdate();
         }
       }
     });
@@ -1354,19 +1355,19 @@ class ChatService {
       const newRoom = { ...roomData, messages: [], unreadCount: 0 };
       this.rooms.push(newRoom);
       console.log(`✅ Added room to local list. Total rooms: ${this.rooms.length}`);
-      if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+      this.notifyRoomUpdate();
       if (this.onRoomAdded) this.onRoomAdded(newRoom);
     });
     this.socket.on("room_joined", (roomData) => {
       if (this.rooms.find((r) => r.id === roomData.id)) return;
       const newRoom = { ...roomData, messages: [], unreadCount: 0 };
       this.rooms.push(newRoom);
-      if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+      this.notifyRoomUpdate();
       if (this.onRoomAdded) this.onRoomAdded(newRoom);
     });
     this.socket.on("room_removed", (roomId) => {
       this.rooms = this.rooms.filter((r) => r.id !== roomId);
-      if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+      this.notifyRoomUpdate();
     });
     this.socket.on("user_kicked", (data) => {
       if (data.userId === this.userId) {
@@ -1388,10 +1389,20 @@ class ChatService {
         localStorage.removeItem("gravity_chat_id");
         localStorage.removeItem("gravity_chat_priv");
         localStorage.removeItem("gravity_chat_pub");
+        if (this.socket) {
+          this.socket.disconnect();
+          this.socket = null;
+        }
+        this.userId = null;
+        this.username = null;
+        this.rooms = [];
         if (storedName && !storedName.startsWith("!RESET!")) {
           console.log(`Auto-repairing identity for ${storedName}...`);
           setTimeout(() => {
-            this.register(storedName).catch(console.error);
+            this.init();
+            setTimeout(() => {
+              this.register(storedName).catch(console.error);
+            }, 500);
           }, 2e3);
           return;
         }
@@ -1450,6 +1461,17 @@ class ChatService {
   }
   bufferToHex(buffer) {
     return Array.from(buffer).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  // Helper to debounce room updates and prevent infinite loops
+  notifyRoomUpdate() {
+    if (this.roomUpdateDebounceTimer) {
+      clearTimeout(this.roomUpdateDebounceTimer);
+    }
+    this.roomUpdateDebounceTimer = setTimeout(() => {
+      if (this.onRoomUpdated) {
+        this.onRoomUpdated([...this.rooms]);
+      }
+    }, 100);
   }
   // --- PUBLIC METHODS ---
   createRoom(name, isPrivate = false) {
