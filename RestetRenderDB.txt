@@ -1,3 +1,5 @@
 curl -X POST "https://gravity-chat-serve.onrender.com/admin/reset?secret=gravity-admin-2024"
 
 Invoke-RestMethod -Method Post -Uri "https://gravity-chat-serve.onrender.com/admin/reset?secret=gravity-admin-2024"
+
+Invoke-RestMethod -Method Post -Uri "https://gravity-chat-serve.onrender.com/admin/delete_user?secret=gravity-admin-2024&username=usuario1,usuario2,usuario3"
