@@ -50,6 +50,52 @@ app.post('/admin/reset', (req, res) => {
     res.json({ success: true, message: 'Database reset successfully' });
 });
 
+// Admin endpoint to delete a specific user
+app.post('/admin/delete_user', (req, res) => {
+    const secret = req.query.secret || req.headers['x-admin-secret'];
+    const targetUsername = req.query.username;
+
+    if (secret !== 'gravity-admin-2024') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!targetUsername) {
+        return res.status(400).json({ error: 'Missing username parameter' });
+    }
+
+    const cleanName = targetUsername.toLowerCase();
+    const idToDelete = usernames[cleanName];
+
+    if (!idToDelete) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // DEEP CLEANUP Logic
+    Object.keys(rooms).forEach(roomId => {
+        const room = rooms[roomId];
+        // Remove from members
+        if (room.members) room.members = room.members.filter(m => m !== idToDelete);
+
+        // Remove from admins
+        if (room.admins) room.admins = room.admins.filter(a => a !== idToDelete);
+
+        // If owner, delete room (except global-lobby)
+        if (room.owner === idToDelete && roomId !== 'global-lobby') {
+            console.log(`Deleting orphan room ${roomId} owned by ${targetUsername}`);
+            delete rooms[roomId];
+            io.emit('room_removed', roomId);
+        }
+    });
+
+    delete users[idToDelete];
+    delete usernames[cleanName];
+    saveData();
+
+    console.log(`🔨 Admin deleted user: ${targetUsername}`);
+
+    res.json({ success: true, message: `User ${targetUsername} deleted successfully` });
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
