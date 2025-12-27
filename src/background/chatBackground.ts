@@ -110,7 +110,7 @@ async function initChatSocket() {
         console.log("BG Chat: Received challenge to sign");
         const signature = await signChallenge(challenge, creds.privateKey);
         if (signature && socket) {
-            socket.emit('verify_auth', { username: creds.username, signature });
+            socket.emit('verify_signature', { signature });
         }
     });
 
