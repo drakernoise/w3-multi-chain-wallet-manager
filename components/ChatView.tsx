@@ -115,6 +115,13 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         };
     }, []); // Empty deps - run ONCE
 
+    // Reset Badge on Mount
+    useEffect(() => {
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ type: 'CHAT_UI_OPENED' });
+        }
+    }, []);
+
     // Handle messages for active room
     useEffect(() => {
         chatService.onMessage = (roomId, msg) => {

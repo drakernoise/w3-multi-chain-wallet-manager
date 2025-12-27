@@ -1,7 +1,137 @@
 import { b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, i as isChainSupported, g as getChainConfig, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation } from './chainService.js';
-import './vendor.js';
+import { b as lookup } from './vendor.js';
+
+let socket = null;
+let unreadCount = 0;
+const SERVER_URL = "https://gravity-chat-serve.onrender.com";
+function hexToBuffer(hexString) {
+  if (!hexString) return new Uint8Array().buffer;
+  const bytes = new Uint8Array(hexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
+  return bytes.buffer;
+}
+async function signChallenge(challenge, privateKeyHex) {
+  try {
+    const privateKeyBuffer = hexToBuffer(privateKeyHex);
+    const privateKey = await self.crypto.subtle.importKey(
+      "pkcs8",
+      privateKeyBuffer,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"]
+    );
+    const encoder = new TextEncoder();
+    const data = encoder.encode(challenge);
+    const signature = await self.crypto.subtle.sign(
+      { name: "ECDSA", hash: { name: "SHA-256" } },
+      privateKey,
+      data
+    );
+    return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch (e) {
+    console.error("BG: Signing Failed", e);
+    return null;
+  }
+}
+function updateBadge() {
+  const text = unreadCount > 0 ? unreadCount > 9 ? "9+" : String(unreadCount) : "";
+  const color = "#9333EA";
+  chrome.action.setBadgeText({ text });
+  chrome.action.setBadgeBackgroundColor({ color });
+}
+async function initChatSocket() {
+  const data = await chrome.storage.local.get(["gravity_chat_creds"]);
+  const creds = data.gravity_chat_creds;
+  if (!creds || !creds.username || !creds.privateKey) {
+    console.log("BG Chat: No credentials found. Chat disabled.");
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+    return;
+  }
+  if (socket && socket.connected) {
+    return;
+  }
+  console.log("BG Chat: Connecting as", creds.username);
+  socket = lookup(SERVER_URL, {
+    transports: ["websocket"],
+    // Force websocket in SW
+    reconnection: true,
+    reconnectionDelay: 5e3,
+    query: {
+      username: creds.username,
+      publicKey: creds.publicKey
+    }
+  });
+  socket.on("connect", () => {
+    console.log("BG Chat: Connected!");
+    socket?.emit("request_challenge", { username: creds.username });
+  });
+  socket.on("auth_challenge", async (challenge) => {
+    console.log("BG Chat: Received challenge to sign");
+    const signature = await signChallenge(challenge, creds.privateKey);
+    if (signature && socket) {
+      socket.emit("verify_auth", { username: creds.username, signature });
+    }
+  });
+  socket.on("auth_success", () => {
+    console.log("BG Chat: Authenticated! Listening for notifications...");
+    updateBadge();
+  });
+  socket.on("new_message", (data2) => {
+    console.log("BG Chat: New Message", data2);
+    if (data2.message && data2.message.senderName === creds.username) return;
+    unreadCount++;
+    updateBadge();
+  });
+  socket.on("message_notification", (_data) => {
+    unreadCount++;
+    updateBadge();
+  });
+  socket.on("disconnect", () => {
+    console.log("BG Chat: Disconnected");
+  });
+}
+function setupChatListeners() {
+  chrome.runtime.onMessage.addListener((request, _sender, _sendResponse) => {
+    if (request.type === "CHAT_SYNC_CREDS") {
+      console.log("BG Chat: Syncing credentials...");
+      chrome.storage.local.set({ gravity_chat_creds: request.data }).then(() => {
+        unreadCount = 0;
+        updateBadge();
+        initChatSocket();
+      });
+    }
+    if (request.type === "CHAT_LOGOUT") {
+      console.log("BG Chat: Logging out...");
+      chrome.storage.local.remove(["gravity_chat_creds"]).then(() => {
+        unreadCount = 0;
+        updateBadge();
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+        }
+      });
+    }
+    if (request.type === "CHAT_UI_OPENED") {
+      unreadCount = 0;
+      updateBadge();
+    }
+  });
+  initChatSocket();
+  chrome.alarms.create("keepChatAlive", { periodInMinutes: 1 });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "keepChatAlive") {
+      if (!socket || !socket.connected) {
+        console.log("BG Chat: Alarm triggered check - Reconnecting...");
+        initChatSocket();
+      }
+    }
+  });
+}
 
 self.exports = {};
+setupChatListeners();
 function detectChainFromUrl(url = "") {
   if (!url) return null;
   try {

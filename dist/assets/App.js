@@ -6395,6 +6395,11 @@ const ChatView = ({ onClose }) => {
     };
   }, []);
   reactExports.useEffect(() => {
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: "CHAT_UI_OPENED" });
+    }
+  }, []);
+  reactExports.useEffect(() => {
     chatService.onMessage = (roomId, msg) => {
       if (roomId === activeRoomId) {
         setMessages((prev) => [...prev, msg]);

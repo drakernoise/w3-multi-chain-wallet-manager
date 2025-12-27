@@ -313,6 +313,17 @@ class ChatService {
         localStorage.setItem('gravity_chat_priv', privateKeyHex);
         localStorage.setItem('gravity_chat_pub', publicKeyHex);
 
+        // Sync with background script for notifications
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({
+                type: 'CHAT_SYNC_CREDS',
+                data: {
+                    privateKey: privateKeyHex,
+                    publicKey: publicKeyHex
+                }
+            });
+        }
+
         return { publicKey: publicKeyHex, privateKey: privateKeyHex };
     }
 
@@ -386,6 +397,13 @@ class ChatService {
         // FIXED: If we already have keys for this username, don't register, just LOGIN
         if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
             console.log("Local keys found, performing cryptographic login recovery...");
+            // Sync with background
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({
+                    type: 'CHAT_SYNC_CREDS',
+                    data: { username: storedUser, privateKey: storedKey, publicKey: localStorage.getItem('gravity_chat_pub') }
+                });
+            }
             return this.authenticateWithSignature(null, username);
         }
 
@@ -395,6 +413,13 @@ class ChatService {
         // Don't save admin commands as username!
         if (!username.startsWith('!RESET!')) {
             localStorage.setItem('gravity_chat_username', username);
+            // Sync username with background
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({
+                    type: 'CHAT_SYNC_CREDS',
+                    data: { username, privateKey: keys.privateKey, publicKey: keys.publicKey }
+                });
+            }
         }
 
         this.socket?.emit('register', {
@@ -482,6 +507,10 @@ class ChatService {
         this.rooms = [];
         this.socket?.disconnect();
         this.socket = null;
+
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ type: 'CHAT_LOGOUT' });
+        }
     }
 
     private handleNewMessage(roomId: string, message: ChatMessage) {

@@ -3,8 +3,11 @@
 
 import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation } from '../../services/chainService';
 import { getChainConfig, isChainSupported } from '../../config/chainConfig';
+import { setupChatListeners } from './chatBackground';
 
 declare var chrome: any;
+
+setupChatListeners();
 
 function detectChainFromUrl(url: string = ""): string | null {
     if (!url) return null;

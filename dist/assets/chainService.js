@@ -1447,6 +1447,15 @@ class ChatService {
     const privateKeyHex = this.bufferToHex(new Uint8Array(exportedPriv));
     localStorage.setItem("gravity_chat_priv", privateKeyHex);
     localStorage.setItem("gravity_chat_pub", publicKeyHex);
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({
+        type: "CHAT_SYNC_CREDS",
+        data: {
+          privateKey: privateKeyHex,
+          publicKey: publicKeyHex
+        }
+      });
+    }
     return { publicKey: publicKeyHex, privateKey: privateKeyHex };
   }
   async authenticateWithSignature(userId, username) {
@@ -1506,11 +1515,23 @@ class ChatService {
     const storedKey = this.getStoredPrivateKey();
     if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
       console.log("Local keys found, performing cryptographic login recovery...");
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "CHAT_SYNC_CREDS",
+          data: { username: storedUser, privateKey: storedKey, publicKey: localStorage.getItem("gravity_chat_pub") }
+        });
+      }
       return this.authenticateWithSignature(null, username);
     }
     const keys = await this.generateAndSaveIdentity();
     if (!username.startsWith("!RESET!")) {
       localStorage.setItem("gravity_chat_username", username);
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "CHAT_SYNC_CREDS",
+          data: { username, privateKey: keys.privateKey, publicKey: keys.publicKey }
+        });
+      }
     }
     this.socket?.emit("register", {
       username,
@@ -1603,6 +1624,9 @@ class ChatService {
     this.rooms = [];
     this.socket?.disconnect();
     this.socket = null;
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: "CHAT_LOGOUT" });
+    }
   }
   handleNewMessage(roomId, message) {
     const room = this.rooms.find((r) => r.id === roomId);
