@@ -632,6 +632,70 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('new_message', { roomId, message: msg });
     });
 
+    socket.on('edit_message', (data) => {
+        if (!socket.user) return;
+        const { roomId, messageId, content, timestamp, signature } = data;
+
+        const room = rooms[roomId];
+        if (!room) return;
+
+        const msgIndex = room.messages.findIndex(m => m.id === messageId);
+        if (msgIndex === -1) return;
+
+        const msg = room.messages[msgIndex];
+
+        // Only sender can edit
+        if (msg.senderId !== socket.user.id) {
+            socket.emit('error', 'Unauthorized: You can only edit your own messages.');
+            return;
+        }
+
+        // Verify signature (new content + new timestamp)
+        const messageToVerify = content + timestamp;
+        const isValid = verifySignature(socket.user.publicKey, messageToVerify, signature);
+        if (!isValid) {
+            socket.emit('error', 'Security error: Invalid signature for edit.');
+            return;
+        }
+
+        // Update message
+        msg.content = content
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        msg.isEdited = true;
+        msg.editTimestamp = new Date().toISOString();
+
+        saveData();
+        io.to(roomId).emit('message_edited', { roomId, messageId, content: msg.content, editTimestamp: msg.editTimestamp });
+    });
+
+    socket.on('delete_message', (data) => {
+        if (!socket.user) return;
+        const { roomId, messageId } = data;
+
+        const room = rooms[roomId];
+        if (!room) return;
+
+        const msgIndex = room.messages.findIndex(m => m.id === messageId);
+        if (msgIndex === -1) return;
+
+        const msg = room.messages[msgIndex];
+
+        // Sender OR Room Owner/Admin can delete
+        const isOwner = room.owner === socket.user.id;
+        const isSender = msg.senderId === socket.user.id;
+        const isAdmin = room.admins && room.admins.includes(socket.user.id);
+
+        if (!isSender && !isOwner && !isAdmin) {
+            socket.emit('error', 'Unauthorized: You do not have permission to delete this message.');
+            return;
+        }
+
+        room.messages.splice(msgIndex, 1);
+        saveData();
+        io.to(roomId).emit('message_deleted', { roomId, messageId });
+    });
+
     // --- 4. Direct Messages (Create Room) ---
     socket.on('create_dm', (targetUserId) => {
         if (!socket.user) return;

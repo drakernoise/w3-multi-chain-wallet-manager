@@ -1381,6 +1381,25 @@ class ChatService {
         window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
       }
     });
+    this.socket.on("message_edited", (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        const msg = room.messages.find((m) => m.id === data.messageId);
+        if (msg) {
+          msg.content = data.content;
+          msg.isEdited = true;
+          msg.editTimestamp = data.editTimestamp;
+          this.notifyRoomUpdate();
+        }
+      }
+    });
+    this.socket.on("message_deleted", (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        room.messages = room.messages.filter((m) => m.id !== data.messageId);
+        this.notifyRoomUpdate();
+      }
+    });
     this.socket.on("error", (msg) => {
       console.error("Socket Error:", msg);
       if (msg.includes("User not found") || msg.includes("no public key registered")) {
@@ -1524,6 +1543,28 @@ class ChatService {
       console.error("Failed to sign message:", err);
       if (this.onError) this.onError("Failed to securely sign message.");
     }
+  }
+  async editMessage(roomId, messageId, newContent) {
+    if (!this.socket) return;
+    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+    if (!privateKeyHex) return;
+    try {
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = newContent + timestamp;
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      this.socket.emit("edit_message", {
+        roomId,
+        messageId,
+        content: newContent,
+        timestamp,
+        signature
+      });
+    } catch (err) {
+      console.error("Failed to sign edit:", err);
+    }
+  }
+  deleteMessage(roomId, messageId) {
+    this.socket?.emit("delete_message", { roomId, messageId });
   }
   joinRoom(roomId) {
     this.socket?.emit("join_room", roomId);

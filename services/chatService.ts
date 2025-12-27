@@ -14,6 +14,8 @@ export interface ChatMessage {
     content: string;
     timestamp: string;
     isVerified?: boolean;
+    isEdited?: boolean;
+    editTimestamp?: string;
 }
 
 export interface ChatRoom {
@@ -225,6 +227,27 @@ class ChatService {
             }
         });
 
+        this.socket.on('message_edited', (data: { roomId: string, messageId: string, content: string, editTimestamp: string }) => {
+            const room = this.rooms.find(r => r.id === data.roomId);
+            if (room) {
+                const msg = room.messages.find(m => m.id === data.messageId);
+                if (msg) {
+                    msg.content = data.content;
+                    msg.isEdited = true;
+                    msg.editTimestamp = data.editTimestamp;
+                    this.notifyRoomUpdate();
+                }
+            }
+        });
+
+        this.socket.on('message_deleted', (data: { roomId: string, messageId: string }) => {
+            const room = this.rooms.find(r => r.id === data.roomId);
+            if (room) {
+                room.messages = room.messages.filter(m => m.id !== data.messageId);
+                this.notifyRoomUpdate();
+            }
+        });
+
         this.socket.on('error', (msg: string) => {
             console.error("Socket Error:", msg);
 
@@ -411,6 +434,32 @@ class ChatService {
             console.error('Failed to sign message:', err);
             if (this.onError) this.onError('Failed to securely sign message.');
         }
+    }
+
+    public async editMessage(roomId: string, messageId: string, newContent: string) {
+        if (!this.socket) return;
+        const privateKeyHex = localStorage.getItem('gravity_chat_priv');
+        if (!privateKeyHex) return;
+
+        try {
+            const timestamp = new Date().toISOString();
+            const messageToSign = newContent + timestamp;
+            const signature = await this.signChallenge(messageToSign, privateKeyHex);
+
+            this.socket.emit('edit_message', {
+                roomId,
+                messageId,
+                content: newContent,
+                timestamp,
+                signature
+            });
+        } catch (err) {
+            console.error('Failed to sign edit:', err);
+        }
+    }
+
+    public deleteMessage(roomId: string, messageId: string) {
+        this.socket?.emit('delete_message', { roomId, messageId });
     }
 
     public joinRoom(roomId: string) { this.socket?.emit('join_room', roomId); }

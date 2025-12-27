@@ -31,6 +31,8 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [chatModal, setChatModal] = useState<{ type: 'invite' | 'confirm_delete' | 'confirm_kick' | 'confirm_ban', data?: any } | null>(null);
     const [modalInput, setModalInput] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+    const [editBuffer, setEditBuffer] = useState('');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -498,62 +500,128 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     const showAvatar = i === 0 || messages[i - 1].senderId !== msg.senderId;
 
                                     return (
-                                        <div key={msg.id || i} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                        <div key={msg.id || i} className={`flex gap-2 group ${isMe ? 'flex-row-reverse' : ''}`}>
                                             <div className={`w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold ${showAvatar ? (isMe ? 'bg-purple-600' : 'bg-slate-600') : 'opacity-0'}`}>
                                                 {msg.senderName.substring(0, 2).toUpperCase()}
                                             </div>
                                             <div className={`flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`}>
                                                 {showAvatar && <span className="text-[9px] text-slate-500 mb-0.5 px-1">{msg.senderName}</span>}
-                                                <div className={`px-3 py-1.5 rounded-xl text-sm leading-relaxed ${isMe ? 'bg-purple-600 text-white rounded-tr-sm' : 'bg-dark-700 text-slate-200 rounded-tl-sm'}`}>
-                                                    {(() => {
-                                                        const urlRegex = /(https?:\/\/[^\s]+)/g;
-                                                        const parts = msg.content.split(urlRegex);
+                                                <div className="flex items-center gap-2 group/bubble">
+                                                    {/* Message Actions (Visible on hover) */}
+                                                    {isMe && !editingMessageId && (
+                                                        <div className={`flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity ${isMe ? 'flex-row' : 'flex-row-reverse'}`}>
+                                                            <button
+                                                                onClick={() => { setEditingMessageId(msg.id); setEditBuffer(msg.content.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#039;/g, "'")); }}
+                                                                className="p-1 text-slate-500 hover:text-purple-400 hover:bg-purple-500/10 rounded transition-colors"
+                                                                title="Edit"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { if (confirm('Eliminar mensaje?')) chatService.deleteMessage(activeRoomId!, msg.id); }}
+                                                                className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                                                title="Delete"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {/* Room Owner Delete Action */}
+                                                    {isOwner && !isMe && !editingMessageId && (
+                                                        <button
+                                                            onClick={() => { if (confirm('Admin delete this message?')) chatService.deleteMessage(activeRoomId!, msg.id); }}
+                                                            className="opacity-0 group-hover/bubble:opacity-100 p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-opacity"
+                                                            title="Admin Delete"
+                                                        >
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
+                                                    )}
 
-                                                        return parts.map((part, index) => {
-                                                            if (part.match(urlRegex)) {
-                                                                const url = part;
-                                                                const isImage = /\.(jpeg|jpg|gif|png|webp)$/i.test(url);
-                                                                const isYouTube = /youtube\.com|youtu\.be/i.test(url);
+                                                    <div className={`px-3 py-1.5 rounded-xl text-sm leading-relaxed ${isMe ? 'bg-purple-600 text-white rounded-tr-sm' : 'bg-dark-700 text-slate-200 rounded-tl-sm'}`}>
+                                                        {editingMessageId === msg.id ? (
+                                                            <div className="flex flex-col gap-2 min-w-[180px]">
+                                                                <textarea
+                                                                    autoFocus
+                                                                    className="bg-dark-800 text-white p-2 rounded border border-purple-500 outline-none w-full text-xs min-h-[60px] resize-none"
+                                                                    value={editBuffer}
+                                                                    onChange={(e) => setEditBuffer(e.target.value)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Escape') setEditingMessageId(null);
+                                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                                            e.preventDefault();
+                                                                            chatService.editMessage(activeRoomId!, msg.id, editBuffer);
+                                                                            setEditingMessageId(null);
+                                                                        }
+                                                                    }}
+                                                                />
+                                                                <div className="flex justify-end gap-1">
+                                                                    <button onClick={() => setEditingMessageId(null)} className="text-[9px] px-2 py-1 hover:bg-white/10 rounded">Cancel</button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            chatService.editMessage(activeRoomId!, msg.id, editBuffer);
+                                                                            setEditingMessageId(null);
+                                                                        }}
+                                                                        className="text-[9px] px-2 py-1 bg-white text-purple-600 font-bold rounded"
+                                                                    >
+                                                                        Save
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                {(() => {
+                                                                    const urlRegex = /(https?:\/\/[^\s]+)/g;
+                                                                    const parts = msg.content.split(urlRegex);
 
-                                                                // --- SECURITY: Domain Verification ---
-                                                                const trustedDomains = ['imgur.com', 'giphy.com', 'gstatic.com', 'youtube.com', 'youtu.be', 'google.com', 'github.com', 'hive.blog', 'peakd.com', 'steemit.com', 'blurt.blog'];
-                                                                const domain = new URL(url).hostname.replace('www.', '');
-                                                                const isTrusted = trustedDomains.some(d => domain === d || domain.endsWith('.' + d));
+                                                                    return parts.map((part, index) => {
+                                                                        if (part.match(urlRegex)) {
+                                                                            const url = part;
+                                                                            const isImage = /\.(jpeg|jpg|gif|png|webp)$/i.test(url);
+                                                                            const isYouTube = /youtube\.com|youtu\.be/i.test(url);
 
-                                                                return (
-                                                                    <span key={index} className="block mt-1 first:mt-0">
-                                                                        <a
-                                                                            href={url}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className={`underline break-all flex items-center gap-1 ${isTrusted ? 'text-blue-300' : 'text-orange-400'}`}
-                                                                            title={isTrusted ? 'Trusted Domain' : 'Unknown Domain - Be careful!'}
-                                                                        >
-                                                                            {!isTrusted && (
-                                                                                <svg className="w-3 h-3 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
-                                                                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                                                </svg>
-                                                                            )}
-                                                                            {url}
-                                                                        </a>
+                                                                            // --- SECURITY: Domain Verification ---
+                                                                            const trustedDomains = ['imgur.com', 'giphy.com', 'gstatic.com', 'youtube.com', 'youtu.be', 'google.com', 'github.com', 'hive.blog', 'peakd.com', 'steemit.com', 'blurt.blog'];
+                                                                            const domain = new URL(url).hostname.replace('www.', '');
+                                                                            const isTrusted = trustedDomains.some(d => domain === d || domain.endsWith('.' + d));
 
-                                                                        {/* --- AUTO PREVIEW (Only for trusted domains) --- */}
-                                                                        {isTrusted && isImage && (
-                                                                            <img src={url} alt="Shared" className="mt-2 rounded-lg max-w-full max-h-48 border border-white/10 shadow-lg cursor-pointer hover:scale-[1.02] transition-transform" />
-                                                                        )}
+                                                                            return (
+                                                                                <span key={index} className="block mt-1 first:mt-0">
+                                                                                    <a
+                                                                                        href={url}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className={`underline break-all flex items-center gap-1 ${isTrusted ? 'text-blue-300' : 'text-orange-400'}`}
+                                                                                        title={isTrusted ? 'Trusted Domain' : 'Unknown Domain - Be careful!'}
+                                                                                    >
+                                                                                        {!isTrusted && (
+                                                                                            <svg className="w-3 h-3 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
+                                                                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                                                            </svg>
+                                                                                        )}
+                                                                                        {url}
+                                                                                    </a>
 
-                                                                        {isTrusted && isYouTube && (
-                                                                            <div className="mt-2 text-[10px] text-slate-400 italic flex items-center gap-1 bg-black/20 p-2 rounded">
-                                                                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" /></svg>
-                                                                                YouTube Video Link
-                                                                            </div>
-                                                                        )}
-                                                                    </span>
-                                                                );
-                                                            }
-                                                            return <span key={index}>{part}</span>;
-                                                        });
-                                                    })()}
+                                                                                    {/* --- AUTO PREVIEW (Only for trusted domains) --- */}
+                                                                                    {isTrusted && isImage && (
+                                                                                        <img src={url} alt="Shared" className="mt-2 rounded-lg max-w-full max-h-48 border border-white/10 shadow-lg cursor-pointer hover:scale-[1.02] transition-transform" />
+                                                                                    )}
+
+                                                                                    {isTrusted && isYouTube && (
+                                                                                        <div className="mt-2 text-[10px] text-slate-400 italic flex items-center gap-1 bg-black/20 p-2 rounded">
+                                                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" /></svg>
+                                                                                            YouTube Video Link
+                                                                                        </div>
+                                                                                    )}
+                                                                                </span>
+                                                                            );
+                                                                        }
+                                                                        return <span key={index}>{part}</span>;
+                                                                    });
+                                                                })()}
+                                                                {msg.isEdited && <span className="text-[10px] opacity-50 block mt-1 italic border-t border-white/10 pt-1">Edited {new Date(msg.editTimestamp!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <span className="text-[9px] text-slate-600 mt-0.5 px-1 opacity-70">
                                                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
