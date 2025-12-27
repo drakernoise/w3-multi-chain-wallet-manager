@@ -22,7 +22,14 @@ function hexToBuffer(hexString: string): ArrayBuffer {
 async function signChallenge(challenge: string, privateKeyHex: string): Promise<string | null> {
     try {
         const privateKeyBuffer = hexToBuffer(privateKeyHex);
-        const privateKey = await self.crypto.subtle.importKey(
+        const cryptoSubtle = crypto.subtle || (self.crypto && self.crypto.subtle);
+
+        if (!cryptoSubtle) {
+            console.error('BG: Crypto Subtle not available');
+            return null;
+        }
+
+        const privateKey = await cryptoSubtle.importKey(
             'pkcs8',
             privateKeyBuffer,
             { name: 'ECDSA', namedCurve: 'P-256' },
@@ -31,7 +38,7 @@ async function signChallenge(challenge: string, privateKeyHex: string): Promise<
         );
         const encoder = new TextEncoder();
         const data = encoder.encode(challenge);
-        const signature = await self.crypto.subtle.sign(
+        const signature = await cryptoSubtle.sign(
             { name: 'ECDSA', hash: { name: 'SHA-256' } },
             privateKey,
             data
