@@ -79,8 +79,13 @@ async function initChatSocket() {
       socket.emit("verify_signature", { signature });
     }
   });
-  socket.on("auth_success", () => {
-    console.log("BG Chat: Authenticated! Listening for notifications...");
+  socket.on("auth_success", (data2) => {
+    console.log("BG Chat: Authenticated! Rooms:", data2.rooms);
+    if (data2.rooms && Array.isArray(data2.rooms)) {
+      data2.rooms.forEach((r) => {
+        socket?.emit("join_room", r.id);
+      });
+    }
     updateBadge();
   });
   socket.on("new_message", (data2) => {

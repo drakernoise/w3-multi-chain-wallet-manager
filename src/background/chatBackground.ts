@@ -114,11 +114,14 @@ async function initChatSocket() {
         }
     });
 
-    socket.on('auth_success', () => {
-        console.log("BG Chat: Authenticated! Listening for notifications...");
-        // Join my own rooms? The server should know my rooms.
-        // Assuming server auto-joins rooms on connection based on logic, or we fetch them.
-        // For notifications, simpler is better: server emits 'new_message' to socket if user is in room.
+    socket.on('auth_success', (data: any) => {
+        console.log("BG Chat: Authenticated! Rooms:", data.rooms);
+        // Explicitly join rooms just in case server auto-join failed for this socket
+        if (data.rooms && Array.isArray(data.rooms)) {
+            data.rooms.forEach((r: any) => {
+                socket?.emit('join_room', r.id);
+            });
+        }
         updateBadge();
     });
 
