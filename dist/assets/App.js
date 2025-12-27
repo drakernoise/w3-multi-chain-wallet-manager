@@ -6464,6 +6464,11 @@ const ChatView = ({ onClose }) => {
           setNotification({ msg: `Banned @${data.username} permanently`, type: "error" });
         }
         break;
+      case "confirm_delete_message":
+        if (activeRoomId && data) {
+          chatService.deleteMessage(activeRoomId, data.messageId);
+        }
+        break;
     }
     setChatModal(null);
     setModalInput("");
@@ -6737,9 +6742,7 @@ const ChatView = ({ onClose }) => {
                     /* @__PURE__ */ jsxRuntimeExports.jsx(
                       "button",
                       {
-                        onClick: () => {
-                          if (confirm("Eliminar mensaje?")) chatService.deleteMessage(activeRoomId, msg.id);
-                        },
+                        onClick: () => setChatModal({ type: "confirm_delete_message", data: { messageId: msg.id } }),
                         className: "p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors",
                         title: "Delete",
                         children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) })
@@ -6749,9 +6752,7 @@ const ChatView = ({ onClose }) => {
                   isOwner && !isMe && !editingMessageId && /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "button",
                     {
-                      onClick: () => {
-                        if (confirm("Admin delete this message?")) chatService.deleteMessage(activeRoomId, msg.id);
-                      },
+                      onClick: () => setChatModal({ type: "confirm_delete_message", data: { messageId: msg.id } }),
                       className: "opacity-0 group-hover/bubble:opacity-100 p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-opacity",
                       title: "Admin Delete",
                       children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) })
@@ -6928,13 +6929,15 @@ const ChatView = ({ onClose }) => {
           chatModal.type === "invite" && "Invite Member",
           chatModal.type === "confirm_delete" && "Delete Room?",
           chatModal.type === "confirm_kick" && `Kick @${chatModal.data?.username}?`,
-          chatModal.type === "confirm_ban" && `Ban @${chatModal.data?.username}?`
+          chatModal.type === "confirm_ban" && `Ban @${chatModal.data?.username}?`,
+          chatModal.type === "confirm_delete_message" && "Delete Message?"
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm text-slate-400 mb-6 font-medium", children: [
           chatModal.type === "invite" && "Type the username of the person you want to invite to this private room.",
           chatModal.type === "confirm_delete" && "This action is permanent. All messages and room history will be lost.",
           chatModal.type === "confirm_kick" && "This user will be removed from the room but can rejoin if it is a public room.",
-          chatModal.type === "confirm_ban" && "This user will be permanently banned from this room."
+          chatModal.type === "confirm_ban" && "This user will be permanently banned from this room.",
+          chatModal.type === "confirm_delete_message" && "This message will be permanently removed for everyone."
         ] }),
         chatModal.type === "invite" && /* @__PURE__ */ jsxRuntimeExports.jsx("input", { autoFocus: true, className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-2 text-white mb-6 outline-none focus:border-purple-500", placeholder: "Username...", value: modalInput, onChange: (e) => setModalInput(e.target.value), onKeyDown: (e) => e.key === "Enter" && handleModalAction() }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3", children: [

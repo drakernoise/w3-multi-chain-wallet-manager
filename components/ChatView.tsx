@@ -28,7 +28,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [isPrivateRoom, setIsPrivateRoom] = useState(false);
     const [showParticipants, setShowParticipants] = useState(false);
     const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
-    const [chatModal, setChatModal] = useState<{ type: 'invite' | 'confirm_delete' | 'confirm_kick' | 'confirm_ban', data?: any } | null>(null);
+    const [chatModal, setChatModal] = useState<{ type: 'invite' | 'confirm_delete' | 'confirm_kick' | 'confirm_ban' | 'confirm_delete_message', data?: any } | null>(null);
     const [modalInput, setModalInput] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -193,6 +193,11 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 if (activeRoomId && data) {
                     chatService.banUser(activeRoomId, data.id);
                     setNotification({ msg: `Banned @${data.username} permanently`, type: 'error' });
+                }
+                break;
+            case 'confirm_delete_message':
+                if (activeRoomId && data) {
+                    chatService.deleteMessage(activeRoomId, data.messageId);
                 }
                 break;
         }
@@ -518,7 +523,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                             </button>
                                                             <button
-                                                                onClick={() => { if (confirm('Eliminar mensaje?')) chatService.deleteMessage(activeRoomId!, msg.id); }}
+                                                                onClick={() => setChatModal({ type: 'confirm_delete_message', data: { messageId: msg.id } })}
                                                                 className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
                                                                 title="Delete"
                                                             >
@@ -529,7 +534,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                                     {/* Room Owner Delete Action */}
                                                     {isOwner && !isMe && !editingMessageId && (
                                                         <button
-                                                            onClick={() => { if (confirm('Admin delete this message?')) chatService.deleteMessage(activeRoomId!, msg.id); }}
+                                                            onClick={() => setChatModal({ type: 'confirm_delete_message', data: { messageId: msg.id } })}
                                                             className="opacity-0 group-hover/bubble:opacity-100 p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-opacity"
                                                             title="Admin Delete"
                                                         >
@@ -742,12 +747,14 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             {chatModal.type === 'confirm_delete' && 'Delete Room?'}
                             {chatModal.type === 'confirm_kick' && `Kick @${chatModal.data?.username}?`}
                             {chatModal.type === 'confirm_ban' && `Ban @${chatModal.data?.username}?`}
+                            {chatModal.type === 'confirm_delete_message' && 'Delete Message?'}
                         </h4>
                         <p className="text-sm text-slate-400 mb-6 font-medium">
                             {chatModal.type === 'invite' && 'Type the username of the person you want to invite to this private room.'}
                             {chatModal.type === 'confirm_delete' && 'This action is permanent. All messages and room history will be lost.'}
                             {chatModal.type === 'confirm_kick' && 'This user will be removed from the room but can rejoin if it is a public room.'}
                             {chatModal.type === 'confirm_ban' && 'This user will be permanently banned from this room.'}
+                            {chatModal.type === 'confirm_delete_message' && 'This message will be permanently removed for everyone.'}
                         </p>
                         {chatModal.type === 'invite' && <input autoFocus className="w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-2 text-white mb-6 outline-none focus:border-purple-500" placeholder="Username..." value={modalInput} onChange={(e) => setModalInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleModalAction()} />}
                         <div className="flex gap-3">
