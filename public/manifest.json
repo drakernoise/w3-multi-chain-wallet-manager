@@ -25,7 +25,8 @@
     "storage",
     "activeTab",
     "tabs",
-    "windows"
+    "windows",
+    "alarms"
   ],
   "content_scripts": [
     {
