@@ -51,49 +51,65 @@ app.post('/admin/reset', (req, res) => {
 });
 
 // Admin endpoint to delete a specific user
+// Admin endpoint to delete specific user(s)
 app.post('/admin/delete_user', (req, res) => {
     const secret = req.query.secret || req.headers['x-admin-secret'];
-    const targetUsername = req.query.username;
+    const targetUsernames = req.query.username; // Can be "user1,user2,user3"
 
     if (secret !== 'gravity-admin-2024') {
         return res.status(403).json({ error: 'Forbidden' });
     }
 
-    if (!targetUsername) {
+    if (!targetUsernames) {
         return res.status(400).json({ error: 'Missing username parameter' });
     }
 
-    const cleanName = targetUsername.toLowerCase();
-    const idToDelete = usernames[cleanName];
+    const namesToDelete = targetUsernames.split(',').map(n => n.trim()).filter(n => n.length > 0);
+    const deletedParams = [];
+    const notFound = [];
 
-    if (!idToDelete) {
-        return res.status(404).json({ error: 'User not found' });
-    }
+    namesToDelete.forEach(rawName => {
+        const cleanName = rawName.toLowerCase();
+        const idToDelete = usernames[cleanName];
 
-    // DEEP CLEANUP Logic
-    Object.keys(rooms).forEach(roomId => {
-        const room = rooms[roomId];
-        // Remove from members
-        if (room.members) room.members = room.members.filter(m => m !== idToDelete);
-
-        // Remove from admins
-        if (room.admins) room.admins = room.admins.filter(a => a !== idToDelete);
-
-        // If owner, delete room (except global-lobby)
-        if (room.owner === idToDelete && roomId !== 'global-lobby') {
-            console.log(`Deleting orphan room ${roomId} owned by ${targetUsername}`);
-            delete rooms[roomId];
-            io.emit('room_removed', roomId);
+        if (!idToDelete) {
+            notFound.push(rawName);
+            return;
         }
+
+        // DEEP CLEANUP Logic
+        Object.keys(rooms).forEach(roomId => {
+            const room = rooms[roomId];
+            if (!room) return;
+
+            // Remove from members
+            if (room.members) room.members = room.members.filter(m => m !== idToDelete);
+
+            // Remove from admins
+            if (room.admins) room.admins = room.admins.filter(a => a !== idToDelete);
+
+            // If owner, delete room (except global-lobby)
+            if (room.owner === idToDelete && roomId !== 'global-lobby') {
+                console.log(`Deleting orphan room ${roomId} owned by ${rawName}`);
+                delete rooms[roomId];
+                io.emit('room_removed', roomId);
+            }
+        });
+
+        delete users[idToDelete];
+        delete usernames[cleanName];
+        deletedParams.push(rawName);
+        console.log(`🔨 Admin deleted user: ${rawName}`);
     });
 
-    delete users[idToDelete];
-    delete usernames[cleanName];
     saveData();
 
-    console.log(`🔨 Admin deleted user: ${targetUsername}`);
-
-    res.json({ success: true, message: `User ${targetUsername} deleted successfully` });
+    res.json({
+        success: true,
+        deleted: deletedParams,
+        notFound: notFound,
+        message: `Deleted ${deletedParams.length} users. ${notFound.length} not found.`
+    });
 });
 
 const server = http.createServer(app);
