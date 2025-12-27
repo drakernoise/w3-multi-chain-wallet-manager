@@ -505,7 +505,55 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                             <div className={`flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`}>
                                                 {showAvatar && <span className="text-[9px] text-slate-500 mb-0.5 px-1">{msg.senderName}</span>}
                                                 <div className={`px-3 py-1.5 rounded-xl text-sm leading-relaxed ${isMe ? 'bg-purple-600 text-white rounded-tr-sm' : 'bg-dark-700 text-slate-200 rounded-tl-sm'}`}>
-                                                    {msg.content}
+                                                    {(() => {
+                                                        const urlRegex = /(https?:\/\/[^\s]+)/g;
+                                                        const parts = msg.content.split(urlRegex);
+
+                                                        return parts.map((part, index) => {
+                                                            if (part.match(urlRegex)) {
+                                                                const url = part;
+                                                                const isImage = /\.(jpeg|jpg|gif|png|webp)$/i.test(url);
+                                                                const isYouTube = /youtube\.com|youtu\.be/i.test(url);
+
+                                                                // --- SECURITY: Domain Verification ---
+                                                                const trustedDomains = ['imgur.com', 'giphy.com', 'gstatic.com', 'youtube.com', 'youtu.be', 'google.com', 'github.com', 'hive.blog', 'peakd.com', 'steemit.com', 'blurt.blog'];
+                                                                const domain = new URL(url).hostname.replace('www.', '');
+                                                                const isTrusted = trustedDomains.some(d => domain === d || domain.endsWith('.' + d));
+
+                                                                return (
+                                                                    <span key={index} className="block mt-1 first:mt-0">
+                                                                        <a
+                                                                            href={url}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className={`underline break-all flex items-center gap-1 ${isTrusted ? 'text-blue-300' : 'text-orange-400'}`}
+                                                                            title={isTrusted ? 'Trusted Domain' : 'Unknown Domain - Be careful!'}
+                                                                        >
+                                                                            {!isTrusted && (
+                                                                                <svg className="w-3 h-3 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
+                                                                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                                                </svg>
+                                                                            )}
+                                                                            {url}
+                                                                        </a>
+
+                                                                        {/* --- AUTO PREVIEW (Only for trusted domains) --- */}
+                                                                        {isTrusted && isImage && (
+                                                                            <img src={url} alt="Shared" className="mt-2 rounded-lg max-w-full max-h-48 border border-white/10 shadow-lg cursor-pointer hover:scale-[1.02] transition-transform" />
+                                                                        )}
+
+                                                                        {isTrusted && isYouTube && (
+                                                                            <div className="mt-2 text-[10px] text-slate-400 italic flex items-center gap-1 bg-black/20 p-2 rounded">
+                                                                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" /></svg>
+                                                                                YouTube Video Link
+                                                                            </div>
+                                                                        )}
+                                                                    </span>
+                                                                );
+                                                            }
+                                                            return <span key={index}>{part}</span>;
+                                                        });
+                                                    })()}
                                                 </div>
                                                 <span className="text-[9px] text-slate-600 mt-0.5 px-1 opacity-70">
                                                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
