@@ -6399,9 +6399,12 @@ const ChatView = ({ onClose }) => {
       if (roomId === activeRoomId) {
         setMessages((prev) => [...prev, msg]);
         scrollToBottom();
+      } else {
+        const roomName = rooms.find((r) => r.id === roomId)?.name || "Unknown Room";
+        setNotification({ msg: `New message in ${roomName} from ${msg.senderName}`, type: "info" });
       }
     };
-  }, [activeRoomId]);
+  }, [activeRoomId, rooms]);
   reactExports.useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 4e3);

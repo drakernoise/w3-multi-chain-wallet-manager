@@ -121,9 +121,13 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             if (roomId === activeRoomId) {
                 setMessages(prev => [...prev, msg]);
                 scrollToBottom();
+            } else {
+                // Not in this room? Show notification!
+                const roomName = rooms.find(r => r.id === roomId)?.name || 'Unknown Room';
+                setNotification({ msg: `New message in ${roomName} from ${msg.senderName}`, type: 'info' });
             }
         };
-    }, [activeRoomId]);
+    }, [activeRoomId, rooms]);
 
     // Notification Timer
     useEffect(() => {
