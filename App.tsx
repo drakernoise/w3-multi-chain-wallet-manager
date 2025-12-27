@@ -421,6 +421,7 @@ function AppContent() {
         walletState={walletState}
         setWalletState={setWalletState}
         lockReason={lockReason}
+        onToggleDetach={handleToggleDetach}
       />
     );
   }

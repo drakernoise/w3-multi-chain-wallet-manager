@@ -2230,7 +2230,7 @@ const LanguageToggle = ({ className = "", direction = "bottom-right" }) => {
   ] });
 };
 
-const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
+const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason, onToggleDetach }) => {
   const { t } = useTranslation();
   const [password, setPassword] = reactExports.useState("");
   const [confirmPassword, setConfirmPassword] = reactExports.useState("");
@@ -2520,12 +2520,10 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason }) => {
       ] })
     ] }) }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute top-4 right-4 z-50 flex items-center gap-2", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
+      onToggleDetach && /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
-          onClick: () => {
-            window.dispatchEvent(new CustomEvent("toggle-detach"));
-          },
+          onClick: onToggleDetach,
           className: "p-2 text-slate-500 hover:text-slate-300 transition-colors",
           title: "Pin/Unpin Extension",
           children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" }) })
@@ -6548,7 +6546,7 @@ const ChatView = ({ onClose }) => {
       /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "mt-4 text-slate-500 text-xs hover:text-white underline", children: t("common.cancel") })
     ] }) });
   }
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex h-full bg-dark-900 text-white overflow-hidden animate-fadeIn", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex h-full bg-dark-900 text-white overflow-hidden animate-fadeIn relative", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `w-80 flex flex-col border-r border-dark-700 bg-dark-850 ${activeRoomId ? "hidden md:flex" : "flex w-full"}`, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-3 border-b border-dark-700 bg-dark-800 flex items-center justify-between", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
@@ -6676,7 +6674,10 @@ const ChatView = ({ onClose }) => {
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
-                onClick: () => setShowParticipants(!showParticipants),
+                onClick: () => {
+                  console.log("👥 Toggling participants panel:", !showParticipants);
+                  setShowParticipants(!showParticipants);
+                },
                 className: `p-2 rounded-lg transition-all active:scale-95 ${showParticipants ? "bg-purple-600/20 text-purple-400 border border-purple-500/30" : "text-slate-400 hover:bg-dark-700"}`,
                 title: "View Members",
                 children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" }) })
@@ -6746,27 +6747,42 @@ const ChatView = ({ onClose }) => {
         ] }) })
       ] });
     })() }),
-    activeRoomId && showParticipants && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-64 bg-dark-800 border-l border-dark-700 flex flex-col animate-slideInRight", children: [
+    activeRoomId && showParticipants && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute right-0 top-0 bottom-0 w-64 bg-dark-800 border-l border-dark-700 flex flex-col z-50 shadow-2xl", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 border-b border-dark-700 flex justify-between items-center bg-dark-900/50", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-[10px] uppercase tracking-wider text-slate-500", children: "Participants" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setShowParticipants(false), className: "text-slate-500 hover:text-white", children: "✕" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar", children: rooms.find((r) => r.id === activeRoomId)?.memberDetails?.map((member) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-2 p-2 rounded hover:bg-dark-700/50 transition-colors border border-transparent hover:border-dark-600", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-between items-center", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-sm flex items-center gap-2 ${member.id === user?.id ? "text-purple-400 font-bold" : "text-slate-300"}`, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-2 h-2 rounded-full ${member.isOnline ? "bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]" : "bg-slate-600"}`, title: member.isOnline ? "Online" : "Offline" }),
-          "@",
-          member.username,
-          rooms.find((r) => r.id === activeRoomId)?.owner === member.id && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400", children: "Owner" })
-        ] }) }),
-        rooms.find((r) => r.id === activeRoomId)?.owner === user?.id && member.id !== user?.id && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1 mt-1", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
-            chatService.muteUser(activeRoomId, member.id);
-            setNotification({ msg: `User @${member.username} muted`, type: "info" });
-          }, className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors", children: "Mute" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_kick", data: member }), className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors", children: "Kick" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_ban", data: member }), className: "flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold", children: "Ban" })
-        ] })
-      ] }, member.id)) })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar", children: (() => {
+        const currentRoom = rooms.find((r) => r.id === activeRoomId);
+        const members = currentRoom?.memberDetails;
+        console.log("🔍 Room participants debug:", {
+          roomId: activeRoomId,
+          room: currentRoom,
+          memberDetails: members,
+          memberCount: members?.length
+        });
+        if (!members || members.length === 0) {
+          return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-center text-slate-500 text-sm py-8", children: "No participants found" });
+        }
+        return members.map((member) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-2 p-2 rounded hover:bg-dark-700/50 transition-colors border border-transparent hover:border-dark-600", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-between items-center", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-sm flex items-center gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-2 h-2 rounded-full flex-shrink-0 ${member.isOnline ? "bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]" : "bg-slate-600"}`, title: member.isOnline ? "Online" : "Offline" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `${member.id === user?.id ? "text-purple-400 font-bold" : "text-white"}`, children: [
+              "@",
+              member.username
+            ] }),
+            rooms.find((r) => r.id === activeRoomId)?.owner === member.id && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400 flex-shrink-0", children: "Owner" })
+          ] }) }),
+          rooms.find((r) => r.id === activeRoomId)?.owner === user?.id && member.id !== user?.id && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1 mt-1", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
+              chatService.muteUser(activeRoomId, member.id);
+              setNotification({ msg: `User @${member.username} muted`, type: "info" });
+            }, className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors", children: "Mute" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_kick", data: member }), className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors", children: "Kick" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_ban", data: member }), className: "flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold", children: "Ban" })
+          ] })
+        ] }, member.id));
+      })() })
     ] }),
     chatModal && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 bg-dark-950/80 backdrop-blur-sm", onClick: () => setChatModal(null) }),
@@ -7160,7 +7176,8 @@ function AppContent() {
         onUnlock: handleUnlock,
         walletState,
         setWalletState,
-        lockReason
+        lockReason,
+        onToggleDetach: handleToggleDetach
       }
     );
   }

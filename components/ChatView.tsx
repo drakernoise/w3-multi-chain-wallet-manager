@@ -291,7 +291,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     // --- Render: Main Chat ---
     return (
-        <div className="flex h-full bg-dark-900 text-white overflow-hidden animate-fadeIn">
+        <div className="flex h-full bg-dark-900 text-white overflow-hidden animate-fadeIn relative">
             {/* Left Sidebar: Rooms & Search */}
             <div className={`w-80 flex flex-col border-r border-dark-700 bg-dark-850 ${activeRoomId ? 'hidden md:flex' : 'flex w-full'}`}>
                 {/* Sidebar Header (Profile) */}
@@ -456,7 +456,10 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 </div>
                                 <div className="flex gap-1.5 items-center shrink-0 ml-2">
                                     <button
-                                        onClick={() => setShowParticipants(!showParticipants)}
+                                        onClick={() => {
+                                            console.log('👥 Toggling participants panel:', !showParticipants);
+                                            setShowParticipants(!showParticipants);
+                                        }}
                                         className={`p-2 rounded-lg transition-all active:scale-95 ${showParticipants ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' : 'text-slate-400 hover:bg-dark-700'}`}
                                         title="View Members"
                                     >
@@ -539,30 +542,52 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
             {/* User List Sidebar */}
             {activeRoomId && showParticipants && (
-                <div className="w-64 bg-dark-800 border-l border-dark-700 flex flex-col animate-slideInRight">
+                <div className="absolute right-0 top-0 bottom-0 w-64 bg-dark-800 border-l border-dark-700 flex flex-col z-50 shadow-2xl">
                     <div className="p-4 border-b border-dark-700 flex justify-between items-center bg-dark-900/50">
                         <span className="font-bold text-[10px] uppercase tracking-wider text-slate-500">Participants</span>
                         <button onClick={() => setShowParticipants(false)} className="text-slate-500 hover:text-white">✕</button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                        {rooms.find(r => r.id === activeRoomId)?.memberDetails?.map(member => (
-                            <div key={member.id} className="flex flex-col gap-2 p-2 rounded hover:bg-dark-700/50 transition-colors border border-transparent hover:border-dark-600">
-                                <div className="flex justify-between items-center">
-                                    <span className={`text-sm flex items-center gap-2 ${member.id === user?.id ? 'text-purple-400 font-bold' : 'text-slate-300'}`}>
-                                        <div className={`w-2 h-2 rounded-full ${member.isOnline ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]' : 'bg-slate-600'}`} title={member.isOnline ? 'Online' : 'Offline'}></div>
-                                        @{member.username}
-                                        {rooms.find(r => r.id === activeRoomId)?.owner === member.id && <span className="ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400">Owner</span>}
-                                    </span>
-                                </div>
-                                {rooms.find(r => r.id === activeRoomId)?.owner === user?.id && member.id !== user?.id && (
-                                    <div className="flex gap-1 mt-1">
-                                        <button onClick={() => { chatService.muteUser(activeRoomId, member.id); setNotification({ msg: `User @${member.username} muted`, type: 'info' }); }} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors">Mute</button>
-                                        <button onClick={() => setChatModal({ type: 'confirm_kick', data: member })} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors">Kick</button>
-                                        <button onClick={() => setChatModal({ type: 'confirm_ban', data: member })} className="flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold">Ban</button>
+                        {(() => {
+                            const currentRoom = rooms.find(r => r.id === activeRoomId);
+                            const members = currentRoom?.memberDetails;
+
+                            console.log('🔍 Room participants debug:', {
+                                roomId: activeRoomId,
+                                room: currentRoom,
+                                memberDetails: members,
+                                memberCount: members?.length
+                            });
+
+                            if (!members || members.length === 0) {
+                                return (
+                                    <div className="text-center text-slate-500 text-sm py-8">
+                                        No participants found
                                     </div>
-                                )}
-                            </div>
-                        ))}
+                                );
+                            }
+
+                            return members.map(member => (
+                                <div key={member.id} className="flex flex-col gap-2 p-2 rounded hover:bg-dark-700/50 transition-colors border border-transparent hover:border-dark-600">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${member.isOnline ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]' : 'bg-slate-600'}`} title={member.isOnline ? 'Online' : 'Offline'}></div>
+                                            <span className={`${member.id === user?.id ? 'text-purple-400 font-bold' : 'text-white'}`}>
+                                                @{member.username}
+                                            </span>
+                                            {rooms.find(r => r.id === activeRoomId)?.owner === member.id && <span className="ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400 flex-shrink-0">Owner</span>}
+                                        </span>
+                                    </div>
+                                    {rooms.find(r => r.id === activeRoomId)?.owner === user?.id && member.id !== user?.id && (
+                                        <div className="flex gap-1 mt-1">
+                                            <button onClick={() => { chatService.muteUser(activeRoomId, member.id); setNotification({ msg: `User @${member.username} muted`, type: 'info' }); }} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors">Mute</button>
+                                            <button onClick={() => setChatModal({ type: 'confirm_kick', data: member })} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors">Kick</button>
+                                            <button onClick={() => setChatModal({ type: 'confirm_ban', data: member })} className="flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold">Ban</button>
+                                        </div>
+                                    )}
+                                </div>
+                            ));
+                        })()}
                     </div>
                 </div>
             )}

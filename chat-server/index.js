@@ -119,7 +119,51 @@ loadData();
 
 const connectedSockets = {}; // socketId -> userId
 const authChallenges = {}; // socketId -> { challenge, timestamp }
+const registrationRateLimit = {}; // IP -> timestamp
 const lastMessageTime = {}; // userId -> timestamp
+const lastSearchTime = {}; // userId -> timestamp
+const userMessageHistory = {}; // userId -> [{ content: string, timestamp: number }]
+
+// Anti-Spam config
+const RATE_LIMIT_TOKENS = 5; // Max 5 messages in 10 seconds
+const RATE_LIMIT_WINDOW = 10000; // 10 seconds
+const DUPLICATE_WINDOW = 30000; // 30 seconds for duplicate check
+const MAX_MESSAGE_LENGTH = 1000;
+
+// Helper: Check for spam and bots
+function isSpamming(userId, content) {
+    const now = Date.now();
+
+    if (!userMessageHistory[userId]) {
+        userMessageHistory[userId] = [];
+    }
+
+    // Clean up old history
+    userMessageHistory[userId] = userMessageHistory[userId].filter(m => (now - m.timestamp) < DUPLICATE_WINDOW);
+
+    const history = userMessageHistory[userId];
+
+    // 1. Rate Limiting (Token Bucket)
+    const recentMessages = history.filter(m => (now - m.timestamp) < RATE_LIMIT_WINDOW);
+    if (recentMessages.length >= RATE_LIMIT_TOKENS) {
+        return "Rate limit exceeded. Too many messages.";
+    }
+
+    // 2. Duplicate Message Detection
+    const isDuplicate = history.some(m => m.content === content && (now - m.timestamp) < DUPLICATE_WINDOW);
+    if (isDuplicate) {
+        return "Duplicate message detected. Please don't spam.";
+    }
+
+    // 3. Max Length
+    if (content.length > MAX_MESSAGE_LENGTH) {
+        return "Message too long.";
+    }
+
+    // Record this message
+    userMessageHistory[userId].push({ content, timestamp: now });
+    return null;
+}
 
 // Helper: Verify ECDSA signature
 function verifySignature(publicKeyHex, challenge, signatureHex) {
@@ -366,6 +410,14 @@ io.on('connection', (socket) => {
             return;
         }
 
+        const ip = socket.handshake.address;
+        const now = Date.now();
+        if (registrationRateLimit[ip] && (now - registrationRateLimit[ip] < 10000)) {
+            socket.emit('error', 'Please wait before registering again.');
+            return;
+        }
+        registrationRateLimit[ip] = now;
+
         const existingStoredId = usernames[cleanUsername.toLowerCase()];
 
         if (existingStoredId && existingStoredId !== existingId) {
@@ -455,6 +507,14 @@ io.on('connection', (socket) => {
     // --- 2. User Discovery ---
     socket.on('search_users', (query) => {
         if (!socket.user) return;
+
+        // Rate limit search
+        const now = Date.now();
+        if (lastSearchTime[socket.user.id] && (now - lastSearchTime[socket.user.id] < 1000)) {
+            return; // Silent ignore
+        }
+        lastSearchTime[socket.user.id] = now;
+
         if (!query || query.length < 2) return;
 
         const results = Object.values(users)
@@ -501,18 +561,17 @@ io.on('connection', (socket) => {
     socket.on('send_message', (data) => {
         if (!socket.user) return;
 
-        const now = Date.now();
-        // Rate limiting
-        if (lastMessageTime[socket.user.id] && (now - lastMessageTime[socket.user.id] < 1000)) {
-            socket.emit('error', 'Rate limit exceeded. Please wait 1s.');
-            return;
-        }
-        lastMessageTime[socket.user.id] = now;
-
         let { roomId, content, timestamp, signature } = data;
 
         // --- SECURITY: Input Validation ---
         if (!roomId || typeof content !== 'string' || content.trim().length === 0) return;
+
+        const spamError = isSpamming(socket.user.id, content.trim());
+        if (spamError) {
+            socket.emit('error', spamError);
+            return;
+        }
+        lastMessageTime[socket.user.id] = Date.now();
         if (!signature || !timestamp) {
             socket.emit('error', 'Security error: Message must be signed.');
             return;
@@ -520,7 +579,7 @@ io.on('connection', (socket) => {
 
         // --- SECURITY: Replay Attack Protection ---
         const msgTime = new Date(timestamp).getTime();
-        if (Math.abs(now - msgTime) > 60000) { // 60s window
+        if (Math.abs(Date.now() - msgTime) > 60000) { // 60s window
             socket.emit('error', 'Security error: Message timestamp expired (Replay attack?)');
             return;
         }

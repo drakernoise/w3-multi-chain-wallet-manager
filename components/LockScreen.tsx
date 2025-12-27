@@ -13,11 +13,12 @@ interface LockScreenProps {
   walletState: WalletState;
   setWalletState: React.Dispatch<React.SetStateAction<WalletState>>;
   lockReason?: string | null;
+  onToggleDetach?: () => void;
 }
 
 declare const chrome: any;
 
-export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, setWalletState, lockReason }) => {
+export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, setWalletState, lockReason, onToggleDetach }) => {
   const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -349,16 +350,15 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
 
       {/* Language Toggle & Pin Button */}
       <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
-        <button
-          onClick={() => {
-            // Toggle detached mode - same as Sidebar
-            window.dispatchEvent(new CustomEvent('toggle-detach'));
-          }}
-          className="p-2 text-slate-500 hover:text-slate-300 transition-colors"
-          title="Pin/Unpin Extension"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" /></svg>
-        </button>
+        {onToggleDetach && (
+          <button
+            onClick={onToggleDetach}
+            className="p-2 text-slate-500 hover:text-slate-300 transition-colors"
+            title="Pin/Unpin Extension"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" /></svg>
+          </button>
+        )}
         <LanguageToggle />
       </div>
 
