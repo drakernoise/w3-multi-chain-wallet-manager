@@ -12,7 +12,7 @@ function hexToBuffer(hexString) {
 async function signChallenge(challenge, privateKeyHex) {
   try {
     const privateKeyBuffer = hexToBuffer(privateKeyHex);
-    const cryptoLib = (typeof crypto !== "undefined" ? crypto : null) || (typeof self !== "undefined" && self.crypto ? self.crypto : null) || (typeof window !== "undefined" && window.crypto ? window.crypto : null);
+    const cryptoLib = (typeof crypto !== "undefined" ? crypto : null) || (typeof globalThis !== "undefined" && globalThis.crypto ? globalThis.crypto : null);
     if (!cryptoLib || !cryptoLib.subtle) {
       console.error("BG: Crypto Subtle API NOT available in this context");
       return null;
