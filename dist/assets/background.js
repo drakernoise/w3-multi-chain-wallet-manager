@@ -12,12 +12,12 @@ function hexToBuffer(hexString) {
 async function signChallenge(challenge, privateKeyHex) {
   try {
     const privateKeyBuffer = hexToBuffer(privateKeyHex);
-    const cryptoSubtle = crypto.subtle || self.crypto && self.crypto.subtle;
-    if (!cryptoSubtle) {
-      console.error("BG: Crypto Subtle not available");
+    const cryptoLib = (typeof crypto !== "undefined" ? crypto : null) || (typeof self !== "undefined" && self.crypto ? self.crypto : null) || (typeof window !== "undefined" && window.crypto ? window.crypto : null);
+    if (!cryptoLib || !cryptoLib.subtle) {
+      console.error("BG: Crypto Subtle API NOT available in this context");
       return null;
     }
-    const privateKey = await cryptoSubtle.importKey(
+    const privateKey = await cryptoLib.subtle.importKey(
       "pkcs8",
       privateKeyBuffer,
       { name: "ECDSA", namedCurve: "P-256" },
@@ -26,7 +26,7 @@ async function signChallenge(challenge, privateKeyHex) {
     );
     const encoder = new TextEncoder();
     const data = encoder.encode(challenge);
-    const signature = await cryptoSubtle.sign(
+    const signature = await cryptoLib.subtle.sign(
       { name: "ECDSA", hash: { name: "SHA-256" } },
       privateKey,
       data
