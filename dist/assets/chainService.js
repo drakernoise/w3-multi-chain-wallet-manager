@@ -1634,6 +1634,9 @@ class ChatService {
       room.messages.push(message);
       if (this.onMessage) this.onMessage(roomId, message);
       if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+      window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
+      const badge = document.getElementById("chat-badge");
+      if (badge) badge.classList.remove("hidden");
     }
   }
   getStoredPrivateKey() {

@@ -517,6 +517,12 @@ video {
 .inset-0 {
   inset: 0px;
 }
+.-right-1 {
+  right: -0.25rem;
+}
+.-top-1 {
+  top: -0.25rem;
+}
 .bottom-0 {
   bottom: 0px;
 }

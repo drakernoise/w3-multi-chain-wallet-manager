@@ -517,8 +517,17 @@ class ChatService {
         const room = this.rooms.find(r => r.id === roomId);
         if (room) {
             room.messages.push(message);
+
+            // UI Handler
             if (this.onMessage) this.onMessage(roomId, message);
             if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+
+            // Dispatch global event for Badge (Sidebar)
+            window.dispatchEvent(new CustomEvent('chat-unread', { detail: { roomId } }));
+
+            // Direct DOM manipulation fallback for Sidebar Badge
+            const badge = document.getElementById('chat-badge');
+            if (badge) badge.classList.remove('hidden');
         }
     }
 
