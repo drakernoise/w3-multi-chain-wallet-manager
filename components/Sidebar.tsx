@@ -76,6 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           }
           label={t('sidebar.messenger') || "Messenger"}
+          raw={true}
         />
         <div className="h-px w-8 bg-dark-600 my-1 shrink-0" />
         <NavIcon
@@ -117,14 +118,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
 };
 
-const NavIcon: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
+const NavIcon: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string; raw?: boolean }> = ({ active, onClick, icon, label, raw }) => (
   <button
     onClick={onClick}
     className={`group relative flex items-center justify-center w-10 h-10 rounded-lg transition-all ${active ? 'bg-dark-700 text-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.2)] scale-105 border border-dark-600' : 'text-slate-500 hover:bg-dark-700 hover:text-slate-300'}`}
   >
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      {icon}
-    </svg>
+    {raw ? icon : (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {icon}
+      </svg>
+    )}
     {/* Tooltip */}
     <span className="absolute left-12 bg-black px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-dark-600 z-50">
       {label}

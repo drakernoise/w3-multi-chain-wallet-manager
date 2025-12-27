@@ -2752,7 +2752,8 @@ const Sidebar = ({
             /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" }) }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { id: "chat-badge", className: "hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-dark-800 animate-pulse" })
           ] }),
-          label: t("sidebar.messenger") || "Messenger"
+          label: t("sidebar.messenger") || "Messenger",
+          raw: true
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "h-px w-8 bg-dark-600 my-1 shrink-0" }),
@@ -2798,13 +2799,13 @@ const Sidebar = ({
     ] })
   ] });
 };
-const NavIcon = ({ active, onClick, icon, label }) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+const NavIcon = ({ active, onClick, icon, label, raw }) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
   "button",
   {
     onClick,
     className: `group relative flex items-center justify-center w-10 h-10 rounded-lg transition-all ${active ? "bg-dark-700 text-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.2)] scale-105 border border-dark-600" : "text-slate-500 hover:bg-dark-700 hover:text-slate-300"}`,
     children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: icon }),
+      raw ? icon : /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: icon }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "absolute left-12 bg-black px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap border border-dark-600 z-50", children: label })
     ]
   }
