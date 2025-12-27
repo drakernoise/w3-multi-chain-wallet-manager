@@ -6325,6 +6325,7 @@ const ChatView = ({ onClose }) => {
   const [notification, setNotification] = reactExports.useState(null);
   const [chatModal, setChatModal] = reactExports.useState(null);
   const [modalInput, setModalInput] = reactExports.useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = reactExports.useState(false);
   const messagesEndRef = reactExports.useRef(null);
   const handleCreateRoom = () => {
     if (newRoomName.trim().length < 3) return;
@@ -6724,27 +6725,50 @@ const ChatView = ({ onClose }) => {
           }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: messagesEndRef })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-2 md:p-3 bg-dark-800 border-t border-dark-700", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 bg-dark-900 border border-dark-600 rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-purple-500/50 transition-all", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              className: "flex-1 bg-transparent px-1 text-white placeholder-slate-600 outline-none text-sm min-w-0",
-              placeholder: room.type === "dm" ? `Message ${cleanName}...` : `Message #${room.name}...`,
-              value: inputText,
-              onChange: (e) => setInputText(e.target.value),
-              onKeyDown: (e) => e.key === "Enter" && handleSend()
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-2 md:p-3 bg-dark-800 border-t border-dark-700 relative", children: [
+          showEmojiPicker && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute bottom-full left-2 mb-2 p-2 bg-dark-800 border border-dark-600 rounded-xl shadow-2xl z-50 grid grid-cols-8 gap-1 animate-fadeIn w-[280px]", children: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "👻", "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😻", "😼", "😽", "🙀", "😿", "😾"].map((emoji) => /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
-              onClick: handleSend,
-              disabled: !inputText.trim(),
-              className: "p-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:bg-dark-700 shrink-0",
-              children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8" }) })
-            }
-          )
-        ] }) })
+              onClick: () => {
+                setInputText((prev) => prev + emoji);
+                setShowEmojiPicker(false);
+              },
+              className: "hover:bg-dark-700 p-1 rounded transition-colors text-lg",
+              children: emoji
+            },
+            emoji
+          )) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 bg-dark-900 border border-dark-600 rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-purple-500/50 transition-all", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => setShowEmojiPicker(!showEmojiPicker),
+                className: `p-1.5 rounded-lg transition-colors ${showEmojiPicker ? "bg-purple-600/20 text-purple-400" : "text-slate-500 hover:text-slate-300"}`,
+                title: "Emojis",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }) })
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                className: "flex-1 bg-transparent px-1 text-white placeholder-slate-600 outline-none text-sm min-w-0",
+                placeholder: room.type === "dm" ? `Message ${cleanName}...` : `Message #${room.name}...`,
+                value: inputText,
+                onChange: (e) => setInputText(e.target.value),
+                onKeyDown: (e) => e.key === "Enter" && handleSend()
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: handleSend,
+                disabled: !inputText.trim(),
+                className: "p-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:bg-dark-700 shrink-0",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8" }) })
+              }
+            )
+          ] })
+        ] })
       ] });
     })() }),
     activeRoomId && showParticipants && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute right-0 top-0 bottom-0 w-64 bg-dark-800 border-l border-dark-700 flex flex-col z-50 shadow-2xl", children: [

@@ -30,6 +30,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
     const [chatModal, setChatModal] = useState<{ type: 'invite' | 'confirm_delete' | 'confirm_kick' | 'confirm_ban', data?: any } | null>(null);
     const [modalInput, setModalInput] = useState('');
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -517,8 +518,31 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             </div>
 
                             {/* Input Area */}
-                            <div className="p-2 md:p-3 bg-dark-800 border-t border-dark-700">
+                            <div className="p-2 md:p-3 bg-dark-800 border-t border-dark-700 relative">
+                                {showEmojiPicker && (
+                                    <div className="absolute bottom-full left-2 mb-2 p-2 bg-dark-800 border border-dark-600 rounded-xl shadow-2xl z-50 grid grid-cols-8 gap-1 animate-fadeIn w-[280px]">
+                                        {['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃', '😺', '😸', '😻', '😼', '😽', '🙀', '😿', '😾'].map(emoji => (
+                                            <button
+                                                key={emoji}
+                                                onClick={() => {
+                                                    setInputText(prev => prev + emoji);
+                                                    setShowEmojiPicker(false);
+                                                }}
+                                                className="hover:bg-dark-700 p-1 rounded transition-colors text-lg"
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-2 bg-dark-900 border border-dark-600 rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-purple-500/50 transition-all">
+                                    <button
+                                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                        className={`p-1.5 rounded-lg transition-colors ${showEmojiPicker ? 'bg-purple-600/20 text-purple-400' : 'text-slate-500 hover:text-slate-300'}`}
+                                        title="Emojis"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    </button>
                                     <input
                                         className="flex-1 bg-transparent px-1 text-white placeholder-slate-600 outline-none text-sm min-w-0"
                                         placeholder={room.type === 'dm' ? `Message ${cleanName}...` : `Message #${room.name}...`}

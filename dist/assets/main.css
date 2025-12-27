@@ -902,6 +902,9 @@ video {
 .w-80 {
   width: 20rem;
 }
+.w-\[280px\] {
+  width: 280px;
+}
 .w-\[400px\] {
   width: 400px;
 }
@@ -1069,6 +1072,9 @@ video {
 }
 .grid-cols-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.grid-cols-8 {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 .flex-row-reverse {
   flex-direction: row-reverse;
