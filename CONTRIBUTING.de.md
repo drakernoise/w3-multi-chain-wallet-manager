@@ -1,6 +1,6 @@
 # Zu Gravity Wallet Beitragen
 
-**Sprachen:** [🇬🇧 English](CONTRIBUTING.md) | [🇪🇸 Español](CONTRIBUTING.es.md) | [🇫🇷 Français](CONTRIBUTING.fr.md) | [🇩🇪 Deutsch](CONTRIBUTING.de.md) | [🇮🇹 Italiano](CONTRIBUTING.it.md)
+**Sprachen:** [English](CONTRIBUTING.md) | [Español](CONTRIBUTING.es.md) | [Français](CONTRIBUTING.fr.md) | [Deutsch](CONTRIBUTING.de.md) | [Italiano](CONTRIBUTING.it.md)
 
 ---
 

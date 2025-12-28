@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🚀 Gravity Wallet Backup Script${NC}"
+echo -e "${BLUE}Gravity Wallet Backup Script${NC}"
 echo "=================================="
 
 # Get version from package.json
@@ -24,14 +24,14 @@ if [ ! -z "$1" ]; then
     TAG="$1"
 fi
 
-echo -e "${YELLOW}📦 Version: ${VERSION}${NC}"
-echo -e "${YELLOW}🏷️  Tag: ${TAG}${NC}"
+echo -e "${YELLOW}Version: ${VERSION}${NC}"
+echo -e "${YELLOW}Tag: ${TAG}${NC}"
 echo ""
 
 # Step 1: Check for uncommitted changes
 echo -e "${BLUE}Step 1: Checking for changes...${NC}"
 if [[ -n $(git status -s) ]]; then
-    echo "✅ Changes detected"
+    echo "Changes detected"
     
     # Show what will be committed
     git status -s
@@ -43,23 +43,23 @@ if [[ -n $(git status -s) ]]; then
     # Commit with descriptive message
     COMMIT_MSG="backup: Production snapshot ${TAG}"
     git commit -m "$COMMIT_MSG"
-    echo -e "${GREEN}✅ Changes committed${NC}"
+    echo -e "${GREEN}Changes committed${NC}"
 else
-    echo "ℹ️  No changes to commit"
+    echo "No changes to commit"
 fi
 
 # Step 2: Create tag
 echo ""
 echo -e "${BLUE}Step 2: Creating tag...${NC}"
 git tag -a "$TAG" -m "Automated production backup - $(date)"
-echo -e "${GREEN}✅ Tag created: ${TAG}${NC}"
+echo -e "${GREEN}Tag created: ${TAG}${NC}"
 
 # Step 3: Push to GitHub
 echo ""
 echo -e "${BLUE}Step 3: Pushing to GitHub...${NC}"
 git push origin main
 git push origin "$TAG"
-echo -e "${GREEN}✅ Pushed to GitHub${NC}"
+echo -e "${GREEN}Pushed to GitHub${NC}"
 
 # Step 4: Create backup branch
 echo ""
@@ -67,18 +67,18 @@ echo -e "${BLUE}Step 4: Creating backup branch...${NC}"
 BACKUP_BRANCH="backup/production-$(date +%Y-%m-%d)"
 git branch "$BACKUP_BRANCH"
 git push origin "$BACKUP_BRANCH"
-echo -e "${GREEN}✅ Backup branch created: ${BACKUP_BRANCH}${NC}"
+echo -e "${GREEN}Backup branch created: ${BACKUP_BRANCH}${NC}"
 
 # Summary
 echo ""
 echo -e "${GREEN}=================================="
-echo "✅ Backup Complete!"
+echo "Backup Complete!"
 echo "==================================${NC}"
 echo ""
-echo "📌 Tag: $TAG"
-echo "🌿 Branch: $BACKUP_BRANCH"
+echo "Tag: $TAG"
+echo "Branch: $BACKUP_BRANCH"
 echo ""
-echo "🔗 Next steps:"
+echo "Next steps:"
 echo "   1. Go to: https://github.com/YOUR_USERNAME/YOUR_REPO/releases"
 echo "   2. Click 'Create a new release'"
 echo "   3. Select tag: $TAG"

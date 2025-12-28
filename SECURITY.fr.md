@@ -1,6 +1,6 @@
 # Politique de Sécurité
 
-**Langues:** [🇬🇧 English](SECURITY.md) | [🇪🇸 Español](SECURITY.es.md) | [🇫🇷 Français](SECURITY.fr.md) | [🇩🇪 Deutsch](SECURITY.de.md) | [🇮🇹 Italiano](SECURITY.it.md)
+**Langues:** [English](SECURITY.md) | [Español](SECURITY.es.md) | [Français](SECURITY.fr.md) | [Deutsch](SECURITY.de.md) | [Italiano](SECURITY.it.md)
 
 ---
 

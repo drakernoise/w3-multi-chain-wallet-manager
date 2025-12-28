@@ -1,4 +1,4 @@
-# 🚀 Despliegue de Gravity Chat Server
+# Despliegue de Gravity Chat Server
 
 He preparado este repositorio para que puedas desplegar el servidor de chat en la nube de forma sencilla. El servidor es un servicio independiente de Node.js que vive en la carpeta `/chat-server`.
 
@@ -15,7 +15,7 @@ Render es excelente porque detectará automáticamente el archivo `render.yaml` 
 5.  **Aprobar**: Render leerá el archivo `render.yaml` y te mostrará que va a crear un servicio llamado `gravity-chat-server`. Dale a **"Apply"**.
 6.  **Espera a que termine**: Una vez que el estado sea "Live", Render te dará una URL (ej: `https://gravity-chat-server.onrender.com`).
 
-## 🔗 Vincular la Extensión con la Nube
+## Vincular la Extensión con la Nube
 
 Una vez que tengas tu URL de Render:
 
@@ -27,6 +27,6 @@ Una vez que tengas tu URL de Render:
 
 ---
 
-### ⚠️ Notas sobre el plan gratuito de Render:
+### Notas sobre el plan gratuito de Render:
 - **Spin-down**: Si no hay actividad, el servidor entra en "reposo". El primer usuario que entre al chat tardará unos 30-50 segundos en conectar mientras el servidor "despierta".
 - **Persistencia**: En el plan gratuito, los mensajes y usuarios se borrarán si el servidor se reinicia (cada vez que subas código nuevo). Para evitarlo, Render ofrece "Disks" (discos persistentes) por un pequeño precio mensual.

@@ -86,7 +86,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         };
 
         chatService.onRoomUpdated = (updatedRooms) => {
-            console.log(`🔄 ChatView: Updating rooms state with ${updatedRooms.length} rooms`);
+            console.log(`ChatView: Updating rooms state with ${updatedRooms.length} rooms`);
             console.trace('Stack trace:'); // This will show us WHO is calling this
             setRooms(updatedRooms);
         };
@@ -411,7 +411,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             className={`p-3 rounded-lg cursor-pointer flex flex-col transition-colors ${activeRoomId === room.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'hover:bg-dark-700 text-slate-300'}`}
                         >
                             <div className="font-bold text-sm flex items-center gap-2">
-                                <span className="opacity-70 text-xs">{room.type === 'public' ? '#' : '🔒'}</span> {room.name}
+                                <span className="opacity-70 text-xs">{room.type === 'public' ? '#' : '[P]'}</span> {room.name}
                             </div>
                         </div>
                     ))}
@@ -475,7 +475,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                             </span>
                                             {(room.type === 'private' || isOwner) && (
                                                 <div className="flex items-center gap-1.5 -mt-0.5">
-                                                    {room.type === 'private' && <span className="text-[8px] text-orange-400/80 flex items-center gap-0.5 uppercase tracking-tighter">🔒 Private</span>}
+                                                    {room.type === 'private' && <span className="text-[8px] text-orange-400/80 flex items-center gap-0.5 uppercase tracking-tighter">Private</span>}
                                                     {isOwner && <span className="text-[8px] text-purple-400 font-bold flex items-center gap-0.5 uppercase tracking-tighter">☆ Owner</span>}
                                                 </div>
                                             )}

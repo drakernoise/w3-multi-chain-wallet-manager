@@ -110,7 +110,7 @@ class ChatService {
         this.socket.on('auth_success', (data: any) => {
             // Prevent duplicate auth_success from triggering infinite updates
             if (this.userId === data.id && this.rooms.length > 0) {
-                console.log(`⚠️ Ignoring duplicate auth_success for ${data.username}`);
+                console.log(`Ignoring duplicate auth_success for ${data.username}`);
                 return;
             }
 
@@ -124,11 +124,11 @@ class ChatService {
                 unreadCount: 0
             }));
 
-            console.log(`✅ Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map(r => r.name));
+            console.log(`Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map(r => r.name));
 
             // Handle pending invites
             if (data.pendingInvites && data.pendingInvites.length > 0) {
-                console.log(`📬 Received ${data.pendingInvites.length} pending invites`);
+                console.log(`Received ${data.pendingInvites.length} pending invites`);
 
                 // Update badge
                 if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -193,15 +193,15 @@ class ChatService {
 
         // Rooms management
         this.socket.on('room_added', (roomData: ChatRoom) => {
-            console.log(`🆕 room_added event received:`, roomData);
+            console.log(`room_added event received:`, roomData);
             if (this.rooms.find(r => r.id === roomData.id)) {
-                console.log(`⚠️ Room ${roomData.name} already exists, skipping`);
+                console.log(`Room ${roomData.name} already exists, skipping`);
                 return;
             }
             // Add to local list
             const newRoom = { ...roomData, messages: [], unreadCount: 0 };
             this.rooms.push(newRoom);
-            console.log(`✅ Added room to local list. Total rooms: ${this.rooms.length}`);
+            console.log(`Added room to local list. Total rooms: ${this.rooms.length}`);
             this.notifyRoomUpdate();
             if (this.onRoomAdded) this.onRoomAdded(newRoom);
         });

@@ -15,7 +15,7 @@ if (!fs.existsSync(WIKI_DIR)) {
    fs.mkdirSync(WIKI_DIR, { recursive: true });
 }
 
-console.log('🌍 Generating multilingual wiki pages...\n');
+console.log('Generating multilingual wiki pages...\n');
 
 // German (DE) - Getting Started
 const gettingStartedDE = `# Erste Schritte mit Gravity Wallet
@@ -137,25 +137,25 @@ Gravity Wallet ist kompatibel mit jeder dApp, die die Hive Keychain API unterst�
 - **Splinterlands**: Gaming
 - **Und viele mehr!**
 
-## Sicherheits-Best-Practices
+### Sicherheits-Best-Practices
 
 ### Passwort-Sicherheit
-- ✅ Verwenden Sie ein einzigartiges, starkes Passwort
-- ✅ Teilen Sie Ihr Passwort niemals
-- ✅ Speichern Sie das Passwort in einem Passwort-Manager
-- ❌ Verwenden Sie nicht dasselbe Passwort wie bei anderen Diensten
+- Verwenden Sie ein einzigartiges, starkes Passwort
+- Teilen Sie Ihr Passwort niemals
+- Speichern Sie das Passwort in einem Passwort-Manager
+- Verwenden Sie nicht dasselbe Passwort wie bei anderen Diensten
 
 ### Schlüsselverwaltung
-- ✅ Importieren Sie nur die Schlüssel, die Sie benötigen
-- ✅ Bewahren Sie eine Offline-Sicherung Ihrer Schlüssel auf
-- ✅ Verwenden Sie den Posting-Schlüssel für tägliche Aktivitäten
-- ❌ Teilen Sie Ihre privaten Schlüssel niemals mit jemandem
+- Importieren Sie nur die Schlüssel, die Sie benötigen
+- Bewahren Sie eine Offline-Sicherung Ihrer Schlüssel auf
+- Verwenden Sie den Posting-Schlüssel für tägliche Aktivitäten
+- Teilen Sie Ihre privaten Schlüssel niemals mit jemandem
 
 ### Browser-Sicherheit
-- ✅ Halten Sie Ihren Browser aktuell
-- ✅ Installieren Sie nur Erweiterungen aus vertrauenswürdigen Quellen
-- ✅ Sperren Sie Ihre Wallet, wenn sie nicht verwendet wird
-- ❌ Verwenden Sie sie nicht auf öffentlichen/gemeinsam genutzten Computern
+- Halten Sie Ihren Browser aktuell
+- Installieren Sie nur Erweiterungen aus vertrauenswürdigen Quellen
+- Sperren Sie Ihre Wallet, wenn sie nicht verwendet wird
+- Verwenden Sie sie nicht auf öffentlichen/gemeinsam genutzten Computern
 
 ## Nächste Schritte
 
@@ -170,7 +170,7 @@ Gravity Wallet ist kompatibel mit jeder dApp, die die Hive Keychain API unterst�
 `;
 
 fs.writeFileSync(path.join(WIKI_DIR, 'Getting-Started-DE.md'), gettingStartedDE);
-console.log('✅ Created: Getting-Started-DE.md');
+console.log('Created: Getting-Started-DE.md');
 
 // Italian (IT) - Getting Started
 const gettingStartedIT = `# Iniziare con Gravity Wallet
@@ -295,22 +295,22 @@ Gravity Wallet è compatibile con qualsiasi dApp che supporti l'API Hive Keychai
 ## Migliori Pratiche di Sicurezza
 
 ### Sicurezza della Password
-- ✅ Usa una password unica e forte
-- ✅ Non condividere mai la tua password
-- ✅ Conserva la password in un gestore di password
-- ❌ Non usare la stessa password di altri servizi
+- Usa una password unica e forte
+- Non condividere mai la tua password
+- Conserva la password in un gestore di password
+- Non usare la stessa password di altri servizi
 
 ### Gestione delle Chiavi
-- ✅ Importa solo le chiavi di cui hai bisogno
-- ✅ Mantieni un backup delle tue chiavi offline
-- ✅ Usa la chiave di posting per attività quotidiane
-- ❌ Non condividere mai le tue chiavi private con nessuno
+- Importa solo le chiavi di cui hai bisogno
+- Mantieni un backup delle tue chiavi offline
+- Usa la chiave di posting per attività quotidiane
+- Non condividere mai le tue chiavi private con nessuno
 
 ### Sicurezza del Browser
-- ✅ Mantieni il tuo browser aggiornato
-- ✅ Installa solo estensioni da fonti affidabili
-- ✅ Blocca il tuo portafoglio quando non lo usi
-- ❌ Non usare su computer pubblici/condivisi
+- Mantieni il tuo browser aggiornato
+- Installa solo estensioni da fonti affidabili
+- Blocca il tuo portafoglio quando non lo usi
+- Non usare su computer pubblici/condivisi
 
 ## Prossimi Passi
 
@@ -325,8 +325,8 @@ Gravity Wallet è compatibile con qualsiasi dApp che supporti l'API Hive Keychai
 `;
 
 fs.writeFileSync(path.join(WIKI_DIR, 'Getting-Started-IT.md'), gettingStartedIT);
-console.log('✅ Created: Getting-Started-IT.md');
+console.log('Created: Getting-Started-IT.md');
 
-console.log('\n✨ Wiki translation generation complete!');
-console.log('📝 Note: Full User Guide and Troubleshooting translations are extensive.');
-console.log('💡 Consider using professional translation services for production use.\n');
+console.log('\nWiki translation generation complete!');
+console.log('Note: Full User Guide and Troubleshooting translations are extensive.');
+console.log('Consider using professional translation services for production use.\n');

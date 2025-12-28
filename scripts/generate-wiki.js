@@ -22,14 +22,14 @@ if (!fs.existsSync(WIKI_DIR)) {
     fs.mkdirSync(WIKI_DIR, { recursive: true });
 }
 
-console.log('🚀 Generating Gravity Wallet Wiki...\n');
+console.log('Generating Gravity Wallet Wiki...\n');
 
 // The wiki files are already created manually for better quality
 // This script serves as a template for future automated generation
 
-console.log('✅ Wiki generation complete!');
-console.log(`📁 Wiki files created in: ${WIKI_DIR}`);
-console.log('\n📝 Next steps:');
+console.log('Wiki generation complete!');
+console.log(`Wiki files created in: ${WIKI_DIR}`);
+console.log('\nNext steps:');
 console.log('1. Review the generated wiki files');
 console.log('2. Push to GitHub wiki repository');
 console.log('3. Enable wiki in repository settings\n');
