@@ -1135,6 +1135,23 @@ async function tryRestoreSession() {
   }
   return false;
 }
+async function generateEncryptionKeys() {
+  return window.crypto.subtle.generateKey(
+    {
+      name: "ECDH",
+      namedCurve: "P-256"
+    },
+    true,
+    // extractable
+    ["deriveKey", "deriveBits"]
+  );
+}
+async function exportKeyToBase64(key) {
+  const format = key.type === "public" ? "spki" : "pkcs8";
+  const exported = await window.crypto.subtle.exportKey(format, key);
+  const buffer = new Uint8Array(exported);
+  return btoa(String.fromCharCode(...buffer));
+}
 
 otplibExports.authenticator.options = { window: 1 };
 const STORAGE_KEY = "device_totp_secret";
@@ -1435,32 +1452,61 @@ class ChatService {
     this.socket.on("user_offline", (userId) => this.handleUserStatusChange(userId, false));
   }
   // --- CRYPTO & AUTH ---
+  // --- CRYPTO & AUTH ---
   async generateAndSaveIdentity() {
-    const keyPair = await crypto.subtle.generateKey(
+    const signKeys = await crypto.subtle.generateKey(
       { name: "ECDSA", namedCurve: "P-256" },
       true,
       ["sign", "verify"]
     );
-    const exportedPub = await crypto.subtle.exportKey("spki", keyPair.publicKey);
-    const exportedPriv = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-    const publicKeyHex = this.bufferToHex(new Uint8Array(exportedPub));
-    const privateKeyHex = this.bufferToHex(new Uint8Array(exportedPriv));
+    const signPubInfo = await crypto.subtle.exportKey("spki", signKeys.publicKey);
+    const signPrivInfo = await crypto.subtle.exportKey("pkcs8", signKeys.privateKey);
+    const publicKeyHex = this.bufferToHex(new Uint8Array(signPubInfo));
+    const privateKeyHex = this.bufferToHex(new Uint8Array(signPrivInfo));
+    const encKeys = await generateEncryptionKeys();
+    const encPubB64 = await exportKeyToBase64(encKeys.publicKey);
+    const encPrivB64 = await exportKeyToBase64(encKeys.privateKey);
     localStorage.setItem("gravity_chat_priv", privateKeyHex);
     localStorage.setItem("gravity_chat_pub", publicKeyHex);
+    localStorage.setItem("gravity_chat_enc_priv", encPrivB64);
+    localStorage.setItem("gravity_chat_enc_pub", encPubB64);
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({
         type: "CHAT_SYNC_CREDS",
         data: {
           privateKey: privateKeyHex,
-          publicKey: publicKeyHex
+          publicKey: publicKeyHex,
+          // We don't necessarily need to sync enc keys to BG unless BG does decryption, 
+          // but good for consistency.
+          encPrivateKey: encPrivB64,
+          encPublicKey: encPubB64
         }
       });
     }
-    return { publicKey: publicKeyHex, privateKey: privateKeyHex };
+    return {
+      publicKey: publicKeyHex,
+      privateKey: privateKeyHex,
+      encryptionPublicKey: encPubB64,
+      encryptionPrivateKey: encPrivB64
+    };
+  }
+  async ensureEncryptionKeys() {
+    let encPub = localStorage.getItem("gravity_chat_enc_pub");
+    let encPriv = localStorage.getItem("gravity_chat_enc_priv");
+    if (!encPub || !encPriv) {
+      console.log("Generating missing E2EE Encryption Keys...");
+      const encKeys = await generateEncryptionKeys();
+      encPub = await exportKeyToBase64(encKeys.publicKey);
+      encPriv = await exportKeyToBase64(encKeys.privateKey);
+      localStorage.setItem("gravity_chat_enc_priv", encPriv);
+      localStorage.setItem("gravity_chat_enc_pub", encPub);
+    }
+    return encPub;
   }
   async authenticateWithSignature(userId, username) {
     if (!this.socket) return;
-    this.socket.emit("request_challenge", { userId, username });
+    const encPub = await this.ensureEncryptionKeys();
+    this.socket.emit("request_challenge", { userId, username, encryptionPublicKey: encPub });
   }
   async signChallenge(challenge, privateKeyHex) {
     const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
@@ -1515,6 +1561,7 @@ class ChatService {
     const storedKey = this.getStoredPrivateKey();
     if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
       console.log("Local keys found, performing cryptographic login recovery...");
+      await this.ensureEncryptionKeys();
       if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
         chrome.runtime.sendMessage({
           type: "CHAT_SYNC_CREDS",
@@ -1535,7 +1582,8 @@ class ChatService {
     }
     this.socket?.emit("register", {
       username,
-      publicKey: keys.publicKey
+      publicKey: keys.publicKey,
+      encryptionPublicKey: keys.encryptionPublicKey
     });
   }
   async sendMessage(roomId, content) {

@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import { generateEncryptionKeys, exportKeyToBase64 } from './cryptoService';
 
 // Define Chat Types
 export interface ChatUser {
@@ -298,20 +299,31 @@ class ChatService {
 
     // --- CRYPTO & AUTH ---
 
-    private async generateAndSaveIdentity(): Promise<{ publicKey: string, privateKey: string }> {
-        const keyPair = await crypto.subtle.generateKey(
+    // --- CRYPTO & AUTH ---
+
+    private async generateAndSaveIdentity(): Promise<{ publicKey: string, privateKey: string, encryptionPublicKey: string, encryptionPrivateKey: string }> {
+        // 1. Signing Keys (ECDSA)
+        const signKeys = await crypto.subtle.generateKey(
             { name: 'ECDSA', namedCurve: 'P-256' },
             true,
             ['sign', 'verify']
         );
-        const exportedPub = await crypto.subtle.exportKey('spki', keyPair.publicKey);
-        const exportedPriv = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+        const signPubInfo = await crypto.subtle.exportKey('spki', signKeys.publicKey);
+        const signPrivInfo = await crypto.subtle.exportKey('pkcs8', signKeys.privateKey);
 
-        const publicKeyHex = this.bufferToHex(new Uint8Array(exportedPub));
-        const privateKeyHex = this.bufferToHex(new Uint8Array(exportedPriv));
+        const publicKeyHex = this.bufferToHex(new Uint8Array(signPubInfo));
+        const privateKeyHex = this.bufferToHex(new Uint8Array(signPrivInfo));
 
+        // 2. Encryption Keys (ECDH)
+        const encKeys = await generateEncryptionKeys();
+        const encPubB64 = await exportKeyToBase64(encKeys.publicKey);
+        const encPrivB64 = await exportKeyToBase64(encKeys.privateKey);
+
+        // Save All
         localStorage.setItem('gravity_chat_priv', privateKeyHex);
         localStorage.setItem('gravity_chat_pub', publicKeyHex);
+        localStorage.setItem('gravity_chat_enc_priv', encPrivB64);
+        localStorage.setItem('gravity_chat_enc_pub', encPubB64);
 
         // Sync with background script for notifications
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
@@ -319,19 +331,44 @@ class ChatService {
                 type: 'CHAT_SYNC_CREDS',
                 data: {
                     privateKey: privateKeyHex,
-                    publicKey: publicKeyHex
+                    publicKey: publicKeyHex,
+                    // We don't necessarily need to sync enc keys to BG unless BG does decryption, 
+                    // but good for consistency.
+                    encPrivateKey: encPrivB64,
+                    encPublicKey: encPubB64
                 }
             });
         }
 
-        return { publicKey: publicKeyHex, privateKey: privateKeyHex };
+        return {
+            publicKey: publicKeyHex,
+            privateKey: privateKeyHex,
+            encryptionPublicKey: encPubB64,
+            encryptionPrivateKey: encPrivB64
+        };
+    }
+
+    private async ensureEncryptionKeys(): Promise<string | null> {
+        let encPub = localStorage.getItem('gravity_chat_enc_pub');
+        let encPriv = localStorage.getItem('gravity_chat_enc_priv');
+
+        if (!encPub || !encPriv) {
+            console.log("Generating missing E2EE Encryption Keys...");
+            const encKeys = await generateEncryptionKeys();
+            encPub = await exportKeyToBase64(encKeys.publicKey);
+            encPriv = await exportKeyToBase64(encKeys.privateKey);
+            localStorage.setItem('gravity_chat_enc_priv', encPriv);
+            localStorage.setItem('gravity_chat_enc_pub', encPub);
+        }
+        return encPub;
     }
 
     public async authenticateWithSignature(userId?: string | null, username?: string | null): Promise<void> {
         if (!this.socket) return;
-        // Trigger server to send challenge. 
-        // We can now request by ID or by Username (for recovery)
-        this.socket.emit('request_challenge', { userId, username });
+        // Ensure we send encryption key during auth too, to backfill server if needed
+        const encPub = await this.ensureEncryptionKeys();
+
+        this.socket.emit('request_challenge', { userId, username, encryptionPublicKey: encPub });
     }
 
     private async signChallenge(challenge: string, privateKeyHex: string): Promise<string> {
@@ -397,6 +434,8 @@ class ChatService {
         // FIXED: If we already have keys for this username, don't register, just LOGIN
         if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
             console.log("Local keys found, performing cryptographic login recovery...");
+            await this.ensureEncryptionKeys();
+
             // Sync with background
             if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                 chrome.runtime.sendMessage({
@@ -424,7 +463,8 @@ class ChatService {
 
         this.socket?.emit('register', {
             username,
-            publicKey: keys.publicKey
+            publicKey: keys.publicKey,
+            encryptionPublicKey: keys.encryptionPublicKey
         });
     }
 
