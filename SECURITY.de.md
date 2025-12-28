@@ -51,7 +51,7 @@ Bitte geben Sie an:
 
 ### Sicherheit Privater Schlüssel
 
-⚠️ **KRITISCH:** Gravity Wallet speichert Ihre privaten Schlüssel lokal im verschlüsselten Speicher Ihres Browsers.
+**KRITISCH:** Gravity Wallet speichert Ihre privaten Schlüssel lokal im verschlüsselten Speicher Ihres Browsers.
 
 **Best Practices:**
 1. **Teilen Sie niemals Ihre privaten Schlüssel** mit jemandem

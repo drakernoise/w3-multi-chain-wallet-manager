@@ -485,7 +485,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 <div className="flex gap-1.5 items-center shrink-0 ml-2">
                                     <button
                                         onClick={() => {
-                                            console.log('👥 Toggling participants panel:', !showParticipants);
+                                            console.log('Toggling participants panel:', !showParticipants);
                                             setShowParticipants(!showParticipants);
                                         }}
                                         className={`p-2 rounded-lg transition-all active:scale-95 ${showParticipants ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' : 'text-slate-400 hover:bg-dark-700'}`}
@@ -717,7 +717,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             const currentRoom = rooms.find(r => r.id === activeRoomId);
                             const members = currentRoom?.memberDetails;
 
-                            console.log('🔍 Room participants debug:', {
+                            console.log('Room participants debug:', {
                                 roomId: activeRoomId,
                                 room: currentRoom,
                                 memberDetails: members,

@@ -1,46 +1,46 @@
 ---
-name: 🐛 Segnalazione Bug
+name: Segnalazione Bug
 about: Segnala un bug per aiutarci a migliorare
 title: '[BUG] '
 labels: bug
 assignees: ''
 ---
 
-**🌐 Lingua / Language / Idioma / Langue / Sprache:**
-🇬🇧 [English](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues/new?template=bug_report.md) | 🇪🇸 [Español](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues/new?template=bug_report_es.md) | 🇫🇷 [Français](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues/new?template=bug_report_fr.md) | 🇩🇪 [Deutsch](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues/new?template=bug_report_de.md) | 🇮🇹 Italiano
+**Lingua / Language / Idioma / Langue / Sprache:**
+[English](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues/new?template=bug_report.md) | [Español](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues/new?template=bug_report_es.md) | [Français](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues/new?template=bug_report_fr.md) | [Deutsch](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues/new?template=bug_report_de.md) | Italiano
 
 ---
 
-## 🐛 Descrizione del Bug
+## Descrizione del Bug
 
 
-## 📋 Passaggi per Riprodurre
+## Passaggi per Riprodurre
 1. Vai a '...'
 2. Clicca su '...'
 3. Vedi errore
 
-## 💡 Comportamento Atteso
+## Comportamento Atteso
 
 
-## 🔴 Comportamento Effettivo
+## Comportamento Effettivo
 
 
-## 📸 Screenshot
+## Screenshot
 
 
-## 🖥️ Ambiente
+## Ambiente
 - **Browser:** [es., Chrome 120]
 - **Sistema Operativo:** [es., Windows 11]
 - **Versione Estensione:** [es., 1.0.4]
 - **Blockchain:** [es., Hive, Steem, Blurt]
 - **Frontend:** [es., PeakD, Steemit]
 
-## 📋 Log Console
+## Log di Console
 ```
 Incolla i log qui
 ```
 
-## ✅ Checklist
+## Checklist
 - [ ] Ho cercato issue simili
 - [ ] Ho controllato la documentazione
 - [ ] Questa non è una vulnerabilità di sicurezza

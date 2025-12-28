@@ -51,7 +51,7 @@ Si prega di fornire:
 
 ### Sicurezza delle Chiavi Private
 
-⚠️ **CRITICO:** Gravity Wallet memorizza le tue chiavi private localmente nell'archivio crittografato del tuo browser.
+**CRITICO:** Gravity Wallet memorizza le tue chiavi private localmente nell'archivio crittografato del tuo browser.
 
 **Migliori Pratiche:**
 1. **Non condividere mai le tue chiavi private** con nessuno

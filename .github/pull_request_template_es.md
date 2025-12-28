@@ -1,26 +1,26 @@
 # Pull Request
 
-**🌐 Idioma:** 🇬🇧 [English](pull_request_template.md) | 🇪🇸 Español | 🇫🇷 [Français](pull_request_template_fr.md) | 🇩🇪 [Deutsch](pull_request_template_de.md) | 🇮🇹 [Italiano](pull_request_template_it.md)
+**Idioma:** [English](pull_request_template.md) | Español | [Français](pull_request_template_fr.md) | [Deutsch](pull_request_template_de.md) | [Italiano](pull_request_template_it.md)
 
 ---
 
-## 📝 Descripción
+## Descripción
 
 
-## 🔗 Issues Relacionados
+## Issues Relacionados
 Cierra #
 Relacionado con #
 
-## 🎯 Tipo de Cambio
-- [ ] 🐛 Corrección de bug
-- [ ] ✨ Nueva función
-- [ ] 💥 Cambio que rompe compatibilidad
-- [ ] 📝 Actualización de documentación
-- [ ] 🎨 Mejora de UI/UX
-- [ ] ⚡ Mejora de rendimiento
-- [ ] ♻️ Refactorización de código
+## Tipo de Cambio
+- [ ] Corrección de bug
+- [ ] Nueva función
+- [ ] Cambio que rompe compatibilidad
+- [ ] Actualización de documentación
+- [ ] Mejora de UI/UX
+- [ ] Mejora de rendimiento
+- [ ] Refactorización de código
 
-## 🧪 Pruebas
+## Pruebas
 
 ### Entorno de Prueba
 - **Navegador:** 
@@ -33,13 +33,13 @@ Relacionado con #
 - [ ] Probado en Blurt
 - [ ] Sin errores en consola
 
-## 📸 Capturas de Pantalla
+## Capturas de Pantalla
 
 ### Antes
 
 ### Después
 
-## 📋 Lista de Verificación
+## Lista de Verificación
 
 ### Calidad del Código
 - [ ] Mi código sigue las guías de estilo del proyecto

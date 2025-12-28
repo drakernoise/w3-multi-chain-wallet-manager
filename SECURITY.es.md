@@ -66,7 +66,7 @@ Por favor proporciona:
 
 ### Seguridad de Claves Privadas
 
-⚠️ **CRÍTICO:** Gravity Wallet almacena tus claves privadas localmente en el almacenamiento encriptado de tu navegador.
+**CRÍTICO:** Gravity Wallet almacena tus claves privadas localmente en el almacenamiento encriptado de tu navegador.
 
 **Mejores Prácticas:**
 1. **Nunca compartas tus claves privadas** con nadie

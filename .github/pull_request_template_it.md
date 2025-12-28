@@ -1,27 +1,27 @@
 # Pull Request
 
-**🌐 Lingua:** 🇬🇧 [English](pull_request_template.md) | 🇪🇸 [Español](pull_request_template_es.md) | 🇫🇷 [Français](pull_request_template_fr.md) | 🇩🇪 [Deutsch](pull_request_template_de.md) | 🇮🇹 Italiano
+**Lingua:** [English](pull_request_template.md) | [Español](pull_request_template_es.md) | [Français](pull_request_template_fr.md) | [Deutsch](pull_request_template_de.md) | Italiano
 
 ---
 
-## 📝 Descrizione
+## Descrizione
 
-## 🔗 Issue Correlati
+## Issue Correlati
 Chiude #
 
-## 🎯 Tipo di Modifica
-- [ ] 🐛 Correzione bug
-- [ ] ✨ Nuova funzionalità
-- [ ] 💥 Breaking change
-- [ ] 📝 Documentazione
-- [ ] 🎨 UI/UX
-- [ ] ⚡ Performance
+## Tipo di Modifica
+- [ ] Correzione bug
+- [ ] Nuova funzionalità
+- [ ] Breaking change
+- [ ] Documentazione
+- [ ] UI/UX
+- [ ] Performance
 
-## 🧪 Test
+## Test
 - [ ] Testato su Hive/Steem/Blurt
 - [ ] Nessun errore console
 
-## 📋 Checklist
+## Checklist
 - [ ] Il codice segue le linee guida di stile
 - [ ] Auto-revisione completata
 - [ ] Documentazione aggiornata

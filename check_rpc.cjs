@@ -34,27 +34,27 @@ async function checkNode(url) {
                 try {
                     const json = JSON.parse(body);
                     if (json.result) {
-                        console.log(`✅ [${res.statusCode}] ${url} - ${time}ms - Head Block: ${json.result.head_block_number}`);
+                        console.log(`[OK] [${res.statusCode}] ${url} - ${time}ms - Head Block: ${json.result.head_block_number}`);
                         resolve(true);
                     } else {
-                        console.log(`❌ [${res.statusCode}] ${url} - Error: ${JSON.stringify(json.error).substring(0, 100)}`);
+                        console.log(`[FAIL] [${res.statusCode}] ${url} - Error: ${JSON.stringify(json.error).substring(0, 100)}`);
                         resolve(false);
                     }
                 } catch (e) {
-                    console.log(`❌ [${res.statusCode}] ${url} - Invalid JSON`);
+                    console.log(`[FAIL] [${res.statusCode}] ${url} - Invalid JSON`);
                     resolve(false);
                 }
             });
         });
 
         req.on('error', (e) => {
-            console.log(`❌ ${url} - Connection Error: ${e.message}`);
+            console.log(`[FAIL] ${url} - Connection Error: ${e.message}`);
             resolve(false);
         });
 
         req.on('timeout', () => {
             req.destroy();
-            console.log(`❌ ${url} - Timeout (5s)`);
+            console.log(`[FAIL] ${url} - Timeout (5s)`);
             resolve(false);
         });
 

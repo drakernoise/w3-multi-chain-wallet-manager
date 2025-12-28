@@ -66,7 +66,7 @@ Please provide:
 
 ### Private Key Security
 
-⚠️ **CRITICAL:** Gravity Wallet stores your private keys locally in your browser's encrypted storage.
+**CRITICAL:** Gravity Wallet stores your private keys locally in your browser's encrypted storage.
 
 **Best Practices:**
 1. **Never share your private keys** with anyone

@@ -51,7 +51,7 @@ Veuillez fournir:
 
 ### Sécurité des Clés Privées
 
-⚠️ **CRITIQUE:** Gravity Wallet stocke vos clés privées localement dans le stockage chiffré de votre navigateur.
+**CRITIQUE:** Gravity Wallet stocke vos clés privées localement dans le stockage chiffré de votre navigateur.
 
 **Meilleures Pratiques:**
 1. **Ne partagez jamais vos clés privées** avec personne

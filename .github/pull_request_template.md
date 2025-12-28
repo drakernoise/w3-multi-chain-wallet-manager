@@ -1,36 +1,36 @@
 # Pull Request
 
-**🌐 Language / Idioma / Langue / Sprache / Lingua:**
-- 🇬🇧 English (this template)
-- 🇪🇸 [Español](pull_request_template_es.md)
-- 🇫🇷 [Français](pull_request_template_fr.md)
-- 🇩🇪 [Deutsch](pull_request_template_de.md)
-- 🇮🇹 [Italiano](pull_request_template_it.md)
+**Language / Idioma / Langue / Sprache / Lingua:**
+- English (this template)
+- [Español](pull_request_template_es.md)
+- [Français](pull_request_template_fr.md)
+- [Deutsch](pull_request_template_de.md)
+- [Italiano](pull_request_template_it.md)
 
 ---
 
-## 📝 Description
+## Description
 <!-- Provide a clear and concise description of what this PR does -->
 
 
-## 🔗 Related Issues
+## Related Issues
 <!-- Link to related issues using #issue_number -->
 Closes #
 Related to #
 
-## 🎯 Type of Change
+## Type of Change
 <!-- Mark the relevant option with an 'x' -->
-- [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
-- [ ] ✨ New feature (non-breaking change which adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] 📝 Documentation update
-- [ ] 🎨 UI/UX improvement
-- [ ] ⚡ Performance improvement
-- [ ] ♻️ Code refactoring
-- [ ] 🧪 Test addition/update
-- [ ] 🔧 Configuration change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+- [ ] UI/UX improvement
+- [ ] Performance improvement
+- [ ] Code refactoring
+- [ ] Test addition/update
+- [ ] Configuration change
 
-## 🧪 Testing
+## Testing
 <!-- Describe the tests you ran and how to reproduce them -->
 
 ### Test Environment
@@ -51,7 +51,7 @@ Related to #
 2. 
 3. 
 
-## 📸 Screenshots/Videos
+## Screenshots/Videos
 <!-- If applicable, add screenshots or videos to demonstrate the changes -->
 
 ### Before
@@ -60,7 +60,7 @@ Related to #
 ### After
 <!-- Screenshot/description of behavior after changes -->
 
-## 📋 Checklist
+## Checklist
 <!-- Mark completed items with an 'x' -->
 
 ### Code Quality
@@ -88,16 +88,16 @@ Related to #
 - [ ] I have not exposed any sensitive information (keys, passwords, etc.)
 - [ ] I have followed secure coding practices
 
-## 🔄 Breaking Changes
+## Breaking Changes
 <!-- If this PR introduces breaking changes, describe them here -->
 <!-- Include migration instructions if applicable -->
 
 
-## 📚 Additional Notes
+## Additional Notes
 <!-- Add any other context about the PR here -->
 
 
-## 🙏 Acknowledgments
+## Acknowledgments
 <!-- Credit any contributors, resources, or inspirations -->
 
 

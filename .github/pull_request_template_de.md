@@ -1,27 +1,27 @@
 # Pull Request
 
-**🌐 Sprache:** 🇬🇧 [English](pull_request_template.md) | 🇪🇸 [Español](pull_request_template_es.md) | 🇫🇷 [Français](pull_request_template_fr.md) | 🇩🇪 Deutsch | 🇮🇹 [Italiano](pull_request_template_it.md)
+**Sprache:** [English](pull_request_template.md) | [Español](pull_request_template_es.md) | [Français](pull_request_template_fr.md) | Deutsch | [Italiano](pull_request_template_it.md)
 
 ---
 
-## 📝 Beschreibung
+## Beschreibung
 
-## 🔗 Verwandte Issues
+## Verwandte Issues
 Schließt #
 
-## 🎯 Art der Änderung
-- [ ] 🐛 Fehlerbehebung
-- [ ] ✨ Neue Funktion
-- [ ] 💥 Breaking Change
-- [ ] 📝 Dokumentation
-- [ ] 🎨 UI/UX
-- [ ] ⚡ Performance
+## Art der Änderung
+- [ ] Fehlerbehebung
+- [ ] Neue Funktion
+- [ ] Breaking Change
+- [ ] Dokumentation
+- [ ] UI/UX
+- [ ] Performance
 
-## 🧪 Tests
+## Tests
 - [ ] Auf Hive/Steem/Blurt getestet
 - [ ] Keine Konsolenfehler
 
-## 📋 Checkliste
+## Checkliste
 - [ ] Code folgt Stilrichtlinien
 - [ ] Selbstüberprüfung durchgeführt
 - [ ] Dokumentation aktualisiert
