@@ -269,7 +269,7 @@ io.on('connection', (socket) => {
 
     // --- 0. Challenge-Response Authentication (Optional Enhanced Security) ---
     socket.on('request_challenge', (data) => {
-        const { userId, username } = data;
+        const { userId, username, encryptionPublicKey } = data;
         let user;
 
         if (userId) {
@@ -285,6 +285,13 @@ io.on('connection', (socket) => {
                     saveData();
                 }
             }
+        }
+
+        // Backfill E2EE key if provided and missing
+        if (user && encryptionPublicKey && user.encryptionPublicKey !== encryptionPublicKey) {
+            console.log(`🔑 Updating encryption key for ${user.username}`);
+            user.encryptionPublicKey = encryptionPublicKey;
+            saveData();
         }
 
         if (!user || !user.publicKey) {
@@ -352,7 +359,7 @@ io.on('connection', (socket) => {
 
     // --- 1. Registration / Login ---
     socket.on('register', (data) => {
-        const { username, publicKey, existingId } = data;
+        const { username, publicKey, existingId, encryptionPublicKey } = data;
 
         // If trying to restore an existing session
         if (existingId) {
@@ -384,6 +391,7 @@ io.on('connection', (socket) => {
                         id: existingId,
                         username,
                         publicKey,
+                        encryptionPublicKey,
                         rooms: ['global-lobby']
                     };
                     users[existingId] = newUser;
@@ -523,6 +531,7 @@ io.on('connection', (socket) => {
             id: newId,
             username,
             publicKey, // stored for future auth challenges
+            encryptionPublicKey,
             rooms: ['global-lobby'],
             pendingInvites: [] // Store invites received while offline
         };
