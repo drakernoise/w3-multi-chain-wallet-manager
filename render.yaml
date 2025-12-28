@@ -4,10 +4,11 @@ services:
     runtime: node
     region: frankfurt
     plan: free
+    rootDir: chat-server
     buildCommand: npm install
     startCommand: node index.js
     envVars:
       - key: NODE_VERSION
         value: 18.16.0
-      - key: DB_PATH
-        value: /opt/render/project/src/chat-server/
+      - key: PORT
+        value: 10000
