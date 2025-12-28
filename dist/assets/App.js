@@ -6756,7 +6756,7 @@ const ChatView = ({ onClose }) => {
                       {
                         onClick: () => {
                           setEditingMessageId(msg.id);
-                          setEditBuffer(msg.content.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#039;/g, "'"));
+                          setEditBuffer(msg.content.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&"));
                         },
                         className: "p-1 text-slate-500 hover:text-purple-400 hover:bg-purple-500/10 rounded transition-colors",
                         title: "Edit",

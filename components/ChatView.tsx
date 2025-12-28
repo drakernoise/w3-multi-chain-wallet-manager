@@ -527,7 +527,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                                     {isMe && !editingMessageId && (
                                                         <div className={`flex items-center gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity ${isMe ? 'flex-row' : 'flex-row-reverse'}`}>
                                                             <button
-                                                                onClick={() => { setEditingMessageId(msg.id); setEditBuffer(msg.content.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#039;/g, "'")); }}
+                                                                onClick={() => { setEditingMessageId(msg.id); setEditBuffer(msg.content.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, "&")); }}
                                                                 className="p-1 text-slate-500 hover:text-purple-400 hover:bg-purple-500/10 rounded transition-colors"
                                                                 title="Edit"
                                                             >

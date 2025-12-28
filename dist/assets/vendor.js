@@ -18995,7 +18995,7 @@ function requireUtil$2 () {
 		function hasOwnProperty(obj, prop) {
 		  return Object.prototype.hasOwnProperty.call(obj, prop);
 		}
-		var kCustomPromisifiedSymbol = typeof Symbol !== "undefined" ? Symbol("util.promisify.custom") : void 0;
+		var kCustomPromisifiedSymbol = typeof Symbol !== "undefined" ? /* @__PURE__ */ Symbol("util.promisify.custom") : void 0;
 		exports$1.promisify = function promisify(original) {
 		  if (typeof original !== "function")
 		    throw new TypeError('The "original" argument must be of type Function');
