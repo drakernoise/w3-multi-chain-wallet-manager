@@ -569,6 +569,7 @@ io.on('connection', (socket) => {
             memberDetails: rooms['global-lobby'].members.map(id => ({
                 id,
                 username: users[id]?.username,
+                encryptionPublicKey: users[id]?.encryptionPublicKey,
                 isOnline: Object.values(connectedSockets).includes(id)
             }))
         };
@@ -590,7 +591,7 @@ io.on('connection', (socket) => {
 
         const results = Object.values(users)
             .filter(u => u.username.toLowerCase().includes(query.toLowerCase()) && u.id !== socket.user.id)
-            .map(u => ({ id: u.id, username: u.username }))
+            .map(u => ({ id: u.id, username: u.username, encryptionPublicKey: u.encryptionPublicKey }))
             .slice(0, 10); // Limit results
 
         socket.emit('search_results', results);
@@ -624,6 +625,7 @@ io.on('connection', (socket) => {
             memberDetails: room.members.map(id => ({
                 id,
                 username: users[id]?.username,
+                encryptionPublicKey: users[id]?.encryptionPublicKey,
                 isOnline: Object.values(connectedSockets).includes(id)
             }))
         });
