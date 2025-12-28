@@ -20,6 +20,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { t } = useTranslation();
 
+  React.useEffect(() => {
+    const handleUnread = () => {
+      const badge = document.getElementById('chat-badge');
+      if (badge) badge.classList.remove('hidden');
+    };
+    window.addEventListener('chat-unread', handleUnread);
+    return () => window.removeEventListener('chat-unread', handleUnread);
+  }, []);
+
   return (
     <aside className="w-16 h-full bg-dark-800 border-r border-dark-700 flex flex-col items-center py-4 shrink-0 z-20">
       {/* App Logo */}

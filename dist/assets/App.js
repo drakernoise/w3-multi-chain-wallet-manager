@@ -1,4 +1,4 @@
-import { r as reactExports, j as jsxRuntimeExports } from './vendor.js';
+import { r as reactExports, j as jsxRuntimeExports, d as React } from './vendor.js';
 import { j as isBiometricsAvailable, k as hasPinProtectedKey, l as getTOTPSecret, v as verifyTOTP, m as getInternalKey, u as unlockVault, n as initVaultWithGeneratedKey, o as loadInternalKeyWithPin, p as initVault, q as authenticateWithGoogle, r as authenticateWithDevice, t as hasTOTPConfigured, V as ViewState, C as Chain, w as generateSetup, x as saveTOTPSecret, y as enablePasswordless, z as registerBiometrics, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, A as broadcastSavingsDeposit, B as broadcastSavingsWithdraw, D as fetchAccountData, E as broadcastRCDelegate, F as broadcastRCUndelegate, G as broadcastBulkTransfer, H as validateUsername, I as validatePrivateKey, J as verifyKeyAgainstChain, K as validateAccountKeys, L as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, M as chatService, N as saveVault, O as fetchBalances, P as clearCryptoCache, Q as getVault, R as tryRestoreSession, S as detectWeb3Context, T as benchmarkNodes } from './chainService.js';
 
 const calculatePasswordStrength = (password) => {
@@ -2691,6 +2691,14 @@ const Sidebar = ({
   onToggleDetach
 }) => {
   const { t } = useTranslation();
+  React.useEffect(() => {
+    const handleUnread = () => {
+      const badge = document.getElementById("chat-badge");
+      if (badge) badge.classList.remove("hidden");
+    };
+    window.addEventListener("chat-unread", handleUnread);
+    return () => window.removeEventListener("chat-unread", handleUnread);
+  }, []);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("aside", { className: "w-16 h-full bg-dark-800 border-r border-dark-700 flex flex-col items-center py-4 shrink-0 z-20", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       "img",
