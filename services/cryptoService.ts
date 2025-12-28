@@ -388,3 +388,111 @@ export async function tryRestoreSession(): Promise<boolean> {
   }
   return false;
 }
+// ==========================================
+// E2EE (End-to-End Encryption) Utilities
+// Using ECDH (P-256) + AES-GCM
+// ==========================================
+
+export async function generateEncryptionKeys(): Promise<CryptoKeyPair> {
+  return window.crypto.subtle.generateKey(
+    {
+      name: 'ECDH',
+      namedCurve: 'P-256',
+    },
+    true, // extractable
+    ['deriveKey', 'deriveBits']
+  );
+}
+
+export async function exportKeyToBase64(key: CryptoKey): Promise<string> {
+  const format = key.type === 'public' ? 'spki' : 'pkcs8';
+  const exported = await window.crypto.subtle.exportKey(format, key);
+  const buffer = new Uint8Array(exported);
+  return btoa(String.fromCharCode(...buffer));
+}
+
+export async function importKeyFromBase64(base64: string, type: 'public' | 'private'): Promise<CryptoKey> {
+  const binary = atob(base64);
+  const buffer = Uint8Array.from(binary, c => c.charCodeAt(0));
+  const format = type === 'public' ? 'spki' : 'pkcs8';
+
+  return window.crypto.subtle.importKey(
+    format,
+    buffer,
+    {
+      name: 'ECDH',
+      namedCurve: 'P-256',
+    },
+    true,
+    type === 'public' ? [] : ['deriveKey', 'deriveBits']
+  );
+}
+
+// Derive a shared AES-GCM key from my Private Key + User's Public Key
+// We use ECDH to get shared bits -> SHA-256 to hash them -> AES-GCM Key
+export async function deriveSharedSecret(privateKey: CryptoKey, publicKey: CryptoKey): Promise<CryptoKey> {
+  const sharedBits = await window.crypto.subtle.deriveBits(
+    {
+      name: 'ECDH',
+      public: publicKey,
+    },
+    privateKey,
+    256 // 256 bits
+  );
+
+  // Hash the shared secret to ensure uniform distribution for AES key
+  const keyMaterial = await window.crypto.subtle.digest('SHA-256', sharedBits);
+
+  return window.crypto.subtle.importKey(
+    'raw',
+    keyMaterial,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+export async function encryptMessage(text: string, sharedKey: CryptoKey): Promise<string> {
+  const iv = window.crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV
+  const encoded = enc.encode(text);
+
+  const encrypted = await window.crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv,
+    },
+    sharedKey,
+    encoded
+  );
+
+  // Pack IV + Ciphertext
+  const bundle = new Uint8Array(iv.length + encrypted.byteLength);
+  bundle.set(iv, 0);
+  bundle.set(new Uint8Array(encrypted), iv.length);
+
+  return btoa(String.fromCharCode(...bundle));
+}
+
+export async function decryptMessage(base64Bundle: string, sharedKey: CryptoKey): Promise<string> {
+  try {
+    const binary = atob(base64Bundle);
+    const bundle = Uint8Array.from(binary, c => c.charCodeAt(0));
+
+    const iv = bundle.slice(0, 12);
+    const ciphertext = bundle.slice(12);
+
+    const decrypted = await window.crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv,
+      },
+      sharedKey,
+      ciphertext
+    );
+
+    return dec.decode(decrypted);
+  } catch (e) {
+    console.error("Decryption failed:", e);
+    return "[Encrypted Message - Cannot Decrypt]";
+  }
+}
