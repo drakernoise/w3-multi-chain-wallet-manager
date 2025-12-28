@@ -1,0 +1,66 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ESNext"
+    ],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": [
+      "vite/client"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@components/*": [
+        "../../packages/shared/components/*"
+      ],
+      "@services/*": [
+        "../../packages/shared/services/*"
+      ],
+      "@contexts/*": [
+        "../../packages/shared/contexts/*"
+      ],
+      "@types/*": [
+        "../../packages/shared/types/*"
+      ],
+      "@types": [
+        "../../packages/shared/types"
+      ],
+      "@utils/*": [
+        "../../packages/shared/utils/*"
+      ],
+      "@config/*": [
+        "../../packages/shared/config/*"
+      ],
+      "gravity-shared/*": [
+        "../../packages/shared/*"
+      ]
+    }
+  },
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../../packages/shared/**/*.ts",
+    "../../packages/shared/**/*.tsx",
+    "../../packages/shared/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
