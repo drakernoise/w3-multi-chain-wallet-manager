@@ -1,4 +1,4 @@
-# 🔐 Gravity Messenger - Signature Verification Guide
+# Gravity Messenger - Signature Verification Guide
 
 ## Overview
 

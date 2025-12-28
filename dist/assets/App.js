@@ -6456,7 +6456,13 @@ const ChatView = ({ onClose }) => {
   };
   const handleSend = () => {
     if (!activeRoomId || !inputText.trim()) return;
-    chatService.sendMessage(activeRoomId, inputText);
+    const room = rooms.find((r) => r.id === activeRoomId);
+    const partner = room?.type === "dm" ? room.memberDetails?.find((m) => m.id !== user?.id) : null;
+    if (partner?.encryptionPublicKey) {
+      chatService.sendDirectMessage(activeRoomId, inputText, partner.encryptionPublicKey);
+    } else {
+      chatService.sendMessage(activeRoomId, inputText);
+    }
     setInputText("");
   };
   const handleModalAction = () => {

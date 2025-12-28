@@ -4,9 +4,9 @@
 
 ---
 
-Tout d'abord, merci d'envisager de contribuer à Gravity Wallet! 🎉
+Tout d'abord, merci d'envisager de contribuer à Gravity Wallet!
 
-## 📋 Table des Matières
+## Table des Matières
 
 - [Code de Conduite](#code-de-conduite)
 - [Comment Contribuer](#comment-contribuer)
@@ -14,48 +14,48 @@ Tout d'abord, merci d'envisager de contribuer à Gravity Wallet! 🎉
 - [Processus de Pull Request](#processus-de-pull-request)
 - [Standards de Code](#standards-de-code)
 
-## 📜 Code de Conduite
+## Code de Conduite
 
 ### Nos Standards
 
 **Comportement positif:**
-- ✅ Utiliser un langage accueillant et inclusif
-- ✅ Respecter les différents points de vue
-- ✅ Accepter gracieusement les critiques constructives
-- ✅ Se concentrer sur ce qui est le mieux pour la communauté
+- Utiliser un langage accueillant et inclusif
+- Respecter les différents points de vue
+- Accepter gracieusement les critiques constructives
+- Se concentrer sur ce qui est le mieux pour la communauté
 
 **Comportement inacceptable:**
-- ❌ Trolling, commentaires insultants et attaques personnelles
-- ❌ Harcèlement public ou privé
-- ❌ Publication d'informations privées sans permission
+- Trolling, commentaires insultants et attaques personnelles
+- Harcèlement public ou privé
+- Publication d'informations privées sans permission
 
-## 🤝 Comment Contribuer
+## Comment Contribuer
 
 ### Signaler des Bugs
 
 **Lors du signalement d'un bug, incluez:**
-- 📝 Titre clair et descriptif
-- 🔍 Étapes pour reproduire le comportement
-- 💡 Comportement attendu vs comportement réel
-- 📸 Captures d'écran (si applicable)
-- 🖥️ Détails de l'environnement (navigateur, OS, version)
+- Titre clair et descriptif
+- Étapes pour reproduire le comportement
+- Comportement attendu vs comportement réel
+- Captures d'écran (si applicable)
+- Détails de l'environnement (navigateur, OS, version)
 
 ### Suggérer des Améliorations
 
 **Lors de la suggestion d'une amélioration, incluez:**
-- 📝 Titre clair et descriptif
-- 💡 Description détaillée de la fonctionnalité proposée
-- 🎯 Cas d'utilisation et avantages
+- Titre clair et descriptif
+- Description détaillée de la fonctionnalité proposée
+- Cas d'utilisation et avantages
 
 ### Vulnérabilités de Sécurité
 
-**⚠️ IMPORTANT:** NE créez PAS d'issues publics pour les vulnérabilités de sécurité.
+**IMPORTANT:** NE créez PAS d'issues publics pour les vulnérabilités de sécurité.
 
 Veuillez signaler les problèmes de sécurité en privé à: `drakernoise@protonmail.com`
 
 Voir notre [Politique de Sécurité](SECURITY.fr.md) pour plus de détails.
 
-## 🛠️ Configuration de Développement
+## Configuration de Développement
 
 ### Prérequis
 
@@ -86,15 +86,15 @@ npm run build
 4. Cliquez sur "Charger l'extension non empaquetée"
 5. Sélectionnez le dossier `dist`
 
-## 🔄 Processus de Pull Request
+## Processus de Pull Request
 
 ### Avant de Soumettre
 
-- ✅ **Testez vos modifications** en profondeur
-- ✅ **Mettez à jour la documentation** si nécessaire
-- ✅ **Suivez les standards de code**
-- ✅ **Écrivez des messages de commit significatifs**
-- ✅ **Assurez-vous qu'il n'y a pas d'erreurs de console**
+- **Testez vos modifications** en profondeur
+- **Mettez à jour la documentation** si nécessaire
+- **Suivez les standards de code**
+- **Écrivez des messages de commit significatifs**
+- **Assurez-vous qu'il n'y a pas d'erreurs de console**
 
 ### Directives PR
 
@@ -102,12 +102,12 @@ npm run build
 2. **Description**: Incluez ce qui a changé, pourquoi et comment tester
 3. **Taille**: Gardez les PRs ciblés et de taille raisonnable
 
-## 💻 Standards de Code
+## Standards de Code
 
 ### TypeScript/JavaScript
 
 ```typescript
-// ✅ Bon
+// Bon
 export const transferFunds = async (
     chain: Chain,
     from: string,
@@ -118,7 +118,7 @@ export const transferFunds = async (
     // Typage approprié
 };
 
-// ❌ Mauvais
+// Mauvais
 function transfer(a, b, c) {
     // Pas de types
     // Paramètres peu clairs
@@ -132,7 +132,7 @@ function transfer(a, b, c) {
 - **Fonctions**: `camelCase`
 - **Constantes**: `UPPER_SNAKE_CASE`
 
-## 📝 Guide des Messages de Commit
+## Guide des Messages de Commit
 
 Nous suivons la spécification [Conventional Commits](https://www.conventionalcommits.org/).
 
@@ -152,7 +152,7 @@ fix(transfer): Résoudre le problème d'encodage du memo sur Blurt
 docs(readme): Mettre à jour les instructions d'installation
 ```
 
-## 🧪 Tests
+## Tests
 
 ### Liste de Vérification des Tests Manuels
 
@@ -162,24 +162,24 @@ docs(readme): Mettre à jour les instructions d'installation
 - [ ] Pas d'erreurs ou d'avertissements dans la console
 - [ ] Fonctionne sur différentes chaînes (Hive, Steem, Blurt)
 
-## 🏆 Reconnaissance
+## Reconnaissance
 
 Les contributeurs seront:
 - Listés dans les notes de version
 - Mentionnés dans le README
 - Ajoutés à la liste des contributeurs
 
-## 📞 Obtenir de l'Aide
+## Obtenir de l'Aide
 
 - **Questions**: Utilisez [GitHub Discussions](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions)
 - **Bugs**: Créez un [Issue](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues)
 
-## 📄 Licence
+## Licence
 
 En contribuant, vous acceptez que vos contributions soient sous licence MIT.
 
 ---
 
-**Merci de contribuer à Gravity Wallet!** 🙏
+**Merci de contribuer à Gravity Wallet!**
 
-Bonne programmation! 💻✨
+Bonne programmation!

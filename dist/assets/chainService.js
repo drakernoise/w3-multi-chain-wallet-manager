@@ -1152,6 +1152,76 @@ async function exportKeyToBase64(key) {
   const buffer = new Uint8Array(exported);
   return btoa(String.fromCharCode(...buffer));
 }
+async function importKeyFromBase64(base64, type) {
+  const binary = atob(base64);
+  const buffer = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const format = type === "public" ? "spki" : "pkcs8";
+  return window.crypto.subtle.importKey(
+    format,
+    buffer,
+    {
+      name: "ECDH",
+      namedCurve: "P-256"
+    },
+    true,
+    type === "public" ? [] : ["deriveKey", "deriveBits"]
+  );
+}
+async function deriveSharedSecret(privateKey, publicKey) {
+  const sharedBits = await window.crypto.subtle.deriveBits(
+    {
+      name: "ECDH",
+      public: publicKey
+    },
+    privateKey,
+    256
+    // 256 bits
+  );
+  const keyMaterial = await window.crypto.subtle.digest("SHA-256", sharedBits);
+  return window.crypto.subtle.importKey(
+    "raw",
+    keyMaterial,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+async function encryptMessage(text, sharedKey) {
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encoded = enc.encode(text);
+  const encrypted = await window.crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv
+    },
+    sharedKey,
+    encoded
+  );
+  const bundle = new Uint8Array(iv.length + encrypted.byteLength);
+  bundle.set(iv, 0);
+  bundle.set(new Uint8Array(encrypted), iv.length);
+  return btoa(String.fromCharCode(...bundle));
+}
+async function decryptMessage(base64Bundle, sharedKey) {
+  try {
+    const binary = atob(base64Bundle);
+    const bundle = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    const iv = bundle.slice(0, 12);
+    const ciphertext = bundle.slice(12);
+    const decrypted = await window.crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv
+      },
+      sharedKey,
+      ciphertext
+    );
+    return dec.decode(decrypted);
+  } catch (e) {
+    console.error("Decryption failed:", e);
+    return "[Encrypted Message - Cannot Decrypt]";
+  }
+}
 
 otplibExports.authenticator.options = { window: 1 };
 const STORAGE_KEY = "device_totp_secret";
@@ -1342,12 +1412,12 @@ class ChatService {
     this.socket.on("new_message", (data) => {
       this.handleNewMessage(data.roomId, data.message);
     });
-    this.socket.on("room_history", (data) => {
+    this.socket.on("room_history", async (data) => {
       const room = this.rooms.find((r) => r.id === data.roomId);
       if (room) {
-        const hadMessages = room.messages.length > 0;
-        room.messages = data.messages;
         room.memberDetails = data.memberDetails;
+        const hadMessages = room.messages.length > 0;
+        room.messages = await Promise.all(data.messages.map((m) => this.processIncomingMessage(data.roomId, m)));
         if (!hadMessages && data.messages.length > 0) {
           this.notifyRoomUpdate();
         }
@@ -1586,7 +1656,7 @@ class ChatService {
       encryptionPublicKey: keys.encryptionPublicKey
     });
   }
-  async sendMessage(roomId, content) {
+  async sendMessage(roomId, content, isEncrypted = false) {
     if (!this.socket) return;
     const privateKeyHex = localStorage.getItem("gravity_chat_priv");
     if (!privateKeyHex) {
@@ -1606,11 +1676,26 @@ class ChatService {
         roomId,
         content,
         timestamp,
-        signature
+        signature,
+        isEncrypted
       });
     } catch (err) {
       console.error("Failed to sign message:", err);
       if (this.onError) this.onError("Failed to securely sign message.");
+    }
+  }
+  async sendDirectMessage(roomId, content, recipientPublicKeyBase64) {
+    try {
+      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
+      if (!myPrivBase64) throw new Error("Encryption keys missing");
+      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
+      const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, "public");
+      const sharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
+      const encryptedContent = await encryptMessage(content, sharedKey);
+      await this.sendMessage(roomId, encryptedContent, true);
+    } catch (e) {
+      console.error("E2EE Failed:", e);
+      if (this.onError) this.onError("Encryption failed: " + e.message);
     }
   }
   async editMessage(roomId, messageId, newContent) {
@@ -1676,15 +1761,41 @@ class ChatService {
       chrome.runtime.sendMessage({ type: "CHAT_LOGOUT" });
     }
   }
-  handleNewMessage(roomId, message) {
+  async handleNewMessage(roomId, message) {
+    const processedMsg = await this.processIncomingMessage(roomId, message);
     const room = this.rooms.find((r) => r.id === roomId);
     if (room) {
-      room.messages.push(message);
-      if (this.onMessage) this.onMessage(roomId, message);
+      room.messages.push(processedMsg);
+      if (this.onMessage) this.onMessage(roomId, processedMsg);
       if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
       window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
       const badge = document.getElementById("chat-badge");
       if (badge) badge.classList.remove("hidden");
+    }
+  }
+  async processIncomingMessage(roomId, message) {
+    if (!message.isEncrypted) return message;
+    try {
+      const room = this.rooms.find((r) => r.id === roomId);
+      const sender = room?.memberDetails?.find((u) => u.id === message.senderId);
+      if (!sender?.encryptionPublicKey) {
+        if (room?.type === "dm") {
+          if (message.senderId === this.userId) {
+            return { ...message, content: "(Encrypted Message sent by you)" };
+          }
+        }
+        return { ...message, content: "Encrypted Message (Key not found)" };
+      }
+      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
+      if (!myPrivBase64) return { ...message, content: "Encrypted Message (You lack keys)" };
+      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
+      const senderPubKey = await importKeyFromBase64(sender.encryptionPublicKey, "public");
+      const sharedKey = await deriveSharedSecret(myPrivKey, senderPubKey);
+      const decrypted = await decryptMessage(message.content, sharedKey);
+      return { ...message, content: decrypted };
+    } catch (e) {
+      console.error("Decryption error", e);
+      return { ...message, content: "Decryption Failed" };
     }
   }
   getStoredPrivateKey() {

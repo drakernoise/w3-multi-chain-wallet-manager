@@ -1,25 +1,25 @@
 # Release v1.0.5 - Steem History & Stability Fixes
 
-## 🚀 Key Highlights
+## Key Highlights
 
 This critical update focuses on resolving persistent connectivity and stability issues across Steem and Blurt ecosystems, ensuring a smoother experience for dApp interactions.
 
-### ✅ Steem Full Compatibility
+### Steem Full Compatibility
 - **History Fixed:** Resolved the "Fetch History Error" that prevented Steem transaction history from loading. This was achieved by restoring `dsteem` client usage and patching module exports for Service Worker compatibility.
 - **Voting Fixed:** Addressed the "broadcastPayload undefined" error on Steemit.com by sanitizing operation payloads (removing frontend-specific properties like `__config`) and ensuring the full transaction result is returned to the client.
 
-### 🛡️ Enhanced Stability & Security
+### Enhanced Stability & Security
 - **Blurt RPC Update:** Switched default RPC nodes to `rpc.beblurt.com` to mitigate downtime issues with `blurt.world`.
 - **Crash Prevention:** Implemented robust null-checking in the background script to prevent Service Worker crashes when receiving malformed or empty messages from extension popups or dApps.
 - **Input Sanitization:** Added a middleware layer to clean transaction operations of non-protocol properties before signing, preventing "Invalid Param" errors on strict nodes.
 
-### 💎 UI Enhancements
+### UI Enhancements
 - **Bulk Transfers:** Replaced radio buttons with a unified dropdown selector for tokens (HIVE/HBD, STEEM/SBD), matching the main wallet UI style.
 - **Memo Field:** Upgraded the Memo input in Transfer dialogs to a resizable textarea for better usability with long memos.
 
 ---
 
-## 🔧 Technical Details
+## Technical Details
 
 - **dsteem Integration:** Successfully integrated `dsteem` in a Vite/SW environment by polyfilling `exports` at build time.
 - **CORS Handling:** Optimized RPC node selection to favor CORS-friendly endpoints for browser extension compatibility.
@@ -29,66 +29,66 @@ This critical update focuses on resolving persistent connectivity and stability 
 
 # Release v1.0.4 - Hive & Blurt Production Ready
 
-## 🎉 Major Milestone: Dual Chain Mastery
+## Major Milestone: Dual Chain Mastery
 
 This release marks a significant leap forward, achieving **full stability and compatibility with both Hive (HF26) and Blurt ecosystems**. 
 
 We have successfully resolved complex serialization and broadcasting issues that were affecting Hive operations, particularly on `hive.blog`, while maintaining the robust Blurt support established previously.
 
-## ✨ Hive Critical Fixes (HF26)
+## Hive Critical Fixes (HF26)
 
 ### HF26 Hardfork Compatibility & Voting
 - **Fixed:** "Missing Posting Authority" errors during voting and broadcasting.
 - **Solution:** Implemented explicit Chain ID enforcement (`beeab0de...`) for all transaction signatures, required by Hive's HF26 standard.
-- **Status:** ✅ Confirmed working on Hive.blog, Ecency, PeakD.
+- **Status:** Confirmed working on Hive.blog, Ecency, PeakD.
 
 ### Custom JSON & Notifications (Mark as Read)
 - **Fixed:** `custom_json` serialization errors causing "Mark as Read" to fail on Hive.blog.
 - **Fixed:** Case-sensitivity issue where `posting` key type (lowercase) was not recognized, defaulting to Active key and causing authority mismatch.
 - **Added:** Robust sanitization middleware that ensures `required_auths` and `required_posting_auths` are always valid arrays.
-- **Status:** ✅ Confirmed working for notifications on Hive.blog.
+- **Status:** Confirmed working for notifications on Hive.blog.
 
-## ✨ Blurt Stability (Recap)
+## Blurt Stability (Recap)
 
 ### Blurt Image Upload
 - **Fixed:** Buffer deserialization and prefix handling for image uploads.
-- **Status:** ✅ Working on BeBlurt, Blurt.blog, blurb, app.blurt.blog.
+- **Status:** Working on BeBlurt, Blurt.blog, blurb, app.blurt.blog.
 
 ### Blurt Delegation
 - **Fixed:** Delegation logic and validation.
-- **Status:** ✅ Working on BlurtWallet.com.
+- **Status:** Working on BlurtWallet.com.
 
-## 🧪 Tested Frontends
+## Tested Frontends
 
 ### Hive Ecosystem
 | Feature | Hive.blog | PeakD | Ecency | Splinterlands |
 |---------|-----------|-------|--------|---------------|
-| Login | ✅ | ✅ | ✅ | ✅ |
+| Login | Yes | Yes | Yes | Yes |
 | Image Upload | N/A | N/A | N/A | N/A |
-| Vote | ✅ | ✅ | ✅ | ✅ |
-| Mark as Read | ✅ | ✅ | ✅ | ✅ |
-| Post/Comment | ✅ | ✅ | ✅ | N/A |
-| Transfer | ✅ | ✅ | ✅ | ⚠️ |
-| Power Up/Down | ✅ | ✅ | ✅ | N/A |
-| Delegation | ✅ | ✅ | ✅ | N/A |
-| Claim Rewards | ✅ | ✅ | ✅ | ✅ |
+| Vote | Yes | Yes | Yes | Yes |
+| Mark as Read | Yes | Yes | Yes | Yes |
+| Post/Comment | Yes | Yes | Yes | N/A |
+| Transfer | Yes | Yes | Yes | WIP |
+| Power Up/Down | Yes | Yes | Yes | N/A |
+| Delegation | Yes | Yes | Yes | N/A |
+| Claim Rewards | Yes | Yes | Yes | Yes |
 
 ### Blurt Ecosystem
 | Feature | BeBlurt | Blurt.blog | blurb | Blurtbb | app.blurt.blog | BlurtWallet |
 |---------|---------|------------|-------|---------|----------------|-------------|
-| Login | ✅ | ✅ | ✅ | N/A | ✅ | ✅ |
-| Image Upload | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Vote | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Mark as Read | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
-| Post/Comment | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Transfer | N/A | ✅ | N/A | N/A | N/A | ✅ |
-| Power Up/Down | N/A | ✅ | N/A | N/A | N/A | ✅ |
-| Delegation | N/A | N/A | N/A | N/A | N/A | ✅ |
-| Claim Rewards | ✅ | ✅ | N/A | N/A | N/A | ✅ |
+| Login | Yes | Yes | Yes | N/A | Yes | Yes |
+| Image Upload | Yes | Yes | Yes | N/A | Yes | N/A |
+| Vote | Yes | Yes | Yes | N/A | Yes | N/A |
+| Mark as Read | Yes | Yes | Yes | Yes | Yes | N/A |
+| Post/Comment | Yes | Yes | Yes | N/A | Yes | N/A |
+| Transfer | N/A | Yes | N/A | N/A | N/A | Yes |
+| Power Up/Down | N/A | Yes | N/A | N/A | N/A | Yes |
+| Delegation | N/A | N/A | N/A | N/A | N/A | Yes |
+| Claim Rewards | Yes | Yes | N/A | N/A | N/A | Yes |
 
-**Legend:** ✅ Working | ⚠️ WIP (Work in Progress) | N/A Not Available/Not Tested
+**Legend:** Yes: Working | WIP: Work in Progress | N/A: Not Available/Not Tested
 
-## 🔧 Technical Deep Dive
+## Technical Deep Dive
 
 ### Hive HF26 Serialization
 ```typescript
@@ -108,12 +108,12 @@ const cleanPayload = {
 };
 ```
 
-## 🐛 Known Issues & Next Steps
+## Known Issues & Next Steps
 - **Splinterlands Transfers:** Internal transfers (DEC/SPS) currently showing "Invalid operation" - Under investigation.
 - **Steem:** Initial compatibility testing scheduled for next release cycle.
 - **UI:** Minor cosmetic updates planned for settings menu.
 
-## 📝 Changelog
+## Changelog
 
 ### Fixed
 - **Hive:** HF26 transaction signature compatibility (Mainnet Chain ID).
@@ -126,10 +126,10 @@ const cleanPayload = {
 - **Dev:** Automated backup scripts (`scripts/backup.ps1`).
 - **Dev:** Enhanced debug logging (now cleaned up for production).
 
-## 👥 Contributors
+## Contributors
 - @drakernoise
 
-## 📄 License
+## License
 MIT
 
 ---
@@ -137,66 +137,66 @@ MIT
 **Full Changelog**: https://github.com/drakernoise/w3-multi-chain-wallet-manager/compare/v1.0.3...v1.0.4
 # Release v1.0.4 - Hive & Blurt Production Ready
 
-## 🎉 Major Milestone: Dual Chain Mastery
+## Major Milestone: Dual Chain Mastery
 
 This release marks a significant leap forward, achieving **full stability and compatibility with both Hive (HF26) and Blurt ecosystems**. 
 
 We have successfully resolved complex serialization and broadcasting issues that were affecting Hive operations, particularly on `hive.blog`, while maintaining the robust Blurt support established previously.
 
-## ✨ Hive Critical Fixes (HF26)
+## Hive Critical Fixes (HF26)
 
 ### HF26 Hardfork Compatibility & Voting
 - **Fixed:** "Missing Posting Authority" errors during voting and broadcasting.
 - **Solution:** Implemented explicit Chain ID enforcement (`beeab0de...`) for all transaction signatures, required by Hive's HF26 standard.
-- **Status:** ✅ Confirmed working on Hive.blog, Ecency, PeakD.
+- **Status:** Confirmed working on Hive.blog, Ecency, PeakD.
 
 ### Custom JSON & Notifications (Mark as Read)
 - **Fixed:** `custom_json` serialization errors causing "Mark as Read" to fail on Hive.blog.
 - **Fixed:** Case-sensitivity issue where `posting` key type (lowercase) was not recognized, defaulting to Active key and causing authority mismatch.
 - **Added:** Robust sanitization middleware that ensures `required_auths` and `required_posting_auths` are always valid arrays.
-- **Status:** ✅ Confirmed working for notifications on Hive.blog.
+- **Status:** Confirmed working for notifications on Hive.blog.
 
-## ✨ Blurt Stability (Recap)
+## Blurt Stability (Recap)
 
 ### Blurt Image Upload
 - **Fixed:** Buffer deserialization and prefix handling for image uploads.
-- **Status:** ✅ Working on BeBlurt, Blurt.blog, blurb, app.blurt.blog.
+- **Status:** Working on BeBlurt, Blurt.blog, blurb, app.blurt.blog.
 
 ### Blurt Delegation
 - **Fixed:** Delegation logic and validation.
-- **Status:** ✅ Working on BlurtWallet.com.
+- **Status:** Working on BlurtWallet.com.
 
-## 🧪 Tested Frontends
+## Tested Frontends
 
 ### Hive Ecosystem
 | Feature | Hive.blog | PeakD | Ecency | Splinterlands |
 |---------|-----------|-------|--------|---------------|
-| Login | ✅ | ✅ | ✅ | ✅ |
+| Login | Yes | Yes | Yes | Yes |
 | Image Upload | N/A | N/A | N/A | N/A |
-| Vote | ✅ | ✅ | ✅ | ✅ |
-| Mark as Read | ✅ | ✅ | ✅ | ✅ |
-| Post/Comment | ✅ | ✅ | ✅ | N/A |
-| Transfer | ✅ | ✅ | ✅ | ⚠️ |
-| Power Up/Down | ✅ | ✅ | ✅ | N/A |
-| Delegation | ✅ | ✅ | ✅ | N/A |
-| Claim Rewards | ✅ | ✅ | ✅ | ✅ |
+| Vote | Yes | Yes | Yes | Yes |
+| Mark as Read | Yes | Yes | Yes | Yes |
+| Post/Comment | Yes | Yes | Yes | N/A |
+| Transfer | Yes | Yes | Yes | WIP |
+| Power Up/Down | Yes | Yes | Yes | N/A |
+| Delegation | Yes | Yes | Yes | N/A |
+| Claim Rewards | Yes | Yes | Yes | Yes |
 
 ### Blurt Ecosystem
 | Feature | BeBlurt | Blurt.blog | blurb | Blurtbb | app.blurt.blog | BlurtWallet |
 |---------|---------|------------|-------|---------|----------------|-------------|
-| Login | ✅ | ✅ | ✅ | N/A | ✅ | ✅ |
-| Image Upload | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Vote | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Mark as Read | ✅ | ✅ | ✅ | ✅ | ✅ | N/A |
-| Post/Comment | ✅ | ✅ | ✅ | N/A | ✅ | N/A |
-| Transfer | N/A | ✅ | N/A | N/A | N/A | ✅ |
-| Power Up/Down | N/A | ✅ | N/A | N/A | N/A | ✅ |
-| Delegation | N/A | N/A | N/A | N/A | N/A | ✅ |
-| Claim Rewards | ✅ | ✅ | N/A | N/A | N/A | ✅ |
+| Login | Yes | Yes | Yes | N/A | Yes | Yes |
+| Image Upload | Yes | Yes | Yes | N/A | Yes | N/A |
+| Vote | Yes | Yes | Yes | N/A | Yes | N/A |
+| Mark as Read | Yes | Yes | Yes | Yes | Yes | N/A |
+| Post/Comment | Yes | Yes | Yes | N/A | Yes | N/A |
+| Transfer | N/A | Yes | N/A | N/A | N/A | Yes |
+| Power Up/Down | N/A | Yes | N/A | N/A | N/A | Yes |
+| Delegation | N/A | N/A | N/A | N/A | N/A | Yes |
+| Claim Rewards | Yes | Yes | N/A | N/A | N/A | Yes |
 
-**Legend:** ✅ Working | ⚠️ WIP (Work in Progress) | N/A Not Available/Not Tested
+**Legend:** Yes: Working | WIP: Work in Progress | N/A: Not Available/Not Tested
 
-## 🔧 Technical Deep Dive
+## Technical Deep Dive
 
 ### Hive HF26 Serialization
 ```typescript
@@ -216,12 +216,12 @@ const cleanPayload = {
 };
 ```
 
-## 🐛 Known Issues & Next Steps
+## Known Issues & Next Steps
 - **Splinterlands Transfers:** Internal transfers (DEC/SPS) currently showing "Invalid operation" - Under investigation.
 - **Steem:** Initial compatibility testing scheduled for next release cycle.
 - **UI:** Minor cosmetic updates planned for settings menu.
 
-## 📝 Changelog
+## Changelog
 
 ### Fixed
 - **Hive:** HF26 transaction signature compatibility (Mainnet Chain ID).
@@ -234,10 +234,10 @@ const cleanPayload = {
 - **Dev:** Automated backup scripts (`scripts/backup.ps1`).
 - **Dev:** Enhanced debug logging (now cleaned up for production).
 
-## 👥 Contributors
+## Contributors
 - @drakernoise
 
-## 📄 License
+## License
 MIT
 
 ---

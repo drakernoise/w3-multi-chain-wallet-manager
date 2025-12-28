@@ -18,7 +18,7 @@ O desde el repositorio:
 
 **Release title:**
 ```
-v1.0.4 - Blurt Production Ready 🎉
+v1.0.4 - Blurt Production Ready
 ```
 
 **Description:**
@@ -33,9 +33,9 @@ Adjunta:
 
 ### 4. Opciones adicionales
 
-☑️ **Set as the latest release** (marcado)
-☐ **Set as a pre-release** (desmarcado)
-☐ **Create a discussion for this release** (opcional)
+- **Set as the latest release** (marcado)
+- **Set as a pre-release** (desmarcado)
+- **Create a discussion for this release** (opcional)
 
 ### 5. Publicar
 
@@ -47,10 +47,10 @@ Click en **"Publish release"**
 
 Una vez publicado, tendrás:
 
-✅ **Tag permanente:** `v1.0.4-blurt-stable`
-✅ **Rama de backup:** `backup/production-2025-12-20`
-✅ **Release público:** Con notas y archivo ZIP descargable
-✅ **Código fuente:** Descargable automáticamente (zip/tar.gz)
+- **Tag permanente:** `v1.0.4-blurt-stable`
+- **Rama de backup:** `backup/production-2025-12-20`
+- **Release público:** Con notas y archivo ZIP descargable
+- **Código fuente:** Descargable automáticamente (zip/tar.gz)
 
 ## Recuperación Rápida en el Futuro
 
@@ -90,10 +90,10 @@ Para crear un nuevo backup en el futuro:
 ```
 
 El script hará automáticamente:
-1. ✅ Commit de cambios
-2. ✅ Crear tag
-3. ✅ Push a GitHub
-4. ✅ Crear rama de backup
+1. Commit de cambios
+2. Crear tag
+3. Push a GitHub
+4. Crear rama de backup
 
 Solo tendrás que crear el Release manualmente en GitHub siguiendo esta guía.
 

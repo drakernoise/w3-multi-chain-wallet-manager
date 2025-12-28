@@ -4,22 +4,22 @@
 
 ---
 
-## 🔐 Security Overview
+## Security Overview
 
 Gravity Wallet is a browser extension that handles sensitive cryptographic operations and private keys. We take security very seriously and appreciate the security research community's efforts to help keep our users safe.
 
-## 📋 Supported Versions
+## Supported Versions
 
 We provide security updates for the following versions:
 
 | Version | Supported          | Status |
 | ------- | ------------------ | ------ |
-| 1.0.x   | ✅ Yes | Current stable release |
-| < 1.0   | ❌ No  | Legacy versions - please upgrade |
+| 1.0.x   | Yes | Current stable release |
+| < 1.0   | No  | Legacy versions - please upgrade |
 
 **Recommendation:** Always use the latest stable release available in the [Releases](https://github.com/drakernoise/w3-multi-chain-wallet-manager/releases) section.
 
-## 🚨 Reporting a Vulnerability
+## Reporting a Vulnerability
 
 ### Where to Report
 
@@ -62,20 +62,20 @@ Please provide:
 - We'll explain why we don't consider it a security issue
 - We may still address it as a regular bug or enhancement
 
-## 🛡️ Security Best Practices for Users
+## Security Best Practices for Users
 
 ### Private Key Security
 
 ⚠️ **CRITICAL:** Gravity Wallet stores your private keys locally in your browser's encrypted storage.
 
 **Best Practices:**
-1. ✅ **Never share your private keys** with anyone
-2. ✅ **Backup your keys** securely offline (paper wallet, encrypted USB)
-3. ✅ **Use strong passwords** for your device and browser
-4. ✅ **Keep your browser updated** to the latest version
-5. ✅ **Only download** from official sources (GitHub releases)
-6. ❌ **Never enter keys** on suspicious websites
-7. ❌ **Don't screenshot** your keys or store them in cloud services
+1. **Never share your private keys** with anyone
+2. **Backup your keys** securely offline (paper wallet, encrypted USB)
+3. **Use strong passwords** for your device and browser
+4. **Keep your browser updated** to the latest version
+5. **Only download** from official sources (GitHub releases)
+6. **Never enter keys** on suspicious websites
+7. **Don't screenshot** your keys or store them in cloud services
 
 ### Extension Security
 
@@ -96,37 +96,37 @@ Please provide:
 
 ### Phishing Protection
 
-⚠️ **Common Phishing Tactics:**
+**Common Phishing Tactics:**
 - Fake websites that look like legitimate frontends
 - Emails asking for your private keys
 - Browser extensions that mimic Gravity Wallet
 - Social media messages offering "support"
 
 **Protection:**
-- ✅ Always verify the URL before entering credentials
-- ✅ Bookmark trusted frontends (PeakD, Ecency, Blurt.blog, etc.)
-- ✅ Enable browser phishing protection
-- ❌ Never click suspicious links in emails/messages
+- Always verify the URL before entering credentials
+- Bookmark trusted frontends (PeakD, Ecency, Blurt.blog, etc.)
+- Enable browser phishing protection
+- Never click suspicious links in emails/messages
 
-## 🔍 Security Features
+## Security Features
 
 ### Current Security Measures
 
-- ✅ **Local Storage Only:** Keys never leave your device
-- ✅ **Browser Encryption:** Uses browser's encrypted storage API
-- ✅ **No Analytics:** No tracking or data collection
-- ✅ **Open Source:** Code is publicly auditable
-- ✅ **Whitelist System:** Control which sites can auto-sign
-- ✅ **Manual Confirmation:** Financial operations require explicit approval
+- **Local Storage Only:** Keys never leave your device
+- **Browser Encryption:** Uses browser's encrypted storage API
+- **No Analytics:** No tracking or data collection
+- **Open Source:** Code is publicly auditable
+- **Whitelist System:** Control which sites can auto-sign
+- **Manual Confirmation:** Financial operations require explicit approval
 
 ### Planned Security Enhancements
 
-- 🔄 **Hardware Wallet Support:** Integration with Ledger/Trezor
-- 🔄 **Biometric Authentication:** Fingerprint/Face ID support
-- 🔄 **Multi-Signature:** Support for multi-sig accounts
-- 🔄 **Session Timeout:** Auto-lock after inactivity
+- **Hardware Wallet Support:** Integration with Ledger/Trezor
+- **Biometric Authentication:** Fingerprint/Face ID support
+- **Multi-Signature:** Support for multi-sig accounts
+- **Session Timeout:** Auto-lock after inactivity
 
-## 🏆 Security Hall of Fame
+## Security Hall of Fame
 
 We recognize and thank security researchers who responsibly disclose vulnerabilities:
 
@@ -134,13 +134,13 @@ We recognize and thank security researchers who responsibly disclose vulnerabili
 
 *No vulnerabilities have been reported yet.*
 
-## 📚 Additional Resources
+## Additional Resources
 
 - **Code Audit:** Community members are encouraged to audit the code
 - **Security Discussions:** Use GitHub Discussions for security questions
 - **Best Practices Guide:** See [Wiki - Security Best Practices](https://github.com/drakernoise/w3-multi-chain-wallet-manager/wiki)
 
-## ⚖️ Responsible Disclosure
+## Responsible Disclosure
 
 We follow responsible disclosure practices:
 
@@ -149,7 +149,7 @@ We follow responsible disclosure practices:
 3. **Credit:** We'll credit you in the advisory (if desired)
 4. **No Legal Action:** We won't pursue legal action against researchers who follow this policy
 
-## 🔗 Contact
+## Contact
 
 - **Security Issues:** drakernoise@protonmail.com
 - **General Support:** [GitHub Issues](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues)
@@ -160,4 +160,4 @@ We follow responsible disclosure practices:
 **Last Updated:** December 20, 2025  
 **Version:** 1.0
 
-Thank you for helping keep Gravity Wallet and our users safe! 🙏
+Thank you for helping keep Gravity Wallet and our users safe!

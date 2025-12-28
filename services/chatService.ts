@@ -1,11 +1,12 @@
 import { io, Socket } from "socket.io-client";
-import { generateEncryptionKeys, exportKeyToBase64 } from './cryptoService';
+import { generateEncryptionKeys, exportKeyToBase64, importKeyFromBase64, deriveSharedSecret, encryptMessage, decryptMessage } from './cryptoService';
 
 // Define Chat Types
 export interface ChatUser {
     id: string;
     username: string;
     isOnline?: boolean;
+    encryptionPublicKey?: string;
 }
 
 export interface ChatMessage {
@@ -15,6 +16,7 @@ export interface ChatMessage {
     content: string;
     timestamp: string;
     isVerified?: boolean;
+    isEncrypted?: boolean;
     isEdited?: boolean;
     editTimestamp?: string;
 }
@@ -159,12 +161,17 @@ class ChatService {
             this.handleNewMessage(data.roomId, data.message);
         });
 
-        this.socket.on('room_history', (data: { roomId: string, messages: ChatMessage[], memberDetails: ChatUser[] }) => {
+        this.socket.on('room_history', async (data: { roomId: string, messages: ChatMessage[], memberDetails: ChatUser[] }) => {
             const room = this.rooms.find(r => r.id === data.roomId);
             if (room) {
-                const hadMessages = room.messages.length > 0;
-                room.messages = data.messages;
+                // Update members first to ensure keys are available for decryption
                 room.memberDetails = data.memberDetails;
+
+                const hadMessages = room.messages.length > 0;
+
+                // Process/Decrypt messages
+                room.messages = await Promise.all(data.messages.map(m => this.processIncomingMessage(data.roomId, m)));
+
                 // Only trigger update if this is the first time we're loading messages
                 // to avoid infinite loops from repeated room_history events
                 if (!hadMessages && data.messages.length > 0) {
@@ -468,7 +475,7 @@ class ChatService {
         });
     }
 
-    public async sendMessage(roomId: string, content: string) {
+    public async sendMessage(roomId: string, content: string, isEncrypted: boolean = false) {
         if (!this.socket) return;
         const privateKeyHex = localStorage.getItem('gravity_chat_priv');
 
@@ -493,11 +500,36 @@ class ChatService {
                 roomId,
                 content,
                 timestamp,
-                signature
+                signature,
+                isEncrypted
             });
         } catch (err) {
             console.error('Failed to sign message:', err);
             if (this.onError) this.onError('Failed to securely sign message.');
+        }
+    }
+
+    public async sendDirectMessage(roomId: string, content: string, recipientPublicKeyBase64: string) {
+        try {
+            // 1. Get my Private Encryption Key
+            const myPrivBase64 = localStorage.getItem('gravity_chat_enc_priv');
+            if (!myPrivBase64) throw new Error("Encryption keys missing");
+
+            const myPrivKey = await importKeyFromBase64(myPrivBase64, 'private');
+            const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, 'public');
+
+            // 2. Derive Shared Secret (AES-GCM)
+            const sharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
+
+            // 3. Encrypt Content
+            const encryptedContent = await encryptMessage(content, sharedKey);
+
+            // 4. Send as normal message but marked encrypted
+            await this.sendMessage(roomId, encryptedContent, true);
+
+        } catch (e) {
+            console.error("E2EE Failed:", e);
+            if (this.onError) this.onError("Encryption failed: " + (e as Error).message);
         }
     }
 
@@ -553,13 +585,15 @@ class ChatService {
         }
     }
 
-    private handleNewMessage(roomId: string, message: ChatMessage) {
+    private async handleNewMessage(roomId: string, message: ChatMessage) {
+        const processedMsg = await this.processIncomingMessage(roomId, message);
+
         const room = this.rooms.find(r => r.id === roomId);
         if (room) {
-            room.messages.push(message);
+            room.messages.push(processedMsg);
 
             // UI Handler
-            if (this.onMessage) this.onMessage(roomId, message);
+            if (this.onMessage) this.onMessage(roomId, processedMsg);
             if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
 
             // Dispatch global event for Badge (Sidebar)
@@ -568,6 +602,52 @@ class ChatService {
             // Direct DOM manipulation fallback for Sidebar Badge
             const badge = document.getElementById('chat-badge');
             if (badge) badge.classList.remove('hidden');
+        }
+    }
+
+    private async processIncomingMessage(roomId: string, message: ChatMessage): Promise<ChatMessage> {
+        if (!message.isEncrypted) return message;
+
+        try {
+            // Find sender's public key
+            const room = this.rooms.find(r => r.id === roomId);
+            // If sender is ME, I encrypted it with MY shared key?
+            // Wait, for self-messages (sent by me), I encrypted it for the recipient.
+            // I cannot decrypt it unless I stored a copy or encrypted it for myself too.
+            // Simplified E2EE usually sends 2 copies or encrypts with room key.
+            // For now, if I sent it, I won't be able to read it back from history unless I persisted it locally unencrypted
+            // or encrypted it for myself.
+            // Let's handle RECEIVING messages first.
+
+            const sender = room?.memberDetails?.find(u => u.id === message.senderId);
+
+            if (!sender?.encryptionPublicKey) {
+                // Determine if it's a DM and try to find the other user
+                if (room?.type === 'dm') {
+                    // In a DM, if I am the sender, the "sender key" I need to decrypt is... recipient's key?
+                    // No, if I encrypted it for Bob, only Bob can decrypt it. 
+                    // I cannot decrypt my own sent messages unless I encrypt for myself too.
+                    if (message.senderId === this.userId) {
+                        return { ...message, content: "(Encrypted Message sent by you)" };
+                    }
+                }
+                return { ...message, content: "Encrypted Message (Key not found)" };
+            }
+
+            const myPrivBase64 = localStorage.getItem('gravity_chat_enc_priv');
+            if (!myPrivBase64) return { ...message, content: "Encrypted Message (You lack keys)" };
+
+            const myPrivKey = await importKeyFromBase64(myPrivBase64, 'private');
+            const senderPubKey = await importKeyFromBase64(sender.encryptionPublicKey, 'public');
+
+            const sharedKey = await deriveSharedSecret(myPrivKey, senderPubKey);
+            const decrypted = await decryptMessage(message.content, sharedKey);
+
+            return { ...message, content: decrypted };
+
+        } catch (e) {
+            console.error("Decryption error", e);
+            return { ...message, content: "Decryption Failed" };
         }
     }
 

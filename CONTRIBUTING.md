@@ -4,11 +4,11 @@
 
 ---
 
-First off, thank you for considering contributing to Gravity Wallet! 🎉
+First off, thank you for considering contributing to Gravity Wallet!
 
 It's people like you that make Gravity Wallet such a great tool for the Graphene blockchain community.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
 - [How Can I Contribute?](#how-can-i-contribute)
@@ -19,38 +19,38 @@ It's people like you that make Gravity Wallet such a great tool for the Graphene
 - [Testing](#testing)
 - [Documentation](#documentation)
 
-## 📜 Code of Conduct
+## Code of Conduct
 
 This project and everyone participating in it is governed by our commitment to providing a welcoming and inspiring community for all.
 
 ### Our Standards
 
 **Positive behavior includes:**
-- ✅ Using welcoming and inclusive language
-- ✅ Being respectful of differing viewpoints
-- ✅ Gracefully accepting constructive criticism
-- ✅ Focusing on what is best for the community
-- ✅ Showing empathy towards other community members
+- Using welcoming and inclusive language
+- Being respectful of differing viewpoints
+- Gracefully accepting constructive criticism
+- Focusing on what is best for the community
+- Showing empathy towards other community members
 
 **Unacceptable behavior includes:**
-- ❌ Trolling, insulting/derogatory comments, and personal attacks
-- ❌ Public or private harassment
-- ❌ Publishing others' private information without permission
-- ❌ Other conduct which could reasonably be considered inappropriate
+- Trolling, insulting/derogatory comments, and personal attacks
+- Public or private harassment
+- Publishing others' private information without permission
+- Other conduct which could reasonably be considered inappropriate
 
-## 🤝 How Can I Contribute?
+## How Can I Contribute?
 
 ### Reporting Bugs
 
 Before creating bug reports, please check existing issues to avoid duplicates.
 
 **When reporting a bug, include:**
-- 📝 Clear and descriptive title
-- 🔍 Steps to reproduce the behavior
-- 💡 Expected behavior vs actual behavior
-- 📸 Screenshots (if applicable)
-- 🖥️ Environment details (browser, OS, extension version)
-- 📋 Console logs or error messages
+- Clear and descriptive title
+- Steps to reproduce the behavior
+- Expected behavior vs actual behavior
+- Screenshots (if applicable)
+- Environment details (browser, OS, extension version)
+- Console logs or error messages
 
 **Use this template:**
 ```markdown
@@ -82,15 +82,15 @@ Before creating bug reports, please check existing issues to avoid duplicates.
 Enhancement suggestions are tracked as GitHub issues.
 
 **When suggesting an enhancement, include:**
-- 📝 Clear and descriptive title
-- 💡 Detailed description of the proposed feature
-- 🎯 Use cases and benefits
-- 🖼️ Mockups or examples (if applicable)
-- 🔗 Links to similar features in other projects
+- Clear and descriptive title
+- Detailed description of the proposed feature
+- Use cases and benefits
+- Mockups or examples (if applicable)
+- Links to similar features in other projects
 
 ### Security Vulnerabilities
 
-**⚠️ IMPORTANT:** Do NOT create public issues for security vulnerabilities.
+**IMPORTANT:** Do NOT create public issues for security vulnerabilities.
 
 Please report security issues privately to: `drakernoise@protonmail.com`
 
@@ -106,7 +106,7 @@ See our [Security Policy](SECURITY.md) for more details.
 6. **Push to your fork** (`git push origin feature/amazing-feature`)
 7. **Open a Pull Request**
 
-## 🛠️ Development Setup
+## Development Setup
 
 ### Prerequisites
 
@@ -156,16 +156,16 @@ web3-multi-chain-wallet/
 └── dist/                   # Built extension (generated)
 ```
 
-## 🔄 Pull Request Process
+## Pull Request Process
 
 ### Before Submitting
 
-- ✅ **Test your changes** thoroughly
-- ✅ **Update documentation** if needed
-- ✅ **Follow coding standards**
-- ✅ **Write meaningful commit messages**
-- ✅ **Ensure no console errors**
-- ✅ **Check for TypeScript errors** (`npm run build`)
+- **Test your changes** thoroughly
+- **Update documentation** if needed
+- **Follow coding standards**
+- **Write meaningful commit messages**
+- **Ensure no console errors**
+- **Check for TypeScript errors** (`npm run build`)
 
 ### PR Guidelines
 
@@ -216,12 +216,12 @@ web3-multi-chain-wallet/
 - [ ] Tests added/updated (if applicable)
 ```
 
-## 💻 Coding Standards
+## Coding Standards
 
 ### TypeScript/JavaScript
 
 ```typescript
-// ✅ Good
+// Good
 export const transferFunds = async (
     chain: Chain,
     from: string,
@@ -233,7 +233,7 @@ export const transferFunds = async (
     // Async/await pattern
 };
 
-// ❌ Bad
+// Bad
 function transfer(a, b, c) {
     // No types
     // Unclear parameters
@@ -244,7 +244,7 @@ function transfer(a, b, c) {
 ### React Components
 
 ```typescript
-// ✅ Good
+// Good
 interface TransferModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -278,7 +278,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 - **Line Length**: Max 120 characters
 - **Comments**: Use JSDoc for functions
 
-## 📝 Commit Message Guidelines
+## Commit Message Guidelines
 
 We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 
@@ -329,7 +329,7 @@ feat(delegation): Add BP delegation UI and API integration
 Use the component/module being changed:
 - `wallet`, `transfer`, `delegation`, `ui`, `services`, etc.
 
-## 🧪 Testing
+## Testing
 
 ### Manual Testing Checklist
 
@@ -357,7 +357,7 @@ Test on:
 - Brave (latest)
 - Edge (latest)
 
-## 📚 Documentation
+## Documentation
 
 ### Code Documentation
 
@@ -401,7 +401,7 @@ For major features, consider adding:
 - Screenshots/GIFs
 - Troubleshooting tips
 
-## 🎨 UI/UX Guidelines
+## UI/UX Guidelines
 
 ### Design Principles
 
@@ -421,27 +421,27 @@ Use the existing color variables:
 --success-color: #...
 ```
 
-## 🏆 Recognition
+## Recognition
 
 Contributors will be:
 - Listed in release notes
 - Mentioned in the README (for significant contributions)
 - Added to the contributors list
 
-## 📞 Getting Help
+## Getting Help
 
 - **Questions**: Use [GitHub Discussions](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions)
 - **Bugs**: Create an [Issue](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues)
 - **Chat**: Join our community channels (if available)
 
-## 📄 License
+## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
 
 ---
 
-**Thank you for contributing to Gravity Wallet!** 🙏
+**Thank you for contributing to Gravity Wallet!**
 
 Every contribution, no matter how small, makes a difference. We appreciate your time and effort in making this project better for everyone.
 
-Happy coding! 💻✨
+Happy coding!

@@ -1,8 +1,8 @@
-# 🗳️ Gravity Wallet - Configuración de Autenticación y 2FA
+# Gravity Wallet - Configuración de Autenticación y 2FA
 
 Esta guía detalla las opciones de autenticación implementadas en la versión 1.0.5+, incluyendo el soporte para múltiples métodos de Segundo Factor (2FA).
 
-## 🔐 Métodos de Autenticación Soportados
+## Métodos de Autenticación Soportados
 
 La bóveda (Vault) de Gravity Wallet puede desbloquearse mediante:
 
@@ -14,7 +14,7 @@ La bóveda (Vault) de Gravity Wallet puede desbloquearse mediante:
 
 ---
 
-## 🚀 NUEVO: Flujo Sin Contraseña (Google & Device Key)
+## NUEVO: Flujo Sin Contraseña (Google & Device Key)
 
 A partir de la versión 1.0.6, puedes elegir inicializar tu billetera sin necesidad de una contraseña maestra.
 
@@ -26,7 +26,7 @@ Esto proporciona una experiencia de usuario similar a la "web2" manteniendo la s
 
 ---
 
-## 🛡️ Configuración de Autenticador (TOTP)
+## Configuración de Autenticador (TOTP)
 
 La funcionalidad TOTP permite desbloquear la extensión utilizando un código temporal de 6 dígitos generado por una app externa. Esto reemplaza la necesidad de escribir la contraseña maestra constantemente.
 
@@ -37,7 +37,7 @@ La funcionalidad TOTP permite desbloquear la extensión utilizando un código te
 3.  Abajo del todo, en la sección **Security**, pulsa **"Authenticator App (2FA)"**.
 4.  Se mostrará un código QR y una clave secreta.
 
-### 📱 Uso Multi-Dispositivo (Aegis + Google Auth a la vez)
+### Uso Multi-Dispositivo (Aegis + Google Auth a la vez)
 
 Puedes configurar múltiples aplicaciones o dispositivos para que generen el mismo código válido.
 
@@ -53,20 +53,20 @@ Puedes configurar múltiples aplicaciones o dispositivos para que generen el mis
 
 ---
 
-## 🚦 Indicador de Fortaleza de Contraseña
+## Indicador de Fortaleza de Contraseña
 
 Durante la creación de una nueva billetera (o reinicio completo), se incluye un medidor de seguridad:
 
 - **Análisis:** Evalúa longitud (>8, >12), mayúsculas, números y símbolos.
 - **Feedback:**
-    - 🟥 **Weak:** < 8 caracteres o muy simple.
-    - 🟨 **Medium:** Aceptable pero mejorable.
-    - 🟩 **Strong:** Buena combinación.
-    - 🟩 **Very Strong:** Excelente seguridad.
+    - **Weak:** < 8 caracteres o muy simple.
+    - **Medium:** Aceptable pero mejorable.
+    - **Strong:** Buena combinación.
+    - **Very Strong:** Excelente seguridad.
 
 ---
 
-## 🔄 Recuperación y Reseteo
+## Recuperación y Reseteo
 
 Si olvidas tu PIN o pierdes tu dispositivo 2FA:
 1.  En la pantalla de bloqueo, usa la **Contraseña Maestra** para entrar.

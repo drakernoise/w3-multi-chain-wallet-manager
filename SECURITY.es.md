@@ -4,22 +4,22 @@
 
 ---
 
-## 🔐 Resumen de Seguridad
+## Resumen de Seguridad
 
 Gravity Wallet es una extensión de navegador que maneja operaciones criptográficas sensibles y claves privadas. Nos tomamos la seguridad muy en serio y apreciamos los esfuerzos de la comunidad de investigación de seguridad para ayudar a mantener seguros a nuestros usuarios.
 
-## 📋 Versiones Soportadas
+## Versiones Soportadas
 
 Proporcionamos actualizaciones de seguridad para las siguientes versiones:
 
 | Versión | Soportada          | Estado |
 | ------- | ------------------ | ------ |
-| 1.0.x   | ✅ Sí | Versión estable actual |
-| < 1.0   | ❌ No  | Versiones antiguas - por favor actualiza |
+| 1.0.x   | Sí | Versión estable actual |
+| < 1.0   | No  | Versiones antiguas - por favor actualiza |
 
 **Recomendación:** Usa siempre la última versión estable disponible en la sección de [Releases](https://github.com/drakernoise/w3-multi-chain-wallet-manager/releases).
 
-## 🚨 Reportar una Vulnerabilidad
+## Reportar una Vulnerabilidad
 
 ### Dónde Reportar
 
@@ -62,20 +62,20 @@ Por favor proporciona:
 - Explicaremos por qué no lo consideramos un problema de seguridad
 - Aún podríamos abordarlo como un error regular o mejora
 
-## 🛡️ Mejores Prácticas de Seguridad para Usuarios
+## Mejores Prácticas de Seguridad para Usuarios
 
 ### Seguridad de Claves Privadas
 
 ⚠️ **CRÍTICO:** Gravity Wallet almacena tus claves privadas localmente en el almacenamiento encriptado de tu navegador.
 
 **Mejores Prácticas:**
-1. ✅ **Nunca compartas tus claves privadas** con nadie
-2. ✅ **Haz copias de seguridad de tus claves** de forma segura offline (papel, USB encriptado)
-3. ✅ **Usa contraseñas fuertes** para tu dispositivo y navegador
-4. ✅ **Mantén tu navegador actualizado** a la última versión
-5. ✅ **Descarga solo** de fuentes oficiales (releases de GitHub)
-6. ❌ **Nunca ingreses claves** en sitios web sospechosos
-7. ❌ **No hagas capturas de pantalla** de tus claves ni las guardes en servicios en la nube
+1. **Nunca compartas tus claves privadas** con nadie
+2. **Haz copias de seguridad de tus claves** de forma segura offline (papel, USB encriptado)
+3. **Usa contraseñas fuertes** para tu dispositivo y navegador
+4. **Mantén tu navegador actualizado** a la última versión
+5. **Descarga solo** de fuentes oficiales (releases de GitHub)
+6. **Nunca ingreses claves** en sitios web sospechosos
+7. **No hagas capturas de pantalla** de tus claves ni las guardes en servicios en la nube
 
 ### Seguridad de la Extensión
 
@@ -96,37 +96,37 @@ Por favor proporciona:
 
 ### Protección contra Phishing
 
-⚠️ **Tácticas Comunes de Phishing:**
+**Tácticas Comunes de Phishing:**
 - Sitios web falsos que parecen frontends legítimos
 - Emails pidiendo tus claves privadas
 - Extensiones de navegador que imitan Gravity Wallet
 - Mensajes en redes sociales ofreciendo "soporte"
 
 **Protección:**
-- ✅ Siempre verifica la URL antes de ingresar credenciales
-- ✅ Guarda en favoritos frontends confiables (PeakD, Ecency, Blurt.blog, etc.)
-- ✅ Activa la protección contra phishing del navegador
-- ❌ Nunca hagas clic en enlaces sospechosos en emails/mensajes
+- Siempre verifica la URL antes de ingresar credenciales
+- Guarda en favoritos frontends confiables (PeakD, Ecency, Blurt.blog, etc.)
+- Activa la protección contra phishing del navegador
+- Nunca hagas clic en enlaces sospechosos en emails/mensajes
 
-## 🔍 Características de Seguridad
+## Características de Seguridad
 
 ### Medidas de Seguridad Actuales
 
-- ✅ **Solo Almacenamiento Local:** Las claves nunca salen de tu dispositivo
-- ✅ **Encriptación del Navegador:** Usa la API de almacenamiento encriptado del navegador
-- ✅ **Sin Analíticas:** Sin seguimiento ni recopilación de datos
-- ✅ **Código Abierto:** El código es públicamente auditable
-- ✅ **Sistema de Whitelist:** Controla qué sitios pueden auto-firmar
-- ✅ **Confirmación Manual:** Las operaciones financieras requieren aprobación explícita
+- **Solo Almacenamiento Local:** Las claves nunca salen de tu dispositivo
+- **Encriptación del Navegador:** Usa la API de almacenamiento encriptado del navegador
+- **Sin Analíticas:** Sin seguimiento ni recopilación de datos
+- **Código Abierto:** El código es públicamente auditable
+- **Sistema de Whitelist:** Controla qué sitios pueden auto-firmar
+- **Confirmación Manual:** Las operaciones financieras requieren aprobación explícita
 
 ### Mejoras de Seguridad Planificadas
 
-- 🔄 **Soporte para Hardware Wallet:** Integración con Ledger/Trezor
-- 🔄 **Autenticación Biométrica:** Soporte para huella digital/Face ID
-- 🔄 **Multi-Firma:** Soporte para cuentas multi-sig
-- 🔄 **Tiempo de Sesión:** Auto-bloqueo después de inactividad
+- **Soporte para Hardware Wallet:** Integración con Ledger/Trezor
+- **Autenticación Biométrica:** Soporte para huella digital/Face ID
+- **Multi-Firma:** Soporte para cuentas multi-sig
+- **Tiempo de Sesión:** Auto-bloqueo después de inactividad
 
-## 🏆 Salón de la Fama de Seguridad
+## Salón de la Fama de Seguridad
 
 Reconocemos y agradecemos a los investigadores de seguridad que divulgan vulnerabilidades de manera responsable:
 
@@ -134,13 +134,13 @@ Reconocemos y agradecemos a los investigadores de seguridad que divulgan vulnera
 
 *Aún no se han reportado vulnerabilidades.*
 
-## 📚 Recursos Adicionales
+## Recursos Adicionales
 
 - **Auditoría de Código:** Se anima a los miembros de la comunidad a auditar el código
 - **Discusiones de Seguridad:** Usa GitHub Discussions para preguntas de seguridad
 - **Guía de Mejores Prácticas:** Ver [Wiki - Mejores Prácticas de Seguridad](https://github.com/drakernoise/w3-multi-chain-wallet-manager/wiki)
 
-## ⚖️ Divulgación Responsable
+## Divulgación Responsable
 
 Seguimos prácticas de divulgación responsable:
 
@@ -149,7 +149,7 @@ Seguimos prácticas de divulgación responsable:
 3. **Crédito:** Te acreditaremos en el aviso (si lo deseas)
 4. **Sin Acción Legal:** No tomaremos acciones legales contra investigadores que sigan esta política
 
-## 🔗 Contacto
+## Contacto
 
 - **Problemas de Seguridad:** drakernoise@protonmail.com
 - **Soporte General:** [GitHub Issues](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues)
@@ -160,4 +160,4 @@ Seguimos prácticas de divulgación responsable:
 **Última Actualización:** 20 de diciembre de 2025  
 **Versión:** 1.0
 
-¡Gracias por ayudar a mantener seguros a Gravity Wallet y nuestros usuarios! 🙏
+¡Gracias por ayudar a mantener seguros a Gravity Wallet y nuestros usuarios!

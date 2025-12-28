@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.1.0] - 2025-12-28
 
-### 🚀 New Features (Chat System V2)
+### New Features (Chat System V2)
 - **Secure Authentication:** Implemented challenge-response authentication using ECDSA (P-256) signatures via Web Crypto API.
 - **Background Notifications:** Robust Service Worker integration for reliable background message processing and badge updates.
 - **In-App Notifications:** 
@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file.
   - Improved socket connection stability and automatic room joining.
   - Proper handling of complex icons and SVG rendering.
 
-### ✨ Improvements
+### Improvements
 - **Bulk Transfers:** 
   - Redesigned "Multi-Account" mode with wider input fields (50% width) for better visibility of large amounts/decimals.
   - Enhanced validation feedback for recipient lists.
@@ -29,7 +29,7 @@ All notable changes to this project will be documented in this file.
   - Optimized badge update logic with event debouncing.
   - Better handling of WebSocket reconnections.
 
-### 🐛 Bug Fixes
+### Bug Fixes
 - Fixed `verify_signature` event name mismatch preventing server-side authentication.
 - Fixed missing SVG wrapper in Sidebar icons causing invisible elements.
 - Fixed Service Worker initialization errors related to `crypto` object access.

@@ -46,7 +46,7 @@ app.post('/admin/reset', (req, res) => {
     // Save clean state
     saveData();
 
-    console.log('🔥 Database reset by admin');
+    console.log('[RESET] Database reset by admin');
     res.json({ success: true, message: 'Database reset successfully' });
 });
 
@@ -99,7 +99,7 @@ app.post('/admin/delete_user', (req, res) => {
         delete users[idToDelete];
         delete usernames[cleanName];
         deletedParams.push(rawName);
-        console.log(`🔨 Admin deleted user: ${rawName}`);
+        console.log(`[DELETE] Admin deleted user: ${rawName}`);
     });
 
     saveData();
@@ -154,7 +154,7 @@ function loadData() {
                 }
             }
             if (cleaned) {
-                console.log("🛠️ Server Integrity Check: Orphaned usernames removed.");
+                console.log("[CHECK] Server Integrity Check: Orphaned usernames removed.");
                 // saveData() is called later if needed, or explicitly here if changes need to be persisted immediately.
                 // For now, we'll let the next saveData() call handle it, or if a user registers.
             }
@@ -289,7 +289,7 @@ io.on('connection', (socket) => {
 
         // Backfill E2EE key if provided and missing
         if (user && encryptionPublicKey && user.encryptionPublicKey !== encryptionPublicKey) {
-            console.log(`🔑 Updating encryption key for ${user.username}`);
+            console.log(`[AUTH] Updating encryption key for ${user.username}`);
             user.encryptionPublicKey = encryptionPublicKey;
             saveData();
         }
@@ -680,7 +680,7 @@ io.on('connection', (socket) => {
         const isValid = verifySignature(socket.user.publicKey, messageToVerify, signature);
 
         if (!isValid) {
-            console.error(`🚨 Cryptographic Spoofing Attempt detected from ${socket.user.username}`);
+            console.error(`[SECURITY] Cryptographic Spoofing Attempt detected from ${socket.user.username}`);
             socket.emit('error', 'Security error: Invalid cryptographic signature.');
             return;
         }

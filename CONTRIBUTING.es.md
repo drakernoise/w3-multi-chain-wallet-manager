@@ -4,11 +4,11 @@
 
 ---
 
-Antes que nada, ¡gracias por considerar contribuir a Gravity Wallet! 🎉
+Antes que nada, ¡gracias por considerar contribuir a Gravity Wallet!
 
 Son personas como tú las que hacen de Gravity Wallet una gran herramienta para la comunidad de blockchains Graphene.
 
-## 📋 Tabla de Contenidos
+## Tabla de Contenidos
 
 - [Código de Conducta](#código-de-conducta)
 - [¿Cómo Puedo Contribuir?](#cómo-puedo-contribuir)
@@ -17,58 +17,58 @@ Son personas como tú las que hacen de Gravity Wallet una gran herramienta para 
 - [Estándares de Código](#estándares-de-código)
 - [Guía de Mensajes de Commit](#guía-de-mensajes-de-commit)
 
-## 📜 Código de Conducta
+## Código de Conducta
 
 Este proyecto se rige por nuestro compromiso de proporcionar una comunidad acogedora e inspiradora para todos.
 
 ### Nuestros Estándares
 
 **Comportamiento positivo incluye:**
-- ✅ Usar lenguaje acogedor e inclusivo
-- ✅ Ser respetuoso con diferentes puntos de vista
-- ✅ Aceptar con gracia la crítica constructiva
-- ✅ Enfocarse en lo mejor para la comunidad
-- ✅ Mostrar empatía hacia otros miembros
+- Usar lenguaje acogedor e inclusivo
+- Ser respetuoso con diferentes puntos de vista
+- Aceptar con gracia la crítica constructiva
+- Enfocarse en lo mejor para la comunidad
+- Mostrar empatía hacia otros miembros
 
 **Comportamiento inaceptable incluye:**
-- ❌ Trolling, comentarios insultantes y ataques personales
-- ❌ Acoso público o privado
-- ❌ Publicar información privada de otros sin permiso
-- ❌ Otra conducta que razonablemente se considere inapropiada
+- Trolling, comentarios insultantes y ataques personales
+- Acoso público o privado
+- Publicar información privada de otros sin permiso
+- Otra conducta que razonablemente se considere inapropiada
 
-## 🤝 ¿Cómo Puedo Contribuir?
+## ¿Cómo Puedo Contribuir?
 
 ### Reportar Bugs
 
 Antes de crear reportes de bugs, por favor verifica los issues existentes para evitar duplicados.
 
 **Al reportar un bug, incluye:**
-- 📝 Título claro y descriptivo
-- 🔍 Pasos para reproducir el comportamiento
-- 💡 Comportamiento esperado vs comportamiento actual
-- 📸 Capturas de pantalla (si aplica)
-- 🖥️ Detalles del entorno (navegador, SO, versión de extensión)
-- 📋 Logs de consola o mensajes de error
+- Título claro y descriptivo
+- Pasos para reproducir el comportamiento
+- Comportamiento esperado vs comportamiento actual
+- Capturas de pantalla (si aplica)
+- Detalles del entorno (navegador, SO, versión de extensión)
+- Logs de consola o mensajes de error
 
 ### Sugerir Mejoras
 
 Las sugerencias de mejoras se rastrean como issues de GitHub.
 
 **Al sugerir una mejora, incluye:**
-- 📝 Título claro y descriptivo
-- 💡 Descripción detallada de la función propuesta
-- 🎯 Casos de uso y beneficios
-- 🖼️ Mockups o ejemplos (si aplica)
+- Título claro y descriptivo
+- Descripción detallada de la función propuesta
+- Casos de uso y beneficios
+- Mockups o ejemplos (si aplica)
 
 ### Vulnerabilidades de Seguridad
 
-**⚠️ IMPORTANTE:** NO crees issues públicos para vulnerabilidades de seguridad.
+**IMPORTANTE:** NO crees issues públicos para vulnerabilidades de seguridad.
 
 Por favor reporta problemas de seguridad de forma privada a: `drakernoise@protonmail.com`
 
 Ver nuestra [Política de Seguridad](SECURITY.es.md) para más detalles.
 
-## 🛠️ Configuración de Desarrollo
+## Configuración de Desarrollo
 
 ### Requisitos Previos
 
@@ -102,16 +102,16 @@ npm run dev
 4. Haz clic en "Cargar extensión sin empaquetar"
 5. Selecciona la carpeta `dist`
 
-## 🔄 Proceso de Pull Request
+## Proceso de Pull Request
 
 ### Antes de Enviar
 
-- ✅ **Prueba tus cambios** exhaustivamente
-- ✅ **Actualiza la documentación** si es necesario
-- ✅ **Sigue los estándares de código**
-- ✅ **Escribe mensajes de commit significativos**
-- ✅ **Asegúrate de que no haya errores en consola**
-- ✅ **Verifica errores de TypeScript** (`npm run build`)
+- **Prueba tus cambios** exhaustivamente
+- **Actualiza la documentación** si es necesario
+- **Sigue los estándares de código**
+- **Escribe mensajes de commit significativos**
+- **Asegúrate de que no haya errores en consola**
+- **Verifica errores de TypeScript** (`npm run build`)
 
 ### Guías de PR
 
@@ -130,12 +130,12 @@ npm run dev
    - Prefiere múltiples PRs pequeños sobre uno grande
    - Cada PR debe abordar una función/corrección
 
-## 💻 Estándares de Código
+## Estándares de Código
 
 ### TypeScript/JavaScript
 
 ```typescript
-// ✅ Bueno
+// Bueno
 export const transferFunds = async (
     chain: Chain,
     from: string,
@@ -147,7 +147,7 @@ export const transferFunds = async (
     // Patrón async/await
 };
 
-// ❌ Malo
+// Malo
 function transfer(a, b, c) {
     // Sin tipos
     // Parámetros poco claros
@@ -163,7 +163,7 @@ function transfer(a, b, c) {
 - **Constantes**: `UPPER_SNAKE_CASE`
 - **Interfaces/Tipos**: `PascalCase`
 
-## 📝 Guía de Mensajes de Commit
+## Guía de Mensajes de Commit
 
 Seguimos la especificación [Conventional Commits](https://www.conventionalcommits.org/).
 
@@ -191,7 +191,7 @@ fix(transfer): Resolver problema de codificación de memo en Blurt
 docs(readme): Actualizar instrucciones de instalación
 ```
 
-## 🧪 Pruebas
+## Pruebas
 
 ### Lista de Verificación de Pruebas Manuales
 
@@ -212,7 +212,7 @@ Prueba tus cambios en:
 - **Steem**: Steemit
 - **Blurt**: BeBlurt, Blurt.blog, BlurtWallet
 
-## 📚 Documentación
+## Documentación
 
 ### Documentación de Código
 
@@ -230,26 +230,26 @@ Prueba tus cambios en:
  */
 ```
 
-## 🏆 Reconocimiento
+## Reconocimiento
 
 Los contribuyentes serán:
 - Listados en las notas de versión
 - Mencionados en el README (para contribuciones significativas)
 - Agregados a la lista de contribuyentes
 
-## 📞 Obtener Ayuda
+## Obtener Ayuda
 
 - **Preguntas**: Usa [GitHub Discussions](https://github.com/drakernoise/w3-multi-chain-wallet-manager/discussions)
 - **Bugs**: Crea un [Issue](https://github.com/drakernoise/w3-multi-chain-wallet-manager/issues)
 
-## 📄 Licencia
+## Licencia
 
 Al contribuir, aceptas que tus contribuciones se licenciarán bajo la Licencia MIT.
 
 ---
 
-**¡Gracias por contribuir a Gravity Wallet!** 🙏
+**¡Gracias por contribuir a Gravity Wallet!**
 
 Cada contribución, sin importar cuán pequeña, hace la diferencia. Apreciamos tu tiempo y esfuerzo en hacer este proyecto mejor para todos.
 
-¡Feliz codificación! 💻✨
+¡Feliz codificación!
