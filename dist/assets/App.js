@@ -4538,7 +4538,7 @@ user3`
                     isInvalid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "✕" })
                   ] })
                 ] }),
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-1/3 relative", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-1/2 relative bg-dark-950 rounded-lg border border-dark-600 flex items-center", children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "input",
                     {
@@ -4554,7 +4554,7 @@ user3`
                           setItems(newItems);
                         }
                       },
-                      className: "w-full bg-dark-950 border border-dark-600 rounded-lg px-3 py-2 text-xs outline-none text-white placeholder-slate-600 font-mono"
+                      className: "w-full bg-transparent border-none px-3 py-2 text-xs outline-none text-white placeholder-slate-600 font-mono"
                     }
                   ),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute right-1 top-1 bottom-1 flex items-center", children: chain === Chain.HIVE || chain === Chain.STEEM ? /* @__PURE__ */ jsxRuntimeExports.jsx(

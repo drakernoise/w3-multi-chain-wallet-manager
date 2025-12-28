@@ -460,7 +460,7 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                                     {isInvalid && <span className="text-red-400 font-bold">✕</span>}
                                                 </div>
                                             </div>
-                                            <div className="w-1/3 relative">
+                                            <div className="w-1/2 relative bg-dark-950 rounded-lg border border-dark-600 flex items-center">
                                                 <input
                                                     type="text"
                                                     inputMode="decimal"
@@ -474,7 +474,7 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                                             setItems(newItems);
                                                         }
                                                     }}
-                                                    className="w-full bg-dark-950 border border-dark-600 rounded-lg px-3 py-2 text-xs outline-none text-white placeholder-slate-600 font-mono"
+                                                    className="w-full bg-transparent border-none px-3 py-2 text-xs outline-none text-white placeholder-slate-600 font-mono"
                                                 />
                                                 <div className="absolute right-1 top-1 bottom-1 flex items-center">
                                                     {(chain === Chain.HIVE || chain === Chain.STEEM) ? (
