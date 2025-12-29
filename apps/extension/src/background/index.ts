@@ -546,3 +546,4 @@ self.addEventListener('notificationclick', (event: any) => {
         height: 620
     });
 });
+

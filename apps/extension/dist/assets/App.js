@@ -1,7 +1,8 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./index.js","./main.css","./index2.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { j as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, k as broadcastSavingsDeposit, m as broadcastSavingsWithdraw, n as fetchAccountData, o as broadcastRCDelegate, p as broadcastRCUndelegate, q as broadcastBulkTransfer, t as indexBrowserExports, u as indexBrowserExports$1, v as validateAccountKeys, w as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, l as lookup, x as fetchBalances, y as detectWeb3Context, z as benchmarkNodes } from './index2.js';
+import { j as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, k as broadcastSavingsDeposit, l as broadcastSavingsWithdraw, m as fetchAccountData, n as broadcastRCDelegate, o as broadcastRCUndelegate, p as broadcastBulkTransfer, q as indexBrowserExports, t as indexBrowserExports$1, v as validateAccountKeys, u as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, w as fetchBalances, x as detectWeb3Context, y as benchmarkNodes } from './chainService.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
+import { l as lookup } from './index2.js';
 
 const authenticateWithGoogle = async () => {
   return new Promise((resolve) => {
@@ -732,7 +733,7 @@ registerPlugin('CapacitorHttp', {
 });
 
 const Preferences = registerPlugin('Preferences', {
-    web: () => __vitePreload(() => import('./web.js'),true              ?__vite__mapDeps([0,1,2,3,4]):void 0,import.meta.url).then(m => new m.PreferencesWeb()),
+    web: () => __vitePreload(() => import('./web.js'),true              ?__vite__mapDeps([0,1,2,3,4,5,6]):void 0,import.meta.url).then(m => new m.PreferencesWeb()),
 });
 
 const isCapacitor = () => {
@@ -5257,6 +5258,15 @@ const translations = {
     "history.sent": "Sent",
     "history.from": "From",
     "history.to": "To",
+    "history.filter_label": "Filter",
+    "history.filter_all": "All",
+    "history.filter_received": "Received",
+    "history.filter_sent": "Sent",
+    "history.filter_powerup": "Power Up",
+    "history.filter_powerdown": "Power Down",
+    "history.type_powerup_in": "Received Power",
+    "history.type_powerup_out": "Sent Power",
+    "history.type_powerdown": "Power Down",
     // Sign Request
     "sign.title": "Signature Request",
     "sign.transfer_title": "Transfer Request",
@@ -5672,6 +5682,15 @@ const translations = {
     "history.sent": "Enviado",
     "history.from": "De",
     "history.to": "Para",
+    "history.filter_label": "Filtrar",
+    "history.filter_all": "Todos",
+    "history.filter_received": "Recibidos",
+    "history.filter_sent": "Enviados",
+    "history.filter_powerup": "Power Up",
+    "history.filter_powerdown": "Power Down",
+    "history.type_powerup_in": "Power Recibido",
+    "history.type_powerup_out": "Power Enviado",
+    "history.type_powerdown": "Power Down",
     // Sign Request
     "sign.title": "Solicitud de Firma",
     "sign.transfer_title": "Solicitud de Transferencia",
@@ -10673,45 +10692,117 @@ const HistoryModal = ({ account, onClose }) => {
   const { t } = useTranslation();
   const [history, setHistory] = reactExports.useState([]);
   const [loading, setLoading] = reactExports.useState(true);
+  const [filter, setFilter] = reactExports.useState("all");
   reactExports.useEffect(() => {
     setLoading(true);
     fetchAccountHistory(account.chain, account.name).then((data) => setHistory(data)).catch((err) => console.error(err)).finally(() => setLoading(false));
   }, [account]);
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 rounded-xl w-full max-w-md max-h-[80vh] flex flex-col border border-dark-700 shadow-2xl", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 border-b border-dark-700 flex justify-between items-center", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "font-bold text-lg text-white", children: t("history.title").replace("{user}", account.name) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-400 hover:text-white text-xl leading-none", children: "×" })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto custom-scrollbar p-0 bg-dark-900/50", children: loading ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-8 text-center text-slate-500 flex flex-col items-center gap-2", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-6 h-6 border-2 border-slate-600 border-t-white rounded-full animate-spin" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("history.loading") })
-    ] }) : history.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-8 text-center text-slate-500", children: t("history.empty") }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "divide-y divide-dark-700", children: history.map((item, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-3 hover:bg-dark-700/50 transition-colors", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-start mb-1", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${item.type === "receive" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`, children: item.type === "receive" ? t("history.received") : t("history.sent") }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-slate-500", children: new Date(item.date).toLocaleString() })
+  const filteredHistory = history.filter((item) => {
+    if (filter === "all") return true;
+    if (filter === "received") return item.type === "receive";
+    if (filter === "sent") return item.type === "send";
+    if (filter === "powerup") return item.type === "powerup_in" || item.type === "powerup_out";
+    if (filter === "powerdown") return item.type === "powerdown";
+    return true;
+  });
+  const getTypeBadgeClass = (type) => {
+    switch (type) {
+      case "receive":
+      case "powerup_in":
+        return "bg-green-500/10 text-green-400";
+      case "send":
+      case "powerup_out":
+      case "powerdown":
+        return "bg-red-500/10 text-red-400";
+      default:
+        return "bg-slate-500/10 text-slate-400";
+    }
+  };
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case "receive":
+        return t("history.received");
+      case "send":
+        return t("history.sent");
+      case "powerup_in":
+        return t("history.type_powerup_in");
+      case "powerup_out":
+        return t("history.type_powerup_out");
+      case "powerdown":
+        return t("history.type_powerdown");
+      default:
+        return type;
+    }
+  };
+  const getFilterIcon = (type) => {
+    switch (type) {
+      case "all":
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" }) });
+      case "received":
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 14l-7 7m0 0l-7-7m7 7V3" }) });
+      case "sent":
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 10l7-7m0 0l7 7m-7-7v18" }) });
+      case "powerup":
+        return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) });
+      case "powerdown":
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative w-5 h-5 flex items-center justify-center", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 absolute inset-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3 text-red-500 absolute top-0 right-0 bg-dark-800 rounded-full", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", strokeWidth: 3, children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }) })
+        ] });
+      default:
+        return null;
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col border border-dark-600 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border-b border-dark-600", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 flex justify-between items-center bg-dark-700/30", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "font-black text-lg text-white tracking-tight", children: t("history.title").replace("{user}", account.name) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-white transition-colors", children: "×" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-1", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-300", children: item.type === "receive" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-3 py-2 bg-dark-900 flex items-center gap-2 overflow-x-auto no-scrollbar justify-between", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-blue-500 shrink-0 flex items-center mr-2", title: t("history.filter_label"), children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { fillRule: "evenodd", d: "M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z", clipRule: "evenodd" }) }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-2 flex-1 justify-end", children: ["all", "received", "sent", "powerup", "powerdown"].map((f) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => setFilter(f),
+            title: t(`history.filter_${f}`),
+            className: `p-2 rounded-lg transition-all border flex items-center justify-center w-9 h-9 ${filter === f ? "bg-blue-600 border-blue-500 text-white shadow-md" : "bg-dark-800 border-dark-700 text-slate-500 hover:border-dark-500 hover:text-slate-300"}`,
+            children: getFilterIcon(f)
+          },
+          f
+        )) })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto custom-scrollbar bg-dark-900/40", children: loading ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-8 text-center text-slate-500 flex flex-col items-center gap-3 mt-8", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-bold uppercase tracking-widest opacity-75", children: t("history.loading") })
+    ] }) : history.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : filteredHistory.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "divide-y divide-dark-800/50", children: filteredHistory.map((item, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 hover:bg-white/[0.02] transition-colors group", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-start mb-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[9px] font-black uppercase px-2 py-1 rounded-md tracking-wider ${getTypeBadgeClass(item.type)}`, children: getTypeLabel(item.type) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] font-medium text-slate-600 group-hover:text-slate-500 transition-colors", children: new Date(item.date).toLocaleString() })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 font-medium", children: item.type === "receive" || item.type === "powerup_in" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
           t("history.from"),
           " ",
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold hover:text-blue-400 cursor-pointer", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
             "@",
             item.from
           ] })
         ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
           t("history.to"),
           " ",
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold hover:text-blue-400 cursor-pointer", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
             "@",
             item.to
           ] })
         ] }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `font-mono font-bold text-sm ${item.type === "receive" ? "text-green-400" : "text-red-400"}`, children: [
-          item.type === "receive" ? "+" : "-",
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `font-mono font-black text-sm tracking-tight ${item.type === "receive" || item.type === "powerup_in" ? "text-green-400" : "text-red-400"}`, children: [
+          item.type === "receive" || item.type === "powerup_in" ? "+" : "-",
           item.amount
         ] })
       ] }),
-      item.memo && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-400 italic bg-dark-900/50 p-1.5 rounded border border-dark-700/50 break-all", children: item.memo })
+      item.memo && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 bg-dark-800 p-2.5 rounded-lg border border-dark-700/50 break-all font-medium leading-relaxed shadow-inner", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "opacity-75", children: item.memo }) })
     ] }, idx)) }) })
   ] }) });
 };
@@ -11416,6 +11507,18 @@ class ChatService {
       const storedId = localStorage.getItem("gravity_chat_id");
       if (storedUser && storedKey) {
         console.log("Auto-logging in as", storedUser);
+        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+          const pubKey = localStorage.getItem("gravity_chat_pub") || "";
+          chrome.runtime.sendMessage({
+            type: "CHAT_SYNC_CREDS",
+            data: {
+              username: storedUser,
+              privateKey: storedKey,
+              publicKey: pubKey
+            }
+          }).catch(() => {
+          });
+        }
         await this.authenticateWithSignature(storedId, storedUser);
       }
     });
@@ -11472,6 +11575,18 @@ class ChatService {
       }
       localStorage.setItem("gravity_chat_id", data.id);
       localStorage.setItem("gravity_chat_username", data.username);
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(["gravity_push_sub"], (res) => {
+          if (res && res.gravity_push_sub) {
+            try {
+              const sub = JSON.parse(res.gravity_push_sub);
+              console.log("Chat: Syncing WebPush Sub");
+              this.socket?.emit("store_push_subscription", sub);
+            } catch (e) {
+            }
+          }
+        });
+      }
       if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
       if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
       this.notifyRoomUpdate();
@@ -11832,12 +11947,15 @@ class ChatService {
     const processedMsg = await this.processIncomingMessage(roomId, message);
     const room = this.rooms.find((r) => r.id === roomId);
     if (room) {
+      if (room.messages.find((m) => m.id === processedMsg.id)) return;
       room.messages.push(processedMsg);
       if (this.onMessage) this.onMessage(roomId, processedMsg);
       if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
-      window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
-      const badge = document.getElementById("chat-badge");
-      if (badge) badge.classList.remove("hidden");
+      if (processedMsg.senderId !== this.userId) {
+        window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
+        const badge = document.getElementById("chat-badge");
+        if (badge) badge.classList.remove("hidden");
+      }
     }
   }
   async processIncomingMessage(roomId, message) {
@@ -11917,6 +12035,10 @@ const ChatView = ({ onClose }) => {
     setIsCreating(false);
   };
   reactExports.useEffect(() => {
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: "CHAT_UI_OPENED" }).catch(() => {
+      });
+    }
     chatService.init();
     setSocketStatus(chatService.getCurrentUser() ? "authenticated" : "connecting");
     const existing = chatService.getCurrentUser();

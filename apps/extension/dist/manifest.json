@@ -26,9 +26,7 @@
     "activeTab",
     "tabs",
     "windows",
-    "alarms",
-    "offscreen",
-    "notifications"
+    "alarms"
   ],
   "content_scripts": [
     {

@@ -1,6 +1,8 @@
 import { W as WebPlugin } from './App.js';
 import './main.js';
+import './modulepreload-polyfill.js';
 import './index.js';
+import './chainService.js';
 import './index2.js';
 
 class PreferencesWeb extends WebPlugin {
