@@ -148,6 +148,28 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         }
     }, [notification]);
 
+    // Push Permission Request
+    useEffect(() => {
+        if (socketStatus === 'authenticated' && user) {
+            if (Notification.permission === 'default') {
+                Notification.requestPermission().then(p => {
+                    if (p === 'granted') {
+                        console.log("Gravity: Push permission granted");
+                        // Signal background to subscribe
+                        if (typeof chrome !== 'undefined' && chrome.runtime) {
+                            chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' });
+                        }
+                    }
+                });
+            } else if (Notification.permission === 'granted') {
+                // Ensure subscribed
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' });
+                }
+            }
+        }
+    }, [socketStatus, user]);
+
     // Effect to load messages when active room changes
     useEffect(() => {
         if (activeRoomId) {

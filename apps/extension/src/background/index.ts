@@ -508,7 +508,19 @@ async function subscribeToPush() {
 }
 
 // Call subscription on init
-subscribeToPush();
+// Don't auto-subscribe on load, wait for UI trigger to ensure permissions
+chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
+    if (msg.type === 'CHAT_ENABLE_PUSH') {
+        console.log("Gravity: Requesting Push Subscription...");
+        subscribeToPush()
+            .then(sub => {
+                if (sub) sendResponse({ success: true, subscription: sub });
+                else sendResponse({ success: false, error: 'Failed to subscribe' });
+            })
+            .catch(err => sendResponse({ success: false, error: err.toString() }));
+        return true; // Keep channel open for async response
+    }
+});
 
 // Listen for Push Events
 // @ts-ignore

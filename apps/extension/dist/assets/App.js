@@ -12119,6 +12119,24 @@ const ChatView = ({ onClose }) => {
     }
   }, [notification]);
   reactExports.useEffect(() => {
+    if (socketStatus === "authenticated" && user) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().then((p) => {
+          if (p === "granted") {
+            console.log("Gravity: Push permission granted");
+            if (typeof chrome !== "undefined" && chrome.runtime) {
+              chrome.runtime.sendMessage({ type: "CHAT_ENABLE_PUSH" });
+            }
+          }
+        });
+      } else if (Notification.permission === "granted") {
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage({ type: "CHAT_ENABLE_PUSH" });
+        }
+      }
+    }
+  }, [socketStatus, user]);
+  reactExports.useEffect(() => {
     if (activeRoomId) {
       chatService.joinRoom(activeRoomId);
       const room = rooms.find((r) => r.id === activeRoomId);

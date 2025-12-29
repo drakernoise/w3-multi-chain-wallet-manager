@@ -356,7 +356,16 @@ async function subscribeToPush() {
     console.error("Gravity: Push Subscription Error", e);
   }
 }
-subscribeToPush();
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "CHAT_ENABLE_PUSH") {
+    console.log("Gravity: Requesting Push Subscription...");
+    subscribeToPush().then((sub) => {
+      if (sub) sendResponse({ success: true, subscription: sub });
+      else sendResponse({ success: false, error: "Failed to subscribe" });
+    }).catch((err) => sendResponse({ success: false, error: err.toString() }));
+    return true;
+  }
+});
 self.addEventListener("push", (event) => {
   console.log("Gravity: Push Event Received");
   let data = {};
