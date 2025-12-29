@@ -1,6 +1,8 @@
 import { io, Socket } from "socket.io-client";
 import { generateEncryptionKeys, exportKeyToBase64, importKeyFromBase64, deriveSharedSecret, encryptMessage, decryptMessage } from './cryptoService';
 
+declare var chrome: any;
+
 // Define Chat Types
 export interface ChatUser {
     id: string;
@@ -93,7 +95,16 @@ class ChatService {
             }
         });
 
+
+
         this.setupListeners();
+    }
+
+    public syncPushSubscription(sub: any) {
+        if (this.socket?.connected) {
+            console.log('Chat: Manual Push Sync');
+            this.socket.emit('store_push_subscription', sub);
+        }
     }
 
     private setupListeners() {

@@ -327,45 +327,6 @@ async function openPrompt(requestId) {
     console.error("Gravity: Failed to open prompt", e);
   }
 }
-const VAPID_PUBLIC_KEY = "BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ";
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-async function subscribeToPush() {
-  try {
-    const registration = self.registration;
-    if (!registration || !registration.pushManager) {
-      console.warn("Gravity: PushManager not available");
-      return;
-    }
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
-    console.log("Gravity: Push Subscribed!", JSON.stringify(subscription));
-    chrome.storage.local.set({ gravity_push_sub: JSON.stringify(subscription) });
-    return subscription;
-  } catch (e) {
-    console.error("Gravity: Push Subscription Error", e);
-  }
-}
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.type === "CHAT_ENABLE_PUSH") {
-    console.log("Gravity: Requesting Push Subscription...");
-    subscribeToPush().then((sub) => {
-      if (sub) sendResponse({ success: true, subscription: sub });
-      else sendResponse({ success: false, error: "Failed to subscribe" });
-    }).catch((err) => sendResponse({ success: false, error: err.toString() }));
-    return true;
-  }
-});
 self.addEventListener("push", (event) => {
   console.log("Gravity: Push Event Received");
   let data = {};

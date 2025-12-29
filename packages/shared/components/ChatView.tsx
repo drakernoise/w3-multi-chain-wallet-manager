@@ -148,26 +148,53 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         }
     }, [notification]);
 
-    // Push Permission Request
+    // Push Subscription Logic (UI-Driven)
     useEffect(() => {
-        if (socketStatus === 'authenticated' && user) {
-            if (Notification.permission === 'default') {
-                Notification.requestPermission().then(p => {
-                    if (p === 'granted') {
-                        console.log("Gravity: Push permission granted");
-                        // Signal background to subscribe
-                        if (typeof chrome !== 'undefined' && chrome.runtime) {
-                            chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' });
-                        }
-                    }
-                });
-            } else if (Notification.permission === 'granted') {
-                // Ensure subscribed
-                if (typeof chrome !== 'undefined' && chrome.runtime) {
-                    chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' });
+        const setupPush = async () => {
+            if (socketStatus !== 'authenticated' || !user) return;
+
+            // 1. Request Permission
+            const perm = await Notification.requestPermission();
+            if (perm !== 'granted') return;
+
+            // 2. Subscribe via SW
+            if (!navigator.serviceWorker) return;
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                if (!reg.pushManager) return;
+
+                const VAPID_KEY = 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
+                const urlBase64ToUint8Array = (base64String: string) => {
+                    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+                    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+                    const rawData = window.atob(base64);
+                    const outputArray = new Uint8Array(rawData.length);
+                    for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+                    return outputArray;
+                };
+
+                let sub = await reg.pushManager.getSubscription();
+                if (!sub) {
+                    sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(VAPID_KEY)
+                    });
                 }
+
+                // 3. Save & Sync
+                if (sub) {
+                    console.log("Gravity: Push Subscribed (UI)", sub);
+                    if (typeof chrome !== 'undefined' && chrome.storage) {
+                        chrome.storage.local.set({ gravity_push_sub: JSON.stringify(sub) });
+                    }
+                    chatService.syncPushSubscription(sub);
+                }
+            } catch (err) {
+                console.error("Gravity: UI Push Error", err);
             }
-        }
+        };
+
+        setupPush();
     }, [socketStatus, user]);
 
     // Effect to load messages when active room changes
