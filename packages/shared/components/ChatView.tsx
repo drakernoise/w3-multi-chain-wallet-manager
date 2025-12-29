@@ -148,54 +148,38 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         }
     }, [notification]);
 
-    // Push Subscription Logic (UI-Driven)
-    useEffect(() => {
-        const setupPush = async () => {
-            if (socketStatus !== 'authenticated' || !user) return;
+    // Push Notifications Logic
+    const [pushGranted, setPushGranted] = useState(Notification.permission === 'granted');
 
-            // 1. Request Permission
-            const perm = await Notification.requestPermission();
-            if (perm !== 'granted') return;
-
-            // 2. Subscribe via SW
-            if (!navigator.serviceWorker) return;
-            try {
-                const reg = await navigator.serviceWorker.ready;
-                if (!reg.pushManager) return;
-
-                const VAPID_KEY = 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
-                const urlBase64ToUint8Array = (base64String: string) => {
-                    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-                    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-                    const rawData = window.atob(base64);
-                    const outputArray = new Uint8Array(rawData.length);
-                    for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
-                    return outputArray;
-                };
-
-                let sub = await reg.pushManager.getSubscription();
-                if (!sub) {
-                    sub = await reg.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: urlBase64ToUint8Array(VAPID_KEY)
-                    });
-                }
-
-                // 3. Save & Sync
-                if (sub) {
-                    console.log("Gravity: Push Subscribed (UI)", sub);
-                    if (typeof chrome !== 'undefined' && chrome.storage) {
-                        chrome.storage.local.set({ gravity_push_sub: JSON.stringify(sub) });
+    const handleEnablePush = async () => {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+            setPushGranted(true);
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' }, (res: any) => {
+                    if (res && res.success) {
+                        console.log("Gravity: Push Subscribed via Background");
+                        if (res.subscription) chatService.syncPushSubscription(res.subscription);
+                    } else {
+                        console.error("Gravity: Push Background Error", res?.error);
                     }
-                    chatService.syncPushSubscription(sub);
-                }
-            } catch (err) {
-                console.error("Gravity: UI Push Error", err);
+                });
             }
-        };
+        }
+    };
 
-        setupPush();
-    }, [socketStatus, user]);
+    // Auto-sync if already granted
+    useEffect(() => {
+        if (socketStatus === 'authenticated' && pushGranted) {
+            if (typeof chrome !== 'undefined' && chrome.runtime) {
+                chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' }, (res: any) => {
+                    if (res && res.success && res.subscription) {
+                        chatService.syncPushSubscription(res.subscription);
+                    }
+                });
+            }
+        }
+    }, [socketStatus, pushGranted]);
 
     // Effect to load messages when active room changes
     useEffect(() => {
@@ -390,6 +374,16 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                     </button>
                 </div>
+
+                {/* Push Notification Trigger */}
+                {!pushGranted && (
+                    <div className="p-2 border-b border-dark-700 bg-indigo-900/10">
+                        <button onClick={handleEnablePush} className="w-full text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                            Enable Notifications
+                        </button>
+                    </div>
+                )}
 
                 {/* Unified Search Bar */}
                 <div className="p-3 border-b border-dark-700 bg-dark-900/20">

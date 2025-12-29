@@ -467,6 +467,67 @@ async function openPrompt(requestId: string) {
     }
 }
 
+// === WEB PUSH LOGIC ===
+const VAPID_PUBLIC_KEY = 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
+
+function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+async function subscribeToPush() {
+    console.log("Gravity: [Background] Starting Push Subscription sequence...");
+    try {
+        // @ts-ignore
+        const reg = self.registration;
+        if (!reg || !reg.pushManager) {
+            throw new Error("PushManager not available in Service Worker context");
+        }
+
+        // Check existing
+        let sub = await reg.pushManager.getSubscription();
+        if (sub) {
+            console.log("Gravity: [Background] Found existing subscription");
+            return sub;
+        }
+
+        // Subscribe
+        console.log("Gravity: [Background] Requesting new subscription...");
+        sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+
+        console.log("Gravity: [Background] Subscription SUCCESS:", JSON.stringify(sub));
+        // Save locally
+        await chrome.storage.local.set({ gravity_push_sub: JSON.stringify(sub) });
+        return sub;
+    } catch (e: any) {
+        console.error("Gravity: [Background] Push Subscription ERROR:", e.name, e.message);
+        throw e;
+    }
+}
+
+// Handler for UI requests
+chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
+    if (msg.type === 'CHAT_ENABLE_PUSH') {
+        subscribeToPush()
+            .then(sub => {
+                sendResponse({ success: true, subscription: sub });
+            })
+            .catch(err => {
+                sendResponse({ success: false, error: err.message || err.toString() });
+            });
+        return true; // Async response
+    }
+});
+
 // === WEB PUSH LISTENER ===
 // Handler for incoming Push Notifications
 // @ts-ignore

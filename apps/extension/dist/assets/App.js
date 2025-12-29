@@ -12124,46 +12124,34 @@ const ChatView = ({ onClose }) => {
       return () => clearTimeout(timer);
     }
   }, [notification]);
-  reactExports.useEffect(() => {
-    const setupPush = async () => {
-      if (socketStatus !== "authenticated" || !user) return;
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") return;
-      if (!navigator.serviceWorker) return;
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        if (!reg.pushManager) return;
-        const VAPID_KEY = "BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ";
-        const urlBase64ToUint8Array = (base64String) => {
-          const padding = "=".repeat((4 - base64String.length % 4) % 4);
-          const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
-          const rawData = window.atob(base64);
-          const outputArray = new Uint8Array(rawData.length);
-          for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
+  const [pushGranted, setPushGranted] = reactExports.useState(Notification.permission === "granted");
+  const handleEnablePush = async () => {
+    const perm = await Notification.requestPermission();
+    if (perm === "granted") {
+      setPushGranted(true);
+      if (typeof chrome !== "undefined" && chrome.runtime) {
+        chrome.runtime.sendMessage({ type: "CHAT_ENABLE_PUSH" }, (res) => {
+          if (res && res.success) {
+            console.log("Gravity: Push Subscribed via Background");
+            if (res.subscription) chatService.syncPushSubscription(res.subscription);
+          } else {
+            console.error("Gravity: Push Background Error", res?.error);
           }
-          return outputArray;
-        };
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(VAPID_KEY)
-          });
-        }
-        if (sub) {
-          console.log("Gravity: Push Subscribed (UI)", sub);
-          if (typeof chrome !== "undefined" && chrome.storage) {
-            chrome.storage.local.set({ gravity_push_sub: JSON.stringify(sub) });
-          }
-          chatService.syncPushSubscription(sub);
-        }
-      } catch (err) {
-        console.error("Gravity: UI Push Error", err);
+        });
       }
-    };
-    setupPush();
-  }, [socketStatus, user]);
+    }
+  };
+  reactExports.useEffect(() => {
+    if (socketStatus === "authenticated" && pushGranted) {
+      if (typeof chrome !== "undefined" && chrome.runtime) {
+        chrome.runtime.sendMessage({ type: "CHAT_ENABLE_PUSH" }, (res) => {
+          if (res && res.success && res.subscription) {
+            chatService.syncPushSubscription(res.subscription);
+          }
+        });
+      }
+    }
+  }, [socketStatus, pushGranted]);
   reactExports.useEffect(() => {
     if (activeRoomId) {
       chatService.joinRoom(activeRoomId);
@@ -12328,6 +12316,10 @@ const ChatView = ({ onClose }) => {
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setIsCreating(true), className: "p-1.5 bg-dark-700 hover:bg-purple-600/20 text-slate-400 hover:text-purple-400 rounded-lg transition-all", title: "New Room", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 4v16m8-8H4" }) }) })
       ] }),
+      !pushGranted && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-2 border-b border-dark-700 bg-indigo-900/10", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: handleEnablePush, className: "w-full text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" }) }),
+        "Enable Notifications"
+      ] }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-3 border-b border-dark-700 bg-dark-900/20", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(
