@@ -12,6 +12,11 @@ let socket: Socket | null = null;
 let unreadCount = 0;
 const SERVER_URL = 'https://gravity-chat-serve.onrender.com'; // Production URL
 
+// FORCE WEBSOCKET POLYFILL FOR SERVICE WORKER
+if (typeof WebSocket === 'undefined' && typeof (self as any).WebSocket !== 'undefined') {
+    (globalThis as any).WebSocket = (self as any).WebSocket;
+}
+
 // --- CRYPTO UTILS (Duplicated from ChatService to run in pure SW context) ---
 function hexToBuffer(hexString: string): ArrayBuffer {
     if (!hexString) return new Uint8Array().buffer;
@@ -24,8 +29,6 @@ async function signChallenge(challenge: string, privateKeyHex: string): Promise<
         const privateKeyBuffer = hexToBuffer(privateKeyHex);
 
         // Robust Cross-Environment Check
-        // In Service Workers, 'crypto' should be globally available.
-        // If not, we fall back to 'globalThis.crypto'.
         const cryptoLib =
             (typeof crypto !== 'undefined' ? crypto : null) ||
             (typeof globalThis !== 'undefined' && globalThis.crypto ? globalThis.crypto : null);
@@ -60,7 +63,7 @@ async function signChallenge(challenge: string, privateKeyHex: string): Promise<
 function updateBadge() {
     // Determine text and color based on count
     const text = unreadCount > 0 ? (unreadCount > 9 ? '9+' : String(unreadCount)) : '';
-    const color = '#9333EA'; // Gravity Purple
+    const color = '#FF0000'; // Standard Red for visibility
 
     chrome.action.setBadgeText({ text });
     chrome.action.setBadgeBackgroundColor({ color });
@@ -100,9 +103,7 @@ async function initChatSocket() {
 
     socket.on('connect', () => {
         console.log("BG Chat: Connected!");
-        // We might need to authenticate if the server requires it for receiving notifications
-        // Usually, 'register' or 'login' involves a challenge.
-        // Let's trigger auth flow.
+        // Trigger auth flow
         socket?.emit('request_challenge', { username: creds.username });
     });
 
@@ -126,9 +127,13 @@ async function initChatSocket() {
     });
 
     socket.on('new_message', (data: any) => {
-        // Check if message is from ME. If so, ignore.
         console.log("BG Chat: New Message", data);
-        if (data.message && data.message.senderName === creds.username) return;
+
+        // Normalize username check to be safe
+        const sender = data.message?.senderName || '';
+        const myName = creds.username || '';
+
+        if (sender.toLowerCase() === myName.toLowerCase()) return;
 
         unreadCount++;
         updateBadge();
@@ -152,6 +157,11 @@ export function setupChatListeners() {
         if (request.type === 'CHAT_SYNC_CREDS') {
             console.log("BG Chat: Syncing credentials...");
             chrome.storage.local.set({ gravity_chat_creds: request.data }).then(() => {
+                // If we are getting fresh creds, maybe reset connection to force login
+                if (socket) {
+                    socket.disconnect();
+                    socket = null;
+                }
                 unreadCount = 0; // Reset on login
                 updateBadge();
                 initChatSocket();
@@ -170,14 +180,10 @@ export function setupChatListeners() {
             });
         }
 
-        // When UI opens, it might send 'CHAT_READ_ALL'
+        // When UI opens, it might send 'CHAT_UI_OPENED'
         if (request.type === 'CHAT_UI_OPENED') {
             unreadCount = 0;
             updateBadge();
-            // Optional: Pause socket to save resources while UI handles it?
-            // Actually better to keep it alive or let UI take over.
-            // If UI and BG both have sockets, user gets double events?
-            // Socket.io handles multiple sockets for same user fine (multiple tabs).
         }
     });
 

@@ -72,6 +72,22 @@ class ChatService {
 
             if (storedUser && storedKey) {
                 console.log('Auto-logging in as', storedUser);
+
+                // Sync keys with Background/Service Worker so it can maintain connection
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    const pubKey = localStorage.getItem('gravity_chat_pub') || '';
+                    chrome.runtime.sendMessage({
+                        type: 'CHAT_SYNC_CREDS',
+                        data: {
+                            username: storedUser,
+                            privateKey: storedKey,
+                            publicKey: pubKey
+                        }
+                    }).catch(() => {
+                        // It's normal for this to fail if the extension context is invalid or reloading
+                    });
+                }
+
                 // Attempt authentication. If we have ID, use it. If not, use Username (Recovery).
                 await this.authenticateWithSignature(storedId, storedUser);
             }
@@ -149,6 +165,19 @@ class ChatService {
             // Persist
             localStorage.setItem('gravity_chat_id', data.id);
             localStorage.setItem('gravity_chat_username', data.username);
+
+            // --- SYNC PUSH SUBSCRIPTION ---
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.get(['gravity_push_sub'], (res: any) => {
+                    if (res && res.gravity_push_sub) {
+                        try {
+                            const sub = JSON.parse(res.gravity_push_sub);
+                            console.log('Chat: Syncing WebPush Sub');
+                            this.socket?.emit('store_push_subscription', sub);
+                        } catch (e) { }
+                    }
+                });
+            }
 
             // Notify UI
             if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
@@ -590,18 +619,24 @@ class ChatService {
 
         const room = this.rooms.find(r => r.id === roomId);
         if (room) {
+            // Prevent duplicates
+            if (room.messages.find(m => m.id === processedMsg.id)) return;
+
             room.messages.push(processedMsg);
 
             // UI Handler
             if (this.onMessage) this.onMessage(roomId, processedMsg);
             if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
 
-            // Dispatch global event for Badge (Sidebar)
-            window.dispatchEvent(new CustomEvent('chat-unread', { detail: { roomId } }));
+            // Trigger notification only if message is NOT from me
+            if (processedMsg.senderId !== this.userId) {
+                // Dispatch global event for Badge (Sidebar)
+                window.dispatchEvent(new CustomEvent('chat-unread', { detail: { roomId } }));
 
-            // Direct DOM manipulation fallback for Sidebar Badge
-            const badge = document.getElementById('chat-badge');
-            if (badge) badge.classList.remove('hidden');
+                // Direct DOM manipulation fallback for Sidebar Badge
+                const badge = document.getElementById('chat-badge');
+                if (badge) badge.classList.remove('hidden');
+            }
         }
     }
 

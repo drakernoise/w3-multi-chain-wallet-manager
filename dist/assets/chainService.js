@@ -680,6 +680,14 @@ const fetchAccountHistory = async (chain, username) => {
       if (data.from === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: data.memo, type: "send", txId: trx_id };
       if (data.to === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: data.memo, type: "receive", txId: trx_id };
     }
+    if (type === "transfer_to_vesting") {
+      if (data.from === username && data.to === username) return { date: timestamp, from: data.from, to: "VESTING", amount: data.amount, memo: "Power Up (Self)", type: "powerup_out", txId: trx_id };
+      if (data.from === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: "Power Up", type: "powerup_out", txId: trx_id };
+      if (data.to === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: "Power Up Received", type: "powerup_in", txId: trx_id };
+    }
+    if (type === "withdraw_vesting") {
+      if (data.account === username) return { date: timestamp, from: data.account, to: "LIQUID", amount: data.vesting_shares, memo: "Power Down", type: "powerdown", txId: trx_id };
+    }
     return null;
   };
   try {
@@ -1349,6 +1357,18 @@ class ChatService {
       const storedId = localStorage.getItem("gravity_chat_id");
       if (storedUser && storedKey) {
         console.log("Auto-logging in as", storedUser);
+        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+          const pubKey = localStorage.getItem("gravity_chat_pub") || "";
+          chrome.runtime.sendMessage({
+            type: "CHAT_SYNC_CREDS",
+            data: {
+              username: storedUser,
+              privateKey: storedKey,
+              publicKey: pubKey
+            }
+          }).catch(() => {
+          });
+        }
         await this.authenticateWithSignature(storedId, storedUser);
       }
     });
@@ -1377,7 +1397,7 @@ class ChatService {
     });
     this.socket.on("auth_success", (data) => {
       if (this.userId === data.id && this.rooms.length > 0) {
-        console.log(`⚠️ Ignoring duplicate auth_success for ${data.username}`);
+        console.log(`Ignoring duplicate auth_success for ${data.username}`);
         return;
       }
       this.userId = data.id;
@@ -1387,9 +1407,9 @@ class ChatService {
         messages: [],
         unreadCount: 0
       }));
-      console.log(`✅ Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map((r) => r.name));
+      console.log(`Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map((r) => r.name));
       if (data.pendingInvites && data.pendingInvites.length > 0) {
-        console.log(`📬 Received ${data.pendingInvites.length} pending invites`);
+        console.log(`Received ${data.pendingInvites.length} pending invites`);
         if (typeof chrome !== "undefined" && chrome.runtime) {
           chrome.runtime.sendMessage({
             type: "UPDATE_BADGE",
@@ -1405,6 +1425,18 @@ class ChatService {
       }
       localStorage.setItem("gravity_chat_id", data.id);
       localStorage.setItem("gravity_chat_username", data.username);
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(["gravity_push_sub"], (res) => {
+          if (res && res.gravity_push_sub) {
+            try {
+              const sub = JSON.parse(res.gravity_push_sub);
+              console.log("Chat: Syncing WebPush Sub");
+              this.socket?.emit("store_push_subscription", sub);
+            } catch (e) {
+            }
+          }
+        });
+      }
       if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
       if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
       this.notifyRoomUpdate();
@@ -1434,14 +1466,14 @@ class ChatService {
       }
     });
     this.socket.on("room_added", (roomData) => {
-      console.log(`🆕 room_added event received:`, roomData);
+      console.log(`room_added event received:`, roomData);
       if (this.rooms.find((r) => r.id === roomData.id)) {
-        console.log(`⚠️ Room ${roomData.name} already exists, skipping`);
+        console.log(`Room ${roomData.name} already exists, skipping`);
         return;
       }
       const newRoom = { ...roomData, messages: [], unreadCount: 0 };
       this.rooms.push(newRoom);
-      console.log(`✅ Added room to local list. Total rooms: ${this.rooms.length}`);
+      console.log(`Added room to local list. Total rooms: ${this.rooms.length}`);
       this.notifyRoomUpdate();
       if (this.onRoomAdded) this.onRoomAdded(newRoom);
     });
@@ -1765,12 +1797,15 @@ class ChatService {
     const processedMsg = await this.processIncomingMessage(roomId, message);
     const room = this.rooms.find((r) => r.id === roomId);
     if (room) {
+      if (room.messages.find((m) => m.id === processedMsg.id)) return;
       room.messages.push(processedMsg);
       if (this.onMessage) this.onMessage(roomId, processedMsg);
       if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
-      window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
-      const badge = document.getElementById("chat-badge");
-      if (badge) badge.classList.remove("hidden");
+      if (processedMsg.senderId !== this.userId) {
+        window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
+        const badge = document.getElementById("chat-badge");
+        if (badge) badge.classList.remove("hidden");
+      }
     }
   }
   async processIncomingMessage(roomId, message) {

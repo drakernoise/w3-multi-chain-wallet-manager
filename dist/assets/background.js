@@ -1,147 +1,24 @@
 import { b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, i as isChainSupported, g as getChainConfig, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation } from './chainService.js';
-import { b as lookup } from './vendor.js';
-
-let socket = null;
-let unreadCount = 0;
-const SERVER_URL = "https://gravity-chat-serve.onrender.com";
-function hexToBuffer(hexString) {
-  if (!hexString) return new Uint8Array().buffer;
-  const bytes = new Uint8Array(hexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
-  return bytes.buffer;
-}
-async function signChallenge(challenge, privateKeyHex) {
-  try {
-    const privateKeyBuffer = hexToBuffer(privateKeyHex);
-    const cryptoLib = (typeof crypto !== "undefined" ? crypto : null) || (typeof globalThis !== "undefined" && globalThis.crypto ? globalThis.crypto : null);
-    if (!cryptoLib || !cryptoLib.subtle) {
-      console.error("BG: Crypto Subtle API NOT available in this context");
-      return null;
-    }
-    const privateKey = await cryptoLib.subtle.importKey(
-      "pkcs8",
-      privateKeyBuffer,
-      { name: "ECDSA", namedCurve: "P-256" },
-      false,
-      ["sign"]
-    );
-    const encoder = new TextEncoder();
-    const data = encoder.encode(challenge);
-    const signature = await cryptoLib.subtle.sign(
-      { name: "ECDSA", hash: { name: "SHA-256" } },
-      privateKey,
-      data
-    );
-    return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  } catch (e) {
-    console.error("BG: Signing Failed", e);
-    return null;
-  }
-}
-function updateBadge() {
-  const text = unreadCount > 0 ? unreadCount > 9 ? "9+" : String(unreadCount) : "";
-  const color = "#9333EA";
-  chrome.action.setBadgeText({ text });
-  chrome.action.setBadgeBackgroundColor({ color });
-}
-async function initChatSocket() {
-  const data = await chrome.storage.local.get(["gravity_chat_creds"]);
-  const creds = data.gravity_chat_creds;
-  if (!creds || !creds.username || !creds.privateKey) {
-    console.log("BG Chat: No credentials found. Chat disabled.");
-    if (socket) {
-      socket.disconnect();
-      socket = null;
-    }
-    return;
-  }
-  if (socket && socket.connected) {
-    return;
-  }
-  console.log("BG Chat: Connecting as", creds.username);
-  socket = lookup(SERVER_URL, {
-    transports: ["websocket"],
-    // Force websocket in SW
-    reconnection: true,
-    reconnectionDelay: 5e3,
-    query: {
-      username: creds.username,
-      publicKey: creds.publicKey
-    }
-  });
-  socket.on("connect", () => {
-    console.log("BG Chat: Connected!");
-    socket?.emit("request_challenge", { username: creds.username });
-  });
-  socket.on("auth_challenge", async (challenge) => {
-    console.log("BG Chat: Received challenge to sign");
-    const signature = await signChallenge(challenge, creds.privateKey);
-    if (signature && socket) {
-      socket.emit("verify_signature", { signature });
-    }
-  });
-  socket.on("auth_success", (data2) => {
-    console.log("BG Chat: Authenticated! Rooms:", data2.rooms);
-    if (data2.rooms && Array.isArray(data2.rooms)) {
-      data2.rooms.forEach((r) => {
-        socket?.emit("join_room", r.id);
-      });
-    }
-    updateBadge();
-  });
-  socket.on("new_message", (data2) => {
-    console.log("BG Chat: New Message", data2);
-    if (data2.message && data2.message.senderName === creds.username) return;
-    unreadCount++;
-    updateBadge();
-  });
-  socket.on("message_notification", (_data) => {
-    unreadCount++;
-    updateBadge();
-  });
-  socket.on("disconnect", () => {
-    console.log("BG Chat: Disconnected");
-  });
-}
-function setupChatListeners() {
-  chrome.runtime.onMessage.addListener((request, _sender, _sendResponse) => {
-    if (request.type === "CHAT_SYNC_CREDS") {
-      console.log("BG Chat: Syncing credentials...");
-      chrome.storage.local.set({ gravity_chat_creds: request.data }).then(() => {
-        unreadCount = 0;
-        updateBadge();
-        initChatSocket();
-      });
-    }
-    if (request.type === "CHAT_LOGOUT") {
-      console.log("BG Chat: Logging out...");
-      chrome.storage.local.remove(["gravity_chat_creds"]).then(() => {
-        unreadCount = 0;
-        updateBadge();
-        if (socket) {
-          socket.disconnect();
-          socket = null;
-        }
-      });
-    }
-    if (request.type === "CHAT_UI_OPENED") {
-      unreadCount = 0;
-      updateBadge();
-    }
-  });
-  initChatSocket();
-  chrome.alarms.create("keepChatAlive", { periodInMinutes: 1 });
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === "keepChatAlive") {
-      if (!socket || !socket.connected) {
-        console.log("BG Chat: Alarm triggered check - Reconnecting...");
-        initChatSocket();
-      }
-    }
-  });
-}
+import './vendor.js';
 
 self.exports = {};
-setupChatListeners();
+const OFFSCREEN_DOCUMENT_PATH = "src/offscreen/offscreen.html";
+async function setupOffscreenDocument(path) {
+  try {
+    if (await chrome.offscreen.hasDocument()) return;
+    await chrome.offscreen.createDocument({
+      url: path,
+      reasons: ["BLOBS"],
+      justification: "Keep WebSocket connection alive for chat notifications"
+    });
+  } catch (e) {
+    console.warn("Gravity: Failed to create offscreen document", e);
+  }
+}
+if (chrome.offscreen) {
+  setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
+}
+let unreadCount = 0;
 function detectChainFromUrl(url = "") {
   if (!url) return null;
   try {
@@ -233,10 +110,47 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ack: true });
     return false;
   }
+  if (request.type === "OFFSCREEN_NEW_MESSAGE") {
+    const count = request.count || 1;
+    unreadCount += count;
+    chrome.action.setBadgeText({ text: unreadCount > 9 ? "9+" : String(unreadCount) });
+    chrome.action.setBadgeBackgroundColor({ color: "#FF0000" });
+    sendResponse({ ack: true });
+    return false;
+  }
+  if (request.type === "CHAT_SYNC_CREDS") {
+    chrome.storage.local.set({ gravity_chat_creds: request.data }).then(() => {
+      chrome.runtime.sendMessage({ type: "INIT_CHAT", creds: request.data }).catch(() => {
+        if (chrome.offscreen) setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
+      });
+    });
+    unreadCount = 0;
+    chrome.action.setBadgeText({ text: "" });
+    sendResponse({ ack: true });
+    return false;
+  }
+  if (request.type === "CHAT_UI_OPENED") {
+    unreadCount = 0;
+    chrome.action.setBadgeText({ text: "" });
+    sendResponse({ ack: true });
+    return false;
+  }
+  if (request.type === "CHAT_LOGOUT") {
+    chrome.storage.local.remove(["gravity_chat_creds"]);
+    chrome.runtime.sendMessage({ type: "DISCONNECT_CHAT" }).catch(() => {
+    });
+    unreadCount = 0;
+    chrome.action.setBadgeText({ text: "" });
+    sendResponse({ ack: true });
+    return false;
+  }
   if (request.type === "UPDATE_BADGE") {
     const count = request.count || 0;
-    chrome.action.setBadgeText({ text: count > 0 ? String(count) : "" });
-    chrome.action.setBadgeBackgroundColor({ color: "#9333EA" });
+    if (count === 0) unreadCount = 0;
+    else unreadCount += count;
+    const text = unreadCount > 0 ? unreadCount > 9 ? "9+" : String(unreadCount) : "";
+    chrome.action.setBadgeText({ text });
+    chrome.action.setBadgeBackgroundColor({ color: "#FF0000" });
     sendResponse({ ack: true });
     return false;
   }
@@ -520,3 +434,59 @@ async function openPrompt(requestId) {
     console.error("Gravity: Failed to open prompt", e);
   }
 }
+const VAPID_PUBLIC_KEY = "BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ";
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+async function subscribeToPush() {
+  try {
+    const registration = self.registration;
+    if (!registration || !registration.pushManager) {
+      console.warn("Gravity: PushManager not available");
+      return;
+    }
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    console.log("Gravity: Push Subscribed!", JSON.stringify(subscription));
+    chrome.storage.local.set({ gravity_push_sub: JSON.stringify(subscription) });
+    return subscription;
+  } catch (e) {
+    console.error("Gravity: Push Subscription Error", e);
+  }
+}
+subscribeToPush();
+self.addEventListener("push", (event) => {
+  console.log("Gravity: Push Event Received");
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+  }
+  unreadCount++;
+  chrome.action.setBadgeText({ text: unreadCount > 9 ? "9+" : String(unreadCount) });
+  chrome.action.setBadgeBackgroundColor({ color: "#FF0000" });
+  const title = data.title || "Gravity Wallet";
+  const options = {
+    body: data.body || "New message received",
+    icon: "icons/48.png"
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  chrome.windows.create({
+    url: "index.html",
+    type: "popup",
+    width: 450,
+    height: 620
+  });
+});

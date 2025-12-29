@@ -3,11 +3,38 @@
 
 import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation } from '../../services/chainService';
 import { getChainConfig, isChainSupported } from '../../config/chainConfig';
-import { setupChatListeners } from './chatBackground';
 
 declare var chrome: any;
 
-setupChatListeners();
+// === OFFSCREEN MANAGEMENT ===
+// IMPORTANT: Path must match what Vite outputs. If using base: './', it might be valid.
+// But check logical path. Offscreen creates document relative to extension root.
+const OFFSCREEN_DOCUMENT_PATH = 'src/offscreen/offscreen.html';
+
+async function setupOffscreenDocument(path: string) {
+    try {
+        // @ts-ignore
+        if (await chrome.offscreen.hasDocument()) return;
+        // @ts-ignore
+        await chrome.offscreen.createDocument({
+            url: path,
+            reasons: ['BLOBS'],
+            justification: 'Keep WebSocket connection alive for chat notifications'
+        });
+    } catch (e) {
+        console.warn("Gravity: Failed to create offscreen document", e);
+    }
+}
+
+
+
+// Initialize Offscreen setup
+// @ts-ignore
+if (chrome.offscreen) {
+    setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
+}
+
+let unreadCount = 0;
 
 function detectChainFromUrl(url: string = ""): string | null {
     if (!url) return null;
@@ -151,11 +178,64 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         return false;
     }
 
-    // Badge update for chat notifications
+    // === CHAT & OFFSCREEN LOGIC ===
+
+    // From Offscreen: New Message
+    if (request.type === 'OFFSCREEN_NEW_MESSAGE') {
+        const count = request.count || 1;
+        unreadCount += count;
+        chrome.action.setBadgeText({ text: unreadCount > 9 ? '9+' : String(unreadCount) });
+        chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
+        sendResponse({ ack: true });
+        return false;
+    }
+
+    // From Popup/Content: Sync Creds (Forward to Offscreen)
+    if (request.type === 'CHAT_SYNC_CREDS') {
+        // Save to storage (Offscreen can read it directly too, but pushing INIT helps wakeup)
+        chrome.storage.local.set({ gravity_chat_creds: request.data }).then(() => {
+            // Forward to Offscreen
+            chrome.runtime.sendMessage({ type: 'INIT_CHAT', creds: request.data }).catch(() => {
+                // If offscreen is asleep, creating it will auto-load from storage in its init
+                if (chrome.offscreen) setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
+            });
+        });
+
+        // Reset local count on login
+        unreadCount = 0;
+        chrome.action.setBadgeText({ text: '' });
+        sendResponse({ ack: true });
+        return false;
+    }
+
+    // UI Opened -> Reset Badge
+    if (request.type === 'CHAT_UI_OPENED') {
+        unreadCount = 0;
+        chrome.action.setBadgeText({ text: '' });
+        sendResponse({ ack: true });
+        return false;
+    }
+
+    // Logout
+    if (request.type === 'CHAT_LOGOUT') {
+        chrome.storage.local.remove(['gravity_chat_creds']);
+        // Tell Offscreen to disconnect
+        chrome.runtime.sendMessage({ type: 'DISCONNECT_CHAT' }).catch(() => { });
+        unreadCount = 0;
+        chrome.action.setBadgeText({ text: '' });
+        sendResponse({ ack: true });
+        return false;
+    }
+
+    // Legacy support just in case
     if (request.type === 'UPDATE_BADGE') {
         const count = request.count || 0;
-        chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
-        chrome.action.setBadgeBackgroundColor({ color: '#9333EA' }); // Purple
+        if (count === 0) unreadCount = 0;
+        else unreadCount += count;
+
+        const text = unreadCount > 0 ? (unreadCount > 9 ? '9+' : String(unreadCount)) : '';
+        chrome.action.setBadgeText({ text });
+        chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
         sendResponse({ ack: true });
         return false;
     }
@@ -588,3 +668,83 @@ async function openPrompt(requestId: string) {
         console.error("Gravity: Failed to open prompt", e);
     }
 }
+
+// === WEB PUSH LOGIC ===
+const VAPID_PUBLIC_KEY = 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
+
+function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+async function subscribeToPush() {
+    try {
+        // @ts-ignore
+        const registration = self.registration;
+        if (!registration || !registration.pushManager) {
+            // PushManager might only be available in SW context, ensuring we are in one.
+            console.warn("Gravity: PushManager not available");
+            return;
+        }
+
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+
+        console.log("Gravity: Push Subscribed!", JSON.stringify(subscription));
+
+        // Save to storage (Frontend will pick this up)
+        chrome.storage.local.set({ gravity_push_sub: JSON.stringify(subscription) });
+
+        return subscription;
+    } catch (e) {
+        console.error("Gravity: Push Subscription Error", e);
+    }
+}
+
+// Call subscription on init
+subscribeToPush();
+
+// Listen for Push Events
+// @ts-ignore
+self.addEventListener('push', (event: any) => {
+    console.log('Gravity: Push Event Received');
+    let data: any = {};
+    try {
+        data = event.data ? event.data.json() : {};
+    } catch (e) { }
+
+    // 1. Update Badge
+    unreadCount++;
+    chrome.action.setBadgeText({ text: unreadCount > 9 ? '9+' : String(unreadCount) });
+    chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
+
+    // 2. Show System Notification
+    const title = data.title || 'Gravity Wallet';
+    const options = {
+        body: data.body || 'New message received',
+        icon: 'icons/48.png'
+    };
+
+    // @ts-ignore
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Notifications Click Handler
+// @ts-ignore
+self.addEventListener('notificationclick', (event: any) => {
+    event.notification.close();
+    chrome.windows.create({
+        url: 'index.html',
+        type: 'popup',
+        width: 450,
+        height: 620
+    });
+});

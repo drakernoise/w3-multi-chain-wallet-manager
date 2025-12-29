@@ -7,6 +7,13 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const webpush = require('web-push');
+
+// VAPID Keys (Generated via CLI)
+const publicVapidKey = 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
+const privateVapidKey = 'kqF_kPNPKYnCdseLHAzy30ZY_6Qhqcnu_lYFPSt_-8w';
+
+webpush.setVapidDetails('mailto:admin@gravity.wallet', publicVapidKey, privateVapidKey);
 
 const STORAGE_DIR = process.env.DB_PATH || __dirname;
 const DB_PATH = path.join(STORAGE_DIR, 'chat_db.json');
@@ -357,6 +364,18 @@ io.on('connection', (socket) => {
         });
     });
 
+    // --- Push Notification Subscription ---
+    socket.on('store_push_subscription', (sub) => {
+        if (!socket.user) return;
+        console.log(`[PUSH] Storing subscription for ${socket.user.username}`);
+        // Basic validation
+        if (!sub || !sub.endpoint) return;
+
+        socket.user.pushSubscription = sub;
+        users[socket.user.id].pushSubscription = sub;
+        saveData();
+    });
+
     // --- 1. Registration / Login ---
     socket.on('register', (data) => {
         const { username, publicKey, existingId, encryptionPublicKey } = data;
@@ -703,6 +722,34 @@ io.on('connection', (socket) => {
         if (room.messages.length > 200) room.messages.shift();
         saveData();
         io.to(roomId).emit('new_message', { roomId, message: msg });
+
+        // --- WEB PUSH NOTIFICATION ---
+        // Notify offline (or online) users via Push API
+        if (room.members) {
+            room.members.forEach(memberId => {
+                // Don't notify sender
+                if (memberId === socket.user.id) return;
+
+                const member = users[memberId];
+                // Only send if user has a push subscription
+                if (member && member.pushSubscription) {
+                    const payload = JSON.stringify({
+                        title: `Message from ${socket.user.username}`,
+                        body: msg.content.substring(0, 50) + (msg.content.length > 50 ? '...' : ''),
+                        count: 1
+                    });
+
+                    webpush.sendNotification(member.pushSubscription, payload)
+                        .catch(err => {
+                            console.error(`[PUSH] Failed to send to ${member.username}:`, err.message);
+                            if (err.statusCode === 404 || err.statusCode === 410) {
+                                console.log(`[PUSH] Removing stale subscription for ${member.username}`);
+                                member.pushSubscription = null;
+                            }
+                        });
+                }
+            });
+        }
     });
 
     socket.on('edit_message', (data) => {

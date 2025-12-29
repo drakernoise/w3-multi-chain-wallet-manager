@@ -50,7 +50,8 @@ export default defineConfig({
         main: 'index.html',
         background: 'src/background/index.ts',
         content: 'src/content/index.ts',
-        provider: 'src/content/provider.ts'
+        provider: 'src/content/provider.ts',
+        offscreen: 'src/offscreen/offscreen.html'
       },
       output: {
         entryFileNames: 'assets/[name].js',

@@ -629,7 +629,7 @@ export interface HistoryItem {
     to: string;
     amount: string;
     memo: string;
-    type: 'send' | 'receive';
+    type: 'send' | 'receive' | 'powerup_in' | 'powerup_out' | 'powerdown';
     txId: string;
 }
 
@@ -641,6 +641,14 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
         if (type === 'transfer') {
             if (data.from === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: data.memo, type: 'send', txId: trx_id };
             if (data.to === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: data.memo, type: 'receive', txId: trx_id };
+        }
+        if (type === 'transfer_to_vesting') {
+            if (data.from === username && data.to === username) return { date: timestamp, from: data.from, to: 'VESTING', amount: data.amount, memo: 'Power Up (Self)', type: 'powerup_out', txId: trx_id };
+            if (data.from === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: 'Power Up', type: 'powerup_out', txId: trx_id };
+            if (data.to === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: 'Power Up Received', type: 'powerup_in', txId: trx_id };
+        }
+        if (type === 'withdraw_vesting') {
+            if (data.account === username) return { date: timestamp, from: data.account, to: 'LIQUID', amount: data.vesting_shares, memo: 'Power Down', type: 'powerdown', txId: trx_id };
         }
         return null;
     };

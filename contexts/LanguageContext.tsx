@@ -239,6 +239,15 @@ const translations: Record<Language, Record<string, string>> = {
         'history.sent': 'Sent',
         'history.from': 'From',
         'history.to': 'To',
+        'history.filter_label': 'Filter',
+        'history.filter_all': 'All',
+        'history.filter_received': 'Received',
+        'history.filter_sent': 'Sent',
+        'history.filter_powerup': 'Power Up',
+        'history.filter_powerdown': 'Power Down',
+        'history.type_powerup_in': 'Received Power',
+        'history.type_powerup_out': 'Sent Power',
+        'history.type_powerdown': 'Power Down',
 
         // Sign Request
         'sign.title': 'Signature Request',
@@ -659,6 +668,15 @@ const translations: Record<Language, Record<string, string>> = {
         'history.sent': 'Enviado',
         'history.from': 'De',
         'history.to': 'Para',
+        'history.filter_label': 'Filtrar',
+        'history.filter_all': 'Todos',
+        'history.filter_received': 'Recibidos',
+        'history.filter_sent': 'Enviados',
+        'history.filter_powerup': 'Power Up',
+        'history.filter_powerdown': 'Power Down',
+        'history.type_powerup_in': 'Power Recibido',
+        'history.type_powerup_out': 'Power Enviado',
+        'history.type_powerdown': 'Power Down',
 
         // Sign Request
         'sign.title': 'Solicitud de Firma',

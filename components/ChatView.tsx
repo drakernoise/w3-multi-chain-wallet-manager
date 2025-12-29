@@ -46,6 +46,11 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     // Init & Listeners (ONCE on mount)
     useEffect(() => {
+        // Clear background badge when UI opens
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ type: 'CHAT_UI_OPENED' }).catch(() => { });
+        }
+
         chatService.init(); // CRITICAL: Start connection
         setSocketStatus(chatService.getCurrentUser() ? 'authenticated' : 'connecting');
 
