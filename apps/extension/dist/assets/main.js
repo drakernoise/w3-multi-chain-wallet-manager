@@ -580,22 +580,30 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 const root = ReactDOM.createRoot(rootElement);
-console.log("Gravity: Inside Index.tsx - Render Start");
-root.render(
-  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: "600px", display: "flex", alignItems: "center", justifyContent: "center", background: "#222", color: "#fff" }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Loading Gravity..." }) })
-);
+console.log("Gravity: Initializing native loader...");
+const loader = document.createElement("div");
+loader.id = "gravity-loader";
+loader.innerHTML = '<div><h2>INITIALIZING GRAVITY...</h2><p style="font-size:12px;opacity:0.7">Core systems loading</p></div>';
+loader.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:#000;color:#0ff;display:flex;justify-content:center;align-items:center;z-index:99999;font-family:monospace;text-align:center;";
+document.body.appendChild(loader);
+console.log("Gravity: Requesting App module...");
 __vitePreload(async () => { const {default: App} = await import('./App.js').then(n => n.A);return { default: App }},true              ?__vite__mapDeps([0,1,2,3]):void 0,import.meta.url).then(({ default: App }) => {
+  console.log("Gravity: App module resolved. Unmounting loader and starting React.");
+  const l = document.getElementById("gravity-loader");
+  if (l) l.remove();
   root.render(
     /* @__PURE__ */ jsxRuntimeExports.jsx(React.StrictMode, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, {}) })
   );
 }).catch((err) => {
   console.error("CRITICAL: Failed to load App", err);
-  document.body.innerHTML = `<div style="padding:20px; color:red; font-family:sans-serif;">
-      <h1>Critical Error</h1>
-      <p>Failed to load application.</p>
-      <pre style="background:#333; color:#f88; padding:10px; overflow:auto;">${err?.message || String(err)}</pre>
-      <p>Please check console for details.</p>
-    </div>`;
+  if (loader) {
+    loader.style.background = "#200";
+    loader.style.color = "#f55";
+    loader.innerHTML = `<div style="padding:20px">
+      <h3>BOOT FAILED</h3>
+      <pre style="text-align:left;background:#411;padding:10px;overflow:auto;max-width:100%;">${err?.message || String(err)}</pre>
+      </div>`;
+  }
 });
 
 export { React as R, __vitePreload as _, jsxRuntimeExports as j, reactExports as r };
