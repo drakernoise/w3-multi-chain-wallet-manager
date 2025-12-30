@@ -579,6 +579,9 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 const root = ReactDOM.createRoot(rootElement);
+root.render(
+  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: "600px", display: "flex", alignItems: "center", justifyContent: "center", background: "#222", color: "#fff" }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Loading Gravity..." }) })
+);
 __vitePreload(async () => { const {default: App} = await import('./App.js').then(n => n.A);return { default: App }},true              ?__vite__mapDeps([0,1,2,3]):void 0,import.meta.url).then(({ default: App }) => {
   root.render(
     /* @__PURE__ */ jsxRuntimeExports.jsx(React.StrictMode, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, {}) })

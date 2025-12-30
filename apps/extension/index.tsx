@@ -13,6 +13,14 @@ const root = ReactDOM.createRoot(rootElement);
 // 3. Dynamic Import of App
 // This guarantees that 'dhive' (inside App) is not loaded until
 // AFTER lines 1-13 have fully executed.
+// Render Loading state immediately
+root.render(
+  <div style={{ height: '600px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#222', color: '#fff' }}>
+    <h3>Loading Gravity...</h3>
+  </div>
+);
+
+// 3. Dynamic Import of App
 import('./App').then(({ default: App }) => {
   root.render(
     <React.StrictMode>
