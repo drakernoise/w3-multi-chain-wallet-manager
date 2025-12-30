@@ -119,6 +119,30 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         };
     }, []); // Empty deps - run ONCE
 
+    // Listen for background notifications
+    useEffect(() => {
+        if (typeof chrome === 'undefined' || !chrome.runtime) return;
+
+        const handleBackgroundMessage = (message: any) => {
+            if (message.type === 'CHAT_NEW_MESSAGE') {
+                // Trigger sidebar badge
+                window.dispatchEvent(new CustomEvent('chat-unread'));
+
+                // Mark room as having unread (we'll track this in state)
+                setRooms(prev => prev.map(room =>
+                    room.id === message.roomId
+                        ? { ...room, hasUnread: true }
+                        : room
+                ));
+            }
+        };
+
+        chrome.runtime.onMessage.addListener(handleBackgroundMessage);
+        return () => {
+            chrome.runtime.onMessage.removeListener(handleBackgroundMessage);
+        };
+    }, []);
+
     // Reset Badge on Mount
     useEffect(() => {
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
@@ -504,11 +528,18 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     {rooms.filter(r => r.type === 'public' || r.type === 'private').map(room => (
                         <div
                             key={room.id}
-                            onClick={() => setActiveRoomId(room.id)}
+                            onClick={() => {
+                                setActiveRoomId(room.id);
+                                // Clear unread status when opening room
+                                setRooms(prev => prev.map(r => r.id === room.id ? { ...r, hasUnread: false } : r));
+                            }}
                             className={`p-3 rounded-lg cursor-pointer flex flex-col transition-colors ${activeRoomId === room.id ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'hover:bg-dark-700 text-slate-300'}`}
                         >
-                            <div className="font-bold text-sm flex items-center gap-2">
+                            <div className="font-bold text-sm flex items-center gap-2 relative">
                                 <span className="opacity-70 text-xs">{room.type === 'public' ? '#' : '[P]'}</span> {room.name}
+                                {(room as any).hasUnread && activeRoomId !== room.id && (
+                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto"></div>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -517,12 +548,19 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     {rooms.filter(r => r.type === 'dm').map(room => (
                         <div
                             key={room.id}
-                            onClick={() => setActiveRoomId(room.id)}
+                            onClick={() => {
+                                setActiveRoomId(room.id);
+                                // Clear unread status when opening room
+                                setRooms(prev => prev.map(r => r.id === room.id ? { ...r, hasUnread: false } : r));
+                            }}
                             className={`p-3 rounded-lg cursor-pointer flex flex-col transition-colors ${activeRoomId === room.id ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-dark-700 text-slate-300'}`}
                         >
-                            <div className="font-bold text-sm flex items-center gap-2">
+                            <div className="font-bold text-sm flex items-center gap-2 relative">
                                 <div className="w-2 h-2 rounded-full bg-green-500"></div>
                                 {room.name.replace(user.username, '').replace(' & ', '').trim() || 'Chat'}
+                                {(room as any).hasUnread && activeRoomId !== room.id && (
+                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto"></div>
+                                )}
                             </div>
                         </div>
                     ))}

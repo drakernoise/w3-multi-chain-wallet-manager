@@ -137,6 +137,15 @@ async function initChatSocket() {
 
         unreadCount++;
         updateBadge();
+
+        // Notify any open UI windows about the unread message
+        chrome.runtime.sendMessage({
+            type: 'CHAT_NEW_MESSAGE',
+            roomId: data.roomId,
+            message: data.message
+        }).catch(() => {
+            // UI might not be open, that's fine
+        });
     });
 
     socket.on('message_notification', (_data: any) => {
