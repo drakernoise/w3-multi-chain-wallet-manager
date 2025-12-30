@@ -12126,21 +12126,37 @@ const ChatView = ({ onClose }) => {
   }, [notification]);
   const [pushGranted, setPushGranted] = reactExports.useState(false);
   const handleEnablePush = async () => {
-    const perm = await Notification.requestPermission();
-    if (perm === "granted") {
-      setPushGranted(true);
-      if (typeof chrome !== "undefined" && chrome.runtime) {
-        chrome.runtime.sendMessage({ type: "CHAT_ENABLE_PUSH" }, (res) => {
-          if (res && res.success) {
-            console.log("Gravity: Push Subscribed via Background");
-            if (res.subscription) chatService.syncPushSubscription(res.subscription);
-          } else {
-            console.error("Gravity: Push Background Error", res?.error);
-            setNotification({ msg: "Push Error: " + (res?.error || "Unknown"), type: "error" });
-            setPushGranted(false);
-          }
-        });
+    try {
+      const perm = await Notification.requestPermission();
+      console.log("Gravity: Notification Permission Result:", perm);
+      if (perm === "granted") {
+        setPushGranted(true);
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage({ type: "CHAT_ENABLE_PUSH" }, (res) => {
+            const lastError2 = chrome.runtime.lastError;
+            if (lastError2) {
+              console.error("Gravity: Runtime Message Error:", lastError2);
+              setNotification({ msg: "Extension Error: " + lastError2.message, type: "error" });
+              setPushGranted(false);
+              return;
+            }
+            if (res && res.success) {
+              console.log("Gravity: Push Subscribed via Background");
+              if (res.subscription) chatService.syncPushSubscription(res.subscription);
+            } else {
+              console.error("Gravity: Push Background Error", res?.error);
+              setNotification({ msg: "Push Error: " + (res?.error || "Unknown"), type: "error" });
+              setPushGranted(false);
+            }
+          });
+        }
+      } else {
+        console.warn("Gravity: Notification permission denied/closed");
+        setNotification({ msg: "Notifications blocked. Please enable them in browser settings.", type: "warning" });
       }
+    } catch (e) {
+      console.error("Gravity: Exception requesting permission", e);
+      setNotification({ msg: "Error: " + e.message, type: "error" });
     }
   };
   reactExports.useEffect(() => {

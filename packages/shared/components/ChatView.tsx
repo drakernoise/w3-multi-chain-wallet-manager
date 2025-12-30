@@ -152,21 +152,39 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [pushGranted, setPushGranted] = useState(false);
 
     const handleEnablePush = async () => {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-            setPushGranted(true);
-            if (typeof chrome !== 'undefined' && chrome.runtime) {
-                chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' }, (res: any) => {
-                    if (res && res.success) {
-                        console.log("Gravity: Push Subscribed via Background");
-                        if (res.subscription) chatService.syncPushSubscription(res.subscription);
-                    } else {
-                        console.error("Gravity: Push Background Error", res?.error);
-                        setNotification({ msg: "Push Error: " + (res?.error || 'Unknown'), type: 'error' });
-                        setPushGranted(false); // Re-show button
-                    }
-                });
+        try {
+            const perm = await Notification.requestPermission();
+            console.log("Gravity: Notification Permission Result:", perm);
+
+            if (perm === 'granted') {
+                setPushGranted(true);
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' }, (res: any) => {
+                        const lastError = chrome.runtime.lastError;
+                        if (lastError) {
+                            console.error("Gravity: Runtime Message Error:", lastError);
+                            setNotification({ msg: "Extension Error: " + lastError.message, type: 'error' });
+                            setPushGranted(false);
+                            return;
+                        }
+
+                        if (res && res.success) {
+                            console.log("Gravity: Push Subscribed via Background");
+                            if (res.subscription) chatService.syncPushSubscription(res.subscription);
+                        } else {
+                            console.error("Gravity: Push Background Error", res?.error);
+                            setNotification({ msg: "Push Error: " + (res?.error || 'Unknown'), type: 'error' });
+                            setPushGranted(false);
+                        }
+                    });
+                }
+            } else {
+                console.warn("Gravity: Notification permission denied/closed");
+                setNotification({ msg: "Notifications blocked. Please enable them in browser settings.", type: 'warning' });
             }
+        } catch (e: any) {
+            console.error("Gravity: Exception requesting permission", e);
+            setNotification({ msg: "Error: " + e.message, type: 'error' });
         }
     };
 
