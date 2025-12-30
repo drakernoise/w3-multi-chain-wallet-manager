@@ -3,7 +3,6 @@ const path = require('path');
 
 const extensionDist = path.join(__dirname, '../apps/extension/dist/assets');
 const polyfillPath = path.join(extensionDist, 'ws-polyfill.js');
-const backgroundPath = path.join(extensionDist, 'background.js');
 
 const POLYFILL_CODE = `console.log("Gravity: WS Polyfill Module Init");
 if (typeof globalThis.WebSocket === 'undefined') {
@@ -27,21 +26,28 @@ if (typeof window === 'undefined') {
 
 try {
     if (fs.existsSync(extensionDist)) {
+        // 1. Write the polyfill module
         fs.writeFileSync(polyfillPath, POLYFILL_CODE);
         console.log("Created ws-polyfill.js");
 
-        if (fs.existsSync(backgroundPath)) {
-            let content = fs.readFileSync(backgroundPath, 'utf8');
-            if (!content.includes('ws-polyfill.js')) {
-                const importStmt = "import './ws-polyfill.js';\n";
-                fs.writeFileSync(backgroundPath, importStmt + content);
-                console.log("Injected import into background.js");
+        // 2. Inject import into critical files
+        const filesToPatch = ['background.js', 'main.js'];
+
+        filesToPatch.forEach(file => {
+            const filePath = path.join(extensionDist, file);
+            if (fs.existsSync(filePath)) {
+                let content = fs.readFileSync(filePath, 'utf8');
+                if (!content.includes('ws-polyfill.js')) {
+                    const importStmt = "import './ws-polyfill.js';\n";
+                    fs.writeFileSync(filePath, importStmt + content);
+                    console.log(`Injected import into ${file}`);
+                } else {
+                    console.log(`${file} already imports polyfill`);
+                }
             } else {
-                console.log("background.js already imports polyfill");
+                console.warn(`${file} not found in assets (skipping)`);
             }
-        } else {
-            console.warn("background.js not found in " + extensionDist);
-        }
+        });
     } else {
         console.warn("Dist folder not found: " + extensionDist);
     }

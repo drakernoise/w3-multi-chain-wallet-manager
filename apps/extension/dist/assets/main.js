@@ -1,3 +1,4 @@
+import './ws-polyfill.js';
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./App.js","./chainService.js","./index.js","./index2.js"])))=>i.map(i=>d[i]);
 import './modulepreload-polyfill.js';
 import { B as Buffer$1, g as getDefaultExportFromCjs } from './index.js';
