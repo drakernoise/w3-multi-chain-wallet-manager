@@ -1,3 +1,4 @@
+console.log("Gravity: BACKGROUND SCRIPT RELOADED - V_FIX_PUSH_DOM_002");
 // Polyfill for libs expecting 'exports'
 (self as any).exports = {};
 
@@ -493,7 +494,7 @@ async function getExistingSubscription() {
     }
 }
 
-async function subscribeToPush() {
+async function manualPushSubscribe() {
     console.log("Gravity: [Background] Starting Push Subscription sequence...");
     try {
         // @ts-ignore
@@ -536,7 +537,7 @@ chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any)
     }
 
     if (msg.type === 'CHAT_ENABLE_PUSH') {
-        subscribeToPush()
+        manualPushSubscribe()
             .then(sub => sendResponse({ success: true, subscription: sub }))
             .catch(err => sendResponse({ success: false, error: err.message || err.toString() }));
         return true; // Async response

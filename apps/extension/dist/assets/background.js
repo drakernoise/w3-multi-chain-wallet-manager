@@ -1,6 +1,7 @@
 import { b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, i as isChainSupported, g as getChainConfig, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation } from './chainService.js';
 import './index.js';
 
+console.log("Gravity: BACKGROUND SCRIPT RELOADED - V_FIX_PUSH_DOM_002");
 self.exports = {};
 const OFFSCREEN_DOCUMENT_PATH = "src/offscreen/offscreen.html";
 async function setupOffscreenDocument(path) {
@@ -348,7 +349,7 @@ async function getExistingSubscription() {
     return null;
   }
 }
-async function subscribeToPush() {
+async function manualPushSubscribe() {
   console.log("Gravity: [Background] Starting Push Subscription sequence...");
   try {
     const reg = self.registration;
@@ -379,7 +380,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg.type === "CHAT_ENABLE_PUSH") {
-    subscribeToPush().then((sub) => sendResponse({ success: true, subscription: sub })).catch((err) => sendResponse({ success: false, error: err.message || err.toString() }));
+    manualPushSubscribe().then((sub) => sendResponse({ success: true, subscription: sub })).catch((err) => sendResponse({ success: false, error: err.message || err.toString() }));
     return true;
   }
 });
