@@ -1,7 +1,22 @@
 import { b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, i as isChainSupported, g as getChainConfig, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation } from './chainService.js';
 import './index.js';
 
-console.log("Gravity: BACKGROUND SCRIPT RELOADED - V_FIX_PUSH_DOM_002");
+console.log("Gravity: BACKGROUND SCRIPT RELOADED - V_FIX_WS_POLYFILL_001");
+if (!globalThis.WebSocket) {
+  globalThis.WebSocket = class DummyWebSocket {
+    constructor() {
+      console.warn("DummyWebSocket instantiated");
+    }
+    close() {
+    }
+    send() {
+    }
+    addEventListener() {
+    }
+    removeEventListener() {
+    }
+  };
+}
 self.exports = {};
 const OFFSCREEN_DOCUMENT_PATH = "src/offscreen/offscreen.html";
 async function setupOffscreenDocument(path) {
