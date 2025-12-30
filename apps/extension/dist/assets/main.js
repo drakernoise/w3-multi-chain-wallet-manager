@@ -583,6 +583,14 @@ __vitePreload(async () => { const {default: App} = await import('./App.js').then
   root.render(
     /* @__PURE__ */ jsxRuntimeExports.jsx(React.StrictMode, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(App, {}) })
   );
+}).catch((err) => {
+  console.error("CRITICAL: Failed to load App", err);
+  document.body.innerHTML = `<div style="padding:20px; color:red; font-family:sans-serif;">
+      <h1>Critical Error</h1>
+      <p>Failed to load application.</p>
+      <pre style="background:#333; color:#f88; padding:10px; overflow:auto;">${err?.message || String(err)}</pre>
+      <p>Please check console for details.</p>
+    </div>`;
 });
 
 export { React as R, __vitePreload as _, jsxRuntimeExports as j, reactExports as r };

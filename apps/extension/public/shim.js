@@ -1,7 +1,6 @@
 // Polyfill for legacy libraries (blurtjs, dsteem)
 window.global = window;
 window.process = { env: { NODE_DEBUG: false, NODE_ENV: 'production' }, version: '' };
-window.Buffer = window.Buffer || [];
 
 // Fix 'module is not defined' or 'exports' errors
 window.exports = window.exports || {};

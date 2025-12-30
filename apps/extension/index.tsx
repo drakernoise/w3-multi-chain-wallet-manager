@@ -19,4 +19,12 @@ import('./App').then(({ default: App }) => {
       <App />
     </React.StrictMode>
   );
+}).catch(err => {
+  console.error("CRITICAL: Failed to load App", err);
+  document.body.innerHTML = `<div style="padding:20px; color:red; font-family:sans-serif;">
+      <h1>Critical Error</h1>
+      <p>Failed to load application.</p>
+      <pre style="background:#333; color:#f88; padding:10px; overflow:auto;">${err?.message || String(err)}</pre>
+      <p>Please check console for details.</p>
+    </div>`;
 });
