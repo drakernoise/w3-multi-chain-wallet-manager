@@ -1,20 +1,4 @@
-console.log("Gravity: BACKGROUND SCRIPT RELOADED - V_FIX_WS_POLYFILL_001");
-
-// Polyfill minimal for libraries expecting WebSocket (like socket.io or older dsteem)
-if (!globalThis.WebSocket) {
-    // @ts-ignore
-    globalThis.WebSocket = class DummyWebSocket {
-        constructor() { console.warn("DummyWebSocket instantiated"); }
-        close() { }
-        send() { }
-        addEventListener() { }
-        removeEventListener() { }
-    };
-}
-
-// Polyfill for libs expecting 'exports'
-(self as any).exports = {};
-
+import './polyfill';
 import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation } from '@services/chainService';
 import { getChainConfig, isChainSupported } from '@config/chainConfig';
 

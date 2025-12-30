@@ -1,11 +1,10 @@
 import { b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, i as isChainSupported, g as getChainConfig, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation } from './chainService.js';
 import './index.js';
 
-console.log("Gravity: BACKGROUND SCRIPT RELOADED - V_FIX_WS_POLYFILL_001");
-if (!globalThis.WebSocket) {
+if (typeof globalThis.WebSocket === "undefined") {
   globalThis.WebSocket = class DummyWebSocket {
     constructor() {
-      console.warn("DummyWebSocket instantiated");
+      console.warn("Gravity: DummyWebSocket instantiated in Background");
     }
     close() {
     }
@@ -16,8 +15,10 @@ if (!globalThis.WebSocket) {
     removeEventListener() {
     }
   };
+  console.log("Gravity: WebSocket Polyfill Applied (Success)");
 }
 self.exports = {};
+
 const OFFSCREEN_DOCUMENT_PATH = "src/offscreen/offscreen.html";
 async function setupOffscreenDocument(path) {
   try {
