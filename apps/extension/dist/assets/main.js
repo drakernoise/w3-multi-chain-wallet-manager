@@ -580,6 +580,7 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 const root = ReactDOM.createRoot(rootElement);
+console.log("Gravity: Inside Index.tsx - Render Start");
 root.render(
   /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { height: "600px", display: "flex", alignItems: "center", justifyContent: "center", background: "#222", color: "#fff" }, children: /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Loading Gravity..." }) })
 );

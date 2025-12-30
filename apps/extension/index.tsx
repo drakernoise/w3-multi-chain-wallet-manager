@@ -14,6 +14,7 @@ const root = ReactDOM.createRoot(rootElement);
 // This guarantees that 'dhive' (inside App) is not loaded until
 // AFTER lines 1-13 have fully executed.
 // Render Loading state immediately
+console.log("Gravity: Inside Index.tsx - Render Start");
 root.render(
   <div style={{ height: '600px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#222', color: '#fff' }}>
     <h3>Loading Gravity...</h3>
