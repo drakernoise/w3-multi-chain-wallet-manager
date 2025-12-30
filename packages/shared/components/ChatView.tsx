@@ -153,6 +153,14 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     const handleEnablePush = async () => {
         try {
+            // If in popup (narrow width), open a full tab to request permission reliably
+            if (window.innerWidth < 600 && typeof chrome !== 'undefined' && chrome.tabs) {
+                console.log("Gravity: Detected popup mode, opening dedicated tab for permissions");
+                chrome.tabs.create({ url: chrome.runtime.getURL('index.html?action=enable_notifications') });
+                window.close();
+                return;
+            }
+
             const perm = await Notification.requestPermission();
             console.log("Gravity: Notification Permission Result:", perm);
 
