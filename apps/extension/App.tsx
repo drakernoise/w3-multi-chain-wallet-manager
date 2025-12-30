@@ -81,6 +81,12 @@ function AppContent() {
     if (req) setRequestId(req);
   }, []);
 
+  useEffect(() => {
+    const handleOpenBridge = () => setShowBridge(true);
+    window.addEventListener('open-bridge', handleOpenBridge);
+    return () => window.removeEventListener('open-bridge', handleOpenBridge);
+  }, []);
+
   // 1. Load Initial State & Session
   useEffect(() => {
     console.log("Gravity: App useEffect mounted");
@@ -461,11 +467,7 @@ function AppContent() {
     );
   }
 
-  useEffect(() => {
-    const handleOpenBridge = () => setShowBridge(true);
-    window.addEventListener('open-bridge', handleOpenBridge);
-    return () => window.removeEventListener('open-bridge', handleOpenBridge);
-  }, []);
+
 
   // SIGNING REQUEST UI
   if (requestId) {

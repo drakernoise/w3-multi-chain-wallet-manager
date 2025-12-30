@@ -13651,6 +13651,11 @@ function AppContent() {
     if (req) setRequestId(req);
   }, []);
   reactExports.useEffect(() => {
+    const handleOpenBridge = () => setShowBridge(true);
+    window.addEventListener("open-bridge", handleOpenBridge);
+    return () => window.removeEventListener("open-bridge", handleOpenBridge);
+  }, []);
+  reactExports.useEffect(() => {
     console.log("Gravity: App useEffect mounted");
     const loadState = async () => {
       console.log("Gravity: loadState started");
@@ -13984,11 +13989,6 @@ function AppContent() {
       }
     );
   }
-  reactExports.useEffect(() => {
-    const handleOpenBridge = () => setShowBridge(true);
-    window.addEventListener("open-bridge", handleOpenBridge);
-    return () => window.removeEventListener("open-bridge", handleOpenBridge);
-  }, []);
   if (requestId) {
     return /* @__PURE__ */ jsxRuntimeExports.jsx(SignRequest, { requestId, accounts: walletState.accounts, onComplete: () => window.close() });
   }
