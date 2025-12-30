@@ -12135,6 +12135,27 @@ const ChatView = ({ onClose }) => {
     };
   }, []);
   reactExports.useEffect(() => {
+    const handleChatUnread = (e) => {
+      const roomId = e.detail?.roomId;
+      console.log("[ChatView] Received chat-unread event for room:", roomId);
+      if (roomId) {
+        setRooms((prev) => {
+          const updated = prev.map(
+            (room) => room.id === roomId ? { ...room, hasUnread: true } : room
+          );
+          console.log("[ChatView] Updated rooms from chat-unread event:", updated);
+          return updated;
+        });
+      }
+    };
+    console.log("[ChatView] Setting up chat-unread event listener");
+    window.addEventListener("chat-unread", handleChatUnread);
+    return () => {
+      console.log("[ChatView] Removing chat-unread event listener");
+      window.removeEventListener("chat-unread", handleChatUnread);
+    };
+  }, []);
+  reactExports.useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ type: "CHAT_UI_OPENED" });
     }
