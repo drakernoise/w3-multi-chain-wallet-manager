@@ -12124,7 +12124,7 @@ const ChatView = ({ onClose }) => {
       return () => clearTimeout(timer);
     }
   }, [notification]);
-  const [pushGranted, setPushGranted] = reactExports.useState(Notification.permission === "granted");
+  const [pushGranted, setPushGranted] = reactExports.useState(false);
   const handleEnablePush = async () => {
     const perm = await Notification.requestPermission();
     if (perm === "granted") {
@@ -12136,22 +12136,39 @@ const ChatView = ({ onClose }) => {
             if (res.subscription) chatService.syncPushSubscription(res.subscription);
           } else {
             console.error("Gravity: Push Background Error", res?.error);
+            setNotification({ msg: "Push Error: " + (res?.error || "Unknown"), type: "error" });
+            setPushGranted(false);
           }
         });
       }
     }
   };
   reactExports.useEffect(() => {
-    if (socketStatus === "authenticated" && pushGranted) {
-      if (typeof chrome !== "undefined" && chrome.runtime) {
-        chrome.runtime.sendMessage({ type: "CHAT_ENABLE_PUSH" }, (res) => {
-          if (res && res.success && res.subscription) {
-            chatService.syncPushSubscription(res.subscription);
-          }
-        });
+    if (socketStatus === "authenticated") {
+      if (Notification.permission === "granted") {
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage({ type: "CHAT_CHECK_PUSH" }, (res) => {
+            if (res && res.success && res.subscription) {
+              console.log("Gravity: Push Sync OK");
+              setPushGranted(true);
+              chatService.syncPushSubscription(res.subscription);
+            } else {
+              console.log("Gravity: Push granted but missing sub. Requesting user action.");
+              setPushGranted(false);
+              chrome.runtime.sendMessage({ type: "CHAT_ENABLE_PUSH" }, (res2) => {
+                if (res2 && res2.success) {
+                  setPushGranted(true);
+                  chatService.syncPushSubscription(res2.subscription);
+                }
+              });
+            }
+          });
+        }
+      } else {
+        setPushGranted(false);
       }
     }
-  }, [socketStatus, pushGranted]);
+  }, [socketStatus]);
   reactExports.useEffect(() => {
     if (activeRoomId) {
       chatService.joinRoom(activeRoomId);

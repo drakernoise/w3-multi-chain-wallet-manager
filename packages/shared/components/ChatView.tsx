@@ -149,7 +149,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }, [notification]);
 
     // Push Notifications Logic
-    const [pushGranted, setPushGranted] = useState(Notification.permission === 'granted');
+    const [pushGranted, setPushGranted] = useState(false);
 
     const handleEnablePush = async () => {
         const perm = await Notification.requestPermission();
@@ -162,24 +162,48 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         if (res.subscription) chatService.syncPushSubscription(res.subscription);
                     } else {
                         console.error("Gravity: Push Background Error", res?.error);
+                        setNotification({ msg: "Push Error: " + (res?.error || 'Unknown'), type: 'error' });
+                        setPushGranted(false); // Re-show button
                     }
                 });
             }
         }
     };
 
-    // Auto-sync if already granted
+    // Check Status on Auth
     useEffect(() => {
-        if (socketStatus === 'authenticated' && pushGranted) {
-            if (typeof chrome !== 'undefined' && chrome.runtime) {
-                chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' }, (res: any) => {
-                    if (res && res.success && res.subscription) {
-                        chatService.syncPushSubscription(res.subscription);
-                    }
-                });
+        if (socketStatus === 'authenticated') {
+            // 1. Check Permission
+            if (Notification.permission === 'granted') {
+                // 2. Check Exisiting Sub in Background (Safe check)
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    chrome.runtime.sendMessage({ type: 'CHAT_CHECK_PUSH' }, (res: any) => {
+                        if (res && res.success && res.subscription) {
+                            console.log("Gravity: Push Sync OK");
+                            setPushGranted(true);
+                            chatService.syncPushSubscription(res.subscription);
+                        } else {
+                            // Granted but not valid sub? Show button to force re-sub.
+                            console.log("Gravity: Push granted but missing sub. Requesting user action.");
+                            setPushGranted(false);
+
+                            // Optional: Try silent enable if we think it might work? 
+                            // Usually if permission is granted, we CAN sub without gesture?
+                            // Let's try ONCE silently.
+                            chrome.runtime.sendMessage({ type: 'CHAT_ENABLE_PUSH' }, (res2: any) => {
+                                if (res2 && res2.success) {
+                                    setPushGranted(true);
+                                    chatService.syncPushSubscription(res2.subscription);
+                                }
+                            });
+                        }
+                    });
+                }
+            } else {
+                setPushGranted(false);
             }
         }
-    }, [socketStatus, pushGranted]);
+    }, [socketStatus]);
 
     // Effect to load messages when active room changes
     useEffect(() => {

@@ -481,6 +481,18 @@ function urlBase64ToUint8Array(base64String: string) {
     return outputArray;
 }
 
+async function getExistingSubscription() {
+    try {
+        // @ts-ignore
+        const reg = self.registration;
+        if (!reg?.pushManager) return null;
+        return await reg.pushManager.getSubscription();
+    } catch (e) {
+        console.warn("Gravity: Failed to get subscription", e);
+        return null;
+    }
+}
+
 async function subscribeToPush() {
     console.log("Gravity: [Background] Starting Push Subscription sequence...");
     try {
@@ -490,14 +502,14 @@ async function subscribeToPush() {
             throw new Error("PushManager not available in Service Worker context");
         }
 
-        // Check existing
+        // Check existing first
         let sub = await reg.pushManager.getSubscription();
         if (sub) {
             console.log("Gravity: [Background] Found existing subscription");
             return sub;
         }
 
-        // Subscribe
+        // Subscribe (Requires User Gesture usually)
         console.log("Gravity: [Background] Requesting new subscription...");
         sub = await reg.pushManager.subscribe({
             userVisibleOnly: true,
@@ -516,14 +528,17 @@ async function subscribeToPush() {
 
 // Handler for UI requests
 chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
+    if (msg.type === 'CHAT_CHECK_PUSH') {
+        getExistingSubscription()
+            .then(sub => sendResponse({ success: true, subscription: sub }))
+            .catch(err => sendResponse({ success: false, error: err.toString() }));
+        return true;
+    }
+
     if (msg.type === 'CHAT_ENABLE_PUSH') {
         subscribeToPush()
-            .then(sub => {
-                sendResponse({ success: true, subscription: sub });
-            })
-            .catch(err => {
-                sendResponse({ success: false, error: err.message || err.toString() });
-            });
+            .then(sub => sendResponse({ success: true, subscription: sub }))
+            .catch(err => sendResponse({ success: false, error: err.message || err.toString() }));
         return true; // Async response
     }
 });

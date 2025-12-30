@@ -338,6 +338,16 @@ function urlBase64ToUint8Array(base64String) {
   }
   return outputArray;
 }
+async function getExistingSubscription() {
+  try {
+    const reg = self.registration;
+    if (!reg?.pushManager) return null;
+    return await reg.pushManager.getSubscription();
+  } catch (e) {
+    console.warn("Gravity: Failed to get subscription", e);
+    return null;
+  }
+}
 async function subscribeToPush() {
   console.log("Gravity: [Background] Starting Push Subscription sequence...");
   try {
@@ -364,12 +374,12 @@ async function subscribeToPush() {
   }
 }
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === "CHAT_CHECK_PUSH") {
+    getExistingSubscription().then((sub) => sendResponse({ success: true, subscription: sub })).catch((err) => sendResponse({ success: false, error: err.toString() }));
+    return true;
+  }
   if (msg.type === "CHAT_ENABLE_PUSH") {
-    subscribeToPush().then((sub) => {
-      sendResponse({ success: true, subscription: sub });
-    }).catch((err) => {
-      sendResponse({ success: false, error: err.message || err.toString() });
-    });
+    subscribeToPush().then((sub) => sendResponse({ success: true, subscription: sub })).catch((err) => sendResponse({ success: false, error: err.message || err.toString() }));
     return true;
   }
 });
