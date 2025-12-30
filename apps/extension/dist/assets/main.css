@@ -2498,6 +2498,15 @@ body,
   scrollbar-color: #334155 #0F172A;
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 .first\:mt-0:first-child {
   margin-top: 0px;
 }

@@ -7732,7 +7732,7 @@ const Sidebar = ({
         className: "w-10 h-10 object-contain mb-6 drop-shadow-md hover:scale-110 transition-transform cursor-pointer shrink-0"
       }
     ),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 w-full flex flex-col items-center gap-4 overflow-y-auto overflow-x-hidden custom-scrollbar no-scrollbar scroll-smooth py-2", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 w-full flex flex-col items-center gap-2 overflow-y-auto overflow-x-hidden custom-scrollbar no-scrollbar scroll-smooth py-2", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         NavIcon,
         {

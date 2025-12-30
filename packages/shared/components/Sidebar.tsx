@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       {/* Middle Scrollable Section */}
-      <div className="flex-1 w-full flex flex-col items-center gap-4 overflow-y-auto overflow-x-hidden custom-scrollbar no-scrollbar scroll-smooth py-2">
+      <div className="flex-1 w-full flex flex-col items-center gap-2 overflow-y-auto overflow-x-hidden custom-scrollbar no-scrollbar scroll-smooth py-2">
         <NavIcon
           active={currentView === ViewState.LANDING}
           onClick={() => onChangeView(ViewState.LANDING)}
