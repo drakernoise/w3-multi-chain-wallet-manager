@@ -89,10 +89,29 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             }
         };
 
-        chatService.onRoomUpdated = (updatedRooms) => {
+        chatService.onRoomUpdated = async (updatedRooms) => {
             console.log(`ChatView: Updating rooms state with ${updatedRooms.length} rooms`);
-            console.trace('Stack trace:'); // This will show us WHO is calling this
-            setRooms(updatedRooms);
+
+            // Restore unread counts from storage
+            if (typeof chrome !== 'undefined' && chrome.storage) {
+                try {
+                    const result = await chrome.storage.local.get(['chat_unread_counts']);
+                    const savedCounts = result.chat_unread_counts || {};
+
+                    const roomsWithUnread = updatedRooms.map(room => ({
+                        ...room,
+                        unreadCount: savedCounts[room.id] || room.unreadCount || 0
+                    }));
+
+                    console.log('ChatView: Restored unread counts from storage:', savedCounts);
+                    setRooms(roomsWithUnread);
+                } catch (e) {
+                    console.error('ChatView: Failed to restore unread counts:', e);
+                    setRooms(updatedRooms);
+                }
+            } else {
+                setRooms(updatedRooms);
+            }
         };
 
         chatService.onError = (err) => {
@@ -182,6 +201,24 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             window.removeEventListener('chat-unread', handleChatUnread);
         };
     }, []);
+
+    // Persist unread counts to storage whenever rooms change
+    useEffect(() => {
+        if (rooms.length > 0 && typeof chrome !== 'undefined' && chrome.storage) {
+            const unreadCounts: Record<string, number> = {};
+            rooms.forEach(room => {
+                if (room.unreadCount && room.unreadCount > 0) {
+                    unreadCounts[room.id] = room.unreadCount;
+                }
+            });
+
+            chrome.storage.local.set({ chat_unread_counts: unreadCounts }).then(() => {
+                console.log('[ChatView] Saved unread counts to storage:', unreadCounts);
+            }).catch((e: any) => {
+                console.error('[ChatView] Failed to save unread counts:', e);
+            });
+        }
+    }, [rooms]);
 
     // Reset Badge on Mount
     useEffect(() => {

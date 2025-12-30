@@ -12083,10 +12083,25 @@ const ChatView = ({ onClose }) => {
         setTimeout(() => setNotification(null), 5e3);
       }
     };
-    chatService.onRoomUpdated = (updatedRooms) => {
+    chatService.onRoomUpdated = async (updatedRooms) => {
       console.log(`ChatView: Updating rooms state with ${updatedRooms.length} rooms`);
-      console.trace("Stack trace:");
-      setRooms(updatedRooms);
+      if (typeof chrome !== "undefined" && chrome.storage) {
+        try {
+          const result = await chrome.storage.local.get(["chat_unread_counts"]);
+          const savedCounts = result.chat_unread_counts || {};
+          const roomsWithUnread = updatedRooms.map((room) => ({
+            ...room,
+            unreadCount: savedCounts[room.id] || room.unreadCount || 0
+          }));
+          console.log("ChatView: Restored unread counts from storage:", savedCounts);
+          setRooms(roomsWithUnread);
+        } catch (e) {
+          console.error("ChatView: Failed to restore unread counts:", e);
+          setRooms(updatedRooms);
+        }
+      } else {
+        setRooms(updatedRooms);
+      }
     };
     chatService.onError = (err) => {
       setNotification({ msg: err, type: "error" });
@@ -12155,6 +12170,21 @@ const ChatView = ({ onClose }) => {
       window.removeEventListener("chat-unread", handleChatUnread);
     };
   }, []);
+  reactExports.useEffect(() => {
+    if (rooms.length > 0 && typeof chrome !== "undefined" && chrome.storage) {
+      const unreadCounts = {};
+      rooms.forEach((room) => {
+        if (room.unreadCount && room.unreadCount > 0) {
+          unreadCounts[room.id] = room.unreadCount;
+        }
+      });
+      chrome.storage.local.set({ chat_unread_counts: unreadCounts }).then(() => {
+        console.log("[ChatView] Saved unread counts to storage:", unreadCounts);
+      }).catch((e) => {
+        console.error("[ChatView] Failed to save unread counts:", e);
+      });
+    }
+  }, [rooms]);
   reactExports.useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ type: "CHAT_UI_OPENED" });
