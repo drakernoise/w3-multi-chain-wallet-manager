@@ -1,3 +1,14 @@
+var window = window || self; var global = global || self; var exports = exports || {}; 
+if (typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = class DummyWebSocket {
+        constructor() { console.warn("Gravity: DummyWebSocket instantiated (Patch)"); }
+        close() {}
+        send() {}
+        addEventListener() {}
+        removeEventListener() {}
+    };
+}
+
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./App.js","./chainService.js","./index.js","./index2.js"])))=>i.map(i=>d[i]);
 import './modulepreload-polyfill.js';
 import { B as Buffer$1, g as getDefaultExportFromCjs } from './index.js';

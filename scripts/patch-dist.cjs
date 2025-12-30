@@ -1,28 +1,47 @@
 const fs = require('fs');
 const path = require('path');
 
-const vendorPath = path.join(__dirname, '../dist/assets/vendor.js');
+// Target the actual extension build output
+const extensionDist = path.join(__dirname, '../apps/extension/dist/assets');
 
-const POLYFILL = 'var window = window || self; var global = global || self; var exports = exports || {}; ';
+// Polyfill for Service Worker environment (WebSocket, Window, Global)
+const WS_POLYFILL = `
+if (typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = class DummyWebSocket {
+        constructor() { console.warn("Gravity: DummyWebSocket instantiated (Patch)"); }
+        close() {}
+        send() {}
+        addEventListener() {}
+        removeEventListener() {}
+    };
+}
+`;
 
-function patch(filePath) {
+const BASE_POLYFILL = 'var window = window || self; var global = global || self; var exports = exports || {}; ';
+const FULL_POLYFILL = BASE_POLYFILL + WS_POLYFILL;
+
+function patch(fileName) {
+    const filePath = path.join(extensionDist, fileName);
     try {
         if (fs.existsSync(filePath)) {
             let content = fs.readFileSync(filePath, 'utf8');
-            if (!content.startsWith('var window')) {
-                fs.writeFileSync(filePath, POLYFILL + content);
-                console.log(`Successfully patched ${filePath}`);
+            // Check if already patched to avoid duplication
+            if (!content.includes('DummyWebSocket')) {
+                fs.writeFileSync(filePath, FULL_POLYFILL + "\n" + content);
+                console.log(`Successfully patched ${fileName}`);
             } else {
-                console.log(`Already patched ${filePath}`);
+                console.log(`Already patched ${fileName}`);
             }
         } else {
-            console.error(`File not found: ${filePath}`);
+            // Optional: console.log(`File not found: ${fileName} (might be ok if build changed)`);
         }
     } catch (e) {
-        console.error(`Error patching ${filePath}:`, e);
+        console.error(`Error patching ${fileName}:`, e);
     }
 }
 
-// Find the vendor file (might have hash if configuration changed, but we set fixed names)
-// We set chunkFileNames: 'assets/[name].js', so it should be vendor.js
-patch(vendorPath);
+// Patch critical files
+patch('background.js');
+patch('index.js');
+patch('main.js');
+patch('vendor.js'); // If it exists

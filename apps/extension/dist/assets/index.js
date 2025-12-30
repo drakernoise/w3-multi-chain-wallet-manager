@@ -1,3 +1,14 @@
+var window = window || self; var global = global || self; var exports = exports || {}; 
+if (typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = class DummyWebSocket {
+        constructor() { console.warn("Gravity: DummyWebSocket instantiated (Patch)"); }
+        close() {}
+        send() {}
+        addEventListener() {}
+        removeEventListener() {}
+    };
+}
+
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
 function getDefaultExportFromCjs (x) {
