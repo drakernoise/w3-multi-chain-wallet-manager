@@ -301,7 +301,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, walletState, s
   };
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 relative overflow-hidden">
+    <div style={{ background: '#111', minHeight: '600px', width: '100%', color: 'white', position: 'absolute' }} className="h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 relative overflow-hidden">
 
       {/* PIN Modal Overlay */}
       {showPinModal && (

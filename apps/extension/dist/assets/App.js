@@ -7497,7 +7497,7 @@ const LockScreen = ({ onUnlock, walletState, setWalletState, lockReason, onToggl
       }
     }
   };
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 relative overflow-hidden", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { background: "#111", minHeight: "600px", width: "100%", color: "white", position: "absolute" }, className: "h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 relative overflow-hidden", children: [
     showPinModal && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 z-50 bg-dark-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 animate-fade-in", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 p-6 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-sm", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-bold text-white mb-2 text-center", children: pinMode === "create" ? "Create Security PIN" : pinMode === "totp" ? "Authenticator Code" : "Enter Security PIN" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6 text-center", children: pinMode === "create" ? "Set a 6-digit PIN to encrypt your wallet key. You will need this to login securely." : pinMode === "totp" ? "Enter the 6-digit code from your Aegis/Auth app." : "Enter your 6-digit PIN to decrypt your wallet." }),
