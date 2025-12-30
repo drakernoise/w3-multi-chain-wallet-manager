@@ -17,7 +17,7 @@ import { HelpView } from '@components/HelpView';
 import { ChatView } from '@components/ChatView';
 import { BridgeModal } from '@components/BridgeModal';
 import { NotificationToast } from '@components/NotificationToast';
-import { NotificationRequest } from '@components/NotificationRequest';
+
 import {
   fetchBalances as serviceFetchBalances,
   broadcastTransfer,
@@ -75,20 +75,12 @@ function AppContent() {
   // Signing Request ID
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showBridge, setShowBridge] = useState(false);
-  const [isNotificationMode, setIsNotificationMode] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const req = params.get('requestId');
     if (req) setRequestId(req);
-    if (params.get('action') === 'enable_notifications') {
-      setIsNotificationMode(true);
-    }
   }, []);
-
-  if (isNotificationMode) {
-    return <NotificationRequest />;
-  }
 
   useEffect(() => {
     const handleOpenBridge = () => setShowBridge(true);
