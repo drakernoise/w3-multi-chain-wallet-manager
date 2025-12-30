@@ -22,9 +22,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   React.useEffect(() => {
     const handleUnread = () => {
+      console.log('[Sidebar] Received chat-unread event');
       const badge = document.getElementById('chat-badge');
-      if (badge) badge.classList.remove('hidden');
+      console.log('[Sidebar] Badge element:', badge);
+      if (badge) {
+        badge.classList.remove('hidden');
+        console.log('[Sidebar] Badge shown');
+      }
     };
+    console.log('[Sidebar] Setting up chat-unread listener');
     window.addEventListener('chat-unread', handleUnread);
     return () => window.removeEventListener('chat-unread', handleUnread);
   }, []);

@@ -7716,9 +7716,15 @@ const Sidebar = ({
   const { t } = useTranslation();
   React.useEffect(() => {
     const handleUnread = () => {
+      console.log("[Sidebar] Received chat-unread event");
       const badge = document.getElementById("chat-badge");
-      if (badge) badge.classList.remove("hidden");
+      console.log("[Sidebar] Badge element:", badge);
+      if (badge) {
+        badge.classList.remove("hidden");
+        console.log("[Sidebar] Badge shown");
+      }
     };
+    console.log("[Sidebar] Setting up chat-unread listener");
     window.addEventListener("chat-unread", handleUnread);
     return () => window.removeEventListener("chat-unread", handleUnread);
   }, []);
@@ -12105,15 +12111,26 @@ const ChatView = ({ onClose }) => {
   reactExports.useEffect(() => {
     if (typeof chrome === "undefined" || !chrome.runtime) return;
     const handleBackgroundMessage = (message) => {
+      console.log("[ChatView] Received message from background:", JSON.stringify(message, null, 2));
+      console.log("[ChatView] Message type:", message?.type);
       if (message.type === "CHAT_NEW_MESSAGE") {
-        window.dispatchEvent(new CustomEvent("chat-unread"));
-        setRooms((prev) => prev.map(
-          (room) => room.id === message.roomId ? { ...room, hasUnread: true } : room
-        ));
+        console.log("[ChatView] Processing CHAT_NEW_MESSAGE for room:", message.roomId);
+        const event = new CustomEvent("chat-unread");
+        console.log("[ChatView] Dispatching chat-unread event");
+        window.dispatchEvent(event);
+        setRooms((prev) => {
+          const updated = prev.map(
+            (room) => room.id === message.roomId ? { ...room, hasUnread: true } : room
+          );
+          console.log("[ChatView] Updated rooms with unread status:", updated);
+          return updated;
+        });
       }
     };
+    console.log("[ChatView] Setting up chrome.runtime.onMessage listener");
     chrome.runtime.onMessage.addListener(handleBackgroundMessage);
     return () => {
+      console.log("[ChatView] Removing chrome.runtime.onMessage listener");
       chrome.runtime.onMessage.removeListener(handleBackgroundMessage);
     };
   }, []);

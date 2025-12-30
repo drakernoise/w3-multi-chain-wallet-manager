@@ -124,21 +124,34 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         if (typeof chrome === 'undefined' || !chrome.runtime) return;
 
         const handleBackgroundMessage = (message: any) => {
-            if (message.type === 'CHAT_NEW_MESSAGE') {
-                // Trigger sidebar badge
-                window.dispatchEvent(new CustomEvent('chat-unread'));
+            console.log('[ChatView] Received message from background:', JSON.stringify(message, null, 2));
+            console.log('[ChatView] Message type:', message?.type);
 
-                // Mark room as having unread (we'll track this in state)
-                setRooms(prev => prev.map(room =>
-                    room.id === message.roomId
-                        ? { ...room, hasUnread: true }
-                        : room
-                ));
+            if (message.type === 'CHAT_NEW_MESSAGE') {
+                console.log('[ChatView] Processing CHAT_NEW_MESSAGE for room:', message.roomId);
+
+                // Trigger sidebar badge
+                const event = new CustomEvent('chat-unread');
+                console.log('[ChatView] Dispatching chat-unread event');
+                window.dispatchEvent(event);
+
+                // Mark room as having unread
+                setRooms(prev => {
+                    const updated = prev.map(room =>
+                        room.id === message.roomId
+                            ? { ...room, hasUnread: true }
+                            : room
+                    );
+                    console.log('[ChatView] Updated rooms with unread status:', updated);
+                    return updated;
+                });
             }
         };
 
+        console.log('[ChatView] Setting up chrome.runtime.onMessage listener');
         chrome.runtime.onMessage.addListener(handleBackgroundMessage);
         return () => {
+            console.log('[ChatView] Removing chrome.runtime.onMessage listener');
             chrome.runtime.onMessage.removeListener(handleBackgroundMessage);
         };
     }, []);

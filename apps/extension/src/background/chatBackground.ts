@@ -139,12 +139,16 @@ async function initChatSocket() {
         updateBadge();
 
         // Notify any open UI windows about the unread message
-        chrome.runtime.sendMessage({
+        const messageToSend = {
             type: 'CHAT_NEW_MESSAGE',
             roomId: data.roomId,
             message: data.message
-        }).catch(() => {
-            // UI might not be open, that's fine
+        };
+        console.log("BG Chat: Sending message to UI:", messageToSend);
+        chrome.runtime.sendMessage(messageToSend).then(() => {
+            console.log("BG Chat: Message sent successfully to UI");
+        }).catch((err: any) => {
+            console.log("BG Chat: Failed to send message to UI (UI might not be open):", err);
         });
     });
 
