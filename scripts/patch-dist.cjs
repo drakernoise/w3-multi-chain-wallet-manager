@@ -1,47 +1,51 @@
 const fs = require('fs');
 const path = require('path');
 
-// Target the actual extension build output
 const extensionDist = path.join(__dirname, '../apps/extension/dist/assets');
+const polyfillPath = path.join(extensionDist, 'ws-polyfill.js');
+const backgroundPath = path.join(extensionDist, 'background.js');
 
-// Polyfill for Service Worker environment (WebSocket, Window, Global)
-const WS_POLYFILL = `
+const POLYFILL_CODE = `console.log("Gravity: WS Polyfill Module Init");
 if (typeof globalThis.WebSocket === 'undefined') {
     globalThis.WebSocket = class DummyWebSocket {
-        constructor() { console.warn("Gravity: DummyWebSocket instantiated (Patch)"); }
+        constructor() { console.warn("Gravity: DummyWebSocket (ESM)"); }
         close() {}
         send() {}
         addEventListener() {}
         removeEventListener() {}
     };
+    globalThis.WebSocket.CONNECTING = 0;
+    globalThis.WebSocket.OPEN = 1;
+    globalThis.WebSocket.CLOSING = 2;
+    globalThis.WebSocket.CLOSED = 3;
+    console.log("Gravity: WS Polyfill APPLIED");
+}
+if (typeof window === 'undefined') {
+    globalThis.window = globalThis;
 }
 `;
 
-const BASE_POLYFILL = 'var window = window || self; var global = global || self; var exports = exports || {}; ';
-const FULL_POLYFILL = BASE_POLYFILL + WS_POLYFILL;
+try {
+    if (fs.existsSync(extensionDist)) {
+        fs.writeFileSync(polyfillPath, POLYFILL_CODE);
+        console.log("Created ws-polyfill.js");
 
-function patch(fileName) {
-    const filePath = path.join(extensionDist, fileName);
-    try {
-        if (fs.existsSync(filePath)) {
-            let content = fs.readFileSync(filePath, 'utf8');
-            // Check if already patched to avoid duplication
-            if (!content.includes('DummyWebSocket')) {
-                fs.writeFileSync(filePath, FULL_POLYFILL + "\n" + content);
-                console.log(`Successfully patched ${fileName}`);
+        if (fs.existsSync(backgroundPath)) {
+            let content = fs.readFileSync(backgroundPath, 'utf8');
+            if (!content.includes('ws-polyfill.js')) {
+                const importStmt = "import './ws-polyfill.js';\n";
+                fs.writeFileSync(backgroundPath, importStmt + content);
+                console.log("Injected import into background.js");
             } else {
-                console.log(`Already patched ${fileName}`);
+                console.log("background.js already imports polyfill");
             }
         } else {
-            // Optional: console.log(`File not found: ${fileName} (might be ok if build changed)`);
+            console.warn("background.js not found in " + extensionDist);
         }
-    } catch (e) {
-        console.error(`Error patching ${fileName}:`, e);
+    } else {
+        console.warn("Dist folder not found: " + extensionDist);
     }
+} catch (e) {
+    console.error("Patch Error:", e);
+    process.exit(1);
 }
-
-// Patch critical files
-patch('background.js');
-patch('index.js');
-patch('main.js');
-patch('vendor.js'); // If it exists
