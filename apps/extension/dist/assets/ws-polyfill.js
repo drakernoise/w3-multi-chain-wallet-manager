@@ -1,32 +1,50 @@
-console.log("Gravity: WS Polyfill Module Init");
-if (typeof globalThis.WebSocket === 'undefined') {
-    globalThis.WebSocket = class DummyWebSocket {
-        constructor() { console.warn("Gravity: DummyWebSocket (ESM)"); }
-        close() {}
-        send() {}
-        addEventListener() {}
-        removeEventListener() {}
-    };
-    globalThis.WebSocket.CONNECTING = 0;
-    globalThis.WebSocket.OPEN = 1;
-    globalThis.WebSocket.CLOSING = 2;
-    globalThis.WebSocket.CLOSED = 3;
-    console.log("Gravity: WS Polyfill APPLIED");
-}
-if (typeof window !== 'undefined') {
-    window.global = window;
-    if (!window.process) window.process = { env: { NODE_ENV: 'production' }, version: '' };
+
+(function() {
+    // Detect environment
+    var globalScope = typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : (typeof window !== 'undefined' ? window : {}));
     
-    // Panic Timer to detect frozen loading
-    setTimeout(() => {
-        const root = document.getElementById('root');
-        if (root && root.innerHTML.trim() === '') {
-             console.error("Gravity: LOADING STUCK - TIMEOUT");
-             document.body.innerHTML = '<div style="background:#330000;color:#ff9999;padding:20px;font-family:sans-serif;">' +
-             '<h2>Loading Timeout</h2>' +
-             '<p>The application stopped responding during startup.</p>' + 
-             '<p>This suggests a conflict in dependency loading.</p>' +
-             '</div>';
-        }
-    }, 3000);
-}
+    console.log("Gravity: WS Polyfill Init");
+
+    // Polyfill WebSocket if missing
+    if (typeof globalScope.WebSocket === 'undefined') {
+        globalScope.WebSocket = class DummyWebSocket {
+            constructor() { console.warn("Gravity: DummyWebSocket instantiated"); }
+            close() {}
+            send() {}
+            addEventListener() {}
+            removeEventListener() {}
+        };
+        // Add constants
+        globalScope.WebSocket.CONNECTING = 0;
+        globalScope.WebSocket.OPEN = 1;
+        globalScope.WebSocket.CLOSING = 2;
+        globalScope.WebSocket.CLOSED = 3;
+        
+        console.log("Gravity: WS Polyfill APPLIED to globalScope");
+    }
+
+    // Polyfill window if missing (essential for many libs)
+    if (typeof globalScope.window === 'undefined') {
+        globalScope.window = globalScope;
+    }
+    
+    // Polyfill process if missing
+    if (typeof globalScope.process === 'undefined') {
+         globalScope.process = { env: { NODE_ENV: 'production' }, version: '' };
+    }
+
+    // Panic timer only for UI (where document exists)
+    if (typeof document !== 'undefined') {
+        setTimeout(() => {
+            var root = document.getElementById('root');
+            if (root && root.innerHTML.trim() === '') {
+                 console.error("Gravity: LOADING STUCK - TIMEOUT");
+                 document.body.innerHTML = '<div style="background:#330000;color:#ff9999;padding:20px;font-family:sans-serif;">' +
+                 '<h2>Loading Timeout</h2>' +
+                 '<p>Application hung during startup.</p>' + 
+                 '<p>Check console for WebSocket/Buffer errors.</p>' +
+                 '</div>';
+            }
+        }, 3000);
+    }
+})();
