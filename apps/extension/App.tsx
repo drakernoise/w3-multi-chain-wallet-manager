@@ -83,66 +83,75 @@ function AppContent() {
 
   // 1. Load Initial State & Session
   useEffect(() => {
+    console.log("Gravity: App useEffect mounted");
     const loadState = async () => {
-      // Load Vault Metadata
-      const vaultData = await getVault();
-      if (vaultData) {
-        setWalletState(prev => ({
-          ...prev,
-          accounts: [], // Keys are encrypted
-          encryptedMaster: true,
-          useGoogleAuth: false,
-          useBiometrics: false,
-          useDeviceAuth: false
-        }));
-      }
+      console.log("Gravity: loadState started");
+      try {
+        // Load Vault Metadata
+        const vaultData = await getVault();
+        console.log("Gravity: getVault result:", !!vaultData);
+        if (vaultData) {
+          setWalletState(prev => ({
+            ...prev,
+            accounts: [], // Keys are encrypted
+            encryptedMaster: true,
+            useGoogleAuth: false,
+            useBiometrics: false,
+            useDeviceAuth: false
+          }));
+        }
 
-      // Check Active Session (chrome.storage.session)
-      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
-        // Try to restore crypto session first
-        const restored = await tryRestoreSession();
+        // Check Active Session (chrome.storage.session)
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+          // Try to restore crypto session first
+          const restored = await tryRestoreSession();
 
-        await new Promise<void>((resolve) => {
-          chrome.storage.session.get(['session_accounts'], (res: any) => {
-            if (res.session_accounts && res.session_accounts.length > 0) {
-              if (restored) {
-                setWalletState(prev => ({ ...prev, accounts: res.session_accounts }));
-                setIsLocked(false);
-                setTimeout(fetchBalances, 500);
-              } else {
-                console.warn("Session accounts found but crypto key missing. Forcing re-login.");
-                chrome.storage.session.remove('session_accounts');
+          await new Promise<void>((resolve) => {
+            chrome.storage.session.get(['session_accounts'], (res: any) => {
+              if (res.session_accounts && res.session_accounts.length > 0) {
+                if (restored) {
+                  setWalletState(prev => ({ ...prev, accounts: res.session_accounts }));
+                  setIsLocked(false);
+                  setTimeout(fetchBalances, 500);
+                } else {
+                  console.warn("Session accounts found but crypto key missing. Forcing re-login.");
+                  chrome.storage.session.remove('session_accounts');
+                }
               }
-            }
-            resolve();
+              resolve();
+            });
           });
-        });
-      }
+        }
 
-      // Also load walletConfig
-      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        await new Promise<void>((resolve) => {
-          chrome.storage.local.get(['walletConfig'], (result: any) => {
-            if (result.walletConfig) {
-              setWalletState(prev => ({
-                ...prev,
-                encryptedMaster: result.walletConfig.encryptedMaster,
-                useGoogleAuth: result.walletConfig.useGoogleAuth,
-                useBiometrics: result.walletConfig.useBiometrics,
-                useDeviceAuth: result.walletConfig.useDeviceAuth,
-                useTOTP: result.walletConfig.useTOTP
-              }));
-            }
-            resolve();
+        // Also load walletConfig
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          await new Promise<void>((resolve) => {
+            chrome.storage.local.get(['walletConfig'], (result: any) => {
+              if (result.walletConfig) {
+                setWalletState(prev => ({
+                  ...prev,
+                  encryptedMaster: result.walletConfig.encryptedMaster,
+                  useGoogleAuth: result.walletConfig.useGoogleAuth,
+                  useBiometrics: result.walletConfig.useBiometrics,
+                  useDeviceAuth: result.walletConfig.useDeviceAuth,
+                  useTOTP: result.walletConfig.useTOTP
+                }));
+              }
+              resolve();
+            });
           });
-        });
+        }
+
+        const context = detectWeb3Context();
+        if (context) setWeb3Context(context);
+
+        benchmarkNodes();
+        setIsDataLoaded(true);
+        console.log("Gravity: loadState COMPLETE");
+      } catch (e) {
+        console.error("Gravity: loadState FAILED", e);
+        setIsDataLoaded(true);
       }
-
-      const context = detectWeb3Context();
-      if (context) setWeb3Context(context);
-
-      benchmarkNodes();
-      setIsDataLoaded(true);
     };
     loadState();
   }, []);
@@ -421,7 +430,23 @@ function AppContent() {
   }, []);
 
   if (!isDataLoaded) {
-    return <div className="h-full bg-dark-900 flex items-center justify-center text-slate-500">Loading...</div>;
+    return (
+      <div style={{
+        height: '600px',
+        width: '100%',
+        background: '#050505',
+        color: '#00ffff',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '16px',
+        fontFamily: 'monospace'
+      }}>
+        <h2 style={{ margin: 0 }}>LOADING DATA...</h2>
+        <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.7 }}>Initializing Storage</div>
+      </div>
+    );
   }
 
   if (isLocked) {
