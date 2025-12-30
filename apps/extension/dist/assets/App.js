@@ -12120,7 +12120,7 @@ const ChatView = ({ onClose }) => {
         window.dispatchEvent(event);
         setRooms((prev) => {
           const updated = prev.map(
-            (room) => room.id === message.roomId ? { ...room, hasUnread: true } : room
+            (room) => room.id === message.roomId ? { ...room, unreadCount: (room.unreadCount || 0) + 1 } : room
           );
           console.log("[ChatView] Updated rooms with unread status:", updated);
           return updated;
@@ -12141,7 +12141,7 @@ const ChatView = ({ onClose }) => {
       if (roomId) {
         setRooms((prev) => {
           const updated = prev.map(
-            (room) => room.id === roomId ? { ...room, hasUnread: true } : room
+            (room) => room.id === roomId ? { ...room, unreadCount: (room.unreadCount || 0) + 1 } : room
           );
           console.log("[ChatView] Updated rooms from chat-unread event:", updated);
           return updated;
@@ -12476,14 +12476,14 @@ const ChatView = ({ onClose }) => {
           {
             onClick: () => {
               setActiveRoomId(room.id);
-              setRooms((prev) => prev.map((r) => r.id === room.id ? { ...r, hasUnread: false } : r));
+              setRooms((prev) => prev.map((r) => r.id === room.id ? { ...r, unreadCount: 0 } : r));
             },
             className: `p-3 rounded-lg cursor-pointer flex flex-col transition-colors ${activeRoomId === room.id ? "bg-purple-600 text-white shadow-lg shadow-purple-900/20" : "hover:bg-dark-700 text-slate-300"}`,
             children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "font-bold text-sm flex items-center gap-2 relative", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "opacity-70 text-xs", children: room.type === "public" ? "#" : "[P]" }),
               " ",
               room.name,
-              room.hasUnread && activeRoomId !== room.id && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto" })
+              room.unreadCount && room.unreadCount > 0 && activeRoomId !== room.id && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto" })
             ] })
           },
           room.id
@@ -12494,13 +12494,13 @@ const ChatView = ({ onClose }) => {
           {
             onClick: () => {
               setActiveRoomId(room.id);
-              setRooms((prev) => prev.map((r) => r.id === room.id ? { ...r, hasUnread: false } : r));
+              setRooms((prev) => prev.map((r) => r.id === room.id ? { ...r, unreadCount: 0 } : r));
             },
             className: `p-3 rounded-lg cursor-pointer flex flex-col transition-colors ${activeRoomId === room.id ? "bg-indigo-600 text-white shadow-lg" : "hover:bg-dark-700 text-slate-300"}`,
             children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "font-bold text-sm flex items-center gap-2 relative", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-2 h-2 rounded-full bg-green-500" }),
               room.name.replace(user.username, "").replace(" & ", "").trim() || "Chat",
-              room.hasUnread && activeRoomId !== room.id && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto" })
+              room.unreadCount && room.unreadCount > 0 && activeRoomId !== room.id && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto" })
             ] })
           },
           room.id
