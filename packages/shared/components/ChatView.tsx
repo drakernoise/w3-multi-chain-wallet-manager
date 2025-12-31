@@ -14,7 +14,10 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     // Chat State
     const [rooms, setRooms] = useState<ChatRoom[]>([]);
-    const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+    const [activeRoomId, setActiveRoomId] = useState<string | null>(() => {
+        // Restore active room from localStorage
+        return localStorage.getItem('gravity_chat_active_room');
+    });
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
 
@@ -152,6 +155,15 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             return () => clearTimeout(timer);
         }
     }, [notification]);
+
+    // Persist active room
+    useEffect(() => {
+        if (activeRoomId) {
+            localStorage.setItem('gravity_chat_active_room', activeRoomId);
+        } else {
+            localStorage.removeItem('gravity_chat_active_room');
+        }
+    }, [activeRoomId]);
 
     // Push Notifications Logic
     const [pushGranted, setPushGranted] = useState(false);

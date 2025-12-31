@@ -12002,7 +12002,9 @@ const ChatView = ({ onClose }) => {
   const [socketStatus, setSocketStatus] = reactExports.useState("disconnected");
   const [lastError, setLastError] = reactExports.useState(null);
   const [rooms, setRooms] = reactExports.useState([]);
-  const [activeRoomId, setActiveRoomId] = reactExports.useState(null);
+  const [activeRoomId, setActiveRoomId] = reactExports.useState(() => {
+    return localStorage.getItem("gravity_chat_active_room");
+  });
   const [messages, setMessages] = reactExports.useState([]);
   const [inputText, setInputText] = reactExports.useState("");
   const [searchQuery, setSearchQuery] = reactExports.useState("");
@@ -12112,6 +12114,13 @@ const ChatView = ({ onClose }) => {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+  reactExports.useEffect(() => {
+    if (activeRoomId) {
+      localStorage.setItem("gravity_chat_active_room", activeRoomId);
+    } else {
+      localStorage.removeItem("gravity_chat_active_room");
+    }
+  }, [activeRoomId]);
   const [pushGranted, setPushGranted] = reactExports.useState(false);
   const handleEnablePush = async () => {
     try {
