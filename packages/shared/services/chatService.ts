@@ -630,6 +630,13 @@ class ChatService {
     }
 
     private async handleNewMessage(roomId: string, message: ChatMessage) {
+        console.log('[ChatService] New message received:', {
+            roomId,
+            messageId: message.id,
+            isEncrypted: message.isEncrypted,
+            content: message.content?.substring(0, 50) + '...'
+        });
+
         const processedMsg = await this.processIncomingMessage(roomId, message);
 
         const room = this.rooms.find(r => r.id === roomId);
