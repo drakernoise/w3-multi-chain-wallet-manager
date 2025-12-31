@@ -58,6 +58,14 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         if (existing) {
             setUser(existing);
             setSocketStatus('authenticated');
+        } else {
+            // Try to restore from localStorage if service doesn't have it yet
+            const storedUsername = localStorage.getItem('gravity_chat_username');
+            const storedId = localStorage.getItem('gravity_chat_id');
+            if (storedUsername && storedId) {
+                setUser({ id: storedId, username: storedUsername });
+                setSocketStatus('authenticated');
+            }
         }
 
         chatService.onAuthSuccess = (u) => {
@@ -313,11 +321,13 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         }
     };
 
-    const startDM = (targetId: string) => {
-        chatService.createDM(targetId);
-        setSearchQuery('');
+    const startDM = (targetUserId: string) => {
+        chatService.createDM(targetUserId);
         setSearchResults([]);
+        setSearchQuery('');
+        setNotification({ msg: 'Creating DM...', type: 'info' });
     };
+
 
     // --- Render: Loading & Error States ---
     if (!user && (socketStatus === 'connecting' || socketStatus === 'disconnected')) {

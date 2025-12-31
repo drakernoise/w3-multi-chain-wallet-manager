@@ -12035,6 +12035,13 @@ const ChatView = ({ onClose }) => {
     if (existing) {
       setUser(existing);
       setSocketStatus("authenticated");
+    } else {
+      const storedUsername = localStorage.getItem("gravity_chat_username");
+      const storedId = localStorage.getItem("gravity_chat_id");
+      if (storedUsername && storedId) {
+        setUser({ id: storedId, username: storedUsername });
+        setSocketStatus("authenticated");
+      }
     }
     chatService.onAuthSuccess = (u) => {
       setUser(u);
@@ -12247,10 +12254,11 @@ const ChatView = ({ onClose }) => {
       setSearchResults([]);
     }
   };
-  const startDM = (targetId) => {
-    chatService.createDM(targetId);
-    setSearchQuery("");
+  const startDM = (targetUserId) => {
+    chatService.createDM(targetUserId);
     setSearchResults([]);
+    setSearchQuery("");
+    setNotification({ msg: "Creating DM...", type: "info" });
   };
   if (!user && (socketStatus === "connecting" || socketStatus === "disconnected")) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6 text-center", children: [
