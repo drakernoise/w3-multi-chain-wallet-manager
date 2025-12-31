@@ -56,6 +56,13 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         chatService.init(); // CRITICAL: Start connection
         setSocketStatus(chatService.getCurrentUser() ? 'authenticated' : 'connecting');
 
+        // Restore rooms from service if they exist
+        const existingRooms = chatService.getRooms();
+        if (existingRooms.length > 0) {
+            console.log('[ChatView] Restoring', existingRooms.length, 'rooms from service');
+            setRooms(existingRooms);
+        }
+
         // Check if already logged in
         const existing = chatService.getCurrentUser();
         if (existing) {

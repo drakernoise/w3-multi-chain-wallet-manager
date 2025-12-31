@@ -472,6 +472,10 @@ class ChatService {
         return null;
     }
 
+    public getRooms(): ChatRoom[] {
+        return [...this.rooms]; // Return a copy
+    }
+
     public async register(username: string) {
         if (!this.socket) await this.init();
 

@@ -11798,6 +11798,9 @@ class ChatService {
     if (this.userId && this.username) return { id: this.userId, username: this.username };
     return null;
   }
+  getRooms() {
+    return [...this.rooms];
+  }
   async register(username) {
     if (!this.socket) await this.init();
     const storedUser = this.getStoredUsername();
@@ -12034,6 +12037,11 @@ const ChatView = ({ onClose }) => {
     }
     chatService.init();
     setSocketStatus(chatService.getCurrentUser() ? "authenticated" : "connecting");
+    const existingRooms = chatService.getRooms();
+    if (existingRooms.length > 0) {
+      console.log("[ChatView] Restoring", existingRooms.length, "rooms from service");
+      setRooms(existingRooms);
+    }
     const existing = chatService.getCurrentUser();
     if (existing) {
       setUser(existing);
