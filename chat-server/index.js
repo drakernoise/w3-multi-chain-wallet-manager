@@ -654,7 +654,7 @@ io.on('connection', (socket) => {
     socket.on('send_message', (data) => {
         if (!socket.user) return;
 
-        let { roomId, content, timestamp, signature } = data;
+        let { roomId, content, contentForSender, timestamp, signature } = data;
 
         // --- SECURITY: Input Validation ---
         if (!roomId || typeof content !== 'string' || content.trim().length === 0) return;
@@ -710,11 +710,16 @@ io.on('connection', (socket) => {
             .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 
+        const sanitizedContentForSender = contentForSender ? contentForSender
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#039;") : null;
+
         const msg = {
             id: uuidv4(),
             senderId: socket.user.id,
             senderName: socket.user.username,
             content: sanitizedContent,
+            contentForSender: sanitizedContentForSender, // Store sender's encrypted version
             timestamp: new Date().toISOString(),
             isVerified: true, // Mark as cryptographically verified
             isEncrypted: room.type === 'dm' // Mark DM messages as encrypted
@@ -723,7 +728,25 @@ io.on('connection', (socket) => {
         room.messages.push(msg);
         if (room.messages.length > 200) room.messages.shift();
         saveData();
-        io.to(roomId).emit('new_message', { roomId, message: msg });
+
+        // Send correct version to each user
+        if (room.type === 'dm' && contentForSender) {
+            // For DMs with dual encryption, send personalized versions
+            room.members.forEach(memberId => {
+                const memberSocket = Object.keys(connectedSockets).find(sid => connectedSockets[sid] === memberId);
+                if (memberSocket) {
+                    const personalizedMsg = {
+                        ...msg,
+                        content: memberId === socket.user.id ? sanitizedContentForSender : sanitizedContent
+                    };
+                    delete personalizedMsg.contentForSender; // Don't send both versions to client
+                    io.to(memberSocket).emit('new_message', { roomId, message: personalizedMsg });
+                }
+            });
+        } else {
+            // For public rooms or old-style DMs, broadcast normally
+            io.to(roomId).emit('new_message', { roomId, message: msg });
+        }
 
         // --- WEB PUSH NOTIFICATION ---
         // Notify offline (or online) users via Push API

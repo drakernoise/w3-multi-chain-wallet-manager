@@ -574,25 +574,23 @@ class ChatService {
             const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
             const encryptedForMe = await encryptMessage(content, mySharedKey);
 
-            // 5. Store encrypted copy locally for display
-            const room = this.rooms.find(r => r.id === roomId);
-            if (room) {
-                const localMsg = {
-                    id: 'temp-' + Date.now(), // Temporary ID until server confirms
-                    senderId: this.userId!,
-                    senderName: this.username!,
-                    content: encryptedForMe, // Store ENCRYPTED with my own key
-                    timestamp: new Date().toISOString(),
-                    isVerified: true,
-                    isEncrypted: true,
-                    _localOnly: true // Mark as local-only until server confirms
-                };
-                room.messages.push(localMsg as any);
-                if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
-            }
+            // 5. Send message with BOTH encrypted versions
+            // The server will store both so each user can decrypt their copy
+            const privateKeyHex = localStorage.getItem('gravity_chat_priv');
+            if (!privateKeyHex) throw new Error("Signing key missing");
 
-            // 6. Send encrypted message to server
-            await this.sendMessage(roomId, encryptedForRecipient, true);
+            const timestamp = new Date().toISOString();
+            const messageToSign = encryptedForRecipient + timestamp;
+            const signature = await this.signChallenge(messageToSign, privateKeyHex);
+
+            this.socket?.emit('send_message', {
+                roomId,
+                content: encryptedForRecipient,
+                contentForSender: encryptedForMe, // NEW: encrypted version for sender
+                timestamp,
+                signature,
+                isEncrypted: true
+            });
 
         } catch (e) {
             console.error("E2EE Failed:", e);

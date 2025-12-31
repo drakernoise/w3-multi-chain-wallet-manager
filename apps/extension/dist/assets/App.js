@@ -11873,25 +11873,20 @@ class ChatService {
       const encryptedForRecipient = await encryptMessage(content, recipientSharedKey);
       const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
       const encryptedForMe = await encryptMessage(content, mySharedKey);
-      const room = this.rooms.find((r) => r.id === roomId);
-      if (room) {
-        const localMsg = {
-          id: "temp-" + Date.now(),
-          // Temporary ID until server confirms
-          senderId: this.userId,
-          senderName: this.username,
-          content: encryptedForMe,
-          // Store ENCRYPTED with my own key
-          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-          isVerified: true,
-          isEncrypted: true,
-          _localOnly: true
-          // Mark as local-only until server confirms
-        };
-        room.messages.push(localMsg);
-        if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
-      }
-      await this.sendMessage(roomId, encryptedForRecipient, true);
+      const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+      if (!privateKeyHex) throw new Error("Signing key missing");
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = encryptedForRecipient + timestamp;
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      this.socket?.emit("send_message", {
+        roomId,
+        content: encryptedForRecipient,
+        contentForSender: encryptedForMe,
+        // NEW: encrypted version for sender
+        timestamp,
+        signature,
+        isEncrypted: true
+      });
     } catch (e) {
       console.error("E2EE Failed:", e);
       if (this.onError) this.onError("Encryption failed: " + e.message);
