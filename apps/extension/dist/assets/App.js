@@ -11868,6 +11868,24 @@ class ChatService {
       const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, "public");
       const sharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
       const encryptedContent = await encryptMessage(content, sharedKey);
+      const room = this.rooms.find((r) => r.id === roomId);
+      if (room) {
+        const localMsg = {
+          id: "temp-" + Date.now(),
+          // Temporary ID until server confirms
+          senderId: this.userId,
+          senderName: this.username,
+          content,
+          // Store UNENCRYPTED for local display
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          isVerified: true,
+          isEncrypted: true,
+          _localOnly: true
+          // Mark as local-only until server confirms
+        };
+        room.messages.push(localMsg);
+        if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+      }
       await this.sendMessage(roomId, encryptedContent, true);
     } catch (e) {
       console.error("E2EE Failed:", e);

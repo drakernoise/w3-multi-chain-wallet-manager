@@ -568,7 +568,24 @@ class ChatService {
             // 3. Encrypt Content
             const encryptedContent = await encryptMessage(content, sharedKey);
 
-            // 4. Send as normal message but marked encrypted
+            // 4. Store unencrypted copy locally for display
+            const room = this.rooms.find(r => r.id === roomId);
+            if (room) {
+                const localMsg = {
+                    id: 'temp-' + Date.now(), // Temporary ID until server confirms
+                    senderId: this.userId!,
+                    senderName: this.username!,
+                    content: content, // Store UNENCRYPTED for local display
+                    timestamp: new Date().toISOString(),
+                    isVerified: true,
+                    isEncrypted: true,
+                    _localOnly: true // Mark as local-only until server confirms
+                };
+                room.messages.push(localMsg as any);
+                if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+            }
+
+            // 5. Send encrypted message to server
             await this.sendMessage(roomId, encryptedContent, true);
 
         } catch (e) {
