@@ -377,6 +377,7 @@ export async function decryptMessage(base64Bundle: string, sharedKey: CryptoKey)
 
     return dec.decode(decrypted);
   } catch (e) {
+    console.error('[cryptoService] Decryption failed:', e);
     return "[Encrypted Message - Cannot Decrypt]";
   }
 }

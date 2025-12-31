@@ -1103,6 +1103,7 @@ async function decryptMessage(base64Bundle, sharedKey) {
     );
     return dec.decode(decrypted);
   } catch (e) {
+    console.error("[cryptoService] Decryption failed:", e);
     return "[Encrypted Message - Cannot Decrypt]";
   }
 }
