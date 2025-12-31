@@ -27,7 +27,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [newRoomName, setNewRoomName] = useState('');
     const [isPrivateRoom, setIsPrivateRoom] = useState(false);
     const [showParticipants, setShowParticipants] = useState(false);
-    const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
+    const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' | 'info' | 'warning', roomId?: string } | null>(null);
     const [chatModal, setChatModal] = useState<{ type: 'invite' | 'confirm_delete' | 'confirm_kick' | 'confirm_ban' | 'confirm_delete_message', data?: any } | null>(null);
     const [modalInput, setModalInput] = useState('');
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -91,14 +91,20 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             if (room.type === 'dm' || room.type === 'private') {
                 setNotification({
                     msg: t('chat.invited_to', { room: room.name }),
-                    type: 'success'
+                    type: 'success',
+                    roomId: room.id
                 });
-                setTimeout(() => setNotification(null), 5000);
             }
         };
 
         chatService.onRoomUpdated = (updatedRooms) => {
             setRooms(updatedRooms);
+
+            // If active room was removed, go back to room list
+            if (activeRoomId && !updatedRooms.find(r => r.id === activeRoomId)) {
+                setActiveRoomId(null);
+                setNotification({ msg: 'Room was closed by owner', type: 'warning' });
+            }
         };
 
         chatService.onError = (err) => {
@@ -139,10 +145,10 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         };
     }, [activeRoomId, rooms]);
 
-    // Notification Timer
+    // Notification Timer - longer duration
     useEffect(() => {
         if (notification) {
-            const timer = setTimeout(() => setNotification(null), 4000);
+            const timer = setTimeout(() => setNotification(null), 8000);
             return () => clearTimeout(timer);
         }
     }, [notification]);
@@ -881,9 +887,17 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             {/* In-App Notifications */}
             {notification && (
                 <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[200] max-w-[90%] w-auto animate-slideUp">
-                    <div className={`px-4 py-3 rounded-xl border shadow-2xl flex items-center gap-3 ${notification.type === 'error' ? 'bg-red-900/90 border-red-500 text-red-100' : notification.type === 'success' ? 'bg-green-900/90 border-green-500 text-green-100' : notification.type === 'warning' ? 'bg-orange-900/90 border-orange-500 text-orange-100' : 'bg-blue-900/90 border-blue-500 text-blue-100'}`}>
+                    <div
+                        onClick={() => {
+                            if (notification.roomId) {
+                                setActiveRoomId(notification.roomId);
+                                setNotification(null);
+                            }
+                        }}
+                        className={`px-4 py-3 rounded-xl border shadow-2xl flex items-center gap-3 ${notification.roomId ? 'cursor-pointer hover:scale-105' : ''} transition-transform ${notification.type === 'error' ? 'bg-red-900/90 border-red-500 text-red-100' : notification.type === 'success' ? 'bg-green-900/90 border-green-500 text-green-100' : notification.type === 'warning' ? 'bg-orange-900/90 border-orange-500 text-orange-100' : 'bg-blue-900/90 border-blue-500 text-blue-100'}`}
+                    >
                         <span className="text-sm font-medium">{notification.msg}</span>
-                        <button onClick={() => setNotification(null)} className="ml-2 hover:opacity-70 transition-opacity">X</button>
+                        <button onClick={(e) => { e.stopPropagation(); setNotification(null); }} className="ml-2 hover:opacity-70 transition-opacity">X</button>
                     </div>
                 </div>
             )}

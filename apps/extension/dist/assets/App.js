@@ -12063,13 +12063,17 @@ const ChatView = ({ onClose }) => {
       if (room.type === "dm" || room.type === "private") {
         setNotification({
           msg: t("chat.invited_to", { room: room.name }),
-          type: "success"
+          type: "success",
+          roomId: room.id
         });
-        setTimeout(() => setNotification(null), 5e3);
       }
     };
     chatService.onRoomUpdated = (updatedRooms) => {
       setRooms(updatedRooms);
+      if (activeRoomId && !updatedRooms.find((r) => r.id === activeRoomId)) {
+        setActiveRoomId(null);
+        setNotification({ msg: "Room was closed by owner", type: "warning" });
+      }
     };
     chatService.onError = (err) => {
       setNotification({ msg: err, type: "error" });
@@ -12104,7 +12108,7 @@ const ChatView = ({ onClose }) => {
   }, [activeRoomId, rooms]);
   reactExports.useEffect(() => {
     if (notification) {
-      const timer = setTimeout(() => setNotification(null), 4e3);
+      const timer = setTimeout(() => setNotification(null), 8e3);
       return () => clearTimeout(timer);
     }
   }, [notification]);
@@ -12713,10 +12717,25 @@ const ChatView = ({ onClose }) => {
         ] })
       ] })
     ] }),
-    notification && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed bottom-20 left-1/2 -translate-x-1/2 z-[200] max-w-[90%] w-auto animate-slideUp", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `px-4 py-3 rounded-xl border shadow-2xl flex items-center gap-3 ${notification.type === "error" ? "bg-red-900/90 border-red-500 text-red-100" : notification.type === "success" ? "bg-green-900/90 border-green-500 text-green-100" : notification.type === "warning" ? "bg-orange-900/90 border-orange-500 text-orange-100" : "bg-blue-900/90 border-blue-500 text-blue-100"}`, children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-medium", children: notification.msg }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setNotification(null), className: "ml-2 hover:opacity-70 transition-opacity", children: "X" })
-    ] }) })
+    notification && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed bottom-20 left-1/2 -translate-x-1/2 z-[200] max-w-[90%] w-auto animate-slideUp", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        onClick: () => {
+          if (notification.roomId) {
+            setActiveRoomId(notification.roomId);
+            setNotification(null);
+          }
+        },
+        className: `px-4 py-3 rounded-xl border shadow-2xl flex items-center gap-3 ${notification.roomId ? "cursor-pointer hover:scale-105" : ""} transition-transform ${notification.type === "error" ? "bg-red-900/90 border-red-500 text-red-100" : notification.type === "success" ? "bg-green-900/90 border-green-500 text-green-100" : notification.type === "warning" ? "bg-orange-900/90 border-orange-500 text-orange-100" : "bg-blue-900/90 border-blue-500 text-blue-100"}`,
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-medium", children: notification.msg }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: (e) => {
+            e.stopPropagation();
+            setNotification(null);
+          }, className: "ml-2 hover:opacity-70 transition-opacity", children: "X" })
+        ]
+      }
+    ) })
   ] });
 };
 
