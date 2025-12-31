@@ -12583,7 +12583,7 @@ const ChatView = ({ onClose }) => {
                       children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) })
                     }
                   ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-3 py-1.5 rounded-xl text-sm leading-relaxed ${isMe ? "bg-purple-600 text-white rounded-tr-sm" : "bg-dark-700 text-slate-200 rounded-tl-sm"}`, children: editingMessageId === msg.id ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-2 min-w-[180px]", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-3 py-1.5 rounded-xl text-sm leading-relaxed break-all ${isMe ? "bg-purple-600 text-white rounded-tr-sm" : "bg-dark-700 text-slate-200 rounded-tl-sm"}`, children: editingMessageId === msg.id ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-2 min-w-[180px]", children: [
                     /* @__PURE__ */ jsxRuntimeExports.jsx(
                       "textarea",
                       {
@@ -12715,7 +12715,7 @@ const ChatView = ({ onClose }) => {
             rooms.find((r) => r.id === activeRoomId)?.owner === member.id && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400 flex-shrink-0", children: "Owner" })
           ] }) }),
           member.id !== user?.id && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1 mt-1", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
+            rooms.find((r) => r.id === activeRoomId)?.type !== "dm" && /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
               {
                 onClick: () => {

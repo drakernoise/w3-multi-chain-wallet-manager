@@ -704,7 +704,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                                         </button>
                                                     )}
 
-                                                    <div className={`px-3 py-1.5 rounded-xl text-sm leading-relaxed ${isMe ? 'bg-purple-600 text-white rounded-tr-sm' : 'bg-dark-700 text-slate-200 rounded-tl-sm'}`}>
+                                                    <div className={`px-3 py-1.5 rounded-xl text-sm leading-relaxed break-all ${isMe ? 'bg-purple-600 text-white rounded-tr-sm' : 'bg-dark-700 text-slate-200 rounded-tl-sm'}`}>
                                                         {editingMessageId === msg.id ? (
                                                             <div className="flex flex-col gap-2 min-w-[180px]">
                                                                 <textarea
@@ -870,16 +870,18 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     {/* Action buttons */}
                                     {member.id !== user?.id && (
                                         <div className="flex gap-1 mt-1">
-                                            {/* DM button for everyone */}
-                                            <button
-                                                onClick={() => {
-                                                    startDM(member.id);
-                                                    setShowParticipants(false);
-                                                }}
-                                                className="flex-1 text-[9px] bg-blue-900/40 border border-blue-600 hover:bg-blue-800 px-1.5 py-1 rounded text-blue-200 hover:text-white transition-colors font-bold"
-                                            >
-                                                DM
-                                            </button>
+                                            {/* DM button for everyone except in DM rooms */}
+                                            {rooms.find(r => r.id === activeRoomId)?.type !== 'dm' && (
+                                                <button
+                                                    onClick={() => {
+                                                        startDM(member.id);
+                                                        setShowParticipants(false);
+                                                    }}
+                                                    className="flex-1 text-[9px] bg-blue-900/40 border border-blue-600 hover:bg-blue-800 px-1.5 py-1 rounded text-blue-200 hover:text-white transition-colors font-bold"
+                                                >
+                                                    DM
+                                                </button>
+                                            )}
 
                                             {/* Owner-only actions */}
                                             {rooms.find(r => r.id === activeRoomId)?.owner === user?.id && (
