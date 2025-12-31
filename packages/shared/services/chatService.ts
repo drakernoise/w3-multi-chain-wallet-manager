@@ -663,7 +663,17 @@ class ChatService {
     }
 
     private async processIncomingMessage(roomId: string, message: ChatMessage): Promise<ChatMessage> {
-        if (!message.isEncrypted) return message;
+        // Auto-detect encryption if not explicitly marked
+        // Encrypted messages are base64 strings that look like: "ABC123...=="
+        const looksEncrypted = message.content &&
+            message.content.length > 20 &&
+            /^[A-Za-z0-9+/]+=*$/.test(message.content) &&
+            !message.content.includes(' ');
+
+        const room = this.rooms.find(r => r.id === roomId);
+        const isEncrypted = message.isEncrypted || (looksEncrypted && room?.type === 'dm');
+
+        if (!isEncrypted) return message;
 
         try {
             // Find sender's public key

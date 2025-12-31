@@ -11959,18 +11959,21 @@ class ChatService {
     }
   }
   async processIncomingMessage(roomId, message) {
-    if (!message.isEncrypted) return message;
+    const looksEncrypted = message.content && message.content.length > 20 && /^[A-Za-z0-9+/]+=*$/.test(message.content) && !message.content.includes(" ");
+    const room = this.rooms.find((r) => r.id === roomId);
+    const isEncrypted = message.isEncrypted || looksEncrypted && room?.type === "dm";
+    if (!isEncrypted) return message;
     try {
-      const room = this.rooms.find((r) => r.id === roomId);
-      const sender = room?.memberDetails?.find((u) => u.id === message.senderId);
+      const room2 = this.rooms.find((r) => r.id === roomId);
+      const sender = room2?.memberDetails?.find((u) => u.id === message.senderId);
       console.log("[ChatService] Decrypting message:", {
         roomId,
-        roomType: room?.type,
+        roomType: room2?.type,
         senderId: message.senderId,
         myId: this.userId,
         hasSender: !!sender,
         hasEncryptionKey: !!sender?.encryptionPublicKey,
-        memberDetails: room?.memberDetails?.map((m) => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
+        memberDetails: room2?.memberDetails?.map((m) => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
       });
       if (!sender?.encryptionPublicKey) {
         if (message.senderId === this.userId) {
