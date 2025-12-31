@@ -11587,10 +11587,11 @@ class ChatService {
     this.socket.on("room_history", async (data) => {
       const room = this.rooms.find((r) => r.id === data.roomId);
       if (room) {
+        const hadMembers = room.memberDetails && room.memberDetails.length > 0;
         room.memberDetails = data.memberDetails;
         const hadMessages = room.messages.length > 0;
         room.messages = await Promise.all(data.messages.map((m) => this.processIncomingMessage(data.roomId, m)));
-        if (!hadMessages && data.messages.length > 0) {
+        if (!hadMessages && data.messages.length > 0 || !hadMembers && data.memberDetails && data.memberDetails.length > 0) {
           this.notifyRoomUpdate();
         }
       }
@@ -12072,9 +12073,13 @@ const ChatView = ({ onClose }) => {
     };
     chatService.onRoomUpdated = (updatedRooms) => {
       setRooms(updatedRooms);
-      if (activeRoomId && !updatedRooms.find((r) => r.id === activeRoomId)) {
-        setActiveRoomId(null);
-        setNotification({ msg: "Room was closed by owner", type: "warning" });
+      if (activeRoomId) {
+        const roomExists = updatedRooms.find((r) => r.id === activeRoomId);
+        if (!roomExists) {
+          console.log("[ChatView] Active room no longer exists, clearing:", activeRoomId);
+          setActiveRoomId(null);
+          localStorage.removeItem("gravity_chat_active_room");
+        }
       }
     };
     chatService.onError = (err) => {

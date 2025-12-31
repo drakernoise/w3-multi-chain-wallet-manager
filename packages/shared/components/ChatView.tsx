@@ -103,10 +103,14 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         chatService.onRoomUpdated = (updatedRooms) => {
             setRooms(updatedRooms);
 
-            // If active room was removed, go back to room list
-            if (activeRoomId && !updatedRooms.find(r => r.id === activeRoomId)) {
-                setActiveRoomId(null);
-                setNotification({ msg: 'Room was closed by owner', type: 'warning' });
+            // Validate that active room still exists
+            if (activeRoomId) {
+                const roomExists = updatedRooms.find(r => r.id === activeRoomId);
+                if (!roomExists) {
+                    console.log('[ChatView] Active room no longer exists, clearing:', activeRoomId);
+                    setActiveRoomId(null);
+                    localStorage.removeItem('gravity_chat_active_room');
+                }
             }
         };
 

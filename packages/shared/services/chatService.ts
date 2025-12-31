@@ -205,6 +205,7 @@ class ChatService {
             const room = this.rooms.find(r => r.id === data.roomId);
             if (room) {
                 // Update members first to ensure keys are available for decryption
+                const hadMembers = room.memberDetails && room.memberDetails.length > 0;
                 room.memberDetails = data.memberDetails;
 
                 const hadMessages = room.messages.length > 0;
@@ -212,9 +213,8 @@ class ChatService {
                 // Process/Decrypt messages
                 room.messages = await Promise.all(data.messages.map(m => this.processIncomingMessage(data.roomId, m)));
 
-                // Only trigger update if this is the first time we're loading messages
-                // to avoid infinite loops from repeated room_history events
-                if (!hadMessages && data.messages.length > 0) {
+                // Trigger update if this is the first time loading messages OR if members changed
+                if ((!hadMessages && data.messages.length > 0) || (!hadMembers && data.memberDetails && data.memberDetails.length > 0)) {
                     this.notifyRoomUpdate();
                 }
             }
