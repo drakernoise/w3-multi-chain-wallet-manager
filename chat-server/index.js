@@ -14,7 +14,7 @@ const webpush = require('web-push');
 const publicVapidKey = 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
 const privateVapidKey = 'kqF_kPNPKYnCdseLHAzy30ZY_6Qhqcnu_lYFPSt_-8w';
 
-webpush.setVapidDetails('mailto:admin@gravity.wallet', publicVapidKey, privateVapidKey);
+webpush.setVapidDetails('mailto:drakernoise2013@gmail.com', publicVapidKey, privateVapidKey);
 
 const STORAGE_DIR = process.env.DB_PATH || __dirname;
 const DB_PATH = path.join(STORAGE_DIR, 'chat_db.json');
@@ -716,7 +716,8 @@ io.on('connection', (socket) => {
             senderName: socket.user.username,
             content: sanitizedContent,
             timestamp: new Date().toISOString(),
-            isVerified: true // Mark as cryptographically verified
+            isVerified: true, // Mark as cryptographically verified
+            isEncrypted: room.type === 'dm' // Mark DM messages as encrypted
         };
 
         room.messages.push(msg);
