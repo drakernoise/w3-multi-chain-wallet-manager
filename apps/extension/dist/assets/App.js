@@ -11863,11 +11863,15 @@ class ChatService {
   async sendDirectMessage(roomId, content, recipientPublicKeyBase64) {
     try {
       const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
-      if (!myPrivBase64) throw new Error("Encryption keys missing");
+      const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
+      if (!myPrivBase64 || !myPubBase64) throw new Error("Encryption keys missing");
       const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
+      const myPubKey = await importKeyFromBase64(myPubBase64, "public");
       const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, "public");
-      const sharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
-      const encryptedContent = await encryptMessage(content, sharedKey);
+      const recipientSharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
+      const encryptedForRecipient = await encryptMessage(content, recipientSharedKey);
+      const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
+      const encryptedForMe = await encryptMessage(content, mySharedKey);
       const room = this.rooms.find((r) => r.id === roomId);
       if (room) {
         const localMsg = {
@@ -11875,8 +11879,8 @@ class ChatService {
           // Temporary ID until server confirms
           senderId: this.userId,
           senderName: this.username,
-          content,
-          // Store UNENCRYPTED for local display
+          content: encryptedForMe,
+          // Store ENCRYPTED with my own key
           timestamp: (/* @__PURE__ */ new Date()).toISOString(),
           isVerified: true,
           isEncrypted: true,
@@ -11886,7 +11890,7 @@ class ChatService {
         room.messages.push(localMsg);
         if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
       }
-      await this.sendMessage(roomId, encryptedContent, true);
+      await this.sendMessage(roomId, encryptedForRecipient, true);
     } catch (e) {
       console.error("E2EE Failed:", e);
       if (this.onError) this.onError("Encryption failed: " + e.message);
@@ -11983,7 +11987,22 @@ class ChatService {
     if (!isEncrypted) return message;
     try {
       if (message.senderId === this.userId) {
-        return { ...message, content: "(Encrypted Message sent by you)" };
+        const myPrivBase642 = localStorage.getItem("gravity_chat_enc_priv");
+        const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
+        if (!myPrivBase642 || !myPubBase64) {
+          return { ...message, content: "(Encrypted Message - keys missing)" };
+        }
+        try {
+          const myPrivKey2 = await importKeyFromBase64(myPrivBase642, "private");
+          const myPubKey = await importKeyFromBase64(myPubBase64, "public");
+          const mySharedKey = await deriveSharedSecret(myPrivKey2, myPubKey);
+          const decrypted2 = await decryptMessage(message.content, mySharedKey);
+          console.log("[ChatService] Successfully decrypted own message");
+          return { ...message, content: decrypted2 };
+        } catch (e) {
+          console.error("[ChatService] Failed to decrypt own message:", e);
+          return { ...message, content: "(Encrypted Message sent by you)" };
+        }
       }
       const room2 = this.rooms.find((r) => r.id === roomId);
       const sender = room2?.memberDetails?.find((u) => u.id === message.senderId);

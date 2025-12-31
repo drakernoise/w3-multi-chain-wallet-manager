@@ -557,25 +557,31 @@ class ChatService {
         try {
             // 1. Get my Private Encryption Key
             const myPrivBase64 = localStorage.getItem('gravity_chat_enc_priv');
-            if (!myPrivBase64) throw new Error("Encryption keys missing");
+            const myPubBase64 = localStorage.getItem('gravity_chat_enc_pub');
+            if (!myPrivBase64 || !myPubBase64) throw new Error("Encryption keys missing");
 
             const myPrivKey = await importKeyFromBase64(myPrivBase64, 'private');
+            const myPubKey = await importKeyFromBase64(myPubBase64, 'public');
             const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, 'public');
 
-            // 2. Derive Shared Secret (AES-GCM)
-            const sharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
+            // 2. Derive Shared Secret with recipient
+            const recipientSharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
 
-            // 3. Encrypt Content
-            const encryptedContent = await encryptMessage(content, sharedKey);
+            // 3. Encrypt Content for recipient
+            const encryptedForRecipient = await encryptMessage(content, recipientSharedKey);
 
-            // 4. Store unencrypted copy locally for display
+            // 4. Encrypt Content for myself (so I can read my own messages)
+            const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
+            const encryptedForMe = await encryptMessage(content, mySharedKey);
+
+            // 5. Store encrypted copy locally for display
             const room = this.rooms.find(r => r.id === roomId);
             if (room) {
                 const localMsg = {
                     id: 'temp-' + Date.now(), // Temporary ID until server confirms
                     senderId: this.userId!,
                     senderName: this.username!,
-                    content: content, // Store UNENCRYPTED for local display
+                    content: encryptedForMe, // Store ENCRYPTED with my own key
                     timestamp: new Date().toISOString(),
                     isVerified: true,
                     isEncrypted: true,
@@ -585,8 +591,8 @@ class ChatService {
                 if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
             }
 
-            // 5. Send encrypted message to server
-            await this.sendMessage(roomId, encryptedContent, true);
+            // 6. Send encrypted message to server
+            await this.sendMessage(roomId, encryptedForRecipient, true);
 
         } catch (e) {
             console.error("E2EE Failed:", e);
@@ -693,9 +699,27 @@ class ChatService {
         if (!isEncrypted) return message;
 
         try {
-            // If I sent this message, I can't decrypt it (encrypted for recipient)
+            // If I sent this message, decrypt it with my own keys
             if (message.senderId === this.userId) {
-                return { ...message, content: "(Encrypted Message sent by you)" };
+                const myPrivBase64 = localStorage.getItem('gravity_chat_enc_priv');
+                const myPubBase64 = localStorage.getItem('gravity_chat_enc_pub');
+
+                if (!myPrivBase64 || !myPubBase64) {
+                    return { ...message, content: "(Encrypted Message - keys missing)" };
+                }
+
+                try {
+                    const myPrivKey = await importKeyFromBase64(myPrivBase64, 'private');
+                    const myPubKey = await importKeyFromBase64(myPubBase64, 'public');
+                    const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
+                    const decrypted = await decryptMessage(message.content, mySharedKey);
+
+                    console.log('[ChatService] Successfully decrypted own message');
+                    return { ...message, content: decrypted };
+                } catch (e) {
+                    console.error('[ChatService] Failed to decrypt own message:', e);
+                    return { ...message, content: "(Encrypted Message sent by you)" };
+                }
             }
 
             // Find sender's public key
