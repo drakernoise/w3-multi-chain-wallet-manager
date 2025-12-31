@@ -88575,24 +88575,37 @@ const fetchAccountHistory = async (chain, username) => {
     return null;
   };
   try {
+    const thirtyDaysAgo = /* @__PURE__ */ new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     if (chain === Chain.HIVE) {
       const response = await fetch(node, {
         method: "POST",
-        body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_account_history", params: [username, -1, 500], id: 1 }),
+        body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_account_history", params: [username, -1, 1e3], id: 1 }),
         headers: { "Content-Type": "application/json" }
       });
       const json = await response.json();
-      if (json.result) return json.result.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
+      if (json.result) {
+        const allHistory = json.result.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
+        return allHistory.filter((item) => new Date(item.date) >= thirtyDaysAgo);
+      }
     }
     if (chain === Chain.STEEM) {
       const client = new indexBrowserExports.Client(node);
-      const history = await client.database.call("get_account_history", [username, -1, 500]);
-      return history.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
+      const history = await client.database.call("get_account_history", [username, -1, 1e3]);
+      const allHistory = history.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
+      return allHistory.filter((item) => new Date(item.date) >= thirtyDaysAgo);
     }
     if (chain === Chain.BLURT) {
-      const response = await fetch(node, { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_account_history", params: [username, -1, 500], id: 1 }), headers: { "Content-Type": "application/json" } });
+      const response = await fetch(node, {
+        method: "POST",
+        body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_account_history", params: [username, -1, 1e3], id: 1 }),
+        headers: { "Content-Type": "application/json" }
+      });
       const json = await response.json();
-      if (json.result) return json.result.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
+      if (json.result) {
+        const allHistory = json.result.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
+        return allHistory.filter((item) => new Date(item.date) >= thirtyDaysAgo);
+      }
     }
   } catch (e) {
     console.error("Fetch History Error:", e);
