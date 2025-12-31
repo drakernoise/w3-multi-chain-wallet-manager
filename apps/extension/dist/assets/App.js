@@ -11964,6 +11964,9 @@ class ChatService {
     const isEncrypted = message.isEncrypted || looksEncrypted && room?.type === "dm";
     if (!isEncrypted) return message;
     try {
+      if (message.senderId === this.userId) {
+        return { ...message, content: "(Encrypted Message sent by you)" };
+      }
       const room2 = this.rooms.find((r) => r.id === roomId);
       const sender = room2?.memberDetails?.find((u) => u.id === message.senderId);
       console.log("[ChatService] Decrypting message:", {
@@ -11976,9 +11979,6 @@ class ChatService {
         memberDetails: room2?.memberDetails?.map((m) => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
       });
       if (!sender?.encryptionPublicKey) {
-        if (message.senderId === this.userId) {
-          return { ...message, content: "(Encrypted Message sent by you)" };
-        }
         console.error("[ChatService] Missing encryption key for sender:", message.senderId);
         return { ...message, content: `Encrypted Message (Key not found for ${message.senderName})` };
       }
