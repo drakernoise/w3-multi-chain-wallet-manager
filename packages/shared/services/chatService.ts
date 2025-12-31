@@ -661,31 +661,33 @@ class ChatService {
         try {
             // Find sender's public key
             const room = this.rooms.find(r => r.id === roomId);
-            // If sender is ME, I encrypted it with MY shared key?
-            // Wait, for self-messages (sent by me), I encrypted it for the recipient.
-            // I cannot decrypt it unless I stored a copy or encrypted it for myself too.
-            // Simplified E2EE usually sends 2 copies or encrypts with room key.
-            // For now, if I sent it, I won't be able to read it back from history unless I persisted it locally unencrypted
-            // or encrypted it for myself.
-            // Let's handle RECEIVING messages first.
-
             const sender = room?.memberDetails?.find(u => u.id === message.senderId);
 
+            console.log('[ChatService] Decrypting message:', {
+                roomId,
+                roomType: room?.type,
+                senderId: message.senderId,
+                myId: this.userId,
+                hasSender: !!sender,
+                hasEncryptionKey: !!sender?.encryptionPublicKey,
+                memberDetails: room?.memberDetails?.map(m => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
+            });
+
             if (!sender?.encryptionPublicKey) {
-                // Determine if it's a DM and try to find the other user
-                if (room?.type === 'dm') {
-                    // In a DM, if I am the sender, the "sender key" I need to decrypt is... recipient's key?
-                    // No, if I encrypted it for Bob, only Bob can decrypt it. 
-                    // I cannot decrypt my own sent messages unless I encrypt for myself too.
-                    if (message.senderId === this.userId) {
-                        return { ...message, content: "(Encrypted Message sent by you)" };
-                    }
+                // If I sent this message, show placeholder
+                if (message.senderId === this.userId) {
+                    return { ...message, content: "(Encrypted Message sent by you)" };
                 }
-                return { ...message, content: "Encrypted Message (Key not found)" };
+
+                console.error('[ChatService] Missing encryption key for sender:', message.senderId);
+                return { ...message, content: `Encrypted Message (Key not found for ${message.senderName})` };
             }
 
             const myPrivBase64 = localStorage.getItem('gravity_chat_enc_priv');
-            if (!myPrivBase64) return { ...message, content: "Encrypted Message (You lack keys)" };
+            if (!myPrivBase64) {
+                console.error('[ChatService] Missing my private encryption key');
+                return { ...message, content: "Encrypted Message (You lack keys)" };
+            }
 
             const myPrivKey = await importKeyFromBase64(myPrivBase64, 'private');
             const senderPubKey = await importKeyFromBase64(sender.encryptionPublicKey, 'public');
@@ -693,10 +695,11 @@ class ChatService {
             const sharedKey = await deriveSharedSecret(myPrivKey, senderPubKey);
             const decrypted = await decryptMessage(message.content, sharedKey);
 
+            console.log('[ChatService] Successfully decrypted message');
             return { ...message, content: decrypted };
 
         } catch (e) {
-            console.error("Decryption error", e);
+            console.error("[ChatService] Decryption error:", e);
             return { ...message, content: "Decryption Failed" };
         }
     }

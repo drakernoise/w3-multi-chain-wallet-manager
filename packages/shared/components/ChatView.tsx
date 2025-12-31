@@ -865,11 +865,29 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                             {rooms.find(r => r.id === activeRoomId)?.owner === member.id && <span className="ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400 flex-shrink-0">Owner</span>}
                                         </span>
                                     </div>
-                                    {rooms.find(r => r.id === activeRoomId)?.owner === user?.id && member.id !== user?.id && (
+
+                                    {/* Action buttons */}
+                                    {member.id !== user?.id && (
                                         <div className="flex gap-1 mt-1">
-                                            <button onClick={() => { chatService.muteUser(activeRoomId, member.id); setNotification({ msg: `User @${member.username} muted`, type: 'info' }); }} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors">Mute</button>
-                                            <button onClick={() => setChatModal({ type: 'confirm_kick', data: member })} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors">Kick</button>
-                                            <button onClick={() => setChatModal({ type: 'confirm_ban', data: member })} className="flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold">Ban</button>
+                                            {/* DM button for everyone */}
+                                            <button
+                                                onClick={() => {
+                                                    startDM(member.id);
+                                                    setShowParticipants(false);
+                                                }}
+                                                className="flex-1 text-[9px] bg-blue-900/40 border border-blue-600 hover:bg-blue-800 px-1.5 py-1 rounded text-blue-200 hover:text-white transition-colors font-bold"
+                                            >
+                                                DM
+                                            </button>
+
+                                            {/* Owner-only actions */}
+                                            {rooms.find(r => r.id === activeRoomId)?.owner === user?.id && (
+                                                <>
+                                                    <button onClick={() => { chatService.muteUser(activeRoomId, member.id); setNotification({ msg: `User @${member.username} muted`, type: 'info' }); }} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors">Mute</button>
+                                                    <button onClick={() => setChatModal({ type: 'confirm_kick', data: member })} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors">Kick</button>
+                                                    <button onClick={() => setChatModal({ type: 'confirm_ban', data: member })} className="flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold">Ban</button>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>

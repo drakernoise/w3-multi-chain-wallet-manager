@@ -11957,23 +11957,35 @@ class ChatService {
     try {
       const room = this.rooms.find((r) => r.id === roomId);
       const sender = room?.memberDetails?.find((u) => u.id === message.senderId);
+      console.log("[ChatService] Decrypting message:", {
+        roomId,
+        roomType: room?.type,
+        senderId: message.senderId,
+        myId: this.userId,
+        hasSender: !!sender,
+        hasEncryptionKey: !!sender?.encryptionPublicKey,
+        memberDetails: room?.memberDetails?.map((m) => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
+      });
       if (!sender?.encryptionPublicKey) {
-        if (room?.type === "dm") {
-          if (message.senderId === this.userId) {
-            return { ...message, content: "(Encrypted Message sent by you)" };
-          }
+        if (message.senderId === this.userId) {
+          return { ...message, content: "(Encrypted Message sent by you)" };
         }
-        return { ...message, content: "Encrypted Message (Key not found)" };
+        console.error("[ChatService] Missing encryption key for sender:", message.senderId);
+        return { ...message, content: `Encrypted Message (Key not found for ${message.senderName})` };
       }
       const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
-      if (!myPrivBase64) return { ...message, content: "Encrypted Message (You lack keys)" };
+      if (!myPrivBase64) {
+        console.error("[ChatService] Missing my private encryption key");
+        return { ...message, content: "Encrypted Message (You lack keys)" };
+      }
       const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
       const senderPubKey = await importKeyFromBase64(sender.encryptionPublicKey, "public");
       const sharedKey = await deriveSharedSecret(myPrivKey, senderPubKey);
       const decrypted = await decryptMessage(message.content, sharedKey);
+      console.log("[ChatService] Successfully decrypted message");
       return { ...message, content: decrypted };
     } catch (e) {
-      console.error("Decryption error", e);
+      console.error("[ChatService] Decryption error:", e);
       return { ...message, content: "Decryption Failed" };
     }
   }
@@ -12701,13 +12713,26 @@ const ChatView = ({ onClose }) => {
             ] }),
             rooms.find((r) => r.id === activeRoomId)?.owner === member.id && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-1 text-[8px] bg-orange-900/30 border border-orange-500/30 px-1 rounded text-orange-400 flex-shrink-0", children: "Owner" })
           ] }) }),
-          rooms.find((r) => r.id === activeRoomId)?.owner === user?.id && member.id !== user?.id && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1 mt-1", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
-              chatService.muteUser(activeRoomId, member.id);
-              setNotification({ msg: `User @${member.username} muted`, type: "info" });
-            }, className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors", children: "Mute" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_kick", data: member }), className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors", children: "Kick" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_ban", data: member }), className: "flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold", children: "Ban" })
+          member.id !== user?.id && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1 mt-1", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => {
+                  startDM(member.id);
+                  setShowParticipants(false);
+                },
+                className: "flex-1 text-[9px] bg-blue-900/40 border border-blue-600 hover:bg-blue-800 px-1.5 py-1 rounded text-blue-200 hover:text-white transition-colors font-bold",
+                children: "DM"
+              }
+            ),
+            rooms.find((r) => r.id === activeRoomId)?.owner === user?.id && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
+                chatService.muteUser(activeRoomId, member.id);
+                setNotification({ msg: `User @${member.username} muted`, type: "info" });
+              }, className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors", children: "Mute" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_kick", data: member }), className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors", children: "Kick" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_ban", data: member }), className: "flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold", children: "Ban" })
+            ] })
           ] })
         ] }, member.id));
       })() })
