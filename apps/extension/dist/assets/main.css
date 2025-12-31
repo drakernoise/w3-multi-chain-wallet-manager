@@ -1984,6 +1984,9 @@ video {
 .pr-4 {
   padding-right: 1rem;
 }
+.pr-64 {
+  padding-right: 16rem;
+}
 .pr-8 {
   padding-right: 2rem;
 }

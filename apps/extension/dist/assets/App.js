@@ -12096,9 +12096,10 @@ const ChatView = ({ onClose }) => {
       if (activeRoomId) {
         const roomExists = updatedRooms.find((r) => r.id === activeRoomId);
         if (!roomExists) {
-          console.log("[ChatView] Active room no longer exists, clearing:", activeRoomId);
+          console.log("[ChatView] Active room no longer exists, returning to room list:", activeRoomId);
           setActiveRoomId(null);
           localStorage.removeItem("gravity_chat_active_room");
+          setNotification({ msg: "Room was closed", type: "warning" });
         }
       }
     };
@@ -12129,7 +12130,7 @@ const ChatView = ({ onClose }) => {
         scrollToBottom();
       } else {
         const roomName = rooms.find((r) => r.id === roomId)?.name || "Unknown Room";
-        setNotification({ msg: `New message in ${roomName} from ${msg.senderName}`, type: "info" });
+        setNotification({ msg: `New message in ${roomName} from ${msg.senderName}`, type: "info", roomId });
       }
     };
   }, [activeRoomId, rooms]);
@@ -12478,7 +12479,7 @@ const ChatView = ({ onClose }) => {
         rooms.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 p-4 text-center italic", children: t("chat.no_rooms") })
       ] })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `flex-1 flex flex-col bg-dark-900 ${!activeRoomId ? "hidden md:flex" : "flex"}`, children: !activeRoomId ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 flex flex-col items-center justify-center text-slate-600 opacity-50", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `flex-1 flex flex-col bg-dark-900 ${!activeRoomId ? "hidden md:flex" : "flex"} ${showParticipants ? "pr-64" : ""} transition-all duration-300`, children: !activeRoomId ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 flex flex-col items-center justify-center text-slate-600 opacity-50", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-16 h-16 mb-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.5, d: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8S21 7.582 21 12z" }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Select a room to start chatting" })
     ] }) : (() => {
