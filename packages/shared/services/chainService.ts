@@ -600,9 +600,12 @@ const checkAccountExistsManual = async (chain: Chain, username: string): Promise
 
 export const broadcastPowerUp = async (chain: Chain, username: string, activeKey: string, to: string, amount: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     // Validate recipient exists
+    console.log(`[PowerUp] Validating recipient @${to} on ${chain}...`);
     const exists = await checkAccountExistsManual(chain, to);
+    console.log(`[PowerUp] Validation result for @${to}: ${exists}`);
+
     if (!exists) {
-        return { success: false, error: `Account @${to} does not exist on ${chain}` };
+        return { success: false, error: `Account @${to} does not exist on ${chain}. Please check the username.` };
     }
 
     const op: any = ['transfer_to_vesting', {

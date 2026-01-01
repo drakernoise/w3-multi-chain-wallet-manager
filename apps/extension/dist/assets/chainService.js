@@ -88519,9 +88519,11 @@ const checkAccountExistsManual = async (chain, username) => {
   }
 };
 const broadcastPowerUp = async (chain, username, activeKey, to, amount) => {
+  console.log(`[PowerUp] Validating recipient @${to} on ${chain}...`);
   const exists = await checkAccountExistsManual(chain, to);
+  console.log(`[PowerUp] Validation result for @${to}: ${exists}`);
   if (!exists) {
-    return { success: false, error: `Account @${to} does not exist on ${chain}` };
+    return { success: false, error: `Account @${to} does not exist on ${chain}. Please check the username.` };
   }
   const op = ["transfer_to_vesting", {
     from: username,
