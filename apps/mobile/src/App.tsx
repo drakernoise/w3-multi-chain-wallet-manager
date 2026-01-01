@@ -4,6 +4,9 @@ import { LanguageProvider } from '@contexts/LanguageContext'
 import { LockScreen } from '@components/LockScreen'
 import { bridgeService, SignRequest, SignResponse } from '@services/bridgeService'
 import { broadcastTransfer } from '@services/chainService'
+import { mobileProvider, SignRequest as MobileSignRequest } from './services/mobileProvider'
+import { SignRequestModal } from './components/SignRequestModal'
+import { PermissionsManager } from './components/PermissionsManager'
 import '../../packages/shared/styles/global.css'
 
 function App() {
@@ -27,6 +30,10 @@ function MobileContent() {
   const [activeRequest, setActiveRequest] = useState<SignRequest | null>(null)
   const [bridgeStatus, setBridgeStatus] = useState('disconnected')
 
+  // Mobile provider states
+  const [mobileSignRequest, setMobileSignRequest] = useState<MobileSignRequest | null>(null)
+  const [showPermissions, setShowPermissions] = useState(false)
+
   useEffect(() => {
     bridgeService.onStatusChange = (status) => setBridgeStatus(status)
     bridgeService.onSignRequest = (req) => {
@@ -35,6 +42,20 @@ function MobileContent() {
       console.log("Haptic feedback: New Sign Request")
     }
     bridgeService.init()
+
+    // Setup mobile provider listener
+    mobileProvider.onSignRequest((req) => {
+      console.log('[Mobile] Sign request received:', req)
+
+      // Check if we have permission
+      if (mobileProvider.hasPermission(req.domain, req.operation)) {
+        // Auto-approve
+        handleMobileApprove(req.id, undefined)
+      } else {
+        // Show approval modal
+        setMobileSignRequest(req)
+      }
+    })
   }, [])
 
   const handleUnlock = (accounts: any[]) => {
@@ -88,6 +109,60 @@ function MobileContent() {
     }
     await bridgeService.sendResponse(response)
     setActiveRequest(null)
+  }
+
+  // Mobile provider handlers
+  const handleMobileApprove = async (requestId: string, duration?: '1day' | '1week' | '1month') => {
+    const request = mobileSignRequest
+    if (!request) return
+
+    // Grant permission if duration specified
+    if (duration) {
+      await mobileProvider.grantPermission(request.domain, [request.operation], duration)
+    }
+
+    // Find account for the operation
+    const account = walletState.accounts[0] // TODO: Better account selection
+    if (!account || !account.activeKey) {
+      mobileProvider.rejectRequest(requestId)
+      setMobileSignRequest(null)
+      return
+    }
+
+    try {
+      // Execute the operation based on type
+      let result
+      if (request.operation === 'transfer') {
+        result = await broadcastTransfer(
+          account.chain as Chain,
+          account.name,
+          account.activeKey,
+          request.params.to,
+          request.params.amount,
+          request.params.memo || '',
+          request.params.symbol || 'HIVE'
+        )
+      }
+      // TODO: Add other operations (vote, post, etc.)
+
+      if (result?.success) {
+        // Generate signature (simplified - in real app would sign the transaction)
+        const signature = result.txId || 'signed'
+        mobileProvider.approveRequest(requestId, signature)
+      } else {
+        mobileProvider.rejectRequest(requestId)
+      }
+    } catch (e) {
+      console.error('[Mobile] Operation failed:', e)
+      mobileProvider.rejectRequest(requestId)
+    }
+
+    setMobileSignRequest(null)
+  }
+
+  const handleMobileReject = (requestId: string) => {
+    mobileProvider.rejectRequest(requestId)
+    setMobileSignRequest(null)
   }
 
   // MOCK: Simulate QR Scan
@@ -207,11 +282,32 @@ function MobileContent() {
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
           <span className="text-[8px] font-black uppercase tracking-widest">Chat</span>
         </div>
-        <div className="flex flex-col items-center gap-1.5 opacity-30">
+        <div
+          onClick={() => setShowPermissions(true)}
+          className="flex flex-col items-center gap-1.5 opacity-30 hover:opacity-100 cursor-pointer transition-opacity"
+        >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
           <span className="text-[8px] font-black uppercase tracking-widest">More</span>
         </div>
       </nav>
+
+      {/* Mobile Sign Request Modal */}
+      {mobileSignRequest && (
+        <SignRequestModal
+          request={mobileSignRequest}
+          onApprove={handleMobileApprove}
+          onReject={handleMobileReject}
+        />
+      )}
+
+      {/* Permissions Manager */}
+      {showPermissions && (
+        <PermissionsManager
+          permissions={mobileProvider.getPermissions()}
+          onRevoke={(domain) => mobileProvider.revokePermission(domain)}
+          onClose={() => setShowPermissions(false)}
+        />
+      )}
     </div>
   )
 }
