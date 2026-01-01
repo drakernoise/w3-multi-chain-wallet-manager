@@ -37,8 +37,20 @@ if (typeof window !== 'undefined' && !window.chrome) {
                 console.log('[Chrome Polyfill] sendMessage called:', message);
                 // In mobile, we don't have background scripts, so just call callback with empty response
                 if (callback) callback({});
+                // Return a resolved promise
+                return Promise.resolve({});
             },
-            lastError: undefined
+            lastError: undefined,
+            getURL: (path: string) => {
+                // In mobile, just return the path as-is
+                return path;
+            }
+        },
+        tabs: {
+            create: (options: { url: string }) => {
+                console.log('[Chrome Polyfill] tabs.create called:', options);
+                // In mobile, we can't create tabs, so just log
+            }
         }
     };
 }

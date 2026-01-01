@@ -7,8 +7,12 @@ declare global {
             };
         };
         runtime: {
-            sendMessage: (message: any, callback?: (response: any) => void) => void;
+            sendMessage: (message: any, callback?: (response: any) => void) => Promise<any>;
             lastError?: { message: string };
+            getURL: (path: string) => string;
+        };
+        tabs: {
+            create: (options: { url: string }) => void;
         };
     };
 }

@@ -8,7 +8,7 @@ import { broadcastTransfer } from '@services/chainService'
 import { mobileProvider, SignRequest as MobileSignRequest } from './services/mobileProvider'
 import { SignRequestModal } from './components/SignRequestModal'
 import { PermissionsManager } from './components/PermissionsManager'
-import '../../packages/shared/styles/global.css'
+import 'gravity-shared/styles/global.css'
 
 function App() {
   return (
