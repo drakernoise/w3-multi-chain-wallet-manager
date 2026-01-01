@@ -385,6 +385,69 @@ const formatChainError = (error: any): string => {
     return msg;
 };
 
+// Manual Blurt Broadcast to avoid library issues
+const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key: string): Promise<any> => {
+    // 1. Get Dynamic Global Properties
+    const propsResponse = await fetch(nodeUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'condenser_api.get_dynamic_global_properties',
+            params: [],
+            id: 1
+        }),
+        headers: { 'Content-Type': 'application/json' }
+    });
+    const propsJson = await propsResponse.json();
+    if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
+    const props = propsJson.result;
+
+    // 2. Prepare Transaction Data
+    const ref_block_num = props.head_block_number & 0xFFFF;
+    const ref_block_prefix = Buffer.from(props.head_block_id, 'hex').readUInt32LE(4);
+    const expiration = new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5);
+
+    const tx = {
+        ref_block_num,
+        ref_block_prefix,
+        expiration,
+        operations,
+        extensions: []
+    };
+
+    // 3. Sign (using blurtjs auth)
+    const config = getChainConfig(Chain.BLURT);
+    blurt.config.set('address_prefix', config.addressPrefix);
+    blurt.config.set('chain_id', config.chainId);
+
+    // signTransaction creates a NEW object with signatures, or modifies in place?
+    // It returns a signed transaction object.
+    const signedTx = blurt.auth.signTransaction(tx, [key]);
+
+    // 4. Broadcast Synchronous
+    const broadcastResponse = await fetch(nodeUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'condenser_api.broadcast_transaction_synchronous',
+            params: [signedTx],
+            id: 1
+        }),
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+    const broadcastResult = await broadcastResponse.json();
+    if (broadcastResult.error) {
+        // Enhance error message
+        const err = broadcastResult.error;
+        const msg = err.message || JSON.stringify(err);
+        const data = err.data ? JSON.stringify(err.data) : '';
+        throw new Error(`${msg} ${data}`);
+    }
+
+    return broadcastResult.result;
+};
+
 export const broadcastOperations = async (
     chain: Chain,
     activeKey: string,
@@ -402,25 +465,18 @@ export const broadcastOperations = async (
             const result = await client.broadcast.sendOperations(operations, key);
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
-            // FORCE reliable node for now to rule out node issues
-            const nodeUrl = 'https://rpc.beblurt.com';
-            console.log(`[ChainService] Force using node for Blurt: ${nodeUrl}`);
+            // FORCE reliable node for now
+            const forcedNodeUrl = 'https://rpc.beblurt.com';
+            console.log(`[ChainService] Force using node for Blurt: ${forcedNodeUrl}`);
 
-            const config = getChainConfig(Chain.BLURT);
-            blurt.config.set('address_prefix', config.addressPrefix);
-            blurt.config.set('chain_id', config.chainId);
-            blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
-
-            // VALIDATION & CLEANUP: Some dApps (like BeBlurt) might send malformed metadata
+            // VALIDATION & CLEANUP
             const cleanOperations = operations.map(op => {
                 const opName = op[0];
-                const opData = { ...op[1] }; // Shallow copy to avoid mutating original
+                const opData = { ...op[1] };
 
-                // 1. Handle Metadata Fields
                 const metadataFields = ['json_metadata', 'posting_json_metadata'];
                 metadataFields.forEach(field => {
                     if (opData[field] !== undefined && opData[field] !== null) {
-                        // If it's an object, stringify it
                         if (typeof opData[field] === 'object') {
                             try {
                                 opData[field] = JSON.stringify(opData[field]);
@@ -429,16 +485,12 @@ export const broadcastOperations = async (
                             }
                         }
                     } else {
-                        // Ensure it's at least an empty string if referenced by dApp but null/undefined
-                        // Actually, better to just leave it if it's not there, but some nodes prefer ""
                         if (opName === 'comment' && field === 'json_metadata') {
                             opData[field] = "";
                         }
                     }
                 });
 
-                // 2. Extra safety for 'tags' (Common issue with BeBlurt and similar dApps)
-                // If 'tags' exists as a top-level field, it MUST be moved to json_metadata
                 if (opData.tags) {
                     try {
                         let meta = {};
@@ -447,9 +499,8 @@ export const broadcastOperations = async (
                                 meta = typeof opData.json_metadata === 'string'
                                     ? JSON.parse(opData.json_metadata)
                                     : opData.json_metadata;
-                            } catch (e) { /* ignore parse error, use empty */ }
+                            } catch (e) { }
                         }
-                        // Merge tags into metadata
                         (meta as any).tags = opData.tags;
                         opData.json_metadata = JSON.stringify(meta);
                         delete opData.tags;
@@ -458,7 +509,6 @@ export const broadcastOperations = async (
                     }
                 }
 
-                // 3. Ensure extensions is an array
                 if (opData.extensions !== undefined && !Array.isArray(opData.extensions)) {
                     opData.extensions = [];
                 }
@@ -466,19 +516,7 @@ export const broadcastOperations = async (
                 return [opName, opData];
             });
 
-            const result = await new Promise<any>((resolve, reject) => {
-                blurt.broadcast.send({ extensions: [], operations: cleanOperations }, [activeKey], (err: any, res: any) => {
-                    if (err) {
-                        console.error("[ChainService] Blurt Broadcast Error:", err);
-                        console.error("[ChainService] Failed Payload:", JSON.stringify(cleanOperations));
-                        reject(err);
-                    } else {
-                        // Success log is fine but keep it brief
-                        console.log("[ChainService] Blurt Success:", res.id);
-                        resolve(res);
-                    }
-                });
-            });
+            const result = await broadcastBlurtTransaction(forcedNodeUrl, cleanOperations, activeKey);
             return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };

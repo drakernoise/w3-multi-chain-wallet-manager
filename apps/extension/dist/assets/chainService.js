@@ -88368,6 +88368,53 @@ const formatChainError = (error) => {
   }
   return msg;
 };
+const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
+  const propsResponse = await fetch(nodeUrl, {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "condenser_api.get_dynamic_global_properties",
+      params: [],
+      id: 1
+    }),
+    headers: { "Content-Type": "application/json" }
+  });
+  const propsJson = await propsResponse.json();
+  if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
+  const props = propsJson.result;
+  const ref_block_num = props.head_block_number & 65535;
+  const ref_block_prefix = Buffer.from(props.head_block_id, "hex").readUInt32LE(4);
+  const expiration = new Date(Date.now() + 60 * 1e3).toISOString().slice(0, -5);
+  const tx = {
+    ref_block_num,
+    ref_block_prefix,
+    expiration,
+    operations,
+    extensions: []
+  };
+  const config = getChainConfig(Chain.BLURT);
+  libExports.config.set("address_prefix", config.addressPrefix);
+  libExports.config.set("chain_id", config.chainId);
+  const signedTx = libExports.auth.signTransaction(tx, [key]);
+  const broadcastResponse = await fetch(nodeUrl, {
+    method: "POST",
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "condenser_api.broadcast_transaction_synchronous",
+      params: [signedTx],
+      id: 1
+    }),
+    headers: { "Content-Type": "application/json" }
+  });
+  const broadcastResult = await broadcastResponse.json();
+  if (broadcastResult.error) {
+    const err = broadcastResult.error;
+    const msg = err.message || JSON.stringify(err);
+    const data = err.data ? JSON.stringify(err.data) : "";
+    throw new Error(`${msg} ${data}`);
+  }
+  return broadcastResult.result;
+};
 const broadcastOperations = async (chain, activeKey, operations) => {
   const nodeUrl = getActiveNode(chain);
   try {
@@ -88380,12 +88427,8 @@ const broadcastOperations = async (chain, activeKey, operations) => {
       const result = await client.broadcast.sendOperations(operations, key);
       return { success: true, txId: result.id, opResult: result };
     } else if (chain === Chain.BLURT) {
-      const nodeUrl2 = "https://rpc.beblurt.com";
-      console.log(`[ChainService] Force using node for Blurt: ${nodeUrl2}`);
-      const config = getChainConfig(Chain.BLURT);
-      libExports.config.set("address_prefix", config.addressPrefix);
-      libExports.config.set("chain_id", config.chainId);
-      libExports.api.setOptions({ url: nodeUrl2, useAppbaseApi: true });
+      const forcedNodeUrl = "https://rpc.beblurt.com";
+      console.log(`[ChainService] Force using node for Blurt: ${forcedNodeUrl}`);
       const cleanOperations = operations.map((op) => {
         const opName = op[0];
         const opData = { ...op[1] };
@@ -88426,18 +88469,7 @@ const broadcastOperations = async (chain, activeKey, operations) => {
         }
         return [opName, opData];
       });
-      const result = await new Promise((resolve, reject) => {
-        libExports.broadcast.send({ extensions: [], operations: cleanOperations }, [activeKey], (err, res) => {
-          if (err) {
-            console.error("[ChainService] Blurt Broadcast Error:", err);
-            console.error("[ChainService] Failed Payload:", JSON.stringify(cleanOperations));
-            reject(err);
-          } else {
-            console.log("[ChainService] Blurt Success:", res.id);
-            resolve(res);
-          }
-        });
-      });
+      const result = await broadcastBlurtTransaction(forcedNodeUrl, cleanOperations, activeKey);
       return { success: true, txId: result.id, opResult: result };
     }
     return { success: false, error: "Chain not supported" };
