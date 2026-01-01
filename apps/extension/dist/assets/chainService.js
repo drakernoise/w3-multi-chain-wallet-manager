@@ -88506,9 +88506,15 @@ const checkAccountExistsManual = async (chain, username) => {
       headers: { "Content-Type": "application/json" }
     });
     const json = await response.json();
+    if (json.error) {
+      console.warn(`[CheckAccount] Node error for @${username}:`, json.error);
+      const msg = json.error.message || "";
+      if (msg.includes("unknown key")) return false;
+      return false;
+    }
     return json.result && json.result.length > 0;
   } catch (e) {
-    console.warn("[ChainService] Account check failed, skipping validation:", e);
+    console.warn("[ChainService] Account check network failed, skipping validation:", e);
     return true;
   }
 };
