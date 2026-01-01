@@ -440,7 +440,13 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
     if (broadcastResult.error) {
         // Enhance error message
         const err = broadcastResult.error;
-        const msg = err.message || JSON.stringify(err);
+        let msg = err.message || JSON.stringify(err);
+
+        // Translate obscure node errors to user-friendly messages
+        if (msg.includes('unknown key')) {
+            msg = "Account not found or invalid key. Please check the username.";
+        }
+
         const data = err.data ? JSON.stringify(err.data) : '';
         throw new Error(`${msg} ${data}`);
     }
@@ -465,18 +471,18 @@ export const broadcastOperations = async (
             const result = await client.broadcast.sendOperations(operations, key);
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
-            // FORCE reliable node for now
-            const forcedNodeUrl = 'https://rpc.beblurt.com';
-            console.log(`[ChainService] Force using node for Blurt: ${forcedNodeUrl}`);
+            // Using manual broadcast implementation for better reliability
 
-            // VALIDATION & CLEANUP
+            // VALIDATION & CLEANUP: Some dApps (like BeBlurt) might send malformed metadata
             const cleanOperations = operations.map(op => {
                 const opName = op[0];
-                const opData = { ...op[1] };
+                const opData = { ...op[1] }; // Shallow copy to avoid mutating original
 
+                // 1. Handle Metadata Fields
                 const metadataFields = ['json_metadata', 'posting_json_metadata'];
                 metadataFields.forEach(field => {
                     if (opData[field] !== undefined && opData[field] !== null) {
+                        // If it's an object, stringify it
                         if (typeof opData[field] === 'object') {
                             try {
                                 opData[field] = JSON.stringify(opData[field]);
@@ -485,12 +491,16 @@ export const broadcastOperations = async (
                             }
                         }
                     } else {
+                        // Ensure it's at least an empty string if referenced by dApp but null/undefined
+                        // Actually, better to just leave it if it's not there, but some nodes prefer ""
                         if (opName === 'comment' && field === 'json_metadata') {
                             opData[field] = "";
                         }
                     }
                 });
 
+                // 2. Extra safety for 'tags' (Common issue with BeBlurt and similar dApps)
+                // If 'tags' exists as a top-level field, it MUST be moved to json_metadata
                 if (opData.tags) {
                     try {
                         let meta = {};
@@ -499,8 +509,9 @@ export const broadcastOperations = async (
                                 meta = typeof opData.json_metadata === 'string'
                                     ? JSON.parse(opData.json_metadata)
                                     : opData.json_metadata;
-                            } catch (e) { }
+                            } catch (e) { /* ignore parse error, use empty */ }
                         }
+                        // Merge tags into metadata
                         (meta as any).tags = opData.tags;
                         opData.json_metadata = JSON.stringify(meta);
                         delete opData.tags;
@@ -509,6 +520,7 @@ export const broadcastOperations = async (
                     }
                 }
 
+                // 3. Ensure extensions is an array
                 if (opData.extensions !== undefined && !Array.isArray(opData.extensions)) {
                     opData.extensions = [];
                 }
@@ -516,7 +528,7 @@ export const broadcastOperations = async (
                 return [opName, opData];
             });
 
-            const result = await broadcastBlurtTransaction(forcedNodeUrl, cleanOperations, activeKey);
+            const result = await broadcastBlurtTransaction(nodeUrl, cleanOperations, activeKey);
             return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };

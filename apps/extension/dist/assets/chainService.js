@@ -88409,7 +88409,10 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
   const broadcastResult = await broadcastResponse.json();
   if (broadcastResult.error) {
     const err = broadcastResult.error;
-    const msg = err.message || JSON.stringify(err);
+    let msg = err.message || JSON.stringify(err);
+    if (msg.includes("unknown key")) {
+      msg = "Account not found or invalid key. Please check the username.";
+    }
     const data = err.data ? JSON.stringify(err.data) : "";
     throw new Error(`${msg} ${data}`);
   }
@@ -88427,8 +88430,6 @@ const broadcastOperations = async (chain, activeKey, operations) => {
       const result = await client.broadcast.sendOperations(operations, key);
       return { success: true, txId: result.id, opResult: result };
     } else if (chain === Chain.BLURT) {
-      const forcedNodeUrl = "https://rpc.beblurt.com";
-      console.log(`[ChainService] Force using node for Blurt: ${forcedNodeUrl}`);
       const cleanOperations = operations.map((op) => {
         const opName = op[0];
         const opData = { ...op[1] };
@@ -88469,7 +88470,7 @@ const broadcastOperations = async (chain, activeKey, operations) => {
         }
         return [opName, opData];
       });
-      const result = await broadcastBlurtTransaction(forcedNodeUrl, cleanOperations, activeKey);
+      const result = await broadcastBlurtTransaction(nodeUrl, cleanOperations, activeKey);
       return { success: true, txId: result.id, opResult: result };
     }
     return { success: false, error: "Chain not supported" };
