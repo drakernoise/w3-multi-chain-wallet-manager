@@ -88380,10 +88380,12 @@ const broadcastOperations = async (chain, activeKey, operations) => {
       const result = await client.broadcast.sendOperations(operations, key);
       return { success: true, txId: result.id, opResult: result };
     } else if (chain === Chain.BLURT) {
+      const nodeUrl2 = "https://rpc.beblurt.com";
+      console.log(`[ChainService] Force using node for Blurt: ${nodeUrl2}`);
       const config = getChainConfig(Chain.BLURT);
       libExports.config.set("address_prefix", config.addressPrefix);
       libExports.config.set("chain_id", config.chainId);
-      libExports.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
+      libExports.api.setOptions({ url: nodeUrl2, useAppbaseApi: true });
       const cleanOperations = operations.map((op) => {
         const opName = op[0];
         const opData = { ...op[1] };

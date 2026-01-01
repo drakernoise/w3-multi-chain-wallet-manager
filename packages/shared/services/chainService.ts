@@ -402,6 +402,10 @@ export const broadcastOperations = async (
             const result = await client.broadcast.sendOperations(operations, key);
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
+            // FORCE reliable node for now to rule out node issues
+            const nodeUrl = 'https://rpc.beblurt.com';
+            console.log(`[ChainService] Force using node for Blurt: ${nodeUrl}`);
+
             const config = getChainConfig(Chain.BLURT);
             blurt.config.set('address_prefix', config.addressPrefix);
             blurt.config.set('chain_id', config.chainId);
