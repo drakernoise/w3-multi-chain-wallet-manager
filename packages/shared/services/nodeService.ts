@@ -21,7 +21,7 @@ export const BLURT_CANDIDATES = [
     // 'https://rpc.blurt.one', // REMOVED (502 Error)
     'https://blurt-rpc.saboin.com',
     'https://rpc.blurt.world',
-    'https://kentzz.blurt.world',
+    // 'https://kentzz.blurt.world', // REMOVED (SSL Error)
 ];
 
 // Active nodes state (in-memory)
