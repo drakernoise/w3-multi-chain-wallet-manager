@@ -1,3 +1,4 @@
+import './polyfills/chrome'
 import { useState, useEffect } from 'react'
 import { Chain, WalletState } from '@types'
 import { LanguageProvider } from '@contexts/LanguageContext'
