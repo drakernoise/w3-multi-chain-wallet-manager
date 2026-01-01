@@ -561,7 +561,35 @@ export const broadcastBulkTransfer = async (
     return broadcastOperations(chain, activeKey, ops);
 };
 
+const checkAccountExistsManual = async (chain: Chain, username: string): Promise<boolean> => {
+    try {
+        const nodeUrl = getActiveNode(chain);
+        const response = await fetch(nodeUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'condenser_api.get_accounts',
+                params: [[username]],
+                id: 1
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const json = await response.json();
+        return json.result && json.result.length > 0;
+    } catch (e) {
+        // If check fails due to network, assume it exists to let broadcast try
+        console.warn("[ChainService] Account check failed, skipping validation:", e);
+        return true;
+    }
+};
+
 export const broadcastPowerUp = async (chain: Chain, username: string, activeKey: string, to: string, amount: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+    // Validate recipient exists
+    const exists = await checkAccountExistsManual(chain, to);
+    if (!exists) {
+        return { success: false, error: `Account @${to} does not exist on ${chain}` };
+    }
+
     const op: any = ['transfer_to_vesting', {
         from: username,
         to: to,

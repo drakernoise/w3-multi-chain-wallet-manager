@@ -88492,7 +88492,31 @@ const broadcastBulkTransfer = async (chain, from, activeKey, items, tokenSymbol)
   });
   return broadcastOperations(chain, activeKey, ops);
 };
+const checkAccountExistsManual = async (chain, username) => {
+  try {
+    const nodeUrl = getActiveNode(chain);
+    const response = await fetch(nodeUrl, {
+      method: "POST",
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "condenser_api.get_accounts",
+        params: [[username]],
+        id: 1
+      }),
+      headers: { "Content-Type": "application/json" }
+    });
+    const json = await response.json();
+    return json.result && json.result.length > 0;
+  } catch (e) {
+    console.warn("[ChainService] Account check failed, skipping validation:", e);
+    return true;
+  }
+};
 const broadcastPowerUp = async (chain, username, activeKey, to, amount) => {
+  const exists = await checkAccountExistsManual(chain, to);
+  if (!exists) {
+    return { success: false, error: `Account @${to} does not exist on ${chain}` };
+  }
   const op = ["transfer_to_vesting", {
     from: username,
     to,
