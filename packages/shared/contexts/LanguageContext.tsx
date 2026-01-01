@@ -47,6 +47,7 @@ const translations: Record<Language, Record<string, string>> = {
         'header.add': 'Add Account',
         'common.cancel': 'Cancel',
         'common.confirm': 'Confirm',
+        'common.confirm_operation': 'Confirm Operation',
         'common.close': 'Close',
         'common.processing': 'Processing...',
         'common.recent_recipients': 'Recent Recipients',
@@ -402,7 +403,9 @@ const translations: Record<Language, Record<string, string>> = {
         'power.success': 'Operation successful!',
         'power.stop_powerdown': 'Stop Power Down',
         'power.stop_powerdown_warning': 'This will cancel your active power down. Click Confirm to proceed.',
+        'power.stop_powerdown_confirm': 'This will stop your active power down.',
         'power.available_power': 'Available {power}',
+        'power.operation_type': 'Operation Type',
         // Savings Operations
         'savings.deposit_title': 'Deposit to Savings',
         'savings.withdraw_title': 'Withdraw from Savings',

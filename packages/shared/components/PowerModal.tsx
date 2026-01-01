@@ -391,7 +391,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                                 <div className="flex justify-between">
                                     <span className="text-slate-400">{t('power.amount') || 'Amount'}:</span>
                                     <span className="text-white font-bold">
-                                        {parseFloat(amount).toFixed(3)} {type === 'powerup' ? getTokenSymbol() : getPowerSymbol()}
+                                        {amount} {type === 'powerup' ? getTokenSymbol() : getPowerSymbol()}
                                     </span>
                                 </div>
                             )}
