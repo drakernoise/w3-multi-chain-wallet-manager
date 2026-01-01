@@ -8211,6 +8211,7 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
   const [isStoppingPowerDown, setIsStoppingPowerDown] = reactExports.useState(false);
   const [recentRecipients, setRecentRecipients] = reactExports.useState([]);
   const [showRecent, setShowRecent] = reactExports.useState(null);
+  const [showConfirmation, setShowConfirmation] = reactExports.useState(false);
   reactExports.useEffect(() => {
     document.body.style.overflow = "hidden";
     chrome.storage?.local.get(["recentRecipients"], (result) => {
@@ -8244,8 +8245,13 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
       setError(t("power.active_key_required"));
       return;
     }
+    setError("");
+    setShowConfirmation(true);
+  };
+  const executeOperation = async () => {
     setProcessing(true);
     setError("");
+    setShowConfirmation(false);
     try {
       let response;
       const tokenSymbol = getTokenSymbol();
@@ -8312,185 +8318,249 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
       ] }) })
     ] });
   };
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 rounded-2xl border border-dark-700 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto my-auto", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-6 border-b border-dark-700", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-bold text-white", children: getTitle() }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            onClick: onClose,
-            className: "text-slate-400 hover:text-white transition-colors",
-            children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
-          }
-        )
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-400 mt-2", children: getDescription() })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("form", { onSubmit: handleSubmit, className: "p-6 space-y-4", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900/50 rounded-lg p-4 border border-dark-700", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 mb-1", children: t("power.from_account") }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-white font-bold", children: [
-          "@",
-          account.name
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 rounded-2xl border border-dark-700 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto my-auto", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-6 border-b border-dark-700", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-bold text-white", children: getTitle() }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              onClick: onClose,
+              className: "text-slate-400 hover:text-white transition-colors",
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
+            }
+          )
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 mt-1", children: account.chain }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-3 pt-3 border-t border-dark-700 space-y-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-slate-400", children: t("power.available_token").replace("{token}", getTokenSymbol()) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-sm font-bold text-green-400", children: [
-              (account.balance || 0).toFixed(3),
-              " ",
-              getTokenSymbol()
-            ] })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-400 mt-2", children: getDescription() })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("form", { onSubmit: handleSubmit, className: "p-6 space-y-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900/50 rounded-lg p-4 border border-dark-700", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 mb-1", children: t("power.from_account") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-white font-bold", children: [
+            "@",
+            account.name
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-slate-400", children: t("power.available_power").replace("{power}", getPowerSymbol()) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-sm font-bold text-blue-400", children: [
-              (account.stakedBalance || 0).toFixed(3),
-              " ",
-              getPowerSymbol()
-            ] })
-          ] }),
-          account.powerDownActive && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 mt-2 border-t border-dark-700/50", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 mt-1", children: account.chain }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-3 pt-3 border-t border-dark-700 space-y-2", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-yellow-500 font-medium", children: t("power.active_powerdown") || "Active Power Down" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs font-bold text-yellow-400", children: [
-                "~",
-                (account.powerDownAmount || 0).toFixed(3),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-slate-400", children: t("power.available_token").replace("{token}", getTokenSymbol()) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-sm font-bold text-green-400", children: [
+                (account.balance || 0).toFixed(3),
                 " ",
-                getPowerSymbol(),
-                "/week"
+                getTokenSymbol()
               ] })
             ] }),
-            account.nextPowerDown && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[10px] text-slate-500 text-right mt-1", children: [
-              t("power.next_withdrawal") || "Next:",
-              " ",
-              new Date(account.nextPowerDown).toLocaleDateString()
-            ] })
-          ] }),
-          !account.powerDownActive && type === "powerdown" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 italic mt-2", children: t("power.no_active_powerdown") || "No active power downs" })
-        ] })
-      ] }),
-      type === "powerup" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-300 mb-2", children: t("power.recipient") }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            type: "text",
-            value: recipient,
-            onChange: (e) => setRecipient(e.target.value.replace("@", "")),
-            onFocus: () => setShowRecent("recipient"),
-            onBlur: () => setTimeout(() => setShowRecent(null), 200),
-            className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none",
-            placeholder: t("power.recipient_placeholder")
-          }
-        ),
-        showRecent === "recipient" && recentRecipients.length > 0 && !recipient && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase", children: t("common.recent_recipients") || "Recent Recipients" }),
-          recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              type: "button",
-              onClick: () => setRecipient(name),
-              className: "w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors",
-              children: [
-                "@",
-                name
-              ]
-            },
-            name
-          ))
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-slate-400", children: t("power.available_power").replace("{power}", getPowerSymbol()) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-sm font-bold text-blue-400", children: [
+                (account.stakedBalance || 0).toFixed(3),
+                " ",
+                getPowerSymbol()
+              ] })
+            ] }),
+            account.powerDownActive && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 mt-2 border-t border-dark-700/50", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-yellow-500 font-medium", children: t("power.active_powerdown") || "Active Power Down" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs font-bold text-yellow-400", children: [
+                  "~",
+                  (account.powerDownAmount || 0).toFixed(3),
+                  " ",
+                  getPowerSymbol(),
+                  "/week"
+                ] })
+              ] }),
+              account.nextPowerDown && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[10px] text-slate-500 text-right mt-1", children: [
+                t("power.next_withdrawal") || "Next:",
+                " ",
+                new Date(account.nextPowerDown).toLocaleDateString()
+              ] })
+            ] }),
+            !account.powerDownActive && type === "powerdown" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 italic mt-2", children: t("power.no_active_powerdown") || "No active power downs" })
+          ] })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mt-1", children: t("power.recipient_hint") })
-      ] }),
-      type === "delegate" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-300 mb-2", children: t("power.delegatee") }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            type: "text",
-            value: delegatee,
-            onChange: (e) => setDelegatee(e.target.value.replace("@", "")),
-            onFocus: () => setShowRecent("delegatee"),
-            onBlur: () => setTimeout(() => setShowRecent(null), 200),
-            className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none",
-            placeholder: t("power.delegatee_placeholder"),
-            required: true
-          }
-        ),
-        showRecent === "delegatee" && recentRecipients.length > 0 && !delegatee && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase", children: t("common.recent_recipients") || "Recent Recipients" }),
-          recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        type === "powerup" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-300 mb-2", children: t("power.recipient") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              type: "text",
+              value: recipient,
+              onChange: (e) => setRecipient(e.target.value.replace("@", "")),
+              onFocus: () => setShowRecent("recipient"),
+              onBlur: () => setTimeout(() => setShowRecent(null), 200),
+              className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none",
+              placeholder: t("power.recipient_placeholder")
+            }
+          ),
+          showRecent === "recipient" && recentRecipients.length > 0 && !recipient && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase", children: t("common.recent_recipients") || "Recent Recipients" }),
+            recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                type: "button",
+                onClick: () => setRecipient(name),
+                className: "w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors",
+                children: [
+                  "@",
+                  name
+                ]
+              },
+              name
+            ))
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mt-1", children: t("power.recipient_hint") })
+        ] }),
+        type === "delegate" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-300 mb-2", children: t("power.delegatee") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              type: "text",
+              value: delegatee,
+              onChange: (e) => setDelegatee(e.target.value.replace("@", "")),
+              onFocus: () => setShowRecent("delegatee"),
+              onBlur: () => setTimeout(() => setShowRecent(null), 200),
+              className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none",
+              placeholder: t("power.delegatee_placeholder"),
+              required: true
+            }
+          ),
+          showRecent === "delegatee" && recentRecipients.length > 0 && !delegatee && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase", children: t("common.recent_recipients") || "Recent Recipients" }),
+            recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                type: "button",
+                onClick: () => setDelegatee(name),
+                className: "w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors",
+                children: [
+                  "@",
+                  name
+                ]
+              },
+              name
+            ))
+          ] })
+        ] }),
+        !isStoppingPowerDown && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-300 mb-2", children: type === "powerup" ? t("power.amount_token").replace("{token}", getTokenSymbol()) : t("power.amount_vests").replace("{power}", getPowerSymbol()) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              type: "number",
+              step: "0.001",
+              value: amount,
+              onChange: (e) => setAmount(e.target.value),
+              className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none",
+              placeholder: "0.000",
+              required: true
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mt-1", children: type === "powerup" ? t("power.powerup_hint").replace("{token}", getTokenSymbol()).replace("{power}", getPowerSymbol()) : type === "powerdown" ? t("power.powerdown_hint").replace("{power}", getPowerSymbol()) : t("power.delegate_hint").replace("{power}", getPowerSymbol()) })
+        ] }),
+        isStoppingPowerDown && type === "powerdown" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm text-yellow-300", children: t("power.stop_powerdown_warning") })
+        ] }) }),
+        error && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm break-all max-h-32 overflow-y-auto custom-scrollbar", children: error }),
+        success && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-green-500/10 border border-green-500/50 rounded-lg p-3 text-green-400 text-sm", children: t("power.success") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3 pt-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
               type: "button",
-              onClick: () => setDelegatee(name),
-              className: "w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors",
-              children: [
-                "@",
-                name
-              ]
-            },
-            name
-          ))
+              onClick: onClose,
+              className: "flex-1 bg-dark-700 hover:bg-dark-600 text-white font-bold py-3 rounded-lg transition-colors",
+              disabled: processing,
+              children: t("common.cancel")
+            }
+          ),
+          type === "powerdown" && !isStoppingPowerDown && account.powerDownActive && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "button",
+              onClick: handleStopPowerDown,
+              className: "flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+              disabled: processing || success,
+              children: t("power.stop_powerdown")
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "submit",
+              className: "flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+              disabled: processing || success,
+              children: processing ? t("common.processing") : t("common.confirm")
+            }
+          )
         ] })
+      ] })
+    ] }),
+    showConfirmation && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-10 p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 rounded-xl border border-yellow-500/30 p-6 max-w-sm w-full", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-lg font-bold text-yellow-400 mb-4", children: t("common.confirm_operation") || "Confirm Operation" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3 mb-6 text-sm", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-400", children: [
+            t("power.operation_type") || "Type",
+            ":"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-white font-bold", children: getTitle() })
+        ] }),
+        !isStoppingPowerDown && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-400", children: [
+            t("power.amount") || "Amount",
+            ":"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+            parseFloat(amount).toFixed(3),
+            " ",
+            type === "powerup" ? getTokenSymbol() : getPowerSymbol()
+          ] })
+        ] }),
+        type === "powerup" && recipient !== account.name && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-400", children: [
+            t("power.recipient") || "Recipient",
+            ":"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+            "@",
+            recipient
+          ] })
+        ] }),
+        type === "delegate" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-400", children: [
+            t("power.delegatee") || "Delegatee",
+            ":"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+            "@",
+            delegatee
+          ] })
+        ] }),
+        isStoppingPowerDown && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-yellow-900/20 border border-yellow-500/30 p-3 rounded text-yellow-300 text-xs", children: t("power.stop_powerdown_confirm") || "This will stop your active power down." })
       ] }),
-      !isStoppingPowerDown && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-300 mb-2", children: type === "powerup" ? t("power.amount_token").replace("{token}", getTokenSymbol()) : t("power.amount_vests").replace("{power}", getPowerSymbol()) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "input",
-          {
-            type: "number",
-            step: "0.001",
-            value: amount,
-            onChange: (e) => setAmount(e.target.value),
-            className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none",
-            placeholder: "0.000",
-            required: true
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mt-1", children: type === "powerup" ? t("power.powerup_hint").replace("{token}", getTokenSymbol()).replace("{power}", getPowerSymbol()) : type === "powerdown" ? t("power.powerdown_hint").replace("{power}", getPowerSymbol()) : t("power.delegate_hint").replace("{power}", getPowerSymbol()) })
-      ] }),
-      isStoppingPowerDown && type === "powerdown" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm text-yellow-300", children: t("power.stop_powerdown_warning") })
-      ] }) }),
-      error && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm break-all max-h-32 overflow-y-auto custom-scrollbar", children: error }),
-      success && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-green-500/10 border border-green-500/50 rounded-lg p-3 text-green-400 text-sm", children: t("power.success") }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3 pt-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx(
           "button",
           {
-            type: "button",
-            onClick: onClose,
+            onClick: () => setShowConfirmation(false),
             className: "flex-1 bg-dark-700 hover:bg-dark-600 text-white font-bold py-3 rounded-lg transition-colors",
-            disabled: processing,
             children: t("common.cancel")
           }
         ),
-        type === "powerdown" && !isStoppingPowerDown && account.powerDownActive && /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            type: "button",
-            onClick: handleStopPowerDown,
-            className: "flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-            disabled: processing || success,
-            children: t("power.stop_powerdown")
-          }
-        ),
         /* @__PURE__ */ jsxRuntimeExports.jsx(
           "button",
           {
-            type: "submit",
-            className: "flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-            disabled: processing || success,
-            children: processing ? t("common.processing") : t("common.confirm")
+            onClick: executeOperation,
+            className: "flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 rounded-lg transition-colors",
+            children: t("common.confirm")
           }
         )
       ] })
-    ] })
-  ] }) });
+    ] }) })
+  ] });
 };
 
 const SavingsModal = ({ account, type, onClose, onSuccess }) => {

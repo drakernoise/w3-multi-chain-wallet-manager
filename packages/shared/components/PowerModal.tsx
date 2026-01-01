@@ -21,6 +21,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
     const [isStoppingPowerDown, setIsStoppingPowerDown] = useState(false); // For stop power down mode
     const [recentRecipients, setRecentRecipients] = useState<string[]>([]);
     const [showRecent, setShowRecent] = useState<'recipient' | 'delegatee' | null>(null);
+    const [showConfirmation, setShowConfirmation] = useState(false); // NEW: Confirmation modal
 
     // Prevent background scrolling and load history
     useEffect(() => {
@@ -66,8 +67,15 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
             return;
         }
 
+        // Show confirmation modal instead of executing immediately
+        setError('');
+        setShowConfirmation(true);
+    };
+
+    const executeOperation = async () => {
         setProcessing(true);
         setError('');
+        setShowConfirmation(false);
 
         try {
             let response;
@@ -75,15 +83,15 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
 
             if (type === 'powerup') {
                 const formattedAmount = `${parseFloat(amount).toFixed(3)} ${tokenSymbol}`;
-                response = await broadcastPowerUp(account.chain, account.name, account.activeKey, recipient, formattedAmount);
+                response = await broadcastPowerUp(account.chain, account.name, account.activeKey!, recipient, formattedAmount);
             } else if (type === 'powerdown') {
                 if (isStoppingPowerDown) {
-                    response = await broadcastPowerDown(account.chain, account.name, account.activeKey, 0);
+                    response = await broadcastPowerDown(account.chain, account.name, account.activeKey!, 0);
                 } else {
-                    response = await broadcastPowerDown(account.chain, account.name, account.activeKey, parseFloat(amount));
+                    response = await broadcastPowerDown(account.chain, account.name, account.activeKey!, parseFloat(amount));
                 }
             } else {
-                response = await broadcastDelegation(account.chain, account.name, account.activeKey, delegatee, parseFloat(amount));
+                response = await broadcastDelegation(account.chain, account.name, account.activeKey!, delegatee, parseFloat(amount));
             }
 
             if (response.success) {
@@ -364,6 +372,68 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                     </div>
                 </form>
             </div>
+
+            {/* Confirmation Modal */}
+            {showConfirmation && (
+                <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-10 p-4">
+                    <div className="bg-dark-800 rounded-xl border border-yellow-500/30 p-6 max-w-sm w-full">
+                        <h3 className="text-lg font-bold text-yellow-400 mb-4">
+                            {t('common.confirm_operation') || 'Confirm Operation'}
+                        </h3>
+
+                        <div className="space-y-3 mb-6 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-slate-400">{t('power.operation_type') || 'Type'}:</span>
+                                <span className="text-white font-bold">{getTitle()}</span>
+                            </div>
+
+                            {!isStoppingPowerDown && (
+                                <div className="flex justify-between">
+                                    <span className="text-slate-400">{t('power.amount') || 'Amount'}:</span>
+                                    <span className="text-white font-bold">
+                                        {parseFloat(amount).toFixed(3)} {type === 'powerup' ? getTokenSymbol() : getPowerSymbol()}
+                                    </span>
+                                </div>
+                            )}
+
+                            {type === 'powerup' && recipient !== account.name && (
+                                <div className="flex justify-between">
+                                    <span className="text-slate-400">{t('power.recipient') || 'Recipient'}:</span>
+                                    <span className="text-white font-bold">@{recipient}</span>
+                                </div>
+                            )}
+
+                            {type === 'delegate' && (
+                                <div className="flex justify-between">
+                                    <span className="text-slate-400">{t('power.delegatee') || 'Delegatee'}:</span>
+                                    <span className="text-white font-bold">@{delegatee}</span>
+                                </div>
+                            )}
+
+                            {isStoppingPowerDown && (
+                                <div className="bg-yellow-900/20 border border-yellow-500/30 p-3 rounded text-yellow-300 text-xs">
+                                    {t('power.stop_powerdown_confirm') || 'This will stop your active power down.'}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowConfirmation(false)}
+                                className="flex-1 bg-dark-700 hover:bg-dark-600 text-white font-bold py-3 rounded-lg transition-colors"
+                            >
+                                {t('common.cancel')}
+                            </button>
+                            <button
+                                onClick={executeOperation}
+                                className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 rounded-lg transition-colors"
+                            >
+                                {t('common.confirm')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
