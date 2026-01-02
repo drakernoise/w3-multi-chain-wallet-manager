@@ -15,18 +15,19 @@
     "cap:open:android": "cap open android"
   },
   "dependencies": {
-    "gravity-shared": "*",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/ios": "^6.0.0",
     "@capacitor/android": "^6.0.0",
     "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
     "@capacitor/haptics": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
     "@capacitor/keyboard": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
+    "framer-motion": "^11.0.0",
+    "gravity-shared": "*",
     "lucide-react": "^0.378.0",
-    "framer-motion": "^11.0.0"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "regenerator-runtime": "^0.14.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.0.0",
