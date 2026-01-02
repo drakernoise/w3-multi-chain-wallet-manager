@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Account, Chain } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 import { broadcastPowerUp, broadcastPowerDown, broadcastDelegation, checkAccountExists } from '../services/chainService';
+import { storageService } from '../services/storageService';
 
 declare const chrome: any;
 
@@ -33,9 +34,27 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
 
-        chrome.storage?.local.get(['recentRecipients'], (result: { recentRecipients?: string[] }) => {
-            if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
-        });
+        const loadRecipients = async () => {
+            const saved = await storageService.getItem('recentRecipients');
+            if (saved) {
+                try {
+                    setRecentRecipients(JSON.parse(saved));
+                } catch (e) {
+                    // If it's pure chrome storage array vs stringified JSON?
+                    // storageService handles chrome.storage.local.get([key]) -> result[key]
+                    // If it was saved as array directly in chrome storage, storageService might need to cast it.
+                    // storageService.getItem returns string | null.
+                    // If chrome storage has an array, storageService might need to cast it.
+                    // Let's check storageService implementation again.
+                }
+            } else if (typeof chrome !== 'undefined' && chrome.storage) {
+                // Fallback for direct chrome storage if storageService didn't find it (migration?)
+                chrome.storage.local.get(['recentRecipients'], (result: any) => {
+                    if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
+                });
+            }
+        };
+        loadRecipients();
 
         // Initialize Default State
         setAmount('');
@@ -51,6 +70,14 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
             document.body.style.overflow = 'unset';
         };
     }, [account.name]);
+
+    const saveRecipient = async (name: string) => {
+        if (!name || recentRecipients.includes(name)) return;
+        const newList = [name, ...recentRecipients].slice(0, 5);
+        setRecentRecipients(newList);
+        // Save using agnostic storage
+        await storageService.setItem('recentRecipients', JSON.stringify(newList));
+    };
 
     const getTokenSymbol = () => {
         if (account.chain === Chain.HIVE) return 'HIVE';
@@ -163,15 +190,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
         }
     };
 
-    const saveRecipient = (name: string) => {
-        chrome.storage?.local.get(['recentRecipients'], (result: { recentRecipients?: string[] }) => {
-            const list = result.recentRecipients || [];
-            if (!list.includes(name)) {
-                const newList = [name, ...list].slice(0, 10);
-                chrome.storage.local.set({ recentRecipients: newList });
-            }
-        });
-    };
+
 
     const handleStopPowerDown = () => {
         // Set the mode to stopping and trigger submit
