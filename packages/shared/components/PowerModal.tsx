@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Account, Chain } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
-import { broadcastPowerUp, broadcastPowerDown, broadcastDelegation } from '../services/chainService';
+import { broadcastPowerUp, broadcastPowerDown, broadcastDelegation, checkAccountExists } from '../services/chainService';
+
+declare const chrome: any;
 
 interface PowerModalProps {
     account: Account;
@@ -21,7 +23,11 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
     const [isStoppingPowerDown, setIsStoppingPowerDown] = useState(false); // For stop power down mode
     const [recentRecipients, setRecentRecipients] = useState<string[]>([]);
     const [showRecent, setShowRecent] = useState<'recipient' | 'delegatee' | null>(null);
-    const [showConfirmation, setShowConfirmation] = useState(false); // NEW: Confirmation modal
+    const [showConfirmation, setShowConfirmation] = useState(false);
+
+    // Validation State
+    const [isValidating, setIsValidating] = useState(false);
+    const [accountError, setAccountError] = useState('');
 
     // Prevent background scrolling and load history
     useEffect(() => {
@@ -31,10 +37,20 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
             if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
         });
 
+        // Initialize Default State
+        setAmount('');
+        // Recipient defaults to account.name (self-powerup), so we reset error.
+        setRecipient(account.name);
+        setDelegatee('');
+        setError('');
+        setSuccess(false);
+        setAccountError('');
+        setIsStoppingPowerDown(false);
+
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, []);
+    }, [account.name]);
 
     const getTokenSymbol = () => {
         if (account.chain === Chain.HIVE) return 'HIVE';
@@ -46,6 +62,30 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
         if (account.chain === Chain.HIVE) return 'HP';
         if (account.chain === Chain.STEEM) return 'SP';
         return 'BP';
+    };
+
+    const validateRecipient = async () => {
+        if (!recipient) return false;
+        if (recipient === account.name) {
+            setAccountError('');
+            return true;
+        }
+
+        setIsValidating(true);
+        setAccountError('');
+        try {
+            const exists = await checkAccountExists(account.chain, recipient);
+            if (!exists) {
+                setAccountError(t('error.account_not_found') || `Account @${recipient} not found`);
+                return false;
+            }
+            return true;
+        } catch (e) {
+            console.warn("Validation error ignored", e);
+            return true; // Fail open if net error
+        } finally {
+            setIsValidating(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -67,6 +107,15 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
             return;
         }
 
+        if (type === 'powerup') {
+            if (accountError) return; // Block if error exists
+            // Optional: validate again if empty error but not empty recipient? 
+            // Better to trust onBlur or re-validate if needed.
+            if (recipient && !accountError) {
+                // Quick re-check or just proceed? Let's proceed, chainService will catch it anyway.
+            }
+        }
+
         // Show confirmation modal instead of executing immediately
         setError('');
         setShowConfirmation(true);
@@ -82,7 +131,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
             const tokenSymbol = getTokenSymbol();
 
             if (type === 'powerup') {
-                const formattedAmount = `${parseFloat(amount).toFixed(3)} ${tokenSymbol}`;
+                const formattedAmount = `${parseFloat(amount).toFixed(3)} ${tokenSymbol} `;
                 response = await broadcastPowerUp(account.chain, account.name, account.activeKey!, recipient, formattedAmount);
             } else if (type === 'powerdown') {
                 if (isStoppingPowerDown) {
@@ -220,15 +269,36 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                             <label className="block text-sm font-medium text-slate-300 mb-2">
                                 {t('power.recipient')}
                             </label>
-                            <input
-                                type="text"
-                                value={recipient}
-                                onChange={(e) => setRecipient(e.target.value.replace('@', ''))}
-                                onFocus={() => setShowRecent('recipient')}
-                                onBlur={() => setTimeout(() => setShowRecent(null), 200)}
-                                className="w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
-                                placeholder={t('power.recipient_placeholder')}
-                            />
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={recipient}
+                                    onChange={(e) => {
+                                        setRecipient(e.target.value.replace('@', ''));
+                                        setAccountError(''); // Clear error on edit
+                                    }}
+                                    onFocus={() => setShowRecent('recipient')}
+                                    onBlur={() => {
+                                        setTimeout(() => setShowRecent(null), 200);
+                                        validateRecipient();
+                                    }}
+                                    className={`w - full bg - dark - 900 border ${accountError ? 'border-red-500' : 'border-dark-700'} rounded - lg px - 4 py - 3 text - white focus: border - blue - 500 focus: outline - none pr - 10`}
+                                    placeholder={t('power.recipient_placeholder')}
+                                />
+                                {isValidating && (
+                                    <div className="absolute right-3 top-3">
+                                        <svg className="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </div>
+                                )}
+                            </div>
+
+                            {accountError && (
+                                <p className="text-xs text-red-500 mt-1 font-medium">{accountError}</p>
+                            )}
+
                             {showRecent === 'recipient' && recentRecipients.length > 0 && !recipient && (
                                 <div className="absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden">
                                     <div className="text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase">
@@ -238,7 +308,10 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                                         <button
                                             key={name}
                                             type="button"
-                                            onClick={() => setRecipient(name)}
+                                            onClick={() => {
+                                                setRecipient(name);
+                                                setAccountError('');
+                                            }}
                                             className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors"
                                         >
                                             @{name}
@@ -246,7 +319,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                                     ))}
                                 </div>
                             )}
-                            <p className="text-xs text-slate-400 mt-1">{t('power.recipient_hint')}</p>
+                            {!accountError && <p className="text-xs text-slate-400 mt-1">{t('power.recipient_hint')}</p>}
                         </div>
                     )}
 

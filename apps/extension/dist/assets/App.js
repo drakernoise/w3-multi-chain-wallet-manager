@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { j as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, k as broadcastSavingsDeposit, l as broadcastSavingsWithdraw, m as fetchAccountData, n as broadcastRCDelegate, o as broadcastRCUndelegate, p as broadcastBulkTransfer, q as indexBrowserExports, t as indexBrowserExports$1, v as validateAccountKeys, u as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, w as fetchBalances, x as detectWeb3Context, y as benchmarkNodes } from './chainService.js';
+import { j as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, k as checkAccountExists, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, l as broadcastSavingsDeposit, m as broadcastSavingsWithdraw, n as fetchAccountData, o as broadcastRCDelegate, p as broadcastRCUndelegate, q as broadcastBulkTransfer, t as indexBrowserExports, u as indexBrowserExports$1, v as validateAccountKeys, w as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, x as fetchBalances, y as detectWeb3Context, z as benchmarkNodes } from './chainService.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 import { l as lookup } from './index2.js';
 
@@ -8215,15 +8215,24 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
   const [recentRecipients, setRecentRecipients] = reactExports.useState([]);
   const [showRecent, setShowRecent] = reactExports.useState(null);
   const [showConfirmation, setShowConfirmation] = reactExports.useState(false);
+  const [isValidating, setIsValidating] = reactExports.useState(false);
+  const [accountError, setAccountError] = reactExports.useState("");
   reactExports.useEffect(() => {
     document.body.style.overflow = "hidden";
     chrome.storage?.local.get(["recentRecipients"], (result) => {
       if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
     });
+    setAmount("");
+    setRecipient(account.name);
+    setDelegatee("");
+    setError("");
+    setSuccess(false);
+    setAccountError("");
+    setIsStoppingPowerDown(false);
     return () => {
       document.body.style.overflow = "unset";
     };
-  }, []);
+  }, [account.name]);
   const getTokenSymbol = () => {
     if (account.chain === Chain.HIVE) return "HIVE";
     if (account.chain === Chain.STEEM) return "STEEM";
@@ -8233,6 +8242,28 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
     if (account.chain === Chain.HIVE) return "HP";
     if (account.chain === Chain.STEEM) return "SP";
     return "BP";
+  };
+  const validateRecipient = async () => {
+    if (!recipient) return false;
+    if (recipient === account.name) {
+      setAccountError("");
+      return true;
+    }
+    setIsValidating(true);
+    setAccountError("");
+    try {
+      const exists = await checkAccountExists(account.chain, recipient);
+      if (!exists) {
+        setAccountError(t("error.account_not_found") || `Account @${recipient} not found`);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.warn("Validation error ignored", e);
+      return true;
+    } finally {
+      setIsValidating(false);
+    }
   };
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -8248,6 +8279,9 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
       setError(t("power.active_key_required"));
       return;
     }
+    if (type === "powerup") {
+      if (accountError) return;
+    }
     setError("");
     setShowConfirmation(true);
   };
@@ -8259,7 +8293,7 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
       let response;
       const tokenSymbol = getTokenSymbol();
       if (type === "powerup") {
-        const formattedAmount = `${parseFloat(amount).toFixed(3)} ${tokenSymbol}`;
+        const formattedAmount = `${parseFloat(amount).toFixed(3)} ${tokenSymbol} `;
         response = await broadcastPowerUp(account.chain, account.name, account.activeKey, recipient, formattedAmount);
       } else if (type === "powerdown") {
         if (isStoppingPowerDown) {
@@ -8384,25 +8418,41 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
         ] }),
         type === "powerup" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-300 mb-2", children: t("power.recipient") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              type: "text",
-              value: recipient,
-              onChange: (e) => setRecipient(e.target.value.replace("@", "")),
-              onFocus: () => setShowRecent("recipient"),
-              onBlur: () => setTimeout(() => setShowRecent(null), 200),
-              className: "w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none",
-              placeholder: t("power.recipient_placeholder")
-            }
-          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "text",
+                value: recipient,
+                onChange: (e) => {
+                  setRecipient(e.target.value.replace("@", ""));
+                  setAccountError("");
+                },
+                onFocus: () => setShowRecent("recipient"),
+                onBlur: () => {
+                  setTimeout(() => setShowRecent(null), 200);
+                  validateRecipient();
+                },
+                className: `w - full bg - dark - 900 border ${accountError ? "border-red-500" : "border-dark-700"} rounded - lg px - 4 py - 3 text - white focus: border - blue - 500 focus: outline - none pr - 10`,
+                placeholder: t("power.recipient_placeholder")
+              }
+            ),
+            isValidating && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute right-3 top-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "animate-spin h-5 w-5 text-blue-500", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
+            ] }) })
+          ] }),
+          accountError && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-red-500 mt-1 font-medium", children: accountError }),
           showRecent === "recipient" && recentRecipients.length > 0 && !recipient && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase", children: t("common.recent_recipients") || "Recent Recipients" }),
             recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
                 type: "button",
-                onClick: () => setRecipient(name),
+                onClick: () => {
+                  setRecipient(name);
+                  setAccountError("");
+                },
                 className: "w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors",
                 children: [
                   "@",
@@ -8412,7 +8462,7 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
               name
             ))
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mt-1", children: t("power.recipient_hint") })
+          !accountError && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mt-1", children: t("power.recipient_hint") })
         ] }),
         type === "delegate" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-300 mb-2", children: t("power.delegatee") }),

@@ -592,6 +592,9 @@ video {
 .top-20 {
   top: 5rem;
 }
+.top-3 {
+  top: 0.75rem;
+}
 .top-4 {
   top: 1rem;
 }
@@ -2386,6 +2389,9 @@ video {
 .outline-none {
   outline: 2px solid transparent;
   outline-offset: 2px;
+}
+.outline {
+  outline-style: solid;
 }
 .ring-blue-500 {
   --tw-ring-opacity: 1;

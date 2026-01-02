@@ -88492,7 +88492,7 @@ const broadcastBulkTransfer = async (chain, from, activeKey, items, tokenSymbol)
   });
   return broadcastOperations(chain, activeKey, ops);
 };
-const checkAccountExistsManual = async (chain, username) => {
+const checkAccountExists = async (chain, username) => {
   try {
     const nodeUrl = getActiveNode(chain);
     const response = await fetch(nodeUrl, {
@@ -88520,7 +88520,7 @@ const checkAccountExistsManual = async (chain, username) => {
 };
 const broadcastPowerUp = async (chain, username, activeKey, to, amount) => {
   console.log(`[PowerUp] Validating recipient @${to} on ${chain}...`);
-  const exists = await checkAccountExistsManual(chain, to);
+  const exists = await checkAccountExists(chain, to);
   console.log(`[PowerUp] Validation result for @${to}: ${exists}`);
   if (!exists) {
     return { success: false, error: `Account @${to} does not exist on ${chain}. Please check the username.` };
@@ -88754,4 +88754,4 @@ const signMessage = (chain, message, keyStr, _useLegacySigner = false) => {
   }
 };
 
-export { Chain as C, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, global as j, broadcastSavingsDeposit as k, broadcastSavingsWithdraw as l, fetchAccountData as m, broadcastRCDelegate as n, broadcastRCUndelegate as o, broadcastBulkTransfer as p, indexBrowserExports$1 as q, requireCryptoBrowserify as r, signMessage as s, indexBrowserExports as t, fetchAccountHistory as u, validateAccountKeys as v, fetchBalances as w, detectWeb3Context as x, benchmarkNodes as y };
+export { Chain as C, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, global as j, checkAccountExists as k, broadcastSavingsDeposit as l, broadcastSavingsWithdraw as m, fetchAccountData as n, broadcastRCDelegate as o, broadcastRCUndelegate as p, broadcastBulkTransfer as q, requireCryptoBrowserify as r, signMessage as s, indexBrowserExports$1 as t, indexBrowserExports as u, validateAccountKeys as v, fetchAccountHistory as w, fetchBalances as x, detectWeb3Context as y, benchmarkNodes as z };

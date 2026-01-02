@@ -561,10 +561,10 @@ export const broadcastBulkTransfer = async (
     return broadcastOperations(chain, activeKey, ops);
 };
 
-const checkAccountExistsManual = async (chain: Chain, username: string): Promise<boolean> => {
+// Export for UI validation
+export const checkAccountExists = async (chain: Chain, username: string): Promise<boolean> => {
     try {
         const nodeUrl = getActiveNode(chain);
-        // console.log(`[CheckAccount] Checking @${username} on ${nodeUrl}`);
 
         const response = await fetch(nodeUrl, {
             method: 'POST',
@@ -580,19 +580,13 @@ const checkAccountExistsManual = async (chain: Chain, username: string): Promise
 
         if (json.error) {
             console.warn(`[CheckAccount] Node error for @${username}:`, json.error);
-            // Blurt specifically returns "unknown key" for non-existent accounts in some APIs
             const msg = json.error.message || '';
             if (msg.includes('unknown key')) return false;
-
-            // If we got an explicit error from node, assume check passed as "not found" or "error".
-            // But to be safe vs "allow if network fail", we should probably return false if node explicitly errors.
             return false;
         }
 
         return json.result && json.result.length > 0;
     } catch (e) {
-        // If check fails due to network connectivity, assume it exists to let broadcast try
-        // This prevents blocking users during intermittent node issues
         console.warn("[ChainService] Account check network failed, skipping validation:", e);
         return true;
     }
@@ -601,7 +595,7 @@ const checkAccountExistsManual = async (chain: Chain, username: string): Promise
 export const broadcastPowerUp = async (chain: Chain, username: string, activeKey: string, to: string, amount: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     // Validate recipient exists
     console.log(`[PowerUp] Validating recipient @${to} on ${chain}...`);
-    const exists = await checkAccountExistsManual(chain, to);
+    const exists = await checkAccountExists(chain, to);
     console.log(`[PowerUp] Validation result for @${to}: ${exists}`);
 
     if (!exists) {
