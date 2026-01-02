@@ -736,62 +736,113 @@ const Preferences = registerPlugin('Preferences', {
     web: () => __vitePreload(() => import('./web.js'),true              ?__vite__mapDeps([0,1,2,3,4,5,6]):void 0,import.meta.url).then(m => new m.PreferencesWeb()),
 });
 
-const isCapacitor = () => {
-  return typeof window !== "undefined" && window.Capacitor !== void 0;
+const isNativePlatform = () => {
+  if (typeof window === "undefined") return false;
+  const cap = window.Capacitor;
+  if (!cap) return false;
+  if (typeof cap.isNativePlatform === "function") {
+    return cap.isNativePlatform();
+  }
+  return cap.getPlatform && cap.getPlatform() !== "web";
 };
 const storageService = {
   async getItem(key) {
-    if (isCapacitor()) {
-      const { value } = await Preferences.get({ key });
-      return value;
+    if (!key) return null;
+    if (isNativePlatform()) {
+      try {
+        const { value } = await Preferences.get({ key });
+        return value;
+      } catch (e) {
+        console.warn("Capacitor Storage Get Error:", e);
+        return null;
+      }
     }
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
       return new Promise((resolve) => {
-        chrome.storage.local.get([key], (result) => {
-          resolve(result[key] || null);
-        });
+        try {
+          chrome.storage.local.get([key], (result) => {
+            if (chrome.runtime?.lastError) {
+              console.warn("Chrome Storage Error:", chrome.runtime.lastError);
+              resolve(null);
+            } else {
+              resolve(result && result[key] !== void 0 ? result[key] : null);
+            }
+          });
+        } catch (e) {
+          console.warn("Chrome Storage Access Error:", e);
+          resolve(null);
+        }
       });
     }
     return localStorage.getItem(key);
   },
   async setItem(key, value) {
-    if (isCapacitor()) {
-      await Preferences.set({ key, value });
+    if (!key) return;
+    if (isNativePlatform()) {
+      try {
+        await Preferences.set({ key, value });
+      } catch (e) {
+        console.warn("Capacitor Storage Set Error:", e);
+      }
       return;
     }
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
       return new Promise((resolve) => {
-        chrome.storage.local.set({ [key]: value }, () => {
+        try {
+          chrome.storage.local.set({ [key]: value }, () => {
+            if (chrome.runtime?.lastError) {
+              console.warn("Chrome Storage Set Error:", chrome.runtime.lastError);
+            }
+            resolve();
+          });
+        } catch (e) {
           resolve();
-        });
+        }
       });
     }
     localStorage.setItem(key, value);
   },
   async removeItem(key) {
-    if (isCapacitor()) {
-      await Preferences.remove({ key });
+    if (!key) return;
+    if (isNativePlatform()) {
+      try {
+        await Preferences.remove({ key });
+      } catch (e) {
+        console.warn("Capacitor Storage Remove Error:", e);
+      }
       return;
     }
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
       return new Promise((resolve) => {
-        chrome.storage.local.remove([key], () => {
+        try {
+          chrome.storage.local.remove([key], () => {
+            resolve();
+          });
+        } catch (e) {
           resolve();
-        });
+        }
       });
     }
     localStorage.removeItem(key);
   },
   async clear() {
-    if (isCapacitor()) {
-      await Preferences.clear();
+    if (isNativePlatform()) {
+      try {
+        await Preferences.clear();
+      } catch (e) {
+        console.warn("Capacitor Storage Clear Error:", e);
+      }
       return;
     }
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
       return new Promise((resolve) => {
-        chrome.storage.local.clear(() => {
+        try {
+          chrome.storage.local.clear(() => {
+            resolve();
+          });
+        } catch (e) {
           resolve();
-        });
+        }
       });
     }
     localStorage.clear();
@@ -8219,9 +8270,20 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
   const [accountError, setAccountError] = reactExports.useState("");
   reactExports.useEffect(() => {
     document.body.style.overflow = "hidden";
-    chrome.storage?.local.get(["recentRecipients"], (result) => {
-      if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
-    });
+    const loadRecipients = async () => {
+      const saved = await storageService.getItem("recentRecipients");
+      if (saved) {
+        try {
+          setRecentRecipients(JSON.parse(saved));
+        } catch (e) {
+        }
+      } else if (typeof chrome !== "undefined" && chrome.storage) {
+        chrome.storage.local.get(["recentRecipients"], (result) => {
+          if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
+        });
+      }
+    };
+    loadRecipients();
     setAmount("");
     setRecipient(account.name);
     setDelegatee("");
@@ -8233,6 +8295,12 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
       document.body.style.overflow = "unset";
     };
   }, [account.name]);
+  const saveRecipient = async (name) => {
+    if (!name || recentRecipients.includes(name)) return;
+    const newList = [name, ...recentRecipients].slice(0, 5);
+    setRecentRecipients(newList);
+    await storageService.setItem("recentRecipients", JSON.stringify(newList));
+  };
   const getTokenSymbol = () => {
     if (account.chain === Chain.HIVE) return "HIVE";
     if (account.chain === Chain.STEEM) return "STEEM";
@@ -8320,15 +8388,6 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
     } finally {
       setProcessing(false);
     }
-  };
-  const saveRecipient = (name) => {
-    chrome.storage?.local.get(["recentRecipients"], (result) => {
-      const list = result.recentRecipients || [];
-      if (!list.includes(name)) {
-        const newList = [name, ...list].slice(0, 10);
-        chrome.storage.local.set({ recentRecipients: newList });
-      }
-    });
   };
   const handleStopPowerDown = () => {
     setIsStoppingPowerDown(true);
