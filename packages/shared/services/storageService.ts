@@ -7,7 +7,6 @@ const isNativePlatform = () => {
     const cap = (window as any).Capacitor;
     if (!cap) return false;
 
-    // Check if we are in a truly native environment (Android/iOS)
     if (typeof cap.isNativePlatform === 'function') {
         return cap.isNativePlatform();
     }
@@ -33,15 +32,10 @@ export const storageService = {
             return new Promise((resolve) => {
                 try {
                     chrome.storage.local.get([key], (result: any) => {
-                        if (chrome.runtime?.lastError) {
-                            console.warn('Chrome Storage Error:', chrome.runtime.lastError);
-                            resolve(null);
-                        } else {
-                            resolve(result && result[key] !== undefined ? result[key] : null);
-                        }
+                        resolve(result && result[key] ? result[key] : null);
                     });
                 } catch (e) {
-                    console.warn('Chrome Storage Access Error:', e);
+                    console.warn('Chrome Storage Error:', e);
                     resolve(null);
                 }
             });
@@ -65,9 +59,6 @@ export const storageService = {
             return new Promise((resolve) => {
                 try {
                     chrome.storage.local.set({ [key]: value }, () => {
-                        if (chrome.runtime?.lastError) {
-                            console.warn('Chrome Storage Set Error:', chrome.runtime.lastError);
-                        }
                         resolve();
                     });
                 } catch (e) {

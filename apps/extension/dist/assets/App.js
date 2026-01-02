@@ -761,15 +761,10 @@ const storageService = {
       return new Promise((resolve) => {
         try {
           chrome.storage.local.get([key], (result) => {
-            if (chrome.runtime?.lastError) {
-              console.warn("Chrome Storage Error:", chrome.runtime.lastError);
-              resolve(null);
-            } else {
-              resolve(result && result[key] !== void 0 ? result[key] : null);
-            }
+            resolve(result && result[key] ? result[key] : null);
           });
         } catch (e) {
-          console.warn("Chrome Storage Access Error:", e);
+          console.warn("Chrome Storage Error:", e);
           resolve(null);
         }
       });
@@ -790,9 +785,6 @@ const storageService = {
       return new Promise((resolve) => {
         try {
           chrome.storage.local.set({ [key]: value }, () => {
-            if (chrome.runtime?.lastError) {
-              console.warn("Chrome Storage Set Error:", chrome.runtime.lastError);
-            }
             resolve();
           });
         } catch (e) {
