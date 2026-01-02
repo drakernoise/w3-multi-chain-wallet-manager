@@ -23,6 +23,12 @@ export default defineConfig({
       'dsteem': path.resolve(__dirname, '../../node_modules/dsteem/lib/index-browser.js'),
     }
   },
+  define: {
+    'process.env': {},
+    'process.browser': true,
+    'process.version': '"v16.0.0"',
+    'global': 'globalThis',
+  },
   build: {
     target: 'es2017',
     outDir: 'dist',
