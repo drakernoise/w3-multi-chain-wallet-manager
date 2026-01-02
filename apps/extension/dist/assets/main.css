@@ -1979,6 +1979,9 @@ video {
 .pr-1 {
   padding-right: 0.25rem;
 }
+.pr-10 {
+  padding-right: 2.5rem;
+}
 .pr-16 {
   padding-right: 4rem;
 }
@@ -2389,9 +2392,6 @@ video {
 .outline-none {
   outline: 2px solid transparent;
   outline-offset: 2px;
-}
-.outline {
-  outline-style: solid;
 }
 .ring-blue-500 {
   --tw-ring-opacity: 1;

@@ -282,7 +282,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                                         setTimeout(() => setShowRecent(null), 200);
                                         validateRecipient();
                                     }}
-                                    className={`w - full bg - dark - 900 border ${accountError ? 'border-red-500' : 'border-dark-700'} rounded - lg px - 4 py - 3 text - white focus: border - blue - 500 focus: outline - none pr - 10`}
+                                    className={`w-full bg-dark-900 border ${accountError ? 'border-red-500' : 'border-dark-700'} rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none pr-10`}
                                     placeholder={t('power.recipient_placeholder')}
                                 />
                                 {isValidating && (
