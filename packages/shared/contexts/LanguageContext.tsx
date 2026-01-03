@@ -443,6 +443,13 @@ const translations: Record<Language, Record<string, string>> = {
         'rc.not_available': 'RC Not Available',
         'rc.delegate_info': 'Delegating RC allows accounts to perform more operations on Hive.',
         'rc.undelegate_info': 'This will remove the RC delegation from this account.',
+        // Mobile Permissions
+        'mobile.dapp_permissions': 'dApp Permissions',
+        'mobile.permissions_desc': 'These dApps have permission to sign operations automatically.',
+        'mobile.no_permissions': 'No permissions granted',
+        'mobile.revoke': 'Revoke',
+        'mobile.domain': 'Domain',
+        'mobile.access': 'Access',
     },
     es: {
         'landing.welcome': 'Bienvenido',
@@ -798,6 +805,13 @@ const translations: Record<Language, Record<string, string>> = {
         'help.btn_savings': 'Depositar stablecoins para ganar intereses (solo Hive/Steem).',
         'help.btn_rc': 'Delegar Créditos de Recursos para ayudar a otros a transaccionar (solo Hive).',
         'help.section_actions': 'Acciones de Cuenta',
+        // Mobile Permissions
+        'mobile.dapp_permissions': 'Permisos de dApp',
+        'mobile.permissions_desc': 'Estas dApps tienen acceso a firmar operaciones automáticamente.',
+        'mobile.no_permissions': 'No hay permisos concedidos',
+        'mobile.revoke': 'Revocar',
+        'mobile.domain': 'Dominio',
+        'mobile.access': 'Acceso',
         'help.section_navigation': 'Navegación Principal',
         'help.chat_memo_required': 'Los Mensajes Directos (DMs) están Encriptados de Extremo a Extremo. Las salas públicas no están encriptadas.',
         'help.2fa_title': 'Autenticación de Dos Factores',

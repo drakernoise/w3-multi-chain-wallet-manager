@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -8,7 +9,16 @@ const __dirname = path.dirname(__filename)
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    nodePolyfills({
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+    }),
+  ],
   resolve: {
     alias: {
       'gravity-shared': path.resolve(__dirname, '../../packages/shared'),
@@ -27,7 +37,7 @@ export default defineConfig({
     'process.env': {},
     'process.browser': true,
     'process.version': '"v16.0.0"',
-    'global': 'globalThis',
+    'global': 'window',
   },
   build: {
     target: 'es2017',

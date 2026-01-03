@@ -1107,6 +1107,31 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- 4. Cross-Device Sync Bridge (Ephemeral) ---
+    // Allows secure, direct, encrypted communication between two devices sharing a QR code session.
+    socket.on('bridge_join', (data) => {
+        const { sessionId } = data;
+        if (!sessionId || typeof sessionId !== 'string') return;
+
+        const bridgeRoom = `sync-bridge:${sessionId}`;
+        console.log(`[BRIDGE] Socket ${socket.id} joined bridge ${sessionId}`);
+        socket.join(bridgeRoom);
+    });
+
+    socket.on('bridge_request', (data) => {
+        const { sessionId, encrypted } = data;
+        if (!sessionId) return;
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_request', { encrypted });
+        console.log(`[BRIDGE] Request forwarded in ${sessionId}`);
+    });
+
+    socket.on('bridge_response', (data) => {
+        const { sessionId, encrypted } = data;
+        if (!sessionId) return;
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_response', { encrypted });
+        console.log(`[BRIDGE] Response forwarded in ${sessionId}`);
+    });
+
     socket.on('disconnect', () => {
         delete connectedSockets[socket.id];
     });

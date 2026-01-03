@@ -1115,7 +1115,9 @@ async function generateEncryptionKeys() {
   );
 }
 async function exportKeyToBase64(key) {
-  const format = key.type === "public" ? "spki" : "pkcs8";
+  let format;
+  if (key.type === "secret") format = "raw";
+  else format = key.type === "public" ? "spki" : "pkcs8";
   const exported = await window.crypto.subtle.exportKey(format, key);
   const buffer = new Uint8Array(exported);
   return btoa(String.fromCharCode(...buffer));
@@ -5528,7 +5530,14 @@ const translations = {
     "rc.success": "RC delegation updated successfully!",
     "rc.not_available": "RC Not Available",
     "rc.delegate_info": "Delegating RC allows accounts to perform more operations on Hive.",
-    "rc.undelegate_info": "This will remove the RC delegation from this account."
+    "rc.undelegate_info": "This will remove the RC delegation from this account.",
+    // Mobile Permissions
+    "mobile.dapp_permissions": "dApp Permissions",
+    "mobile.permissions_desc": "These dApps have permission to sign operations automatically.",
+    "mobile.no_permissions": "No permissions granted",
+    "mobile.revoke": "Revoke",
+    "mobile.domain": "Domain",
+    "mobile.access": "Access"
   },
   es: {
     "landing.welcome": "Bienvenido",
@@ -5880,6 +5889,13 @@ const translations = {
     "help.btn_savings": "Depositar stablecoins para ganar intereses (solo Hive/Steem).",
     "help.btn_rc": "Delegar Créditos de Recursos para ayudar a otros a transaccionar (solo Hive).",
     "help.section_actions": "Acciones de Cuenta",
+    // Mobile Permissions
+    "mobile.dapp_permissions": "Permisos de dApp",
+    "mobile.permissions_desc": "Estas dApps tienen acceso a firmar operaciones automáticamente.",
+    "mobile.no_permissions": "No hay permisos concedidos",
+    "mobile.revoke": "Revocar",
+    "mobile.domain": "Dominio",
+    "mobile.access": "Acceso",
     "help.section_navigation": "Navegación Principal",
     "help.chat_memo_required": "Los Mensajes Directos (DMs) están Encriptados de Extremo a Extremo. Las salas públicas no están encriptadas.",
     "help.2fa_title": "Autenticación de Dos Factores",
@@ -8164,10 +8180,1686 @@ const BiometricSetupModal = ({ accounts, setWalletState, onClose, onComplete }) 
   ] }) });
 };
 
+var __defProp = Object.defineProperty;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __objRest = (source, exclude) => {
+  var target = {};
+  for (var prop in source)
+    if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+      target[prop] = source[prop];
+  if (source != null && __getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(source)) {
+      if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+        target[prop] = source[prop];
+    }
+  return target;
+};
+
+// src/third-party/qrcodegen/index.ts
+/**
+ * @license QR Code generator library (TypeScript)
+ * Copyright (c) Project Nayuki.
+ * SPDX-License-Identifier: MIT
+ */
+var qrcodegen;
+((qrcodegen2) => {
+  const _QrCode = class {
+    constructor(version, errorCorrectionLevel, dataCodewords, msk) {
+      this.version = version;
+      this.errorCorrectionLevel = errorCorrectionLevel;
+      this.modules = [];
+      this.isFunction = [];
+      if (version < _QrCode.MIN_VERSION || version > _QrCode.MAX_VERSION)
+        throw new RangeError("Version value out of range");
+      if (msk < -1 || msk > 7)
+        throw new RangeError("Mask value out of range");
+      this.size = version * 4 + 17;
+      let row = [];
+      for (let i = 0; i < this.size; i++)
+        row.push(false);
+      for (let i = 0; i < this.size; i++) {
+        this.modules.push(row.slice());
+        this.isFunction.push(row.slice());
+      }
+      this.drawFunctionPatterns();
+      const allCodewords = this.addEccAndInterleave(dataCodewords);
+      this.drawCodewords(allCodewords);
+      if (msk == -1) {
+        let minPenalty = 1e9;
+        for (let i = 0; i < 8; i++) {
+          this.applyMask(i);
+          this.drawFormatBits(i);
+          const penalty = this.getPenaltyScore();
+          if (penalty < minPenalty) {
+            msk = i;
+            minPenalty = penalty;
+          }
+          this.applyMask(i);
+        }
+      }
+      assert(0 <= msk && msk <= 7);
+      this.mask = msk;
+      this.applyMask(msk);
+      this.drawFormatBits(msk);
+      this.isFunction = [];
+    }
+    static encodeText(text, ecl) {
+      const segs = qrcodegen2.QrSegment.makeSegments(text);
+      return _QrCode.encodeSegments(segs, ecl);
+    }
+    static encodeBinary(data, ecl) {
+      const seg = qrcodegen2.QrSegment.makeBytes(data);
+      return _QrCode.encodeSegments([seg], ecl);
+    }
+    static encodeSegments(segs, ecl, minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true) {
+      if (!(_QrCode.MIN_VERSION <= minVersion && minVersion <= maxVersion && maxVersion <= _QrCode.MAX_VERSION) || mask < -1 || mask > 7)
+        throw new RangeError("Invalid value");
+      let version;
+      let dataUsedBits;
+      for (version = minVersion; ; version++) {
+        const dataCapacityBits2 = _QrCode.getNumDataCodewords(version, ecl) * 8;
+        const usedBits = QrSegment.getTotalBits(segs, version);
+        if (usedBits <= dataCapacityBits2) {
+          dataUsedBits = usedBits;
+          break;
+        }
+        if (version >= maxVersion)
+          throw new RangeError("Data too long");
+      }
+      for (const newEcl of [_QrCode.Ecc.MEDIUM, _QrCode.Ecc.QUARTILE, _QrCode.Ecc.HIGH]) {
+        if (boostEcl && dataUsedBits <= _QrCode.getNumDataCodewords(version, newEcl) * 8)
+          ecl = newEcl;
+      }
+      let bb = [];
+      for (const seg of segs) {
+        appendBits(seg.mode.modeBits, 4, bb);
+        appendBits(seg.numChars, seg.mode.numCharCountBits(version), bb);
+        for (const b of seg.getData())
+          bb.push(b);
+      }
+      assert(bb.length == dataUsedBits);
+      const dataCapacityBits = _QrCode.getNumDataCodewords(version, ecl) * 8;
+      assert(bb.length <= dataCapacityBits);
+      appendBits(0, Math.min(4, dataCapacityBits - bb.length), bb);
+      appendBits(0, (8 - bb.length % 8) % 8, bb);
+      assert(bb.length % 8 == 0);
+      for (let padByte = 236; bb.length < dataCapacityBits; padByte ^= 236 ^ 17)
+        appendBits(padByte, 8, bb);
+      let dataCodewords = [];
+      while (dataCodewords.length * 8 < bb.length)
+        dataCodewords.push(0);
+      bb.forEach((b, i) => dataCodewords[i >>> 3] |= b << 7 - (i & 7));
+      return new _QrCode(version, ecl, dataCodewords, mask);
+    }
+    getModule(x, y) {
+      return 0 <= x && x < this.size && 0 <= y && y < this.size && this.modules[y][x];
+    }
+    getModules() {
+      return this.modules;
+    }
+    drawFunctionPatterns() {
+      for (let i = 0; i < this.size; i++) {
+        this.setFunctionModule(6, i, i % 2 == 0);
+        this.setFunctionModule(i, 6, i % 2 == 0);
+      }
+      this.drawFinderPattern(3, 3);
+      this.drawFinderPattern(this.size - 4, 3);
+      this.drawFinderPattern(3, this.size - 4);
+      const alignPatPos = this.getAlignmentPatternPositions();
+      const numAlign = alignPatPos.length;
+      for (let i = 0; i < numAlign; i++) {
+        for (let j = 0; j < numAlign; j++) {
+          if (!(i == 0 && j == 0 || i == 0 && j == numAlign - 1 || i == numAlign - 1 && j == 0))
+            this.drawAlignmentPattern(alignPatPos[i], alignPatPos[j]);
+        }
+      }
+      this.drawFormatBits(0);
+      this.drawVersion();
+    }
+    drawFormatBits(mask) {
+      const data = this.errorCorrectionLevel.formatBits << 3 | mask;
+      let rem = data;
+      for (let i = 0; i < 10; i++)
+        rem = rem << 1 ^ (rem >>> 9) * 1335;
+      const bits = (data << 10 | rem) ^ 21522;
+      assert(bits >>> 15 == 0);
+      for (let i = 0; i <= 5; i++)
+        this.setFunctionModule(8, i, getBit(bits, i));
+      this.setFunctionModule(8, 7, getBit(bits, 6));
+      this.setFunctionModule(8, 8, getBit(bits, 7));
+      this.setFunctionModule(7, 8, getBit(bits, 8));
+      for (let i = 9; i < 15; i++)
+        this.setFunctionModule(14 - i, 8, getBit(bits, i));
+      for (let i = 0; i < 8; i++)
+        this.setFunctionModule(this.size - 1 - i, 8, getBit(bits, i));
+      for (let i = 8; i < 15; i++)
+        this.setFunctionModule(8, this.size - 15 + i, getBit(bits, i));
+      this.setFunctionModule(8, this.size - 8, true);
+    }
+    drawVersion() {
+      if (this.version < 7)
+        return;
+      let rem = this.version;
+      for (let i = 0; i < 12; i++)
+        rem = rem << 1 ^ (rem >>> 11) * 7973;
+      const bits = this.version << 12 | rem;
+      assert(bits >>> 18 == 0);
+      for (let i = 0; i < 18; i++) {
+        const color = getBit(bits, i);
+        const a = this.size - 11 + i % 3;
+        const b = Math.floor(i / 3);
+        this.setFunctionModule(a, b, color);
+        this.setFunctionModule(b, a, color);
+      }
+    }
+    drawFinderPattern(x, y) {
+      for (let dy = -4; dy <= 4; dy++) {
+        for (let dx = -4; dx <= 4; dx++) {
+          const dist = Math.max(Math.abs(dx), Math.abs(dy));
+          const xx = x + dx;
+          const yy = y + dy;
+          if (0 <= xx && xx < this.size && 0 <= yy && yy < this.size)
+            this.setFunctionModule(xx, yy, dist != 2 && dist != 4);
+        }
+      }
+    }
+    drawAlignmentPattern(x, y) {
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++)
+          this.setFunctionModule(x + dx, y + dy, Math.max(Math.abs(dx), Math.abs(dy)) != 1);
+      }
+    }
+    setFunctionModule(x, y, isDark) {
+      this.modules[y][x] = isDark;
+      this.isFunction[y][x] = true;
+    }
+    addEccAndInterleave(data) {
+      const ver = this.version;
+      const ecl = this.errorCorrectionLevel;
+      if (data.length != _QrCode.getNumDataCodewords(ver, ecl))
+        throw new RangeError("Invalid argument");
+      const numBlocks = _QrCode.NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
+      const blockEccLen = _QrCode.ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver];
+      const rawCodewords = Math.floor(_QrCode.getNumRawDataModules(ver) / 8);
+      const numShortBlocks = numBlocks - rawCodewords % numBlocks;
+      const shortBlockLen = Math.floor(rawCodewords / numBlocks);
+      let blocks = [];
+      const rsDiv = _QrCode.reedSolomonComputeDivisor(blockEccLen);
+      for (let i = 0, k = 0; i < numBlocks; i++) {
+        let dat = data.slice(k, k + shortBlockLen - blockEccLen + (i < numShortBlocks ? 0 : 1));
+        k += dat.length;
+        const ecc = _QrCode.reedSolomonComputeRemainder(dat, rsDiv);
+        if (i < numShortBlocks)
+          dat.push(0);
+        blocks.push(dat.concat(ecc));
+      }
+      let result = [];
+      for (let i = 0; i < blocks[0].length; i++) {
+        blocks.forEach((block, j) => {
+          if (i != shortBlockLen - blockEccLen || j >= numShortBlocks)
+            result.push(block[i]);
+        });
+      }
+      assert(result.length == rawCodewords);
+      return result;
+    }
+    drawCodewords(data) {
+      if (data.length != Math.floor(_QrCode.getNumRawDataModules(this.version) / 8))
+        throw new RangeError("Invalid argument");
+      let i = 0;
+      for (let right = this.size - 1; right >= 1; right -= 2) {
+        if (right == 6)
+          right = 5;
+        for (let vert = 0; vert < this.size; vert++) {
+          for (let j = 0; j < 2; j++) {
+            const x = right - j;
+            const upward = (right + 1 & 2) == 0;
+            const y = upward ? this.size - 1 - vert : vert;
+            if (!this.isFunction[y][x] && i < data.length * 8) {
+              this.modules[y][x] = getBit(data[i >>> 3], 7 - (i & 7));
+              i++;
+            }
+          }
+        }
+      }
+      assert(i == data.length * 8);
+    }
+    applyMask(mask) {
+      if (mask < 0 || mask > 7)
+        throw new RangeError("Mask value out of range");
+      for (let y = 0; y < this.size; y++) {
+        for (let x = 0; x < this.size; x++) {
+          let invert;
+          switch (mask) {
+            case 0:
+              invert = (x + y) % 2 == 0;
+              break;
+            case 1:
+              invert = y % 2 == 0;
+              break;
+            case 2:
+              invert = x % 3 == 0;
+              break;
+            case 3:
+              invert = (x + y) % 3 == 0;
+              break;
+            case 4:
+              invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 == 0;
+              break;
+            case 5:
+              invert = x * y % 2 + x * y % 3 == 0;
+              break;
+            case 6:
+              invert = (x * y % 2 + x * y % 3) % 2 == 0;
+              break;
+            case 7:
+              invert = ((x + y) % 2 + x * y % 3) % 2 == 0;
+              break;
+            default:
+              throw new Error("Unreachable");
+          }
+          if (!this.isFunction[y][x] && invert)
+            this.modules[y][x] = !this.modules[y][x];
+        }
+      }
+    }
+    getPenaltyScore() {
+      let result = 0;
+      for (let y = 0; y < this.size; y++) {
+        let runColor = false;
+        let runX = 0;
+        let runHistory = [0, 0, 0, 0, 0, 0, 0];
+        for (let x = 0; x < this.size; x++) {
+          if (this.modules[y][x] == runColor) {
+            runX++;
+            if (runX == 5)
+              result += _QrCode.PENALTY_N1;
+            else if (runX > 5)
+              result++;
+          } else {
+            this.finderPenaltyAddHistory(runX, runHistory);
+            if (!runColor)
+              result += this.finderPenaltyCountPatterns(runHistory) * _QrCode.PENALTY_N3;
+            runColor = this.modules[y][x];
+            runX = 1;
+          }
+        }
+        result += this.finderPenaltyTerminateAndCount(runColor, runX, runHistory) * _QrCode.PENALTY_N3;
+      }
+      for (let x = 0; x < this.size; x++) {
+        let runColor = false;
+        let runY = 0;
+        let runHistory = [0, 0, 0, 0, 0, 0, 0];
+        for (let y = 0; y < this.size; y++) {
+          if (this.modules[y][x] == runColor) {
+            runY++;
+            if (runY == 5)
+              result += _QrCode.PENALTY_N1;
+            else if (runY > 5)
+              result++;
+          } else {
+            this.finderPenaltyAddHistory(runY, runHistory);
+            if (!runColor)
+              result += this.finderPenaltyCountPatterns(runHistory) * _QrCode.PENALTY_N3;
+            runColor = this.modules[y][x];
+            runY = 1;
+          }
+        }
+        result += this.finderPenaltyTerminateAndCount(runColor, runY, runHistory) * _QrCode.PENALTY_N3;
+      }
+      for (let y = 0; y < this.size - 1; y++) {
+        for (let x = 0; x < this.size - 1; x++) {
+          const color = this.modules[y][x];
+          if (color == this.modules[y][x + 1] && color == this.modules[y + 1][x] && color == this.modules[y + 1][x + 1])
+            result += _QrCode.PENALTY_N2;
+        }
+      }
+      let dark = 0;
+      for (const row of this.modules)
+        dark = row.reduce((sum, color) => sum + (color ? 1 : 0), dark);
+      const total = this.size * this.size;
+      const k = Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1;
+      assert(0 <= k && k <= 9);
+      result += k * _QrCode.PENALTY_N4;
+      assert(0 <= result && result <= 2568888);
+      return result;
+    }
+    getAlignmentPatternPositions() {
+      if (this.version == 1)
+        return [];
+      else {
+        const numAlign = Math.floor(this.version / 7) + 2;
+        const step = this.version == 32 ? 26 : Math.ceil((this.version * 4 + 4) / (numAlign * 2 - 2)) * 2;
+        let result = [6];
+        for (let pos = this.size - 7; result.length < numAlign; pos -= step)
+          result.splice(1, 0, pos);
+        return result;
+      }
+    }
+    static getNumRawDataModules(ver) {
+      if (ver < _QrCode.MIN_VERSION || ver > _QrCode.MAX_VERSION)
+        throw new RangeError("Version number out of range");
+      let result = (16 * ver + 128) * ver + 64;
+      if (ver >= 2) {
+        const numAlign = Math.floor(ver / 7) + 2;
+        result -= (25 * numAlign - 10) * numAlign - 55;
+        if (ver >= 7)
+          result -= 36;
+      }
+      assert(208 <= result && result <= 29648);
+      return result;
+    }
+    static getNumDataCodewords(ver, ecl) {
+      return Math.floor(_QrCode.getNumRawDataModules(ver) / 8) - _QrCode.ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver] * _QrCode.NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
+    }
+    static reedSolomonComputeDivisor(degree) {
+      if (degree < 1 || degree > 255)
+        throw new RangeError("Degree out of range");
+      let result = [];
+      for (let i = 0; i < degree - 1; i++)
+        result.push(0);
+      result.push(1);
+      let root = 1;
+      for (let i = 0; i < degree; i++) {
+        for (let j = 0; j < result.length; j++) {
+          result[j] = _QrCode.reedSolomonMultiply(result[j], root);
+          if (j + 1 < result.length)
+            result[j] ^= result[j + 1];
+        }
+        root = _QrCode.reedSolomonMultiply(root, 2);
+      }
+      return result;
+    }
+    static reedSolomonComputeRemainder(data, divisor) {
+      let result = divisor.map((_) => 0);
+      for (const b of data) {
+        const factor = b ^ result.shift();
+        result.push(0);
+        divisor.forEach((coef, i) => result[i] ^= _QrCode.reedSolomonMultiply(coef, factor));
+      }
+      return result;
+    }
+    static reedSolomonMultiply(x, y) {
+      if (x >>> 8 != 0 || y >>> 8 != 0)
+        throw new RangeError("Byte out of range");
+      let z = 0;
+      for (let i = 7; i >= 0; i--) {
+        z = z << 1 ^ (z >>> 7) * 285;
+        z ^= (y >>> i & 1) * x;
+      }
+      assert(z >>> 8 == 0);
+      return z;
+    }
+    finderPenaltyCountPatterns(runHistory) {
+      const n = runHistory[1];
+      assert(n <= this.size * 3);
+      const core = n > 0 && runHistory[2] == n && runHistory[3] == n * 3 && runHistory[4] == n && runHistory[5] == n;
+      return (core && runHistory[0] >= n * 4 && runHistory[6] >= n ? 1 : 0) + (core && runHistory[6] >= n * 4 && runHistory[0] >= n ? 1 : 0);
+    }
+    finderPenaltyTerminateAndCount(currentRunColor, currentRunLength, runHistory) {
+      if (currentRunColor) {
+        this.finderPenaltyAddHistory(currentRunLength, runHistory);
+        currentRunLength = 0;
+      }
+      currentRunLength += this.size;
+      this.finderPenaltyAddHistory(currentRunLength, runHistory);
+      return this.finderPenaltyCountPatterns(runHistory);
+    }
+    finderPenaltyAddHistory(currentRunLength, runHistory) {
+      if (runHistory[0] == 0)
+        currentRunLength += this.size;
+      runHistory.pop();
+      runHistory.unshift(currentRunLength);
+    }
+  };
+  let QrCode = _QrCode;
+  QrCode.MIN_VERSION = 1;
+  QrCode.MAX_VERSION = 40;
+  QrCode.PENALTY_N1 = 3;
+  QrCode.PENALTY_N2 = 3;
+  QrCode.PENALTY_N3 = 40;
+  QrCode.PENALTY_N4 = 10;
+  QrCode.ECC_CODEWORDS_PER_BLOCK = [
+    [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+    [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
+  ];
+  QrCode.NUM_ERROR_CORRECTION_BLOCKS = [
+    [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+    [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+    [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+    [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81]
+  ];
+  qrcodegen2.QrCode = QrCode;
+  function appendBits(val, len, bb) {
+    if (len < 0 || len > 31 || val >>> len != 0)
+      throw new RangeError("Value out of range");
+    for (let i = len - 1; i >= 0; i--)
+      bb.push(val >>> i & 1);
+  }
+  function getBit(x, i) {
+    return (x >>> i & 1) != 0;
+  }
+  function assert(cond) {
+    if (!cond)
+      throw new Error("Assertion error");
+  }
+  const _QrSegment = class {
+    constructor(mode, numChars, bitData) {
+      this.mode = mode;
+      this.numChars = numChars;
+      this.bitData = bitData;
+      if (numChars < 0)
+        throw new RangeError("Invalid argument");
+      this.bitData = bitData.slice();
+    }
+    static makeBytes(data) {
+      let bb = [];
+      for (const b of data)
+        appendBits(b, 8, bb);
+      return new _QrSegment(_QrSegment.Mode.BYTE, data.length, bb);
+    }
+    static makeNumeric(digits) {
+      if (!_QrSegment.isNumeric(digits))
+        throw new RangeError("String contains non-numeric characters");
+      let bb = [];
+      for (let i = 0; i < digits.length; ) {
+        const n = Math.min(digits.length - i, 3);
+        appendBits(parseInt(digits.substr(i, n), 10), n * 3 + 1, bb);
+        i += n;
+      }
+      return new _QrSegment(_QrSegment.Mode.NUMERIC, digits.length, bb);
+    }
+    static makeAlphanumeric(text) {
+      if (!_QrSegment.isAlphanumeric(text))
+        throw new RangeError("String contains unencodable characters in alphanumeric mode");
+      let bb = [];
+      let i;
+      for (i = 0; i + 2 <= text.length; i += 2) {
+        let temp = _QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)) * 45;
+        temp += _QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i + 1));
+        appendBits(temp, 11, bb);
+      }
+      if (i < text.length)
+        appendBits(_QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)), 6, bb);
+      return new _QrSegment(_QrSegment.Mode.ALPHANUMERIC, text.length, bb);
+    }
+    static makeSegments(text) {
+      if (text == "")
+        return [];
+      else if (_QrSegment.isNumeric(text))
+        return [_QrSegment.makeNumeric(text)];
+      else if (_QrSegment.isAlphanumeric(text))
+        return [_QrSegment.makeAlphanumeric(text)];
+      else
+        return [_QrSegment.makeBytes(_QrSegment.toUtf8ByteArray(text))];
+    }
+    static makeEci(assignVal) {
+      let bb = [];
+      if (assignVal < 0)
+        throw new RangeError("ECI assignment value out of range");
+      else if (assignVal < 1 << 7)
+        appendBits(assignVal, 8, bb);
+      else if (assignVal < 1 << 14) {
+        appendBits(2, 2, bb);
+        appendBits(assignVal, 14, bb);
+      } else if (assignVal < 1e6) {
+        appendBits(6, 3, bb);
+        appendBits(assignVal, 21, bb);
+      } else
+        throw new RangeError("ECI assignment value out of range");
+      return new _QrSegment(_QrSegment.Mode.ECI, 0, bb);
+    }
+    static isNumeric(text) {
+      return _QrSegment.NUMERIC_REGEX.test(text);
+    }
+    static isAlphanumeric(text) {
+      return _QrSegment.ALPHANUMERIC_REGEX.test(text);
+    }
+    getData() {
+      return this.bitData.slice();
+    }
+    static getTotalBits(segs, version) {
+      let result = 0;
+      for (const seg of segs) {
+        const ccbits = seg.mode.numCharCountBits(version);
+        if (seg.numChars >= 1 << ccbits)
+          return Infinity;
+        result += 4 + ccbits + seg.bitData.length;
+      }
+      return result;
+    }
+    static toUtf8ByteArray(str) {
+      str = encodeURI(str);
+      let result = [];
+      for (let i = 0; i < str.length; i++) {
+        if (str.charAt(i) != "%")
+          result.push(str.charCodeAt(i));
+        else {
+          result.push(parseInt(str.substr(i + 1, 2), 16));
+          i += 2;
+        }
+      }
+      return result;
+    }
+  };
+  let QrSegment = _QrSegment;
+  QrSegment.NUMERIC_REGEX = /^[0-9]*$/;
+  QrSegment.ALPHANUMERIC_REGEX = /^[A-Z0-9 $%*+.\/:-]*$/;
+  QrSegment.ALPHANUMERIC_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+  qrcodegen2.QrSegment = QrSegment;
+})(qrcodegen || (qrcodegen = {}));
+((qrcodegen2) => {
+  ((QrCode2) => {
+    const _Ecc = class {
+      constructor(ordinal, formatBits) {
+        this.ordinal = ordinal;
+        this.formatBits = formatBits;
+      }
+    };
+    let Ecc = _Ecc;
+    Ecc.LOW = new _Ecc(0, 1);
+    Ecc.MEDIUM = new _Ecc(1, 0);
+    Ecc.QUARTILE = new _Ecc(2, 3);
+    Ecc.HIGH = new _Ecc(3, 2);
+    QrCode2.Ecc = Ecc;
+  })(qrcodegen2.QrCode || (qrcodegen2.QrCode = {}));
+})(qrcodegen || (qrcodegen = {}));
+((qrcodegen2) => {
+  ((QrSegment2) => {
+    const _Mode = class {
+      constructor(modeBits, numBitsCharCount) {
+        this.modeBits = modeBits;
+        this.numBitsCharCount = numBitsCharCount;
+      }
+      numCharCountBits(ver) {
+        return this.numBitsCharCount[Math.floor((ver + 7) / 17)];
+      }
+    };
+    let Mode = _Mode;
+    Mode.NUMERIC = new _Mode(1, [10, 12, 14]);
+    Mode.ALPHANUMERIC = new _Mode(2, [9, 11, 13]);
+    Mode.BYTE = new _Mode(4, [8, 16, 16]);
+    Mode.KANJI = new _Mode(8, [8, 10, 12]);
+    Mode.ECI = new _Mode(7, [0, 0, 0]);
+    QrSegment2.Mode = Mode;
+  })(qrcodegen2.QrSegment || (qrcodegen2.QrSegment = {}));
+})(qrcodegen || (qrcodegen = {}));
+var qrcodegen_default = qrcodegen;
+
+// src/index.tsx
+/**
+ * @license qrcode.react
+ * Copyright (c) Paul O'Shannessy
+ * SPDX-License-Identifier: ISC
+ */
+var ERROR_LEVEL_MAP = {
+  L: qrcodegen_default.QrCode.Ecc.LOW,
+  M: qrcodegen_default.QrCode.Ecc.MEDIUM,
+  Q: qrcodegen_default.QrCode.Ecc.QUARTILE,
+  H: qrcodegen_default.QrCode.Ecc.HIGH
+};
+var DEFAULT_SIZE = 128;
+var DEFAULT_LEVEL = "L";
+var DEFAULT_BGCOLOR = "#FFFFFF";
+var DEFAULT_FGCOLOR = "#000000";
+var DEFAULT_INCLUDEMARGIN = false;
+var MARGIN_SIZE = 4;
+var DEFAULT_IMG_SCALE = 0.1;
+function generatePath(modules, margin = 0) {
+  const ops = [];
+  modules.forEach(function(row, y) {
+    let start = null;
+    row.forEach(function(cell, x) {
+      if (!cell && start !== null) {
+        ops.push(`M${start + margin} ${y + margin}h${x - start}v1H${start + margin}z`);
+        start = null;
+        return;
+      }
+      if (x === row.length - 1) {
+        if (!cell) {
+          return;
+        }
+        if (start === null) {
+          ops.push(`M${x + margin},${y + margin} h1v1H${x + margin}z`);
+        } else {
+          ops.push(`M${start + margin},${y + margin} h${x + 1 - start}v1H${start + margin}z`);
+        }
+        return;
+      }
+      if (cell && start === null) {
+        start = x;
+      }
+    });
+  });
+  return ops.join("");
+}
+function excavateModules(modules, excavation) {
+  return modules.slice().map((row, y) => {
+    if (y < excavation.y || y >= excavation.y + excavation.h) {
+      return row;
+    }
+    return row.map((cell, x) => {
+      if (x < excavation.x || x >= excavation.x + excavation.w) {
+        return cell;
+      }
+      return false;
+    });
+  });
+}
+function getImageSettings(cells, size, includeMargin, imageSettings) {
+  if (imageSettings == null) {
+    return null;
+  }
+  const margin = includeMargin ? MARGIN_SIZE : 0;
+  const numCells = cells.length + margin * 2;
+  const defaultSize = Math.floor(size * DEFAULT_IMG_SCALE);
+  const scale = numCells / size;
+  const w = (imageSettings.width || defaultSize) * scale;
+  const h = (imageSettings.height || defaultSize) * scale;
+  const x = imageSettings.x == null ? cells.length / 2 - w / 2 : imageSettings.x * scale;
+  const y = imageSettings.y == null ? cells.length / 2 - h / 2 : imageSettings.y * scale;
+  let excavation = null;
+  if (imageSettings.excavate) {
+    let floorX = Math.floor(x);
+    let floorY = Math.floor(y);
+    let ceilW = Math.ceil(w + x - floorX);
+    let ceilH = Math.ceil(h + y - floorY);
+    excavation = { x: floorX, y: floorY, w: ceilW, h: ceilH };
+  }
+  return { x, y, h, w, excavation };
+}
+(function() {
+  try {
+    new Path2D().addPath(new Path2D());
+  } catch (e) {
+    return false;
+  }
+  return true;
+})();
+function QRCodeSVG(props) {
+  const _a = props, {
+    value,
+    size = DEFAULT_SIZE,
+    level = DEFAULT_LEVEL,
+    bgColor = DEFAULT_BGCOLOR,
+    fgColor = DEFAULT_FGCOLOR,
+    includeMargin = DEFAULT_INCLUDEMARGIN,
+    imageSettings
+  } = _a, otherProps = __objRest(_a, [
+    "value",
+    "size",
+    "level",
+    "bgColor",
+    "fgColor",
+    "includeMargin",
+    "imageSettings"
+  ]);
+  let cells = qrcodegen_default.QrCode.encodeText(value, ERROR_LEVEL_MAP[level]).getModules();
+  const margin = includeMargin ? MARGIN_SIZE : 0;
+  const numCells = cells.length + margin * 2;
+  const calculatedImageSettings = getImageSettings(cells, size, includeMargin, imageSettings);
+  let image = null;
+  if (imageSettings != null && calculatedImageSettings != null) {
+    if (calculatedImageSettings.excavation != null) {
+      cells = excavateModules(cells, calculatedImageSettings.excavation);
+    }
+    image = /* @__PURE__ */ React.createElement("image", {
+      xlinkHref: imageSettings.src,
+      height: calculatedImageSettings.h,
+      width: calculatedImageSettings.w,
+      x: calculatedImageSettings.x + margin,
+      y: calculatedImageSettings.y + margin,
+      preserveAspectRatio: "none"
+    });
+  }
+  const fgPath = generatePath(cells, margin);
+  return /* @__PURE__ */ React.createElement("svg", __spreadValues({
+    height: size,
+    width: size,
+    viewBox: `0 0 ${numCells} ${numCells}`
+  }, otherProps), /* @__PURE__ */ React.createElement("path", {
+    fill: bgColor,
+    d: `M0,0 h${numCells}v${numCells}H0z`,
+    shapeRendering: "crispEdges"
+  }), /* @__PURE__ */ React.createElement("path", {
+    fill: fgColor,
+    d: fgPath,
+    shapeRendering: "crispEdges"
+  }), image);
+}
+
+class ChatService {
+  constructor() {
+    this.socket = null;
+    this.userId = null;
+    this.username = null;
+    // Callbacks for UI updates
+    this.onMessage = null;
+    this.onRoomUpdated = null;
+    this.onRoomAdded = null;
+    this.onAuthSuccess = null;
+    this.onAuthenticated = null;
+    // Alias for AuthSuccess
+    this.onError = null;
+    this.onStatusChange = null;
+    this.rooms = [];
+    this.serverUrl = "https://gravity-chat-serve.onrender.com";
+    this.roomUpdateDebounceTimer = null;
+  }
+  init() {
+    if (this.socket?.connected) return;
+    this.socket = lookup(this.serverUrl, {
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1e3,
+      autoConnect: true
+    });
+    this.socket.on("connect", async () => {
+      console.log("Connected to Chat Server");
+      if (this.onStatusChange) this.onStatusChange("connected");
+      window.dispatchEvent(new Event("chat-connected"));
+      const storedUser = localStorage.getItem("gravity_chat_username");
+      const storedKey = localStorage.getItem("gravity_chat_priv");
+      const storedId = localStorage.getItem("gravity_chat_id");
+      if (storedUser && storedKey) {
+        console.log("Auto-logging in as", storedUser);
+        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+          const pubKey = localStorage.getItem("gravity_chat_pub") || "";
+          chrome.runtime.sendMessage({
+            type: "CHAT_SYNC_CREDS",
+            data: {
+              username: storedUser,
+              privateKey: storedKey,
+              publicKey: pubKey
+            }
+          }).catch(() => {
+          });
+        }
+        await this.authenticateWithSignature(storedId, storedUser);
+      }
+    });
+    this.setupListeners();
+  }
+  syncPushSubscription(sub) {
+    if (this.socket?.connected) {
+      console.log("Chat: Manual Push Sync");
+      this.socket.emit("store_push_subscription", sub);
+    }
+  }
+  setupListeners() {
+    if (!this.socket) return;
+    this.socket.on("disconnect", () => {
+      if (this.onStatusChange) this.onStatusChange("disconnected");
+      window.dispatchEvent(new Event("chat-disconnected"));
+    });
+    this.socket.on("connect_error", (err) => {
+      if (this.onStatusChange) this.onStatusChange("disconnected", err.message);
+    });
+    this.socket.on("auth_challenge", async (data) => {
+      console.log("Received auth challenge");
+      const storedKey = localStorage.getItem("gravity_chat_priv");
+      if (storedKey) {
+        try {
+          const signature = await this.signChallenge(data.challenge, storedKey);
+          this.socket?.emit("verify_signature", { signature });
+        } catch (e) {
+          console.error("Auto-signing challenge failed", e);
+        }
+      }
+    });
+    this.socket.on("auth_success", (data) => {
+      if (this.userId === data.id && this.rooms.length > 0) {
+        console.log(`Ignoring duplicate auth_success for ${data.username}`);
+        return;
+      }
+      this.userId = data.id;
+      this.username = data.username;
+      this.rooms = data.rooms.map((r) => ({
+        ...r,
+        messages: [],
+        unreadCount: 0
+      }));
+      console.log(`Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map((r) => r.name));
+      if (data.pendingInvites && data.pendingInvites.length > 0) {
+        console.log(`Received ${data.pendingInvites.length} pending invites`);
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage({
+            type: "UPDATE_BADGE",
+            count: data.pendingInvites.length
+          }).catch(() => {
+          });
+        }
+        data.pendingInvites.forEach((invite) => {
+          if (this.onError) {
+            this.onError(`You were invited to "${invite.roomName}" by ${invite.invitedBy}`);
+          }
+        });
+      }
+      localStorage.setItem("gravity_chat_id", data.id);
+      localStorage.setItem("gravity_chat_username", data.username);
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(["gravity_push_sub"], (res) => {
+          if (res && res.gravity_push_sub) {
+            try {
+              const sub = JSON.parse(res.gravity_push_sub);
+              console.log("Chat: Syncing WebPush Sub");
+              this.socket?.emit("store_push_subscription", sub);
+            } catch (e) {
+            }
+          }
+        });
+      }
+      if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
+      if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
+      this.notifyRoomUpdate();
+    });
+    this.socket.on("new_message", (data) => {
+      this.handleNewMessage(data.roomId, data.message);
+    });
+    this.socket.on("room_history", async (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        const hadMembers = room.memberDetails && room.memberDetails.length > 0;
+        room.memberDetails = data.memberDetails;
+        const hadMessages = room.messages.length > 0;
+        room.messages = await Promise.all(data.messages.map((m) => this.processIncomingMessage(data.roomId, m)));
+        if (!hadMessages && data.messages.length > 0 || !hadMembers && data.memberDetails && data.memberDetails.length > 0) {
+          this.notifyRoomUpdate();
+        }
+      }
+    });
+    this.socket.on("member_joined", (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        if (!room.memberDetails) room.memberDetails = [];
+        if (!room.memberDetails.find((u) => u.id === data.userId)) {
+          room.memberDetails.push({ id: data.userId, username: data.username });
+          this.notifyRoomUpdate();
+        }
+      }
+    });
+    this.socket.on("room_added", (roomData) => {
+      console.log(`room_added event received:`, roomData);
+      if (this.rooms.find((r) => r.id === roomData.id)) {
+        console.log(`Room ${roomData.name} already exists, skipping`);
+        return;
+      }
+      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
+      this.rooms.push(newRoom);
+      console.log(`Added room to local list. Total rooms: ${this.rooms.length}`);
+      this.notifyRoomUpdate();
+      if (this.onRoomAdded) this.onRoomAdded(newRoom);
+    });
+    this.socket.on("room_joined", (roomData) => {
+      if (this.rooms.find((r) => r.id === roomData.id)) return;
+      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
+      this.rooms.push(newRoom);
+      this.notifyRoomUpdate();
+      if (this.onRoomAdded) this.onRoomAdded(newRoom);
+    });
+    this.socket.on("room_removed", (roomId) => {
+      this.rooms = this.rooms.filter((r) => r.id !== roomId);
+      this.notifyRoomUpdate();
+    });
+    this.socket.on("user_kicked", (data) => {
+      if (data.userId === this.userId) {
+        if (this.onError) this.onError(`You were kicked from room`);
+        window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
+      }
+    });
+    this.socket.on("user_banned", (data) => {
+      if (data.userId === this.userId) {
+        if (this.onError) this.onError(`You were BANNED from room`);
+        window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
+      }
+    });
+    this.socket.on("message_edited", (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        const msg = room.messages.find((m) => m.id === data.messageId);
+        if (msg) {
+          msg.content = data.content;
+          msg.isEdited = true;
+          msg.editTimestamp = data.editTimestamp;
+          this.notifyRoomUpdate();
+        }
+      }
+    });
+    this.socket.on("message_deleted", (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        room.messages = room.messages.filter((m) => m.id !== data.messageId);
+        this.notifyRoomUpdate();
+      }
+    });
+    this.socket.on("error", (msg) => {
+      console.error("Socket Error:", msg);
+      if (msg.includes("User not found") || msg.includes("no public key registered")) {
+        console.warn("Server identity lost. Clearing local chat identity.");
+        const storedName = localStorage.getItem("gravity_chat_username");
+        localStorage.removeItem("gravity_chat_id");
+        localStorage.removeItem("gravity_chat_priv");
+        localStorage.removeItem("gravity_chat_pub");
+        if (this.socket) {
+          this.socket.disconnect();
+          this.socket = null;
+        }
+        this.userId = null;
+        this.username = null;
+        this.rooms = [];
+        if (storedName && !storedName.startsWith("!RESET!")) {
+          console.log(`Auto-repairing identity for ${storedName}...`);
+          setTimeout(() => {
+            this.init();
+            setTimeout(() => {
+              this.register(storedName).catch(console.error);
+            }, 500);
+          }, 2e3);
+          return;
+        }
+      }
+      if (this.onError) this.onError(msg);
+    });
+    this.socket.on("search_results", (results) => {
+      window.dispatchEvent(new CustomEvent("chat-search-results", { detail: results }));
+    });
+    this.socket.on("user_online", (userId) => this.handleUserStatusChange(userId, true));
+    this.socket.on("user_offline", (userId) => this.handleUserStatusChange(userId, false));
+  }
+  // --- CRYPTO & AUTH ---
+  // --- CRYPTO & AUTH ---
+  async generateAndSaveIdentity() {
+    const signKeys = await crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["sign", "verify"]
+    );
+    const signPubInfo = await crypto.subtle.exportKey("spki", signKeys.publicKey);
+    const signPrivInfo = await crypto.subtle.exportKey("pkcs8", signKeys.privateKey);
+    const publicKeyHex = this.bufferToHex(new Uint8Array(signPubInfo));
+    const privateKeyHex = this.bufferToHex(new Uint8Array(signPrivInfo));
+    const encKeys = await generateEncryptionKeys();
+    const encPubB64 = await exportKeyToBase64(encKeys.publicKey);
+    const encPrivB64 = await exportKeyToBase64(encKeys.privateKey);
+    localStorage.setItem("gravity_chat_priv", privateKeyHex);
+    localStorage.setItem("gravity_chat_pub", publicKeyHex);
+    localStorage.setItem("gravity_chat_enc_priv", encPrivB64);
+    localStorage.setItem("gravity_chat_enc_pub", encPubB64);
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({
+        type: "CHAT_SYNC_CREDS",
+        data: {
+          privateKey: privateKeyHex,
+          publicKey: publicKeyHex,
+          // We don't necessarily need to sync enc keys to BG unless BG does decryption, 
+          // but good for consistency.
+          encPrivateKey: encPrivB64,
+          encPublicKey: encPubB64
+        }
+      });
+    }
+    return {
+      publicKey: publicKeyHex,
+      privateKey: privateKeyHex,
+      encryptionPublicKey: encPubB64,
+      encryptionPrivateKey: encPrivB64
+    };
+  }
+  async ensureEncryptionKeys() {
+    let encPub = localStorage.getItem("gravity_chat_enc_pub");
+    let encPriv = localStorage.getItem("gravity_chat_enc_priv");
+    if (!encPub || !encPriv) {
+      console.log("Generating missing E2EE Encryption Keys...");
+      const encKeys = await generateEncryptionKeys();
+      encPub = await exportKeyToBase64(encKeys.publicKey);
+      encPriv = await exportKeyToBase64(encKeys.privateKey);
+      localStorage.setItem("gravity_chat_enc_priv", encPriv);
+      localStorage.setItem("gravity_chat_enc_pub", encPub);
+    }
+    return encPub;
+  }
+  async authenticateWithSignature(userId, username) {
+    if (!this.socket) return;
+    const encPub = await this.ensureEncryptionKeys();
+    this.socket.emit("request_challenge", { userId, username, encryptionPublicKey: encPub });
+  }
+  async signChallenge(challenge, privateKeyHex) {
+    const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
+    const privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      privateKeyBuffer,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"]
+    );
+    const encoder = new TextEncoder();
+    const data = encoder.encode(challenge);
+    const signature = await crypto.subtle.sign(
+      { name: "ECDSA", hash: { name: "SHA-256" } },
+      privateKey,
+      data
+    );
+    return this.bufferToHex(new Uint8Array(signature));
+  }
+  hexToBuffer(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    }
+    return bytes.buffer;
+  }
+  bufferToHex(buffer) {
+    return Array.from(buffer).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  // Helper to debounce room updates and prevent infinite loops
+  notifyRoomUpdate() {
+    if (this.roomUpdateDebounceTimer) {
+      clearTimeout(this.roomUpdateDebounceTimer);
+    }
+    this.roomUpdateDebounceTimer = setTimeout(() => {
+      if (this.onRoomUpdated) {
+        this.onRoomUpdated([...this.rooms]);
+      }
+    }, 100);
+  }
+  // --- PUBLIC METHODS ---
+  createRoom(name, isPrivate = false) {
+    this.socket?.emit("create_room", { name, isPrivate });
+  }
+  getCurrentUser() {
+    if (this.userId && this.username) return { id: this.userId, username: this.username };
+    return null;
+  }
+  getRooms() {
+    return [...this.rooms];
+  }
+  async register(username) {
+    if (!this.socket) await this.init();
+    const storedUser = this.getStoredUsername();
+    const storedKey = this.getStoredPrivateKey();
+    if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
+      console.log("Local keys found, performing cryptographic login recovery...");
+      await this.ensureEncryptionKeys();
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "CHAT_SYNC_CREDS",
+          data: { username: storedUser, privateKey: storedKey, publicKey: localStorage.getItem("gravity_chat_pub") }
+        });
+      }
+      return this.authenticateWithSignature(null, username);
+    }
+    const keys = await this.generateAndSaveIdentity();
+    if (!username.startsWith("!RESET!")) {
+      localStorage.setItem("gravity_chat_username", username);
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "CHAT_SYNC_CREDS",
+          data: { username, privateKey: keys.privateKey, publicKey: keys.publicKey }
+        });
+      }
+    }
+    this.socket?.emit("register", {
+      username,
+      publicKey: keys.publicKey,
+      encryptionPublicKey: keys.encryptionPublicKey
+    });
+  }
+  async sendMessage(roomId, content, isEncrypted = false) {
+    if (!this.socket) return;
+    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+    if (!privateKeyHex) {
+      if (this.onError) this.onError("Security Error: No identity found. Please re-login.");
+      return;
+    }
+    try {
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = content + timestamp;
+      const publicKeyHex = localStorage.getItem("gravity_chat_pub");
+      console.log("[SIGN] Public Key (first 20):", publicKeyHex?.substring(0, 20));
+      console.log("[SIGN] Private Key (first 20):", privateKeyHex?.substring(0, 20));
+      console.log("[SIGN] Message to sign:", messageToSign);
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      console.log("[SIGN] Signature (first 20):", signature?.substring(0, 20));
+      this.socket.emit("send_message", {
+        roomId,
+        content,
+        timestamp,
+        signature,
+        isEncrypted
+      });
+    } catch (err) {
+      console.error("Failed to sign message:", err);
+      if (this.onError) this.onError("Failed to securely sign message.");
+    }
+  }
+  async sendDirectMessage(roomId, content, recipientPublicKeyBase64) {
+    try {
+      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
+      const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
+      if (!myPrivBase64 || !myPubBase64) throw new Error("Encryption keys missing");
+      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
+      const myPubKey = await importKeyFromBase64(myPubBase64, "public");
+      const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, "public");
+      const recipientSharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
+      const encryptedForRecipient = await encryptMessage(content, recipientSharedKey);
+      const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
+      const encryptedForMe = await encryptMessage(content, mySharedKey);
+      const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+      if (!privateKeyHex) throw new Error("Signing key missing");
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = encryptedForRecipient + timestamp;
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      this.socket?.emit("send_message", {
+        roomId,
+        content: encryptedForRecipient,
+        contentForSender: encryptedForMe,
+        // NEW: encrypted version for sender
+        timestamp,
+        signature,
+        isEncrypted: true
+      });
+    } catch (e) {
+      console.error("E2EE Failed:", e);
+      if (this.onError) this.onError("Encryption failed: " + e.message);
+    }
+  }
+  async editMessage(roomId, messageId, newContent) {
+    if (!this.socket) return;
+    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+    if (!privateKeyHex) return;
+    try {
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = newContent + timestamp;
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      this.socket.emit("edit_message", {
+        roomId,
+        messageId,
+        content: newContent,
+        timestamp,
+        signature
+      });
+    } catch (err) {
+      console.error("Failed to sign edit:", err);
+    }
+  }
+  deleteMessage(roomId, messageId) {
+    this.socket?.emit("delete_message", { roomId, messageId });
+  }
+  joinRoom(roomId) {
+    this.socket?.emit("join_room", roomId);
+  }
+  createDM(targetId) {
+    this.socket?.emit("create_dm", targetId);
+  }
+  searchUsers(query) {
+    this.socket?.emit("search_users", query);
+  }
+  inviteUser(roomId, user) {
+    this.socket?.emit("invite_user", { roomId, targetUsername: user });
+  }
+  closeRoom(roomId) {
+    this.socket?.emit("close_room", roomId);
+  }
+  kickUser(roomId, userId) {
+    this.socket?.emit("kick_user", { roomId, targetUserId: userId });
+  }
+  banUser(roomId, userId) {
+    this.socket?.emit("ban_user", { roomId, targetUserId: userId });
+  }
+  muteUser(roomId, userId) {
+    this.socket?.emit("mute_user", { roomId, targetUserId: userId });
+  }
+  unmuteUser(roomId, userId) {
+    this.socket?.emit("unmute_user", { roomId, targetUserId: userId });
+  }
+  logout() {
+    localStorage.removeItem("gravity_chat_id");
+    localStorage.removeItem("gravity_chat_username");
+    localStorage.removeItem("gravity_chat_priv");
+    localStorage.removeItem("gravity_chat_pub");
+    this.userId = null;
+    this.username = null;
+    this.rooms = [];
+    this.socket?.disconnect();
+    this.socket = null;
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: "CHAT_LOGOUT" });
+    }
+  }
+  async handleNewMessage(roomId, message) {
+    console.log("[ChatService] New message received:", {
+      roomId,
+      messageId: message.id,
+      isEncrypted: message.isEncrypted,
+      content: message.content?.substring(0, 50) + "..."
+    });
+    const processedMsg = await this.processIncomingMessage(roomId, message);
+    const room = this.rooms.find((r) => r.id === roomId);
+    if (room) {
+      if (room.messages.find((m) => m.id === processedMsg.id)) return;
+      room.messages.push(processedMsg);
+      if (this.onMessage) this.onMessage(roomId, processedMsg);
+      if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+      if (processedMsg.senderId !== this.userId) {
+        window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
+        const badge = document.getElementById("chat-badge");
+        if (badge) badge.classList.remove("hidden");
+      }
+    }
+  }
+  async processIncomingMessage(roomId, message) {
+    const looksEncrypted = message.content && message.content.length > 20 && /^[A-Za-z0-9+/]+=*$/.test(message.content) && !message.content.includes(" ");
+    const room = this.rooms.find((r) => r.id === roomId);
+    const isEncrypted = message.isEncrypted || looksEncrypted && room?.type === "dm";
+    if (!isEncrypted) return message;
+    try {
+      if (message.senderId === this.userId) {
+        const myPrivBase642 = localStorage.getItem("gravity_chat_enc_priv");
+        const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
+        if (!myPrivBase642 || !myPubBase64) {
+          return { ...message, content: "(Encrypted Message - keys missing)" };
+        }
+        try {
+          const myPrivKey2 = await importKeyFromBase64(myPrivBase642, "private");
+          const myPubKey = await importKeyFromBase64(myPubBase64, "public");
+          const mySharedKey = await deriveSharedSecret(myPrivKey2, myPubKey);
+          const decrypted2 = await decryptMessage(message.content, mySharedKey);
+          console.log("[ChatService] Successfully decrypted own message");
+          return { ...message, content: decrypted2 };
+        } catch (e) {
+          console.error("[ChatService] Failed to decrypt own message:", e);
+          return { ...message, content: "(Encrypted Message sent by you)" };
+        }
+      }
+      const room2 = this.rooms.find((r) => r.id === roomId);
+      const sender = room2?.memberDetails?.find((u) => u.id === message.senderId);
+      console.log("[ChatService] Decrypting message:", {
+        roomId,
+        roomType: room2?.type,
+        senderId: message.senderId,
+        myId: this.userId,
+        hasSender: !!sender,
+        hasEncryptionKey: !!sender?.encryptionPublicKey,
+        memberDetails: room2?.memberDetails?.map((m) => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
+      });
+      if (!sender?.encryptionPublicKey) {
+        console.error("[ChatService] Missing encryption key for sender:", message.senderId);
+        return { ...message, content: `Encrypted Message (Key not found for ${message.senderName})` };
+      }
+      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
+      if (!myPrivBase64) {
+        console.error("[ChatService] Missing my private encryption key");
+        return { ...message, content: "Encrypted Message (You lack keys)" };
+      }
+      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
+      const senderPubKey = await importKeyFromBase64(sender.encryptionPublicKey, "public");
+      const sharedKey = await deriveSharedSecret(myPrivKey, senderPubKey);
+      const decrypted = await decryptMessage(message.content, sharedKey);
+      console.log("[ChatService] Successfully decrypted message");
+      return { ...message, content: decrypted };
+    } catch (e) {
+      console.error("[ChatService] Decryption error:", e);
+      return { ...message, content: "Decryption Failed" };
+    }
+  }
+  getStoredPrivateKey() {
+    return localStorage.getItem("gravity_chat_priv");
+  }
+  getStoredUsername() {
+    return localStorage.getItem("gravity_chat_username");
+  }
+  handleUserStatusChange(userId, isOnline) {
+    let updated = false;
+    this.rooms.forEach((room) => {
+      const member = room.memberDetails?.find((m) => m.id === userId);
+      if (member) {
+        member.isOnline = isOnline;
+        updated = true;
+      }
+    });
+    if (updated && this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+  }
+}
+const chatService = new ChatService();
+
+class SyncService {
+  constructor() {
+    this.socket = null;
+    this.serverUrl = "https://gravity-chat-serve.onrender.com";
+  }
+  // EXPORT FLOW (Sender)
+  async startExportSession(accounts, settings, onSuccess) {
+    const syncId = Math.random().toString(36).substring(2, 15);
+    const sessionKeyRaw = await window.crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+    const sessionKey = await exportKeyToBase64(sessionKeyRaw);
+    const payload = {
+      timestamp: Date.now(),
+      accounts,
+      settings: {
+        useGoogleAuth: settings?.useGoogleAuth,
+        useBiometrics: settings?.useBiometrics,
+        useDeviceAuth: settings?.useDeviceAuth,
+        useTOTP: settings?.useTOTP
+      }
+    };
+    const user = chatService.getCurrentUser();
+    const privat = await storageService.getItem("gravity_chat_key");
+    const publick = await storageService.getItem("gravity_chat_pub");
+    if (user && privat && publick) {
+      payload.chatIdentity = {
+        username: user.username,
+        id: user.id,
+        privateKey: privat,
+        publicKey: publick
+      };
+    }
+    this.connect();
+    const onConnect = () => {
+      console.log("[SyncService] Export: Joining room", syncId);
+      this.socket?.emit("bridge_join", { sessionId: syncId });
+    };
+    if (this.socket?.connected) {
+      onConnect();
+    } else {
+      this.socket?.on("connect", onConnect);
+    }
+    const encryptedData = await this.encryptPayload(payload, sessionKeyRaw);
+    this.socket?.on("bridge_request", (_msg) => {
+      console.log("Sync peer detected. Sending payload...");
+      this.socket?.emit("bridge_response", { sessionId: syncId, encrypted: encryptedData });
+      if (onSuccess) onSuccess();
+      setTimeout(() => this.disconnect(), 5e3);
+    });
+    const qrData = `gravity:sync:${syncId}:${sessionKey}`;
+    return { syncId, sessionKey, qrData };
+  }
+  // IMPORT FLOW (Receiver)
+  async startImportSession(qrCodeOrText) {
+    const parts = qrCodeOrText.trim().split(":");
+    if (parts[0] !== "gravity" || parts[1] !== "sync" || !parts[2] || !parts[3]) {
+      throw new Error("Invalid Sync Code Format");
+    }
+    const syncId = parts[2];
+    const keyB64 = parts[3];
+    const key = await this.importAesKey(keyB64);
+    this.connect();
+    return new Promise((resolve, reject) => {
+      const onConnect = () => {
+        console.log("[SyncService] Import: Joining room", syncId);
+        this.socket?.emit("bridge_join", { sessionId: syncId });
+        setTimeout(() => {
+          console.log("[SyncService] Import: Sending bridge_request");
+          this.socket?.emit("bridge_request", { sessionId: syncId, encrypted: "HELO" });
+        }, 1500);
+      };
+      if (this.socket?.connected) {
+        onConnect();
+      } else {
+        this.socket?.on("connect", onConnect);
+      }
+      this.socket?.on("bridge_response", async (msg) => {
+        console.log("[SyncService] Import: Received response!");
+        try {
+          const decrypted = await this.decryptPayload(msg.encrypted, key);
+          this.disconnect();
+          resolve(decrypted);
+        } catch (e) {
+          console.error("Sync decryption failed", e);
+          reject("Decryption Failed: Invalid Key or Data");
+        }
+      });
+      setTimeout(() => {
+        this.disconnect();
+        reject("Sync Timeout: No connection from peer.");
+      }, 6e4);
+    });
+  }
+  // UTILS
+  connect() {
+    if (this.socket) this.disconnect();
+    this.socket = lookup(this.serverUrl, { transports: ["websocket"] });
+    this.socket.on("connect", () => console.log("[SyncService] Socket Connected:", this.socket?.id));
+    this.socket.on("connect_error", (err) => console.error("[SyncService] Socket Connection Error:", err));
+    this.socket.on("disconnect", (reason) => console.log("[SyncService] Socket Disconnected:", reason));
+  }
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+  }
+  isConnected() {
+    return this.socket?.connected || false;
+  }
+  async importAesKey(b64) {
+    const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return window.crypto.subtle.importKey("raw", raw, "AES-GCM", true, ["encrypt", "decrypt"]);
+  }
+  async encryptPayload(payload, key) {
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const enc = new TextEncoder().encode(JSON.stringify(payload));
+    const encrypted = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc);
+    const bundle = new Uint8Array(iv.length + encrypted.byteLength);
+    bundle.set(iv, 0);
+    bundle.set(new Uint8Array(encrypted), 12);
+    return btoa(String.fromCharCode(...bundle));
+  }
+  async decryptPayload(b64, key) {
+    const data = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const iv = data.slice(0, 12);
+    const ciphertext = data.slice(12);
+    const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+    return JSON.parse(new TextDecoder().decode(decrypted));
+  }
+}
+const syncService = new SyncService();
+
+const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
+  const [qrData, setQrData] = reactExports.useState(null);
+  const [status, setStatus] = reactExports.useState("initializing");
+  const [copied, setCopied] = reactExports.useState(false);
+  const [errorMsg, setErrorMsg] = reactExports.useState("");
+  const [socketConnected, setSocketConnected] = reactExports.useState(false);
+  reactExports.useEffect(() => {
+    let mounted = true;
+    const start = async () => {
+      try {
+        const { qrData: qrData2 } = await syncService.startExportSession(
+          accounts,
+          walletConfig,
+          () => {
+            if (mounted) setStatus("synced");
+          }
+        );
+        if (mounted) {
+          setQrData(qrData2);
+          setStatus("ready");
+        }
+      } catch (e) {
+        console.error("Sync Export Error:", e);
+        if (mounted) {
+          setStatus("error");
+          setErrorMsg(e.message || String(e));
+        }
+      }
+    };
+    start();
+    const interval = setInterval(() => {
+      setSocketConnected(syncService.isConnected());
+    }, 1e3);
+    return () => {
+      mounted = false;
+      syncService.disconnect();
+      clearInterval(interval);
+    };
+  }, []);
+  const handleCopy = () => {
+    if (qrData) {
+      navigator.clipboard.writeText(qrData);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2e3);
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "button",
+      {
+        onClick: onClose,
+        className: "absolute top-4 right-4 text-slate-400 hover:text-white",
+        children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: "Sync to Mobile" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: "Scan with your mobile app to transfer your accounts." }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center justify-center space-y-6", children: [
+      status === "initializing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-48 h-48 flex items-center justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500" }) }),
+      status === "ready" && qrData && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white p-4 rounded-xl flex flex-col items-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(QRCodeSVG, { value: qrData, size: 192, level: "M" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `text-[10px] font-bold mt-2 flex items-center gap-1 ${socketConnected ? "text-green-600" : "text-orange-500"}`, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-2 h-2 rounded-full ${socketConnected ? "bg-green-500" : "bg-orange-500 animate-pulse"}` }),
+          socketConnected ? "Server Connected" : "Connecting to Server..."
+        ] })
+      ] }),
+      status === "synced" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-48 h-48 flex flex-col items-center justify-center text-green-400", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-20 h-20 mb-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-bold", children: "Sync Complete!" })
+      ] }),
+      status === "error" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-red-400 font-bold text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Connection Error." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] font-mono mt-2 bg-black/20 p-2 rounded max-w-[250px] break-words", children: errorMsg })
+      ] })
+    ] }),
+    status === "ready" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-6", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-center text-slate-500 mb-2 uppercase font-bold tracking-widest", children: "Or copy code manually" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: handleCopy,
+          className: "w-full py-3 bg-dark-700 hover:bg-dark-600 rounded-xl font-mono text-xs text-purple-300 transition-all active:scale-95 flex items-center justify-center gap-2",
+          children: copied ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }) }),
+            "Copied!"
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" }) }),
+            "Copy Sync Code"
+          ] })
+        }
+      )
+    ] })
+  ] }) });
+};
+
+const SyncImportModal = ({ onClose, onImport }) => {
+  const [code, setCode] = reactExports.useState("");
+  const [status, setStatus] = reactExports.useState("idle");
+  const [errorMsg, setErrorMsg] = reactExports.useState("");
+  const handleSync = async () => {
+    if (!code) return;
+    setStatus("syncing");
+    setErrorMsg("");
+    try {
+      const payload = await syncService.startImportSession(code);
+      await onImport(payload);
+      onClose();
+    } catch (e) {
+      setStatus("error");
+      setErrorMsg(e.message || "Sync Failed");
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "button",
+      {
+        onClick: onClose,
+        className: "absolute top-4 right-4 text-slate-400 hover:text-white",
+        children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: "Import Sync Code" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: "Paste the sync code from the other device (Mobile/Desktop)." }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "textarea",
+        {
+          value: code,
+          onChange: (e) => setCode(e.target.value),
+          placeholder: "Paste gravity:sync:... code here",
+          className: "w-full bg-dark-900 border border-dark-700 rounded-xl p-4 text-xs font-mono text-slate-200 focus:border-purple-500 outline-none h-24 resize-none"
+        }
+      ),
+      errorMsg && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-400 text-xs font-bold text-center", children: errorMsg }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: handleSync,
+          disabled: !code || status === "syncing",
+          className: `w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${!code || status === "syncing" ? "bg-dark-700 text-slate-500" : "bg-purple-600 text-white shadow-lg active:scale-95"}`,
+          children: status === "syncing" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Connecting..." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[8px] opacity-70 normal-case mt-1", children: "Keep Desktop Export screen OPEN" })
+          ] }) : "Start Sync"
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: "Secure End-to-End Encrypted Transfer" })
+    ] })
+  ] }) });
+};
+
 const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport }) => {
   const { t } = useTranslation();
   const [showTOTP, setShowTOTP] = reactExports.useState(false);
   const [showBio, setShowBio] = reactExports.useState(false);
+  const [showSyncExport, setShowSyncExport] = reactExports.useState(false);
+  const [showSyncImport, setShowSyncImport] = reactExports.useState(false);
+  const handleSyncImport = async (payload) => {
+    const mergedAccounts = [...walletState.accounts];
+    let added = 0;
+    payload.accounts.forEach((acc) => {
+      if (!mergedAccounts.find((a) => a.name === acc.name && a.chain === acc.chain)) {
+        mergedAccounts.push(acc);
+        added++;
+      }
+    });
+    const newConfig = { ...walletState };
+    if (payload.settings) {
+      if (payload.settings.useGoogleAuth !== void 0) newConfig.useGoogleAuth = payload.settings.useGoogleAuth;
+      if (payload.settings.useBiometrics !== void 0) newConfig.useBiometrics = payload.settings.useBiometrics;
+      if (payload.settings.useDeviceAuth !== void 0) newConfig.useDeviceAuth = payload.settings.useDeviceAuth;
+      if (payload.settings.useTOTP !== void 0) newConfig.useTOTP = payload.settings.useTOTP;
+    }
+    setWalletState({ ...newConfig, accounts: mergedAccounts });
+    if (payload.chatIdentity) {
+      await storageService.setItem("gravity_chat_key", payload.chatIdentity.privateKey);
+      await storageService.setItem("gravity_chat_pub", payload.chatIdentity.publicKey);
+      localStorage.setItem("gravity_chat_username", payload.chatIdentity.username);
+      localStorage.setItem("gravity_chat_registration", JSON.stringify({
+        id: payload.chatIdentity.id,
+        username: payload.chatIdentity.username,
+        timestamp: payload.timestamp
+      }));
+    }
+    alert(`Sync Successful! Added ${added} new accounts.`);
+  };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full space-y-4", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center p-4 border-b border-dark-700", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-lg font-bold", children: t("settings.accounts_title") }),
@@ -8205,7 +9897,32 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
       )
     ] }, `${acc.chain}-${acc.name}-${idx}`)) }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 pt-2 border-t border-dark-700 mt-auto space-y-3", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: "Security" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: "Cross-Device Sync" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => setShowSyncExport(true),
+            className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" }) }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: "Export" })
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => setShowSyncImport(true),
+            className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }) }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: "Import" })
+            ]
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1 mt-4", children: "Security" }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs(
         "button",
         {
@@ -8268,6 +9985,21 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
         setWalletState,
         onClose: () => setShowBio(false),
         onComplete: () => setShowBio(false)
+      }
+    ),
+    showSyncExport && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SyncExportModal,
+      {
+        accounts,
+        walletConfig: walletState,
+        onClose: () => setShowSyncExport(false)
+      }
+    ),
+    showSyncImport && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SyncImportModal,
+      {
+        onClose: () => setShowSyncImport(false),
+        onImport: handleSyncImport
       }
     )
   ] });
@@ -11658,600 +13390,6 @@ const HelpView = () => {
   ] });
 };
 
-class ChatService {
-  constructor() {
-    this.socket = null;
-    this.userId = null;
-    this.username = null;
-    // Callbacks for UI updates
-    this.onMessage = null;
-    this.onRoomUpdated = null;
-    this.onRoomAdded = null;
-    this.onAuthSuccess = null;
-    this.onAuthenticated = null;
-    // Alias for AuthSuccess
-    this.onError = null;
-    this.onStatusChange = null;
-    this.rooms = [];
-    this.serverUrl = "https://gravity-chat-serve.onrender.com";
-    this.roomUpdateDebounceTimer = null;
-  }
-  init() {
-    if (this.socket?.connected) return;
-    this.socket = lookup(this.serverUrl, {
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1e3,
-      autoConnect: true
-    });
-    this.socket.on("connect", async () => {
-      console.log("Connected to Chat Server");
-      if (this.onStatusChange) this.onStatusChange("connected");
-      window.dispatchEvent(new Event("chat-connected"));
-      const storedUser = localStorage.getItem("gravity_chat_username");
-      const storedKey = localStorage.getItem("gravity_chat_priv");
-      const storedId = localStorage.getItem("gravity_chat_id");
-      if (storedUser && storedKey) {
-        console.log("Auto-logging in as", storedUser);
-        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-          const pubKey = localStorage.getItem("gravity_chat_pub") || "";
-          chrome.runtime.sendMessage({
-            type: "CHAT_SYNC_CREDS",
-            data: {
-              username: storedUser,
-              privateKey: storedKey,
-              publicKey: pubKey
-            }
-          }).catch(() => {
-          });
-        }
-        await this.authenticateWithSignature(storedId, storedUser);
-      }
-    });
-    this.setupListeners();
-  }
-  syncPushSubscription(sub) {
-    if (this.socket?.connected) {
-      console.log("Chat: Manual Push Sync");
-      this.socket.emit("store_push_subscription", sub);
-    }
-  }
-  setupListeners() {
-    if (!this.socket) return;
-    this.socket.on("disconnect", () => {
-      if (this.onStatusChange) this.onStatusChange("disconnected");
-      window.dispatchEvent(new Event("chat-disconnected"));
-    });
-    this.socket.on("connect_error", (err) => {
-      if (this.onStatusChange) this.onStatusChange("disconnected", err.message);
-    });
-    this.socket.on("auth_challenge", async (data) => {
-      console.log("Received auth challenge");
-      const storedKey = localStorage.getItem("gravity_chat_priv");
-      if (storedKey) {
-        try {
-          const signature = await this.signChallenge(data.challenge, storedKey);
-          this.socket?.emit("verify_signature", { signature });
-        } catch (e) {
-          console.error("Auto-signing challenge failed", e);
-        }
-      }
-    });
-    this.socket.on("auth_success", (data) => {
-      if (this.userId === data.id && this.rooms.length > 0) {
-        console.log(`Ignoring duplicate auth_success for ${data.username}`);
-        return;
-      }
-      this.userId = data.id;
-      this.username = data.username;
-      this.rooms = data.rooms.map((r) => ({
-        ...r,
-        messages: [],
-        unreadCount: 0
-      }));
-      console.log(`Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map((r) => r.name));
-      if (data.pendingInvites && data.pendingInvites.length > 0) {
-        console.log(`Received ${data.pendingInvites.length} pending invites`);
-        if (typeof chrome !== "undefined" && chrome.runtime) {
-          chrome.runtime.sendMessage({
-            type: "UPDATE_BADGE",
-            count: data.pendingInvites.length
-          }).catch(() => {
-          });
-        }
-        data.pendingInvites.forEach((invite) => {
-          if (this.onError) {
-            this.onError(`You were invited to "${invite.roomName}" by ${invite.invitedBy}`);
-          }
-        });
-      }
-      localStorage.setItem("gravity_chat_id", data.id);
-      localStorage.setItem("gravity_chat_username", data.username);
-      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(["gravity_push_sub"], (res) => {
-          if (res && res.gravity_push_sub) {
-            try {
-              const sub = JSON.parse(res.gravity_push_sub);
-              console.log("Chat: Syncing WebPush Sub");
-              this.socket?.emit("store_push_subscription", sub);
-            } catch (e) {
-            }
-          }
-        });
-      }
-      if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
-      if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
-      this.notifyRoomUpdate();
-    });
-    this.socket.on("new_message", (data) => {
-      this.handleNewMessage(data.roomId, data.message);
-    });
-    this.socket.on("room_history", async (data) => {
-      const room = this.rooms.find((r) => r.id === data.roomId);
-      if (room) {
-        const hadMembers = room.memberDetails && room.memberDetails.length > 0;
-        room.memberDetails = data.memberDetails;
-        const hadMessages = room.messages.length > 0;
-        room.messages = await Promise.all(data.messages.map((m) => this.processIncomingMessage(data.roomId, m)));
-        if (!hadMessages && data.messages.length > 0 || !hadMembers && data.memberDetails && data.memberDetails.length > 0) {
-          this.notifyRoomUpdate();
-        }
-      }
-    });
-    this.socket.on("member_joined", (data) => {
-      const room = this.rooms.find((r) => r.id === data.roomId);
-      if (room) {
-        if (!room.memberDetails) room.memberDetails = [];
-        if (!room.memberDetails.find((u) => u.id === data.userId)) {
-          room.memberDetails.push({ id: data.userId, username: data.username });
-          this.notifyRoomUpdate();
-        }
-      }
-    });
-    this.socket.on("room_added", (roomData) => {
-      console.log(`room_added event received:`, roomData);
-      if (this.rooms.find((r) => r.id === roomData.id)) {
-        console.log(`Room ${roomData.name} already exists, skipping`);
-        return;
-      }
-      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
-      this.rooms.push(newRoom);
-      console.log(`Added room to local list. Total rooms: ${this.rooms.length}`);
-      this.notifyRoomUpdate();
-      if (this.onRoomAdded) this.onRoomAdded(newRoom);
-    });
-    this.socket.on("room_joined", (roomData) => {
-      if (this.rooms.find((r) => r.id === roomData.id)) return;
-      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
-      this.rooms.push(newRoom);
-      this.notifyRoomUpdate();
-      if (this.onRoomAdded) this.onRoomAdded(newRoom);
-    });
-    this.socket.on("room_removed", (roomId) => {
-      this.rooms = this.rooms.filter((r) => r.id !== roomId);
-      this.notifyRoomUpdate();
-    });
-    this.socket.on("user_kicked", (data) => {
-      if (data.userId === this.userId) {
-        if (this.onError) this.onError(`You were kicked from room`);
-        window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
-      }
-    });
-    this.socket.on("user_banned", (data) => {
-      if (data.userId === this.userId) {
-        if (this.onError) this.onError(`You were BANNED from room`);
-        window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
-      }
-    });
-    this.socket.on("message_edited", (data) => {
-      const room = this.rooms.find((r) => r.id === data.roomId);
-      if (room) {
-        const msg = room.messages.find((m) => m.id === data.messageId);
-        if (msg) {
-          msg.content = data.content;
-          msg.isEdited = true;
-          msg.editTimestamp = data.editTimestamp;
-          this.notifyRoomUpdate();
-        }
-      }
-    });
-    this.socket.on("message_deleted", (data) => {
-      const room = this.rooms.find((r) => r.id === data.roomId);
-      if (room) {
-        room.messages = room.messages.filter((m) => m.id !== data.messageId);
-        this.notifyRoomUpdate();
-      }
-    });
-    this.socket.on("error", (msg) => {
-      console.error("Socket Error:", msg);
-      if (msg.includes("User not found") || msg.includes("no public key registered")) {
-        console.warn("Server identity lost. Clearing local chat identity.");
-        const storedName = localStorage.getItem("gravity_chat_username");
-        localStorage.removeItem("gravity_chat_id");
-        localStorage.removeItem("gravity_chat_priv");
-        localStorage.removeItem("gravity_chat_pub");
-        if (this.socket) {
-          this.socket.disconnect();
-          this.socket = null;
-        }
-        this.userId = null;
-        this.username = null;
-        this.rooms = [];
-        if (storedName && !storedName.startsWith("!RESET!")) {
-          console.log(`Auto-repairing identity for ${storedName}...`);
-          setTimeout(() => {
-            this.init();
-            setTimeout(() => {
-              this.register(storedName).catch(console.error);
-            }, 500);
-          }, 2e3);
-          return;
-        }
-      }
-      if (this.onError) this.onError(msg);
-    });
-    this.socket.on("search_results", (results) => {
-      window.dispatchEvent(new CustomEvent("chat-search-results", { detail: results }));
-    });
-    this.socket.on("user_online", (userId) => this.handleUserStatusChange(userId, true));
-    this.socket.on("user_offline", (userId) => this.handleUserStatusChange(userId, false));
-  }
-  // --- CRYPTO & AUTH ---
-  // --- CRYPTO & AUTH ---
-  async generateAndSaveIdentity() {
-    const signKeys = await crypto.subtle.generateKey(
-      { name: "ECDSA", namedCurve: "P-256" },
-      true,
-      ["sign", "verify"]
-    );
-    const signPubInfo = await crypto.subtle.exportKey("spki", signKeys.publicKey);
-    const signPrivInfo = await crypto.subtle.exportKey("pkcs8", signKeys.privateKey);
-    const publicKeyHex = this.bufferToHex(new Uint8Array(signPubInfo));
-    const privateKeyHex = this.bufferToHex(new Uint8Array(signPrivInfo));
-    const encKeys = await generateEncryptionKeys();
-    const encPubB64 = await exportKeyToBase64(encKeys.publicKey);
-    const encPrivB64 = await exportKeyToBase64(encKeys.privateKey);
-    localStorage.setItem("gravity_chat_priv", privateKeyHex);
-    localStorage.setItem("gravity_chat_pub", publicKeyHex);
-    localStorage.setItem("gravity_chat_enc_priv", encPrivB64);
-    localStorage.setItem("gravity_chat_enc_pub", encPubB64);
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({
-        type: "CHAT_SYNC_CREDS",
-        data: {
-          privateKey: privateKeyHex,
-          publicKey: publicKeyHex,
-          // We don't necessarily need to sync enc keys to BG unless BG does decryption, 
-          // but good for consistency.
-          encPrivateKey: encPrivB64,
-          encPublicKey: encPubB64
-        }
-      });
-    }
-    return {
-      publicKey: publicKeyHex,
-      privateKey: privateKeyHex,
-      encryptionPublicKey: encPubB64,
-      encryptionPrivateKey: encPrivB64
-    };
-  }
-  async ensureEncryptionKeys() {
-    let encPub = localStorage.getItem("gravity_chat_enc_pub");
-    let encPriv = localStorage.getItem("gravity_chat_enc_priv");
-    if (!encPub || !encPriv) {
-      console.log("Generating missing E2EE Encryption Keys...");
-      const encKeys = await generateEncryptionKeys();
-      encPub = await exportKeyToBase64(encKeys.publicKey);
-      encPriv = await exportKeyToBase64(encKeys.privateKey);
-      localStorage.setItem("gravity_chat_enc_priv", encPriv);
-      localStorage.setItem("gravity_chat_enc_pub", encPub);
-    }
-    return encPub;
-  }
-  async authenticateWithSignature(userId, username) {
-    if (!this.socket) return;
-    const encPub = await this.ensureEncryptionKeys();
-    this.socket.emit("request_challenge", { userId, username, encryptionPublicKey: encPub });
-  }
-  async signChallenge(challenge, privateKeyHex) {
-    const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
-    const privateKey = await crypto.subtle.importKey(
-      "pkcs8",
-      privateKeyBuffer,
-      { name: "ECDSA", namedCurve: "P-256" },
-      false,
-      ["sign"]
-    );
-    const encoder = new TextEncoder();
-    const data = encoder.encode(challenge);
-    const signature = await crypto.subtle.sign(
-      { name: "ECDSA", hash: { name: "SHA-256" } },
-      privateKey,
-      data
-    );
-    return this.bufferToHex(new Uint8Array(signature));
-  }
-  hexToBuffer(hex) {
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-      bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-    }
-    return bytes.buffer;
-  }
-  bufferToHex(buffer) {
-    return Array.from(buffer).map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-  // Helper to debounce room updates and prevent infinite loops
-  notifyRoomUpdate() {
-    if (this.roomUpdateDebounceTimer) {
-      clearTimeout(this.roomUpdateDebounceTimer);
-    }
-    this.roomUpdateDebounceTimer = setTimeout(() => {
-      if (this.onRoomUpdated) {
-        this.onRoomUpdated([...this.rooms]);
-      }
-    }, 100);
-  }
-  // --- PUBLIC METHODS ---
-  createRoom(name, isPrivate = false) {
-    this.socket?.emit("create_room", { name, isPrivate });
-  }
-  getCurrentUser() {
-    if (this.userId && this.username) return { id: this.userId, username: this.username };
-    return null;
-  }
-  getRooms() {
-    return [...this.rooms];
-  }
-  async register(username) {
-    if (!this.socket) await this.init();
-    const storedUser = this.getStoredUsername();
-    const storedKey = this.getStoredPrivateKey();
-    if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
-      console.log("Local keys found, performing cryptographic login recovery...");
-      await this.ensureEncryptionKeys();
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({
-          type: "CHAT_SYNC_CREDS",
-          data: { username: storedUser, privateKey: storedKey, publicKey: localStorage.getItem("gravity_chat_pub") }
-        });
-      }
-      return this.authenticateWithSignature(null, username);
-    }
-    const keys = await this.generateAndSaveIdentity();
-    if (!username.startsWith("!RESET!")) {
-      localStorage.setItem("gravity_chat_username", username);
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({
-          type: "CHAT_SYNC_CREDS",
-          data: { username, privateKey: keys.privateKey, publicKey: keys.publicKey }
-        });
-      }
-    }
-    this.socket?.emit("register", {
-      username,
-      publicKey: keys.publicKey,
-      encryptionPublicKey: keys.encryptionPublicKey
-    });
-  }
-  async sendMessage(roomId, content, isEncrypted = false) {
-    if (!this.socket) return;
-    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
-    if (!privateKeyHex) {
-      if (this.onError) this.onError("Security Error: No identity found. Please re-login.");
-      return;
-    }
-    try {
-      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-      const messageToSign = content + timestamp;
-      const publicKeyHex = localStorage.getItem("gravity_chat_pub");
-      console.log("[SIGN] Public Key (first 20):", publicKeyHex?.substring(0, 20));
-      console.log("[SIGN] Private Key (first 20):", privateKeyHex?.substring(0, 20));
-      console.log("[SIGN] Message to sign:", messageToSign);
-      const signature = await this.signChallenge(messageToSign, privateKeyHex);
-      console.log("[SIGN] Signature (first 20):", signature?.substring(0, 20));
-      this.socket.emit("send_message", {
-        roomId,
-        content,
-        timestamp,
-        signature,
-        isEncrypted
-      });
-    } catch (err) {
-      console.error("Failed to sign message:", err);
-      if (this.onError) this.onError("Failed to securely sign message.");
-    }
-  }
-  async sendDirectMessage(roomId, content, recipientPublicKeyBase64) {
-    try {
-      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
-      const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
-      if (!myPrivBase64 || !myPubBase64) throw new Error("Encryption keys missing");
-      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
-      const myPubKey = await importKeyFromBase64(myPubBase64, "public");
-      const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, "public");
-      const recipientSharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
-      const encryptedForRecipient = await encryptMessage(content, recipientSharedKey);
-      const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
-      const encryptedForMe = await encryptMessage(content, mySharedKey);
-      const privateKeyHex = localStorage.getItem("gravity_chat_priv");
-      if (!privateKeyHex) throw new Error("Signing key missing");
-      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-      const messageToSign = encryptedForRecipient + timestamp;
-      const signature = await this.signChallenge(messageToSign, privateKeyHex);
-      this.socket?.emit("send_message", {
-        roomId,
-        content: encryptedForRecipient,
-        contentForSender: encryptedForMe,
-        // NEW: encrypted version for sender
-        timestamp,
-        signature,
-        isEncrypted: true
-      });
-    } catch (e) {
-      console.error("E2EE Failed:", e);
-      if (this.onError) this.onError("Encryption failed: " + e.message);
-    }
-  }
-  async editMessage(roomId, messageId, newContent) {
-    if (!this.socket) return;
-    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
-    if (!privateKeyHex) return;
-    try {
-      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-      const messageToSign = newContent + timestamp;
-      const signature = await this.signChallenge(messageToSign, privateKeyHex);
-      this.socket.emit("edit_message", {
-        roomId,
-        messageId,
-        content: newContent,
-        timestamp,
-        signature
-      });
-    } catch (err) {
-      console.error("Failed to sign edit:", err);
-    }
-  }
-  deleteMessage(roomId, messageId) {
-    this.socket?.emit("delete_message", { roomId, messageId });
-  }
-  joinRoom(roomId) {
-    this.socket?.emit("join_room", roomId);
-  }
-  createDM(targetId) {
-    this.socket?.emit("create_dm", targetId);
-  }
-  searchUsers(query) {
-    this.socket?.emit("search_users", query);
-  }
-  inviteUser(roomId, user) {
-    this.socket?.emit("invite_user", { roomId, targetUsername: user });
-  }
-  closeRoom(roomId) {
-    this.socket?.emit("close_room", roomId);
-  }
-  kickUser(roomId, userId) {
-    this.socket?.emit("kick_user", { roomId, targetUserId: userId });
-  }
-  banUser(roomId, userId) {
-    this.socket?.emit("ban_user", { roomId, targetUserId: userId });
-  }
-  muteUser(roomId, userId) {
-    this.socket?.emit("mute_user", { roomId, targetUserId: userId });
-  }
-  unmuteUser(roomId, userId) {
-    this.socket?.emit("unmute_user", { roomId, targetUserId: userId });
-  }
-  logout() {
-    localStorage.removeItem("gravity_chat_id");
-    localStorage.removeItem("gravity_chat_username");
-    localStorage.removeItem("gravity_chat_priv");
-    localStorage.removeItem("gravity_chat_pub");
-    this.userId = null;
-    this.username = null;
-    this.rooms = [];
-    this.socket?.disconnect();
-    this.socket = null;
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({ type: "CHAT_LOGOUT" });
-    }
-  }
-  async handleNewMessage(roomId, message) {
-    console.log("[ChatService] New message received:", {
-      roomId,
-      messageId: message.id,
-      isEncrypted: message.isEncrypted,
-      content: message.content?.substring(0, 50) + "..."
-    });
-    const processedMsg = await this.processIncomingMessage(roomId, message);
-    const room = this.rooms.find((r) => r.id === roomId);
-    if (room) {
-      if (room.messages.find((m) => m.id === processedMsg.id)) return;
-      room.messages.push(processedMsg);
-      if (this.onMessage) this.onMessage(roomId, processedMsg);
-      if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
-      if (processedMsg.senderId !== this.userId) {
-        window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
-        const badge = document.getElementById("chat-badge");
-        if (badge) badge.classList.remove("hidden");
-      }
-    }
-  }
-  async processIncomingMessage(roomId, message) {
-    const looksEncrypted = message.content && message.content.length > 20 && /^[A-Za-z0-9+/]+=*$/.test(message.content) && !message.content.includes(" ");
-    const room = this.rooms.find((r) => r.id === roomId);
-    const isEncrypted = message.isEncrypted || looksEncrypted && room?.type === "dm";
-    if (!isEncrypted) return message;
-    try {
-      if (message.senderId === this.userId) {
-        const myPrivBase642 = localStorage.getItem("gravity_chat_enc_priv");
-        const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
-        if (!myPrivBase642 || !myPubBase64) {
-          return { ...message, content: "(Encrypted Message - keys missing)" };
-        }
-        try {
-          const myPrivKey2 = await importKeyFromBase64(myPrivBase642, "private");
-          const myPubKey = await importKeyFromBase64(myPubBase64, "public");
-          const mySharedKey = await deriveSharedSecret(myPrivKey2, myPubKey);
-          const decrypted2 = await decryptMessage(message.content, mySharedKey);
-          console.log("[ChatService] Successfully decrypted own message");
-          return { ...message, content: decrypted2 };
-        } catch (e) {
-          console.error("[ChatService] Failed to decrypt own message:", e);
-          return { ...message, content: "(Encrypted Message sent by you)" };
-        }
-      }
-      const room2 = this.rooms.find((r) => r.id === roomId);
-      const sender = room2?.memberDetails?.find((u) => u.id === message.senderId);
-      console.log("[ChatService] Decrypting message:", {
-        roomId,
-        roomType: room2?.type,
-        senderId: message.senderId,
-        myId: this.userId,
-        hasSender: !!sender,
-        hasEncryptionKey: !!sender?.encryptionPublicKey,
-        memberDetails: room2?.memberDetails?.map((m) => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
-      });
-      if (!sender?.encryptionPublicKey) {
-        console.error("[ChatService] Missing encryption key for sender:", message.senderId);
-        return { ...message, content: `Encrypted Message (Key not found for ${message.senderName})` };
-      }
-      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
-      if (!myPrivBase64) {
-        console.error("[ChatService] Missing my private encryption key");
-        return { ...message, content: "Encrypted Message (You lack keys)" };
-      }
-      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
-      const senderPubKey = await importKeyFromBase64(sender.encryptionPublicKey, "public");
-      const sharedKey = await deriveSharedSecret(myPrivKey, senderPubKey);
-      const decrypted = await decryptMessage(message.content, sharedKey);
-      console.log("[ChatService] Successfully decrypted message");
-      return { ...message, content: decrypted };
-    } catch (e) {
-      console.error("[ChatService] Decryption error:", e);
-      return { ...message, content: "Decryption Failed" };
-    }
-  }
-  getStoredPrivateKey() {
-    return localStorage.getItem("gravity_chat_priv");
-  }
-  getStoredUsername() {
-    return localStorage.getItem("gravity_chat_username");
-  }
-  handleUserStatusChange(userId, isOnline) {
-    let updated = false;
-    this.rooms.forEach((room) => {
-      const member = room.memberDetails?.find((m) => m.id === userId);
-      if (member) {
-        member.isOnline = isOnline;
-        updated = true;
-      }
-    });
-    if (updated && this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
-  }
-}
-const chatService = new ChatService();
-
 const ChatView = ({ onClose }) => {
   const { t } = useTranslation();
   const [user, setUser] = reactExports.useState(null);
@@ -13029,770 +14167,6 @@ const ChatView = ({ onClose }) => {
     ) })
   ] });
 };
-
-var __defProp = Object.defineProperty;
-var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __propIsEnum = Object.prototype.propertyIsEnumerable;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues = (a, b) => {
-  for (var prop in b || (b = {}))
-    if (__hasOwnProp.call(b, prop))
-      __defNormalProp(a, prop, b[prop]);
-  if (__getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(b)) {
-      if (__propIsEnum.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    }
-  return a;
-};
-var __objRest = (source, exclude) => {
-  var target = {};
-  for (var prop in source)
-    if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
-      target[prop] = source[prop];
-  if (source != null && __getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(source)) {
-      if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
-        target[prop] = source[prop];
-    }
-  return target;
-};
-
-// src/third-party/qrcodegen/index.ts
-/**
- * @license QR Code generator library (TypeScript)
- * Copyright (c) Project Nayuki.
- * SPDX-License-Identifier: MIT
- */
-var qrcodegen;
-((qrcodegen2) => {
-  const _QrCode = class {
-    constructor(version, errorCorrectionLevel, dataCodewords, msk) {
-      this.version = version;
-      this.errorCorrectionLevel = errorCorrectionLevel;
-      this.modules = [];
-      this.isFunction = [];
-      if (version < _QrCode.MIN_VERSION || version > _QrCode.MAX_VERSION)
-        throw new RangeError("Version value out of range");
-      if (msk < -1 || msk > 7)
-        throw new RangeError("Mask value out of range");
-      this.size = version * 4 + 17;
-      let row = [];
-      for (let i = 0; i < this.size; i++)
-        row.push(false);
-      for (let i = 0; i < this.size; i++) {
-        this.modules.push(row.slice());
-        this.isFunction.push(row.slice());
-      }
-      this.drawFunctionPatterns();
-      const allCodewords = this.addEccAndInterleave(dataCodewords);
-      this.drawCodewords(allCodewords);
-      if (msk == -1) {
-        let minPenalty = 1e9;
-        for (let i = 0; i < 8; i++) {
-          this.applyMask(i);
-          this.drawFormatBits(i);
-          const penalty = this.getPenaltyScore();
-          if (penalty < minPenalty) {
-            msk = i;
-            minPenalty = penalty;
-          }
-          this.applyMask(i);
-        }
-      }
-      assert(0 <= msk && msk <= 7);
-      this.mask = msk;
-      this.applyMask(msk);
-      this.drawFormatBits(msk);
-      this.isFunction = [];
-    }
-    static encodeText(text, ecl) {
-      const segs = qrcodegen2.QrSegment.makeSegments(text);
-      return _QrCode.encodeSegments(segs, ecl);
-    }
-    static encodeBinary(data, ecl) {
-      const seg = qrcodegen2.QrSegment.makeBytes(data);
-      return _QrCode.encodeSegments([seg], ecl);
-    }
-    static encodeSegments(segs, ecl, minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true) {
-      if (!(_QrCode.MIN_VERSION <= minVersion && minVersion <= maxVersion && maxVersion <= _QrCode.MAX_VERSION) || mask < -1 || mask > 7)
-        throw new RangeError("Invalid value");
-      let version;
-      let dataUsedBits;
-      for (version = minVersion; ; version++) {
-        const dataCapacityBits2 = _QrCode.getNumDataCodewords(version, ecl) * 8;
-        const usedBits = QrSegment.getTotalBits(segs, version);
-        if (usedBits <= dataCapacityBits2) {
-          dataUsedBits = usedBits;
-          break;
-        }
-        if (version >= maxVersion)
-          throw new RangeError("Data too long");
-      }
-      for (const newEcl of [_QrCode.Ecc.MEDIUM, _QrCode.Ecc.QUARTILE, _QrCode.Ecc.HIGH]) {
-        if (boostEcl && dataUsedBits <= _QrCode.getNumDataCodewords(version, newEcl) * 8)
-          ecl = newEcl;
-      }
-      let bb = [];
-      for (const seg of segs) {
-        appendBits(seg.mode.modeBits, 4, bb);
-        appendBits(seg.numChars, seg.mode.numCharCountBits(version), bb);
-        for (const b of seg.getData())
-          bb.push(b);
-      }
-      assert(bb.length == dataUsedBits);
-      const dataCapacityBits = _QrCode.getNumDataCodewords(version, ecl) * 8;
-      assert(bb.length <= dataCapacityBits);
-      appendBits(0, Math.min(4, dataCapacityBits - bb.length), bb);
-      appendBits(0, (8 - bb.length % 8) % 8, bb);
-      assert(bb.length % 8 == 0);
-      for (let padByte = 236; bb.length < dataCapacityBits; padByte ^= 236 ^ 17)
-        appendBits(padByte, 8, bb);
-      let dataCodewords = [];
-      while (dataCodewords.length * 8 < bb.length)
-        dataCodewords.push(0);
-      bb.forEach((b, i) => dataCodewords[i >>> 3] |= b << 7 - (i & 7));
-      return new _QrCode(version, ecl, dataCodewords, mask);
-    }
-    getModule(x, y) {
-      return 0 <= x && x < this.size && 0 <= y && y < this.size && this.modules[y][x];
-    }
-    getModules() {
-      return this.modules;
-    }
-    drawFunctionPatterns() {
-      for (let i = 0; i < this.size; i++) {
-        this.setFunctionModule(6, i, i % 2 == 0);
-        this.setFunctionModule(i, 6, i % 2 == 0);
-      }
-      this.drawFinderPattern(3, 3);
-      this.drawFinderPattern(this.size - 4, 3);
-      this.drawFinderPattern(3, this.size - 4);
-      const alignPatPos = this.getAlignmentPatternPositions();
-      const numAlign = alignPatPos.length;
-      for (let i = 0; i < numAlign; i++) {
-        for (let j = 0; j < numAlign; j++) {
-          if (!(i == 0 && j == 0 || i == 0 && j == numAlign - 1 || i == numAlign - 1 && j == 0))
-            this.drawAlignmentPattern(alignPatPos[i], alignPatPos[j]);
-        }
-      }
-      this.drawFormatBits(0);
-      this.drawVersion();
-    }
-    drawFormatBits(mask) {
-      const data = this.errorCorrectionLevel.formatBits << 3 | mask;
-      let rem = data;
-      for (let i = 0; i < 10; i++)
-        rem = rem << 1 ^ (rem >>> 9) * 1335;
-      const bits = (data << 10 | rem) ^ 21522;
-      assert(bits >>> 15 == 0);
-      for (let i = 0; i <= 5; i++)
-        this.setFunctionModule(8, i, getBit(bits, i));
-      this.setFunctionModule(8, 7, getBit(bits, 6));
-      this.setFunctionModule(8, 8, getBit(bits, 7));
-      this.setFunctionModule(7, 8, getBit(bits, 8));
-      for (let i = 9; i < 15; i++)
-        this.setFunctionModule(14 - i, 8, getBit(bits, i));
-      for (let i = 0; i < 8; i++)
-        this.setFunctionModule(this.size - 1 - i, 8, getBit(bits, i));
-      for (let i = 8; i < 15; i++)
-        this.setFunctionModule(8, this.size - 15 + i, getBit(bits, i));
-      this.setFunctionModule(8, this.size - 8, true);
-    }
-    drawVersion() {
-      if (this.version < 7)
-        return;
-      let rem = this.version;
-      for (let i = 0; i < 12; i++)
-        rem = rem << 1 ^ (rem >>> 11) * 7973;
-      const bits = this.version << 12 | rem;
-      assert(bits >>> 18 == 0);
-      for (let i = 0; i < 18; i++) {
-        const color = getBit(bits, i);
-        const a = this.size - 11 + i % 3;
-        const b = Math.floor(i / 3);
-        this.setFunctionModule(a, b, color);
-        this.setFunctionModule(b, a, color);
-      }
-    }
-    drawFinderPattern(x, y) {
-      for (let dy = -4; dy <= 4; dy++) {
-        for (let dx = -4; dx <= 4; dx++) {
-          const dist = Math.max(Math.abs(dx), Math.abs(dy));
-          const xx = x + dx;
-          const yy = y + dy;
-          if (0 <= xx && xx < this.size && 0 <= yy && yy < this.size)
-            this.setFunctionModule(xx, yy, dist != 2 && dist != 4);
-        }
-      }
-    }
-    drawAlignmentPattern(x, y) {
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++)
-          this.setFunctionModule(x + dx, y + dy, Math.max(Math.abs(dx), Math.abs(dy)) != 1);
-      }
-    }
-    setFunctionModule(x, y, isDark) {
-      this.modules[y][x] = isDark;
-      this.isFunction[y][x] = true;
-    }
-    addEccAndInterleave(data) {
-      const ver = this.version;
-      const ecl = this.errorCorrectionLevel;
-      if (data.length != _QrCode.getNumDataCodewords(ver, ecl))
-        throw new RangeError("Invalid argument");
-      const numBlocks = _QrCode.NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
-      const blockEccLen = _QrCode.ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver];
-      const rawCodewords = Math.floor(_QrCode.getNumRawDataModules(ver) / 8);
-      const numShortBlocks = numBlocks - rawCodewords % numBlocks;
-      const shortBlockLen = Math.floor(rawCodewords / numBlocks);
-      let blocks = [];
-      const rsDiv = _QrCode.reedSolomonComputeDivisor(blockEccLen);
-      for (let i = 0, k = 0; i < numBlocks; i++) {
-        let dat = data.slice(k, k + shortBlockLen - blockEccLen + (i < numShortBlocks ? 0 : 1));
-        k += dat.length;
-        const ecc = _QrCode.reedSolomonComputeRemainder(dat, rsDiv);
-        if (i < numShortBlocks)
-          dat.push(0);
-        blocks.push(dat.concat(ecc));
-      }
-      let result = [];
-      for (let i = 0; i < blocks[0].length; i++) {
-        blocks.forEach((block, j) => {
-          if (i != shortBlockLen - blockEccLen || j >= numShortBlocks)
-            result.push(block[i]);
-        });
-      }
-      assert(result.length == rawCodewords);
-      return result;
-    }
-    drawCodewords(data) {
-      if (data.length != Math.floor(_QrCode.getNumRawDataModules(this.version) / 8))
-        throw new RangeError("Invalid argument");
-      let i = 0;
-      for (let right = this.size - 1; right >= 1; right -= 2) {
-        if (right == 6)
-          right = 5;
-        for (let vert = 0; vert < this.size; vert++) {
-          for (let j = 0; j < 2; j++) {
-            const x = right - j;
-            const upward = (right + 1 & 2) == 0;
-            const y = upward ? this.size - 1 - vert : vert;
-            if (!this.isFunction[y][x] && i < data.length * 8) {
-              this.modules[y][x] = getBit(data[i >>> 3], 7 - (i & 7));
-              i++;
-            }
-          }
-        }
-      }
-      assert(i == data.length * 8);
-    }
-    applyMask(mask) {
-      if (mask < 0 || mask > 7)
-        throw new RangeError("Mask value out of range");
-      for (let y = 0; y < this.size; y++) {
-        for (let x = 0; x < this.size; x++) {
-          let invert;
-          switch (mask) {
-            case 0:
-              invert = (x + y) % 2 == 0;
-              break;
-            case 1:
-              invert = y % 2 == 0;
-              break;
-            case 2:
-              invert = x % 3 == 0;
-              break;
-            case 3:
-              invert = (x + y) % 3 == 0;
-              break;
-            case 4:
-              invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 == 0;
-              break;
-            case 5:
-              invert = x * y % 2 + x * y % 3 == 0;
-              break;
-            case 6:
-              invert = (x * y % 2 + x * y % 3) % 2 == 0;
-              break;
-            case 7:
-              invert = ((x + y) % 2 + x * y % 3) % 2 == 0;
-              break;
-            default:
-              throw new Error("Unreachable");
-          }
-          if (!this.isFunction[y][x] && invert)
-            this.modules[y][x] = !this.modules[y][x];
-        }
-      }
-    }
-    getPenaltyScore() {
-      let result = 0;
-      for (let y = 0; y < this.size; y++) {
-        let runColor = false;
-        let runX = 0;
-        let runHistory = [0, 0, 0, 0, 0, 0, 0];
-        for (let x = 0; x < this.size; x++) {
-          if (this.modules[y][x] == runColor) {
-            runX++;
-            if (runX == 5)
-              result += _QrCode.PENALTY_N1;
-            else if (runX > 5)
-              result++;
-          } else {
-            this.finderPenaltyAddHistory(runX, runHistory);
-            if (!runColor)
-              result += this.finderPenaltyCountPatterns(runHistory) * _QrCode.PENALTY_N3;
-            runColor = this.modules[y][x];
-            runX = 1;
-          }
-        }
-        result += this.finderPenaltyTerminateAndCount(runColor, runX, runHistory) * _QrCode.PENALTY_N3;
-      }
-      for (let x = 0; x < this.size; x++) {
-        let runColor = false;
-        let runY = 0;
-        let runHistory = [0, 0, 0, 0, 0, 0, 0];
-        for (let y = 0; y < this.size; y++) {
-          if (this.modules[y][x] == runColor) {
-            runY++;
-            if (runY == 5)
-              result += _QrCode.PENALTY_N1;
-            else if (runY > 5)
-              result++;
-          } else {
-            this.finderPenaltyAddHistory(runY, runHistory);
-            if (!runColor)
-              result += this.finderPenaltyCountPatterns(runHistory) * _QrCode.PENALTY_N3;
-            runColor = this.modules[y][x];
-            runY = 1;
-          }
-        }
-        result += this.finderPenaltyTerminateAndCount(runColor, runY, runHistory) * _QrCode.PENALTY_N3;
-      }
-      for (let y = 0; y < this.size - 1; y++) {
-        for (let x = 0; x < this.size - 1; x++) {
-          const color = this.modules[y][x];
-          if (color == this.modules[y][x + 1] && color == this.modules[y + 1][x] && color == this.modules[y + 1][x + 1])
-            result += _QrCode.PENALTY_N2;
-        }
-      }
-      let dark = 0;
-      for (const row of this.modules)
-        dark = row.reduce((sum, color) => sum + (color ? 1 : 0), dark);
-      const total = this.size * this.size;
-      const k = Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1;
-      assert(0 <= k && k <= 9);
-      result += k * _QrCode.PENALTY_N4;
-      assert(0 <= result && result <= 2568888);
-      return result;
-    }
-    getAlignmentPatternPositions() {
-      if (this.version == 1)
-        return [];
-      else {
-        const numAlign = Math.floor(this.version / 7) + 2;
-        const step = this.version == 32 ? 26 : Math.ceil((this.version * 4 + 4) / (numAlign * 2 - 2)) * 2;
-        let result = [6];
-        for (let pos = this.size - 7; result.length < numAlign; pos -= step)
-          result.splice(1, 0, pos);
-        return result;
-      }
-    }
-    static getNumRawDataModules(ver) {
-      if (ver < _QrCode.MIN_VERSION || ver > _QrCode.MAX_VERSION)
-        throw new RangeError("Version number out of range");
-      let result = (16 * ver + 128) * ver + 64;
-      if (ver >= 2) {
-        const numAlign = Math.floor(ver / 7) + 2;
-        result -= (25 * numAlign - 10) * numAlign - 55;
-        if (ver >= 7)
-          result -= 36;
-      }
-      assert(208 <= result && result <= 29648);
-      return result;
-    }
-    static getNumDataCodewords(ver, ecl) {
-      return Math.floor(_QrCode.getNumRawDataModules(ver) / 8) - _QrCode.ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver] * _QrCode.NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
-    }
-    static reedSolomonComputeDivisor(degree) {
-      if (degree < 1 || degree > 255)
-        throw new RangeError("Degree out of range");
-      let result = [];
-      for (let i = 0; i < degree - 1; i++)
-        result.push(0);
-      result.push(1);
-      let root = 1;
-      for (let i = 0; i < degree; i++) {
-        for (let j = 0; j < result.length; j++) {
-          result[j] = _QrCode.reedSolomonMultiply(result[j], root);
-          if (j + 1 < result.length)
-            result[j] ^= result[j + 1];
-        }
-        root = _QrCode.reedSolomonMultiply(root, 2);
-      }
-      return result;
-    }
-    static reedSolomonComputeRemainder(data, divisor) {
-      let result = divisor.map((_) => 0);
-      for (const b of data) {
-        const factor = b ^ result.shift();
-        result.push(0);
-        divisor.forEach((coef, i) => result[i] ^= _QrCode.reedSolomonMultiply(coef, factor));
-      }
-      return result;
-    }
-    static reedSolomonMultiply(x, y) {
-      if (x >>> 8 != 0 || y >>> 8 != 0)
-        throw new RangeError("Byte out of range");
-      let z = 0;
-      for (let i = 7; i >= 0; i--) {
-        z = z << 1 ^ (z >>> 7) * 285;
-        z ^= (y >>> i & 1) * x;
-      }
-      assert(z >>> 8 == 0);
-      return z;
-    }
-    finderPenaltyCountPatterns(runHistory) {
-      const n = runHistory[1];
-      assert(n <= this.size * 3);
-      const core = n > 0 && runHistory[2] == n && runHistory[3] == n * 3 && runHistory[4] == n && runHistory[5] == n;
-      return (core && runHistory[0] >= n * 4 && runHistory[6] >= n ? 1 : 0) + (core && runHistory[6] >= n * 4 && runHistory[0] >= n ? 1 : 0);
-    }
-    finderPenaltyTerminateAndCount(currentRunColor, currentRunLength, runHistory) {
-      if (currentRunColor) {
-        this.finderPenaltyAddHistory(currentRunLength, runHistory);
-        currentRunLength = 0;
-      }
-      currentRunLength += this.size;
-      this.finderPenaltyAddHistory(currentRunLength, runHistory);
-      return this.finderPenaltyCountPatterns(runHistory);
-    }
-    finderPenaltyAddHistory(currentRunLength, runHistory) {
-      if (runHistory[0] == 0)
-        currentRunLength += this.size;
-      runHistory.pop();
-      runHistory.unshift(currentRunLength);
-    }
-  };
-  let QrCode = _QrCode;
-  QrCode.MIN_VERSION = 1;
-  QrCode.MAX_VERSION = 40;
-  QrCode.PENALTY_N1 = 3;
-  QrCode.PENALTY_N2 = 3;
-  QrCode.PENALTY_N3 = 40;
-  QrCode.PENALTY_N4 = 10;
-  QrCode.ECC_CODEWORDS_PER_BLOCK = [
-    [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
-    [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
-    [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
-    [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
-  ];
-  QrCode.NUM_ERROR_CORRECTION_BLOCKS = [
-    [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
-    [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
-    [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
-    [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81]
-  ];
-  qrcodegen2.QrCode = QrCode;
-  function appendBits(val, len, bb) {
-    if (len < 0 || len > 31 || val >>> len != 0)
-      throw new RangeError("Value out of range");
-    for (let i = len - 1; i >= 0; i--)
-      bb.push(val >>> i & 1);
-  }
-  function getBit(x, i) {
-    return (x >>> i & 1) != 0;
-  }
-  function assert(cond) {
-    if (!cond)
-      throw new Error("Assertion error");
-  }
-  const _QrSegment = class {
-    constructor(mode, numChars, bitData) {
-      this.mode = mode;
-      this.numChars = numChars;
-      this.bitData = bitData;
-      if (numChars < 0)
-        throw new RangeError("Invalid argument");
-      this.bitData = bitData.slice();
-    }
-    static makeBytes(data) {
-      let bb = [];
-      for (const b of data)
-        appendBits(b, 8, bb);
-      return new _QrSegment(_QrSegment.Mode.BYTE, data.length, bb);
-    }
-    static makeNumeric(digits) {
-      if (!_QrSegment.isNumeric(digits))
-        throw new RangeError("String contains non-numeric characters");
-      let bb = [];
-      for (let i = 0; i < digits.length; ) {
-        const n = Math.min(digits.length - i, 3);
-        appendBits(parseInt(digits.substr(i, n), 10), n * 3 + 1, bb);
-        i += n;
-      }
-      return new _QrSegment(_QrSegment.Mode.NUMERIC, digits.length, bb);
-    }
-    static makeAlphanumeric(text) {
-      if (!_QrSegment.isAlphanumeric(text))
-        throw new RangeError("String contains unencodable characters in alphanumeric mode");
-      let bb = [];
-      let i;
-      for (i = 0; i + 2 <= text.length; i += 2) {
-        let temp = _QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)) * 45;
-        temp += _QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i + 1));
-        appendBits(temp, 11, bb);
-      }
-      if (i < text.length)
-        appendBits(_QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)), 6, bb);
-      return new _QrSegment(_QrSegment.Mode.ALPHANUMERIC, text.length, bb);
-    }
-    static makeSegments(text) {
-      if (text == "")
-        return [];
-      else if (_QrSegment.isNumeric(text))
-        return [_QrSegment.makeNumeric(text)];
-      else if (_QrSegment.isAlphanumeric(text))
-        return [_QrSegment.makeAlphanumeric(text)];
-      else
-        return [_QrSegment.makeBytes(_QrSegment.toUtf8ByteArray(text))];
-    }
-    static makeEci(assignVal) {
-      let bb = [];
-      if (assignVal < 0)
-        throw new RangeError("ECI assignment value out of range");
-      else if (assignVal < 1 << 7)
-        appendBits(assignVal, 8, bb);
-      else if (assignVal < 1 << 14) {
-        appendBits(2, 2, bb);
-        appendBits(assignVal, 14, bb);
-      } else if (assignVal < 1e6) {
-        appendBits(6, 3, bb);
-        appendBits(assignVal, 21, bb);
-      } else
-        throw new RangeError("ECI assignment value out of range");
-      return new _QrSegment(_QrSegment.Mode.ECI, 0, bb);
-    }
-    static isNumeric(text) {
-      return _QrSegment.NUMERIC_REGEX.test(text);
-    }
-    static isAlphanumeric(text) {
-      return _QrSegment.ALPHANUMERIC_REGEX.test(text);
-    }
-    getData() {
-      return this.bitData.slice();
-    }
-    static getTotalBits(segs, version) {
-      let result = 0;
-      for (const seg of segs) {
-        const ccbits = seg.mode.numCharCountBits(version);
-        if (seg.numChars >= 1 << ccbits)
-          return Infinity;
-        result += 4 + ccbits + seg.bitData.length;
-      }
-      return result;
-    }
-    static toUtf8ByteArray(str) {
-      str = encodeURI(str);
-      let result = [];
-      for (let i = 0; i < str.length; i++) {
-        if (str.charAt(i) != "%")
-          result.push(str.charCodeAt(i));
-        else {
-          result.push(parseInt(str.substr(i + 1, 2), 16));
-          i += 2;
-        }
-      }
-      return result;
-    }
-  };
-  let QrSegment = _QrSegment;
-  QrSegment.NUMERIC_REGEX = /^[0-9]*$/;
-  QrSegment.ALPHANUMERIC_REGEX = /^[A-Z0-9 $%*+.\/:-]*$/;
-  QrSegment.ALPHANUMERIC_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
-  qrcodegen2.QrSegment = QrSegment;
-})(qrcodegen || (qrcodegen = {}));
-((qrcodegen2) => {
-  ((QrCode2) => {
-    const _Ecc = class {
-      constructor(ordinal, formatBits) {
-        this.ordinal = ordinal;
-        this.formatBits = formatBits;
-      }
-    };
-    let Ecc = _Ecc;
-    Ecc.LOW = new _Ecc(0, 1);
-    Ecc.MEDIUM = new _Ecc(1, 0);
-    Ecc.QUARTILE = new _Ecc(2, 3);
-    Ecc.HIGH = new _Ecc(3, 2);
-    QrCode2.Ecc = Ecc;
-  })(qrcodegen2.QrCode || (qrcodegen2.QrCode = {}));
-})(qrcodegen || (qrcodegen = {}));
-((qrcodegen2) => {
-  ((QrSegment2) => {
-    const _Mode = class {
-      constructor(modeBits, numBitsCharCount) {
-        this.modeBits = modeBits;
-        this.numBitsCharCount = numBitsCharCount;
-      }
-      numCharCountBits(ver) {
-        return this.numBitsCharCount[Math.floor((ver + 7) / 17)];
-      }
-    };
-    let Mode = _Mode;
-    Mode.NUMERIC = new _Mode(1, [10, 12, 14]);
-    Mode.ALPHANUMERIC = new _Mode(2, [9, 11, 13]);
-    Mode.BYTE = new _Mode(4, [8, 16, 16]);
-    Mode.KANJI = new _Mode(8, [8, 10, 12]);
-    Mode.ECI = new _Mode(7, [0, 0, 0]);
-    QrSegment2.Mode = Mode;
-  })(qrcodegen2.QrSegment || (qrcodegen2.QrSegment = {}));
-})(qrcodegen || (qrcodegen = {}));
-var qrcodegen_default = qrcodegen;
-
-// src/index.tsx
-/**
- * @license qrcode.react
- * Copyright (c) Paul O'Shannessy
- * SPDX-License-Identifier: ISC
- */
-var ERROR_LEVEL_MAP = {
-  L: qrcodegen_default.QrCode.Ecc.LOW,
-  M: qrcodegen_default.QrCode.Ecc.MEDIUM,
-  Q: qrcodegen_default.QrCode.Ecc.QUARTILE,
-  H: qrcodegen_default.QrCode.Ecc.HIGH
-};
-var DEFAULT_SIZE = 128;
-var DEFAULT_LEVEL = "L";
-var DEFAULT_BGCOLOR = "#FFFFFF";
-var DEFAULT_FGCOLOR = "#000000";
-var DEFAULT_INCLUDEMARGIN = false;
-var MARGIN_SIZE = 4;
-var DEFAULT_IMG_SCALE = 0.1;
-function generatePath(modules, margin = 0) {
-  const ops = [];
-  modules.forEach(function(row, y) {
-    let start = null;
-    row.forEach(function(cell, x) {
-      if (!cell && start !== null) {
-        ops.push(`M${start + margin} ${y + margin}h${x - start}v1H${start + margin}z`);
-        start = null;
-        return;
-      }
-      if (x === row.length - 1) {
-        if (!cell) {
-          return;
-        }
-        if (start === null) {
-          ops.push(`M${x + margin},${y + margin} h1v1H${x + margin}z`);
-        } else {
-          ops.push(`M${start + margin},${y + margin} h${x + 1 - start}v1H${start + margin}z`);
-        }
-        return;
-      }
-      if (cell && start === null) {
-        start = x;
-      }
-    });
-  });
-  return ops.join("");
-}
-function excavateModules(modules, excavation) {
-  return modules.slice().map((row, y) => {
-    if (y < excavation.y || y >= excavation.y + excavation.h) {
-      return row;
-    }
-    return row.map((cell, x) => {
-      if (x < excavation.x || x >= excavation.x + excavation.w) {
-        return cell;
-      }
-      return false;
-    });
-  });
-}
-function getImageSettings(cells, size, includeMargin, imageSettings) {
-  if (imageSettings == null) {
-    return null;
-  }
-  const margin = includeMargin ? MARGIN_SIZE : 0;
-  const numCells = cells.length + margin * 2;
-  const defaultSize = Math.floor(size * DEFAULT_IMG_SCALE);
-  const scale = numCells / size;
-  const w = (imageSettings.width || defaultSize) * scale;
-  const h = (imageSettings.height || defaultSize) * scale;
-  const x = imageSettings.x == null ? cells.length / 2 - w / 2 : imageSettings.x * scale;
-  const y = imageSettings.y == null ? cells.length / 2 - h / 2 : imageSettings.y * scale;
-  let excavation = null;
-  if (imageSettings.excavate) {
-    let floorX = Math.floor(x);
-    let floorY = Math.floor(y);
-    let ceilW = Math.ceil(w + x - floorX);
-    let ceilH = Math.ceil(h + y - floorY);
-    excavation = { x: floorX, y: floorY, w: ceilW, h: ceilH };
-  }
-  return { x, y, h, w, excavation };
-}
-(function() {
-  try {
-    new Path2D().addPath(new Path2D());
-  } catch (e) {
-    return false;
-  }
-  return true;
-})();
-function QRCodeSVG(props) {
-  const _a = props, {
-    value,
-    size = DEFAULT_SIZE,
-    level = DEFAULT_LEVEL,
-    bgColor = DEFAULT_BGCOLOR,
-    fgColor = DEFAULT_FGCOLOR,
-    includeMargin = DEFAULT_INCLUDEMARGIN,
-    imageSettings
-  } = _a, otherProps = __objRest(_a, [
-    "value",
-    "size",
-    "level",
-    "bgColor",
-    "fgColor",
-    "includeMargin",
-    "imageSettings"
-  ]);
-  let cells = qrcodegen_default.QrCode.encodeText(value, ERROR_LEVEL_MAP[level]).getModules();
-  const margin = includeMargin ? MARGIN_SIZE : 0;
-  const numCells = cells.length + margin * 2;
-  const calculatedImageSettings = getImageSettings(cells, size, includeMargin, imageSettings);
-  let image = null;
-  if (imageSettings != null && calculatedImageSettings != null) {
-    if (calculatedImageSettings.excavation != null) {
-      cells = excavateModules(cells, calculatedImageSettings.excavation);
-    }
-    image = /* @__PURE__ */ React.createElement("image", {
-      xlinkHref: imageSettings.src,
-      height: calculatedImageSettings.h,
-      width: calculatedImageSettings.w,
-      x: calculatedImageSettings.x + margin,
-      y: calculatedImageSettings.y + margin,
-      preserveAspectRatio: "none"
-    });
-  }
-  const fgPath = generatePath(cells, margin);
-  return /* @__PURE__ */ React.createElement("svg", __spreadValues({
-    height: size,
-    width: size,
-    viewBox: `0 0 ${numCells} ${numCells}`
-  }, otherProps), /* @__PURE__ */ React.createElement("path", {
-    fill: bgColor,
-    d: `M0,0 h${numCells}v${numCells}H0z`,
-    shapeRendering: "crispEdges"
-  }), /* @__PURE__ */ React.createElement("path", {
-    fill: fgColor,
-    d: fgPath,
-    shapeRendering: "crispEdges"
-  }), image);
-}
 
 class BridgeService {
   constructor() {

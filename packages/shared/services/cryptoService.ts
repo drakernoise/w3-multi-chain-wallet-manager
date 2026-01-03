@@ -307,7 +307,10 @@ export async function generateEncryptionKeys(): Promise<CryptoKeyPair> {
 }
 
 export async function exportKeyToBase64(key: CryptoKey): Promise<string> {
-  const format = key.type === 'public' ? 'spki' : 'pkcs8';
+  let format: 'spki' | 'pkcs8' | 'raw';
+  if (key.type === 'secret') format = 'raw';
+  else format = key.type === 'public' ? 'spki' : 'pkcs8';
+
   const exported = await window.crypto.subtle.exportKey(format, key);
   const buffer = new Uint8Array(exported);
   return btoa(String.fromCharCode(...buffer));

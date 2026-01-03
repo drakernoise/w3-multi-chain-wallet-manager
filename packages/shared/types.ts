@@ -57,3 +57,20 @@ export interface MultiSigRequest {
   threshold: number;
   operation: string;
 }
+
+export interface SyncPayload {
+  timestamp: number;
+  accounts: Account[];
+  chatIdentity?: {
+    username: string;
+    id: string;
+    privateKey: string; // Base64 export
+    publicKey: string; // Base64 export
+  };
+  settings?: {
+    useGoogleAuth?: boolean;
+    useBiometrics?: boolean;
+    useDeviceAuth?: boolean;
+    useTOTP?: boolean;
+  };
+}

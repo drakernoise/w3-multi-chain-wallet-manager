@@ -3,6 +3,10 @@ import { Account, Chain, WalletState } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 import { TOTPSetupModal } from './TOTPSetupModal';
 import { BiometricSetupModal } from './BiometricSetupModal';
+import { SyncExportModal } from './SyncExportModal';
+import { SyncImportModal } from './SyncImportModal';
+import { SyncPayload } from '../types';
+import { storageService } from '../services/storageService';
 
 interface ManageWalletsProps {
   accounts: Account[];
@@ -16,6 +20,44 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
   const { t } = useTranslation();
   const [showTOTP, setShowTOTP] = useState(false);
   const [showBio, setShowBio] = useState(false);
+  const [showSyncExport, setShowSyncExport] = useState(false);
+  const [showSyncImport, setShowSyncImport] = useState(false);
+
+  const handleSyncImport = async (payload: SyncPayload) => {
+    // Merge Accounts
+    const mergedAccounts = [...walletState.accounts];
+    let added = 0;
+    payload.accounts.forEach(acc => {
+      if (!mergedAccounts.find(a => a.name === acc.name && a.chain === acc.chain)) {
+        mergedAccounts.push(acc);
+        added++;
+      }
+    });
+
+    const newConfig = { ...walletState };
+    if (payload.settings) {
+      if (payload.settings.useGoogleAuth !== undefined) newConfig.useGoogleAuth = payload.settings.useGoogleAuth;
+      if (payload.settings.useBiometrics !== undefined) newConfig.useBiometrics = payload.settings.useBiometrics;
+      if (payload.settings.useDeviceAuth !== undefined) newConfig.useDeviceAuth = payload.settings.useDeviceAuth;
+      if (payload.settings.useTOTP !== undefined) newConfig.useTOTP = payload.settings.useTOTP;
+    }
+
+    setWalletState({ ...newConfig, accounts: mergedAccounts });
+
+    // Save Chat Identity
+    if (payload.chatIdentity) {
+      await storageService.setItem('gravity_chat_key', payload.chatIdentity.privateKey);
+      await storageService.setItem('gravity_chat_pub', payload.chatIdentity.publicKey);
+      localStorage.setItem('gravity_chat_username', payload.chatIdentity.username);
+      localStorage.setItem('gravity_chat_registration', JSON.stringify({
+        id: payload.chatIdentity.id,
+        username: payload.chatIdentity.username,
+        timestamp: payload.timestamp
+      }));
+    }
+
+    alert(`Sync Successful! Added ${added} new accounts.`);
+  };
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -63,7 +105,29 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
       </div>
 
       <div className="p-4 pt-2 border-t border-dark-700 mt-auto space-y-3">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Security</h3>
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Cross-Device Sync</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setShowSyncExport(true)}
+            className="bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            </div>
+            <span className="font-bold text-xs">Export</span>
+          </button>
+          <button
+            onClick={() => setShowSyncImport(true)}
+            className="bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            </div>
+            <span className="font-bold text-xs">Import</span>
+          </button>
+        </div>
+
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1 mt-4">Security</h3>
 
         <button
           onClick={() => setShowTOTP(true)}
@@ -129,6 +193,21 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
           setWalletState={setWalletState}
           onClose={() => setShowBio(false)}
           onComplete={() => setShowBio(false)}
+        />
+      )}
+
+      {showSyncExport && (
+        <SyncExportModal
+          accounts={accounts}
+          walletConfig={walletState}
+          onClose={() => setShowSyncExport(false)}
+        />
+      )}
+
+      {showSyncImport && (
+        <SyncImportModal
+          onClose={() => setShowSyncImport(false)}
+          onImport={handleSyncImport}
         />
       )}
     </div>
