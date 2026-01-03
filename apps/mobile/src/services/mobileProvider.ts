@@ -44,7 +44,12 @@ class MobileProviderService {
             // Use loose check for robustness (ignore protocol/host specifics of URL class)
             if (url.startsWith('gravitywallet://sign')) {
                 console.log('[MobileProvider] Valid gravitywallet://sign URL detected (string match)');
-                const params = Object.fromEntries(parsedUrl.searchParams);
+
+                // Manual param extraction for older WebViews (Object.fromEntries might be missing)
+                const params: any = {};
+                parsedUrl.searchParams.forEach((value, key) => {
+                    params[key] = value;
+                });
                 console.log('[MobileProvider] Parsed params:', JSON.stringify(params));
 
                 const request: SignRequest = {
