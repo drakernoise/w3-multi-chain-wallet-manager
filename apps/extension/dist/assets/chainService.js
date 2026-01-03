@@ -88348,7 +88348,7 @@ const broadcastCustomJson = async (chain, username, key, id, json, keyType) => {
   }
 };
 const formatChainError = (error) => {
-  const msg = error.message || String(error);
+  const msg = error.message || (typeof error === "object" ? JSON.stringify(error) : String(error));
   if (msg.includes("op.vesting_shares >= min_delegation")) {
     try {
       const match = msg.match(/minimum delegation amount of ({.*})/);
@@ -88361,10 +88361,13 @@ const formatChainError = (error) => {
     }
     return "Delegation amount is too small. Please enter a larger amount (at least ~35 BP for Blurt).";
   }
+  if (msg.includes("balance >= fee") || msg.includes("sufficient funds")) {
+    return "Insufficient funds to pay transaction fee (Blurt fees depend on message size).";
+  }
   if (msg.includes("balance")) return "Insufficient balance for this operation.";
   if (msg.includes("authority")) return "Missing required authority. Check your Active key.";
   if (msg.includes("Error Signature") || msg.includes("32602")) {
-    return "Signature Error (-32602). This often happens if the data sent by the website is malformed or if there is a mismatch in serialization. Please try reloading the website.";
+    return `Signature/Params Error (-32602). Node response: ${msg}`;
   }
   return msg;
 };
@@ -88408,6 +88411,7 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
   });
   const broadcastResult = await broadcastResponse.json();
   if (broadcastResult.error) {
+    console.error("FULL RPC ERROR:", JSON.stringify(broadcastResult.error, null, 2));
     const err = broadcastResult.error;
     let msg = err.message || JSON.stringify(err);
     if (msg.includes("unknown key")) {

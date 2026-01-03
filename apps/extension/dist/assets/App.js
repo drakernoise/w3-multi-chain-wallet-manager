@@ -14071,15 +14071,18 @@ function AppContent() {
       });
     }
   }, [walletState.accounts, isLocked, needsSave]);
+  const fetchBalancesRef = reactExports.useRef();
   reactExports.useEffect(() => {
-    let interval;
+    fetchBalancesRef.current = fetchBalances$1;
+  });
+  reactExports.useEffect(() => {
     if (!isLocked && walletState.accounts.length > 0) {
-      interval = setInterval(fetchBalances$1, 12e3);
+      const id = setInterval(() => {
+        if (fetchBalancesRef.current) fetchBalancesRef.current();
+      }, 5e3);
+      return () => clearInterval(id);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isLocked, walletState.accounts.length]);
+  }, [isLocked, walletState.accounts.length > 0]);
   const fetchBalances$1 = async () => {
     if (isLocked || walletState.accounts.length === 0) return;
     setIsRefreshing(true);

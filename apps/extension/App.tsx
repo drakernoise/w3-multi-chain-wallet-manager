@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Account, Chain, ViewState, WalletState, Vault } from '@types';
 import { LockScreen } from '@components/LockScreen';
 import { Sidebar } from '@components/Sidebar';
@@ -195,16 +195,20 @@ function AppContent() {
     }
   }, [walletState.accounts, isLocked, needsSave]);
 
-  // 4. Poll Balances automatically
+  // 4. Poll Balances automatically (Safe closure pattern)
+  const fetchBalancesRef = useRef<() => void>();
   useEffect(() => {
-    let interval: any;
+    fetchBalancesRef.current = fetchBalances;
+  });
+
+  useEffect(() => {
     if (!isLocked && walletState.accounts.length > 0) {
-      interval = setInterval(fetchBalances, 12000);
+      const id = setInterval(() => {
+        if (fetchBalancesRef.current) fetchBalancesRef.current();
+      }, 5000);
+      return () => clearInterval(id);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isLocked, walletState.accounts.length]);
+  }, [isLocked, walletState.accounts.length > 0]);
 
   const fetchBalances = async () => {
     if (isLocked || walletState.accounts.length === 0) return;

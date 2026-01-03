@@ -21,8 +21,6 @@ export interface ChainAccountData {
 }
 
 // --- HELPER: Manual Fetch for HIVE (Service Worker Compatible) ---
-// This bypasses 'dhive' networking to avoid "WorkerGlobalScope: Illegal invocation" errors.
-// It performs standard Hive RPC calls using native fetch.
 const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key: string): Promise<any> => {
     // 1. Get Dynamic Global Properties
     const propsResponse = await fetch(nodeUrl, {
@@ -358,7 +356,8 @@ export const broadcastCustomJson = async (chain: Chain, username: string, key: s
 };
 
 const formatChainError = (error: any): string => {
-    const msg = error.message || String(error);
+    // If it's an object with error.message, use that. Or just stringify.
+    const msg = error.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
 
     // Handle "min_delegation" error
     if (msg.includes('op.vesting_shares >= min_delegation')) {
@@ -373,13 +372,18 @@ const formatChainError = (error: any): string => {
         return "Delegation amount is too small. Please enter a larger amount (at least ~35 BP for Blurt).";
     }
 
+    // Handle Fee / Balance error
+    if (msg.includes('balance >= fee') || msg.includes('sufficient funds')) {
+        return "Insufficient funds to pay transaction fee (Blurt fees depend on message size).";
+    }
+
     // Handle other common errors
     if (msg.includes('balance')) return "Insufficient balance for this operation.";
     if (msg.includes('authority')) return "Missing required authority. Check your Active key.";
 
     // Handle signature errors with hints
     if (msg.includes('Error Signature') || msg.includes('32602')) {
-        return "Signature Error (-32602). This often happens if the data sent by the website is malformed or if there is a mismatch in serialization. Please try reloading the website.";
+        return `Signature/Params Error (-32602). Node response: ${msg}`;
     }
 
     return msg;
@@ -420,8 +424,6 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
     blurt.config.set('address_prefix', config.addressPrefix);
     blurt.config.set('chain_id', config.chainId);
 
-    // signTransaction creates a NEW object with signatures, or modifies in place?
-    // It returns a signed transaction object.
     const signedTx = blurt.auth.signTransaction(tx, [key]);
 
     // 4. Broadcast Synchronous
@@ -438,6 +440,8 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
 
     const broadcastResult = await broadcastResponse.json();
     if (broadcastResult.error) {
+        console.error("FULL RPC ERROR:", JSON.stringify(broadcastResult.error, null, 2));
+
         // Enhance error message
         const err = broadcastResult.error;
         let msg = err.message || JSON.stringify(err);
