@@ -34,12 +34,19 @@ class MobileProviderService {
     }
 
     private handleDeepLink(url: string) {
+        console.log('[MobileProvider] handleDeepLink called with:', url);
         try {
             const parsedUrl = new URL(url);
+            console.log('[MobileProvider] Parsed URL protocol:', parsedUrl.protocol);
+            console.log('[MobileProvider] Parsed URL host:', parsedUrl.host);
 
             // gravitywallet://sign?domain=example.com&operation=transfer&amount=10&to=user&callback=https://...
-            if (parsedUrl.protocol === 'gravitywallet:' && parsedUrl.host === 'sign') {
+            // Use loose check for robustness (ignore protocol/host specifics of URL class)
+            if (url.startsWith('gravitywallet://sign')) {
+                console.log('[MobileProvider] Valid gravitywallet://sign URL detected (string match)');
                 const params = Object.fromEntries(parsedUrl.searchParams);
+                console.log('[MobileProvider] Parsed params:', JSON.stringify(params));
+
                 const request: SignRequest = {
                     id: Date.now().toString(),
                     domain: params.domain || 'unknown',
@@ -49,11 +56,16 @@ class MobileProviderService {
                     callbackUrl: params.callback
                 };
 
+                console.log('[MobileProvider] Created request:', request.id);
                 this.pendingRequests.set(request.id, request);
+                console.log('[MobileProvider] Notifying', this.listeners.length, 'listeners');
                 this.notifyListeners(request);
+            } else {
+                console.log('[MobileProvider] URL does not match gravitywallet://sign pattern');
             }
         } catch (e) {
             console.error('[MobileProvider] Failed to parse deep link:', e);
+            console.error('[MobileProvider] URL was:', url);
         }
     }
 
