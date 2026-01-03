@@ -9,7 +9,6 @@ import { getVault, saveVault, tryRestoreSession } from '@services/cryptoService'
 import { mobileProvider, SignRequest as MobileSignRequest } from './services/mobileProvider'
 import { SignRequestModal } from './components/SignRequestModal'
 import { PermissionsManager } from './components/PermissionsManager'
-import { BrowserView } from './components/BrowserView'
 import 'gravity-shared/styles/global.css'
 
 // Shared Components
@@ -42,7 +41,7 @@ function MobileContent() {
   const [needsSave, setNeedsSave] = useState(false)
 
   // Navigation & View State
-  const [currentView, setCurrentView] = useState<'wallets' | 'bridge' | 'chat' | 'settings' | 'browser'>('wallets')
+  const [currentView, setCurrentView] = useState<'wallets' | 'bridge' | 'chat' | 'settings'>('wallets')
   const [activeChain, setActiveChain] = useState<Chain>(Chain.HIVE)
 
   // Bridge State
@@ -251,15 +250,7 @@ function MobileContent() {
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{bridgeStatus}</span>
               </>
             )}
-            {currentView === 'wallets' && (
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Wallets</span>
-            )}
-            {currentView === 'chat' && (
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Chat</span>
-            )}
-            {currentView === 'settings' && (
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Settings</span>
-            )}
+            {/* Nav Labels removed from Header for cleaner look as they are in nav bar now */}
           </div>
         </div>
         <div className="w-10 h-10 rounded-2xl bg-dark-800 border border-dark-700 flex items-center justify-center font-bold text-purple-400">
@@ -354,13 +345,6 @@ function MobileContent() {
             />
           </div>
         )}
-        {/* BROWSER VIEW */}
-        {currentView === 'browser' && (
-          <div className="h-full w-full">
-            <BrowserView />
-          </div>
-        )}
-
         {/* SETTINGS VIEW */}
         {currentView === 'settings' && (
           <div className="h-full w-full p-4 overflow-y-auto">
@@ -375,7 +359,8 @@ function MobileContent() {
         )}
       </main>
 
-      <nav className="shrink-0 grid grid-cols-5 gap-2 border-t border-dark-800 pt-6 mt-4">
+      {/* Navigation Bar */}
+      <nav className="shrink-0 grid grid-cols-4 gap-2 border-t border-dark-800 pt-6 mt-4">
         <button
           onClick={() => setCurrentView('wallets')}
           className={`flex flex-col items-center gap-1.5 transition-all outline-none bg-transparent border-none p-0 ${currentView === 'wallets' ? 'text-purple-400 opacity-100' : 'opacity-30'}`}
@@ -383,15 +368,6 @@ function MobileContent() {
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
           <span className={`text-[8px] font-black uppercase tracking-widest ${currentView === 'wallets' ? 'border-b border-purple-400' : ''}`}>Wallets</span>
-        </button>
-
-        <button
-          onClick={() => setCurrentView('browser')}
-          className={`flex flex-col items-center gap-1.5 transition-all outline-none bg-transparent border-none p-0 ${currentView === 'browser' ? 'text-purple-400 opacity-100' : 'opacity-30'}`}
-          style={{ backgroundColor: 'transparent' }}
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-          <span className={`text-[8px] font-black uppercase tracking-widest ${currentView === 'browser' ? 'border-b border-purple-400' : ''}`}>Browser</span>
         </button>
 
         <button
