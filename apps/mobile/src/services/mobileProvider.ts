@@ -24,15 +24,6 @@ class MobileProviderService {
     constructor() {
         this.loadPermissions();
         this.setupDeepLinkListener();
-        this.checkLaunchUrl();
-    }
-
-    private async checkLaunchUrl() {
-        const result = await App.getLaunchUrl();
-        if (result && result.url) {
-            console.log('[MobileProvider] Launch URL detected:', result.url);
-            this.handleDeepLink(result.url);
-        }
     }
 
     private setupDeepLinkListener() {
@@ -67,9 +58,14 @@ class MobileProviderService {
     }
 
     public onSignRequest(callback: (request: SignRequest) => void) {
+        console.log('[MobileProvider] Registering sign request listener');
+        console.log('[MobileProvider] Pending requests count:', this.pendingRequests.size);
         this.listeners.push(callback);
         // Replay pending requests immediately
-        this.pendingRequests.forEach(req => callback(req));
+        this.pendingRequests.forEach(req => {
+            console.log('[MobileProvider] Replaying pending request:', req.id);
+            callback(req);
+        });
     }
 
     public async grantPermission(domain: string, operations: string[], duration: '1day' | '1week' | '1month') {
