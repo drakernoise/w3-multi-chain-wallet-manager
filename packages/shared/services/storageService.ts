@@ -34,18 +34,32 @@ export const storageService = {
                     chrome.storage.local.get([key], (result: any) => {
                         const value = result && result[key] ? result[key] : null;
                         if (value === null) {
-                            // Fallback to localStorage
-                            resolve(localStorage.getItem(key));
+                            // Fallback 1: localStorage direct
+                            let local = localStorage.getItem(key);
+                            // Fallback 2: Capacitor default web prefix (Rescue migrated data)
+                            if (local === null) {
+                                local = localStorage.getItem(`CapacitorStorage.${key}`);
+                            }
+                            resolve(local);
                         } else {
                             resolve(value);
                         }
                     });
                 } catch (e) {
-                    resolve(localStorage.getItem(key));
+                    let local = localStorage.getItem(key);
+                    if (local === null) {
+                        local = localStorage.getItem(`CapacitorStorage.${key}`);
+                    }
+                    resolve(local);
                 }
             });
         }
-        return localStorage.getItem(key);
+
+        let local = localStorage.getItem(key);
+        if (local === null) {
+            local = localStorage.getItem(`CapacitorStorage.${key}`);
+        }
+        return local;
     },
 
     async setItem(key: string, value: string): Promise<void> {
@@ -92,15 +106,18 @@ export const storageService = {
                 try {
                     chrome.storage.local.remove([key], () => {
                         localStorage.removeItem(key);
+                        localStorage.removeItem(`CapacitorStorage.${key}`); // Cleanup both
                         resolve();
                     });
                 } catch (e) {
                     localStorage.removeItem(key);
+                    localStorage.removeItem(`CapacitorStorage.${key}`);
                     resolve();
                 }
             });
         }
         localStorage.removeItem(key);
+        localStorage.removeItem(`CapacitorStorage.${key}`);
     },
 
     async clear(): Promise<void> {

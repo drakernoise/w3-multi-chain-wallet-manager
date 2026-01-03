@@ -763,17 +763,29 @@ const storageService = {
           chrome.storage.local.get([key], (result) => {
             const value = result && result[key] ? result[key] : null;
             if (value === null) {
-              resolve(localStorage.getItem(key));
+              let local2 = localStorage.getItem(key);
+              if (local2 === null) {
+                local2 = localStorage.getItem(`CapacitorStorage.${key}`);
+              }
+              resolve(local2);
             } else {
               resolve(value);
             }
           });
         } catch (e) {
-          resolve(localStorage.getItem(key));
+          let local2 = localStorage.getItem(key);
+          if (local2 === null) {
+            local2 = localStorage.getItem(`CapacitorStorage.${key}`);
+          }
+          resolve(local2);
         }
       });
     }
-    return localStorage.getItem(key);
+    let local = localStorage.getItem(key);
+    if (local === null) {
+      local = localStorage.getItem(`CapacitorStorage.${key}`);
+    }
+    return local;
   },
   async setItem(key, value) {
     if (!key) return;
@@ -817,15 +829,18 @@ const storageService = {
         try {
           chrome.storage.local.remove([key], () => {
             localStorage.removeItem(key);
+            localStorage.removeItem(`CapacitorStorage.${key}`);
             resolve();
           });
         } catch (e) {
           localStorage.removeItem(key);
+          localStorage.removeItem(`CapacitorStorage.${key}`);
           resolve();
         }
       });
     }
     localStorage.removeItem(key);
+    localStorage.removeItem(`CapacitorStorage.${key}`);
   },
   async clear() {
     if (isNativePlatform()) {
