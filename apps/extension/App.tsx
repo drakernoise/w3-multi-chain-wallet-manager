@@ -27,7 +27,8 @@ import {
   saveVault,
   getVault,
   clearCryptoCache,
-  tryRestoreSession
+  tryRestoreSession,
+  enablePasswordless
 } from '@services/cryptoService';
 import { benchmarkNodes } from '@services/nodeService';
 import { LanguageProvider, useTranslation } from '@contexts/LanguageContext';
@@ -262,13 +263,25 @@ function AppContent() {
       };
     }));
 
-    setWalletState(prev => ({
-      ...prev,
-      accounts: [...prev.accounts, ...withBalance]
-    }));
-    setNeedsSave(true);
-    setNotification({ msg: 'Account imported successfully', type: 'success' });
-    setShowImport(false);
+    const updatedAccounts = [...walletState.accounts, ...withBalance];
+
+    try {
+      if (!walletState.encryptedMaster) {
+        // First account setup: Initialize Vault with Passwordless key
+        await enablePasswordless(updatedAccounts);
+        setWalletState(prev => ({ ...prev, accounts: updatedAccounts, encryptedMaster: true }));
+      } else {
+        // Standard save
+        await saveVault('cached', { accounts: updatedAccounts, lastUpdated: Date.now() });
+        setWalletState(prev => ({ ...prev, accounts: updatedAccounts }));
+      }
+
+      setNotification({ msg: 'Account imported successfully', type: 'success' });
+      setShowImport(false);
+    } catch (e) {
+      console.error("Import Save Failed:", e);
+      setNotification({ msg: 'Failed to save account. Please try again.', type: 'error' });
+    }
   };
 
   const handleUpdateAccount = (updatedAccount: Account) => {
