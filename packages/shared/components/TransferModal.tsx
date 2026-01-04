@@ -40,7 +40,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
     useEffect(() => {
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
             chrome.storage.local.get(['recentRecipients'], (result: { recentRecipients?: string[] }) => {
-                if (result.recentRecipients) {
+                if (Array.isArray(result.recentRecipients)) {
                     setRecentRecipients(result.recentRecipients);
                 }
             });
@@ -271,7 +271,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                                     <div className="px-3 py-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-dark-700 bg-dark-900/50">
                                         {t('common.recent_recipients')}
                                     </div>
-                                    {recentRecipients.map((recipient) => (
+                                    {Array.isArray(recentRecipients) && recentRecipients.map((recipient) => (
                                         <div
                                             key={recipient}
                                             onClick={() => {

@@ -10025,12 +10025,13 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
       const saved = await storageService.getItem("recentRecipients");
       if (saved) {
         try {
-          setRecentRecipients(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setRecentRecipients(parsed);
         } catch (e) {
         }
       } else if (typeof chrome !== "undefined" && chrome.storage) {
         chrome.storage.local.get(["recentRecipients"], (result) => {
-          if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
+          if (Array.isArray(result.recentRecipients)) setRecentRecipients(result.recentRecipients);
         });
       }
     };
@@ -10255,7 +10256,7 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
           accountError && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-red-500 mt-1 font-medium", children: accountError }),
           showRecent === "recipient" && recentRecipients.length > 0 && !recipient && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase", children: t("common.recent_recipients") || "Recent Recipients" }),
-            recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Array.isArray(recentRecipients) && recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
                 type: "button",
@@ -10291,7 +10292,7 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
           ),
           showRecent === "delegatee" && recentRecipients.length > 0 && !delegatee && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase", children: t("common.recent_recipients") || "Recent Recipients" }),
-            recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Array.isArray(recentRecipients) && recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
                 type: "button",
@@ -10607,7 +10608,7 @@ const RCModal = ({ account, type, onClose, onSuccess }) => {
   reactExports.useEffect(() => {
     document.body.style.overflow = "hidden";
     chrome.storage?.local.get(["recentRecipients"], (result) => {
-      if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
+      if (Array.isArray(result.recentRecipients)) setRecentRecipients(result.recentRecipients);
     });
     return () => {
       document.body.style.overflow = "unset";
@@ -10739,7 +10740,7 @@ const RCModal = ({ account, type, onClose, onSuccess }) => {
         ),
         showRecent && recentRecipients.length > 0 && !delegatee && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute z-10 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl overflow-hidden", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase", children: t("common.recent_recipients") || "Recent Recipients" }),
-          recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          Array.isArray(recentRecipients) && recentRecipients.map((name) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "button",
             {
               type: "button",
@@ -12286,7 +12287,7 @@ const TransferModal = ({ account: initialAccount, accounts, onClose, onTransfer,
   reactExports.useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
       chrome.storage.local.get(["recentRecipients"], (result) => {
-        if (result.recentRecipients) {
+        if (Array.isArray(result.recentRecipients)) {
           setRecentRecipients(result.recentRecipients);
         }
       });
@@ -12490,7 +12491,7 @@ const TransferModal = ({ account: initialAccount, accounts, onClose, onTransfer,
           ] }),
           showRecent && recentRecipients.length > 0 && !to && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute top-full left-0 right-0 z-50 mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-40 overflow-y-auto custom-scrollbar animate-slide-down", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 py-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-dark-700 bg-dark-900/50", children: t("common.recent_recipients") }),
-            recentRecipients.map((recipient) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Array.isArray(recentRecipients) && recentRecipients.map((recipient) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "div",
               {
                 onClick: () => {

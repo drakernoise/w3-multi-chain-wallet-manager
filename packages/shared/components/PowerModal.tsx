@@ -38,19 +38,15 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
             const saved = await storageService.getItem('recentRecipients');
             if (saved) {
                 try {
-                    setRecentRecipients(JSON.parse(saved));
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) setRecentRecipients(parsed);
                 } catch (e) {
-                    // If it's pure chrome storage array vs stringified JSON?
-                    // storageService handles chrome.storage.local.get([key]) -> result[key]
-                    // If it was saved as array directly in chrome storage, storageService might need to cast it.
-                    // storageService.getItem returns string | null.
-                    // If chrome storage has an array, storageService might need to cast it.
-                    // Let's check storageService implementation again.
+                    // Ignore parse error
                 }
             } else if (typeof chrome !== 'undefined' && chrome.storage) {
                 // Fallback for direct chrome storage if storageService didn't find it (migration?)
                 chrome.storage.local.get(['recentRecipients'], (result: any) => {
-                    if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
+                    if (Array.isArray(result.recentRecipients)) setRecentRecipients(result.recentRecipients);
                 });
             }
         };
@@ -323,7 +319,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                                     <div className="text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase">
                                         {t('common.recent_recipients') || "Recent Recipients"}
                                     </div>
-                                    {recentRecipients.map(name => (
+                                    {Array.isArray(recentRecipients) && recentRecipients.map(name => (
                                         <button
                                             key={name}
                                             type="button"
@@ -363,7 +359,7 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
                                     <div className="text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase">
                                         {t('common.recent_recipients') || "Recent Recipients"}
                                     </div>
-                                    {recentRecipients.map(name => (
+                                    {Array.isArray(recentRecipients) && recentRecipients.map(name => (
                                         <button
                                             key={name}
                                             type="button"

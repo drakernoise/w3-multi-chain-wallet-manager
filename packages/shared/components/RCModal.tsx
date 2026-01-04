@@ -26,7 +26,7 @@ export const RCModal: React.FC<RCModalProps> = ({ account, type, onClose, onSucc
         document.body.style.overflow = 'hidden';
 
         chrome.storage?.local.get(['recentRecipients'], (result: { recentRecipients?: string[] }) => {
-            if (result.recentRecipients) setRecentRecipients(result.recentRecipients);
+            if (Array.isArray(result.recentRecipients)) setRecentRecipients(result.recentRecipients);
         });
 
         return () => {
@@ -192,7 +192,7 @@ export const RCModal: React.FC<RCModalProps> = ({ account, type, onClose, onSucc
                                     <div className="text-[10px] text-slate-500 font-bold px-3 py-2 border-b border-dark-700 uppercase">
                                         {t('common.recent_recipients') || "Recent Recipients"}
                                     </div>
-                                    {recentRecipients.map(name => (
+                                    {Array.isArray(recentRecipients) && recentRecipients.map(name => (
                                         <button
                                             key={name}
                                             type="button"
