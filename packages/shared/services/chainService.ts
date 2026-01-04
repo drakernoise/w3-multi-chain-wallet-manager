@@ -373,8 +373,12 @@ const formatChainError = (error: any): string => {
     }
 
     // Handle Fee / Balance error
-    if (msg.includes('balance >= fee') || msg.includes('sufficient funds')) {
+    // Handle Fee / Balance error
+    if (msg.includes('balance >= fee')) {
         return "Insufficient funds to pay transaction fee (Blurt fees depend on message size).";
+    }
+    if (msg.includes('sufficient funds')) {
+        return "Insufficient funds. You do not have enough balance for this operation.";
     }
 
     // Handle other common errors
@@ -546,18 +550,20 @@ export const broadcastBulkTransfer = async (
     chain: Chain,
     from: string,
     activeKey: string,
-    items: { to: string; amount: number; memo: string }[],
+    items: { to: string; amount: number | string; memo: string; symbol?: string }[],
     tokenSymbol?: string
 ): Promise<{ success: boolean; txId?: string; error?: string }> => {
     // Determine default token if not provided
     const defaultToken = chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT';
-    const symbol = tokenSymbol || defaultToken;
+    const fallbackSymbol = tokenSymbol || defaultToken;
 
     const ops = items.map(item => {
+        const symbol = item.symbol || fallbackSymbol;
+        const amt = typeof item.amount === 'string' ? parseFloat(item.amount) : item.amount;
         return ['transfer', {
             from,
             to: item.to,
-            amount: `${item.amount.toFixed(3)} ${symbol}`,
+            amount: `${amt.toFixed(3)} ${symbol}`,
             memo: item.memo
         }];
     });

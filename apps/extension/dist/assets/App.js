@@ -11113,12 +11113,48 @@ const BulkTransferForm = ({ chain, account, mode, onClose, onSuccess }) => {
     else if (chain === Chain.STEEM) setSelectedToken("STEEM");
     else setSelectedToken("BLURT");
   }, [chain]);
-  const [items, setItems] = reactExports.useState([{ to: "", amount: 0, memo: "" }]);
+  const [items, setItems] = reactExports.useState([{
+    to: "",
+    amount: 0,
+    memo: "",
+    symbol: chain === Chain.HIVE ? "HIVE" : chain === Chain.STEEM ? "STEEM" : "BLURT"
+  }]);
   const [validationStatus, setValidationStatus] = reactExports.useState({ valid: [], invalid: [], checking: false });
   const [confirmModal, setConfirmModal] = reactExports.useState(null);
   const [isBroadcasting, setIsBroadcasting] = reactExports.useState(false);
+  const [fundError, setFundError] = reactExports.useState(null);
   const totalAmount = mode === "single" ? Number(singleAmount) * recipientsText.split(/[\s,]+/).filter((s) => s).length : items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  reactExports.useEffect(() => {
+    if (!account) return;
+    let reqMain = 0;
+    let reqSec = 0;
+    const mainSym = chain === Chain.HIVE ? "HIVE" : chain === Chain.STEEM ? "STEEM" : "BLURT";
+    const secSym = chain === Chain.HIVE ? "HBD" : "SBD";
+    if (mode === "single") {
+      const count = recipientsText.split(/[\s,]+/).filter((s) => s.trim()).length;
+      const amt = Number(singleAmount);
+      if (selectedToken === secSym) reqSec = amt * count;
+      else reqMain = amt * count;
+    } else {
+      items.forEach((i) => {
+        const amt = Number(i.amount) || 0;
+        const sym = i.symbol || selectedToken;
+        if (sym === secSym) reqSec += amt;
+        else reqMain += amt;
+      });
+    }
+    const availMain = account.balance || 0;
+    const availSec = account.secondaryBalance || 0;
+    let errorMsg = null;
+    if (reqMain > availMain) {
+      errorMsg = `${t("validation.insufficient_funds") || "Insufficient Funds"}: ${t("common.required") || "Required"} ${reqMain.toFixed(3)} ${mainSym}, ${t("transfer.available") || "Available"} ${availMain.toFixed(3)}`;
+    } else if (reqSec > availSec) {
+      errorMsg = `${t("validation.insufficient_funds") || "Insufficient Funds"}: ${t("common.required") || "Required"} ${reqSec.toFixed(3)} ${secSym}, ${t("transfer.available") || "Available"} ${availSec.toFixed(3)}`;
+    }
+    setFundError(errorMsg);
+  }, [singleAmount, recipientsText, items, mode, selectedToken, account, chain, t]);
   const recipientCount = mode === "single" ? recipientsText.split(/[\s,]+/).filter((s) => s.trim()).length : items.filter((i) => i.to).length;
+  const [toast, setToast] = reactExports.useState(null);
   const handleFileImport = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -11137,7 +11173,8 @@ const BulkTransferForm = ({ chain, account, mode, onClose, onSuccess }) => {
               newItems.push({
                 to: parts[0],
                 amount: parseFloat(parts[1]) || 0,
-                memo: parts.slice(2).join(" ")
+                memo: parts.slice(2).join(" "),
+                symbol: selectedToken
               });
             }
           });
@@ -11152,24 +11189,6 @@ const BulkTransferForm = ({ chain, account, mode, onClose, onSuccess }) => {
       reader.readAsText(file);
     }
   };
-  const [toast, setToast] = reactExports.useState(null);
-  reactExports.useEffect(() => {
-    const timer = setTimeout(() => {
-      const hasData = mode === "single" ? recipientsText.trim().length > 0 : items.some((i) => i.to.trim().length > 0);
-      if (hasData) {
-        verifyAccounts(true);
-      } else {
-        setValidationStatus({ valid: [], invalid: [], checking: false });
-      }
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [recipientsText, items, mode, chain]);
-  reactExports.useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4e3);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
   const verifyAccounts = async (isAuto = false) => {
     setValidationStatus((prev) => ({ ...prev, checking: true }));
     let usernamesToCheck = [];
@@ -11206,11 +11225,37 @@ const BulkTransferForm = ({ chain, account, mode, onClose, onSuccess }) => {
       });
     }
   };
-  const addNewRow = () => setItems([...items, { to: "", amount: 0, memo: "" }]);
+  reactExports.useEffect(() => {
+    const timer = setTimeout(() => {
+      const hasData = mode === "single" ? recipientsText.trim().length > 0 : items.some((i) => i.to.trim().length > 0);
+      if (hasData) {
+        verifyAccounts(true);
+      } else {
+        setValidationStatus({ valid: [], invalid: [], checking: false });
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [recipientsText, items, mode, chain]);
+  reactExports.useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4e3);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+  const addNewRow = () => setItems([...items, { to: "", amount: 0, memo: "", symbol: selectedToken }]);
   const removeRow = (idx) => setItems(items.filter((_, i) => i !== idx));
   const handleInitiateSend = () => {
     if (mode === "single" && recipientCount === 0) return;
     if (mode === "multi" && items.length === 0) return;
+    if (fundError) {
+      setConfirmModal({
+        isOpen: true,
+        title: t("validation.error") || "Validation Error",
+        message: fundError,
+        type: "error"
+      });
+      return;
+    }
     if (validationStatus.invalid.length > 0) {
       setConfirmModal({
         isOpen: true,
@@ -11269,14 +11314,6 @@ const BulkTransferForm = ({ chain, account, mode, onClose, onSuccess }) => {
           account.name
         ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between border-b border-dark-700 pb-2 mb-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: t("transfer.total_amount") }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-blue-400 font-bold", children: [
-          totalAmount.toFixed(3),
-          " ",
-          selectedToken
-        ] })
-      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-slate-500 mb-1 font-bold", children: [
         t("transfer.operations"),
         " (",
@@ -11292,7 +11329,7 @@ const BulkTransferForm = ({ chain, account, mode, onClose, onSuccess }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-green-400", children: [
             item.amount,
             " ",
-            selectedToken
+            item.symbol || selectedToken
           ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-slate-500 italic truncate", title: item.memo, children: item.memo || "No Memo" })
@@ -11313,18 +11350,21 @@ const BulkTransferForm = ({ chain, account, mode, onClose, onSuccess }) => {
       finalItems = names.map((name) => ({
         to: name,
         amount: Number(singleAmount),
-        memo: singleMemo
+        memo: singleMemo,
+        symbol: selectedToken
       }));
     } else {
       finalItems = items.filter((i) => i.to && Number(i.amount) > 0).map((i) => ({
         to: i.to.replace(/^@/, ""),
         amount: Number(i.amount),
-        memo: i.memo
+        memo: i.memo,
+        symbol: i.symbol || selectedToken
       }));
     }
     try {
       if (!account.activeKey) throw new Error(t("bulk.error_no_active"));
-      const result = await broadcastBulkTransfer(chain, account.name, account.activeKey, finalItems, selectedToken);
+      if (fundError) throw new Error(fundError);
+      const result = await broadcastBulkTransfer(chain, account.name, account.activeKey, finalItems);
       if (result.success) {
         setConfirmModal({
           isOpen: true,
@@ -11368,7 +11408,11 @@ const BulkTransferForm = ({ chain, account, mode, onClose, onSuccess }) => {
             account.name
           ] })
         ] }),
-        (chain === Chain.HIVE || chain === Chain.STEEM) && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-between bg-dark-900/50 p-2 rounded-lg border border-dark-700", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[10px] text-slate-400 w-full text-right", children: [
+        fundError && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-2 bg-red-900/30 text-red-300 border border-red-500/30 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 animate-pulse", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" }) }),
+          fundError
+        ] }),
+        !fundError && (chain === Chain.HIVE || chain === Chain.STEEM) && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-between bg-dark-900/50 p-2 rounded-lg border border-dark-700 mt-2", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[10px] text-slate-400 w-full text-right", children: [
           t("bulk.available"),
           " ",
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400 font-bold font-mono", children: (selectedToken === "HBD" || selectedToken === "SBD" ? account.secondaryBalance : account.balance)?.toFixed(3) }),
@@ -11521,8 +11565,12 @@ user3`
                   /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute right-1 top-1 bottom-1 flex items-center", children: chain === Chain.HIVE || chain === Chain.STEEM ? /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "select",
                     {
-                      value: selectedToken,
-                      onChange: (e) => setSelectedToken(e.target.value),
+                      value: item.symbol || selectedToken,
+                      onChange: (e) => {
+                        const newItems = [...items];
+                        newItems[idx].symbol = e.target.value;
+                        setItems(newItems);
+                      },
                       className: "h-full bg-dark-800 text-xs font-bold text-white border-l border-dark-600 rounded-r-lg px-2 outline-none cursor-pointer hover:bg-dark-700",
                       children: chain === Chain.HIVE ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
                         /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "HIVE", children: "HIVE" }),
@@ -11532,7 +11580,7 @@ user3`
                         /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "SBD", children: "SBD" })
                       ] })
                     }
-                  ) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "px-3 text-xs font-bold text-slate-500", children: selectedToken }) })
+                  ) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "px-3 text-xs font-bold text-slate-500", children: item.symbol || selectedToken }) })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx(
                   "button",
@@ -11569,7 +11617,7 @@ user3`
           "button",
           {
             onClick: handleInitiateSend,
-            disabled: validationStatus.invalid.length > 0 || validationStatus.checking || isBroadcasting,
+            disabled: validationStatus.invalid.length > 0 || validationStatus.checking || isBroadcasting || !!fundError,
             className: "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-dark-600 disabled:to-dark-600 disabled:text-slate-500 text-white font-bold py-2 px-6 h-auto min-h-[40px] rounded-full shadow-lg transition-all transform active:scale-[0.98] text-xs tracking-wide whitespace-normal leading-tight max-w-[200px]",
             children: isBroadcasting ? "Broadcasting..." : t("bulk.sign_broadcast")
           }
@@ -11595,8 +11643,8 @@ user3`
         },
         onCancel: () => setConfirmModal(null),
         isLoading: isBroadcasting,
-        confirmLabel: confirmModal?.type === "warning" ? "Confirm Send" : "OK",
-        cancelLabel: confirmModal?.type === "warning" ? "Cancel" : "Close"
+        confirmLabel: confirmModal?.type === "warning" ? t("common.confirm") || "Confirm" : "OK",
+        cancelLabel: confirmModal?.type === "warning" ? t("common.cancel") || "Cancel" : t("common.close") || "Close"
       }
     )
   ] });

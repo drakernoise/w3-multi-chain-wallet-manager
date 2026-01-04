@@ -49,6 +49,7 @@ export interface BulkItem {
   to: string;
   amount: number | string;
   memo: string;
+  symbol?: string;
 }
 
 export interface MultiSigRequest {

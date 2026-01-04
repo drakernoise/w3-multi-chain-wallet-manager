@@ -25,7 +25,7 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
         chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT'
     );
 
-    // Sync token on chain change (though chain shouldn't change in modal context, good for safety)
+    // Sync token on chain change
     useEffect(() => {
         if (chain === Chain.HIVE) setSelectedToken('HIVE');
         else if (chain === Chain.STEEM) setSelectedToken('STEEM');
@@ -33,7 +33,12 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
     }, [chain]);
 
     // Multi Mode State
-    const [items, setItems] = useState<BulkItem[]>([{ to: '', amount: 0, memo: '' }]);
+    const [items, setItems] = useState<BulkItem[]>([{
+        to: '',
+        amount: 0,
+        memo: '',
+        symbol: chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT'
+    }]);
 
     const [validationStatus, setValidationStatus] = useState<{ valid: string[], invalid: string[], checking: boolean }>({ valid: [], invalid: [], checking: false });
 
@@ -41,15 +46,58 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, message: React.ReactNode, title: string, type: 'info' | 'warning' | 'error' | 'success' } | null>(null);
     const [isBroadcasting, setIsBroadcasting] = useState(false);
 
-    // Calculate total amount
+    // Fund Validation State
+    const [fundError, setFundError] = useState<string | null>(null);
+
+    // Calculate total amount (Display only)
     const totalAmount = mode === 'single'
         ? (Number(singleAmount) * recipientsText.split(/[\s,]+/).filter(s => s).length)
         : items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    // Validate Funds Real-time
+    useEffect(() => {
+        if (!account) return;
+
+        let reqMain = 0; // HIVE/STEEM/BLURT
+        let reqSec = 0;  // HBD/SBD
+
+        const mainSym = chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT';
+        const secSym = chain === Chain.HIVE ? 'HBD' : 'SBD';
+
+        if (mode === 'single') {
+            const count = recipientsText.split(/[\s,]+/).filter(s => s.trim()).length;
+            const amt = Number(singleAmount);
+            if (selectedToken === secSym) reqSec = amt * count;
+            else reqMain = amt * count;
+        } else {
+            items.forEach(i => {
+                const amt = Number(i.amount) || 0;
+                const sym = i.symbol || selectedToken; // Fallback
+                if (sym === secSym) reqSec += amt;
+                else reqMain += amt;
+            });
+        }
+
+        const availMain = account.balance || 0;
+        const availSec = account.secondaryBalance || 0;
+
+        let errorMsg = null;
+        if (reqMain > availMain) {
+            errorMsg = `${t('validation.insufficient_funds') || 'Insufficient Funds'}: ${t('common.required') || 'Required'} ${reqMain.toFixed(3)} ${mainSym}, ${t('transfer.available') || 'Available'} ${availMain.toFixed(3)}`;
+        } else if (reqSec > availSec) {
+            errorMsg = `${t('validation.insufficient_funds') || 'Insufficient Funds'}: ${t('common.required') || 'Required'} ${reqSec.toFixed(3)} ${secSym}, ${t('transfer.available') || 'Available'} ${availSec.toFixed(3)}`;
+        }
+
+        setFundError(errorMsg);
+
+    }, [singleAmount, recipientsText, items, mode, selectedToken, account, chain, t]);
 
     // Count recipients
     const recipientCount = mode === 'single'
         ? recipientsText.split(/[\s,]+/).filter(s => s.trim()).length
         : items.filter(i => i.to).length;
+
+    const [toast, setToast] = useState<{ msg: string, type: 'error' | 'success' | 'warning' } | null>(null);
 
     const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -71,7 +119,8 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                             newItems.push({
                                 to: parts[0],
                                 amount: parseFloat(parts[1]) || 0,
-                                memo: parts.slice(2).join(' ')
+                                memo: parts.slice(2).join(' '),
+                                symbol: selectedToken
                             });
                         }
                     });
@@ -86,33 +135,6 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
             reader.readAsText(file);
         }
     };
-
-    const [toast, setToast] = useState<{ msg: string, type: 'error' | 'success' | 'warning' } | null>(null);
-
-    // Auto-Verify with Debounce
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            const hasData = mode === 'single'
-                ? recipientsText.trim().length > 0
-                : items.some(i => i.to.trim().length > 0);
-
-            if (hasData) {
-                verifyAccounts(true);
-            } else {
-                setValidationStatus({ valid: [], invalid: [], checking: false });
-            }
-        }, 1500);
-
-        return () => clearTimeout(timer);
-    }, [recipientsText, items, mode, chain]);
-
-    // Toast Timer
-    useEffect(() => {
-        if (toast) {
-            const timer = setTimeout(() => setToast(null), 4000);
-            return () => clearTimeout(timer);
-        }
-    }, [toast]);
 
     const verifyAccounts = async (isAuto = false) => {
         setValidationStatus(prev => ({ ...prev, checking: true }));
@@ -158,14 +180,48 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
         }
     };
 
-    const addNewRow = () => setItems([...items, { to: '', amount: 0, memo: '' }]);
+    // Auto-Verify with Debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const hasData = mode === 'single'
+                ? recipientsText.trim().length > 0
+                : items.some(i => i.to.trim().length > 0);
+
+            if (hasData) {
+                verifyAccounts(true);
+            } else {
+                setValidationStatus({ valid: [], invalid: [], checking: false });
+            }
+        }, 1500);
+
+        return () => clearTimeout(timer);
+    }, [recipientsText, items, mode, chain]);
+
+    // Toast Timer
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
+
+    const addNewRow = () => setItems([...items, { to: '', amount: 0, memo: '', symbol: selectedToken }]);
     const removeRow = (idx: number) => setItems(items.filter((_, i) => i !== idx));
-
-
 
     const handleInitiateSend = () => {
         if (mode === 'single' && recipientCount === 0) return;
         if (mode === 'multi' && items.length === 0) return;
+
+        if (fundError) {
+            setConfirmModal({
+                isOpen: true,
+                title: t('validation.error') || 'Validation Error',
+                message: fundError,
+                type: 'error'
+            });
+            return;
+        }
 
         if (validationStatus.invalid.length > 0) {
             setConfirmModal({
@@ -214,18 +270,14 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                         <span className="text-slate-500">{t('sign.from')}</span>
                         <span className="text-white font-bold">@{account.name}</span>
                     </div>
-                    <div className="flex justify-between border-b border-dark-700 pb-2 mb-2">
-                        <span className="text-slate-500">{t('transfer.total_amount')}</span>
-                        <span className="text-blue-400 font-bold">{totalAmount.toFixed(3)} {selectedToken}</span>
-                    </div>
-
+                    {/* Simplified header for Mixed Tokens */}
                     <p className="text-slate-500 mb-1 font-bold">{t('transfer.operations')} ({items.length})</p>
                     <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1 pr-1">
                         {items.map((item, idx) => (
                             <div key={idx} className="flex flex-col bg-dark-900 p-2 rounded border border-dark-800">
                                 <div className="flex justify-between font-bold mb-1">
                                     <span className="text-white">@{item.to.replace(/^@/, '')}</span>
-                                    <span className="text-green-400">{item.amount} {selectedToken}</span>
+                                    <span className="text-green-400">{item.amount} {item.symbol || selectedToken}</span>
                                 </div>
                                 <span className="text-[10px] text-slate-500 italic truncate" title={item.memo}>{item.memo || "No Memo"}</span>
                             </div>
@@ -245,14 +297,15 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
 
     const executeSend = async () => {
         setIsBroadcasting(true);
-        let finalItems: { to: string; amount: number; memo: string }[] = [];
+        let finalItems: { to: string; amount: number; memo: string; symbol?: string }[] = [];
 
         if (mode === 'single') {
             const names = recipientsText.split(/[\s,]+/).map(s => s.trim()).filter(s => s).map(u => u.replace(/^@/, ''));
             finalItems = names.map(name => ({
                 to: name,
                 amount: Number(singleAmount),
-                memo: singleMemo
+                memo: singleMemo,
+                symbol: selectedToken
             }));
         } else {
             finalItems = items
@@ -260,14 +313,16 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                 .map(i => ({
                     to: i.to.replace(/^@/, ''),
                     amount: Number(i.amount),
-                    memo: i.memo
+                    memo: i.memo,
+                    symbol: i.symbol || selectedToken
                 }));
         }
 
         try {
             if (!account.activeKey) throw new Error(t('bulk.error_no_active'));
+            if (fundError) throw new Error(fundError);
 
-            const result = await broadcastBulkTransfer(chain, account.name, account.activeKey, finalItems, selectedToken);
+            const result = await broadcastBulkTransfer(chain, account.name, account.activeKey, finalItems);
 
             if (result.success) {
                 setConfirmModal({
@@ -321,10 +376,17 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                         {t('bulk.sending_from')} <span className="text-blue-400 font-bold">@{account.name}</span>
                     </p>
 
-                    {/* Token Selector & Balance Row */}
-                    {(chain === Chain.HIVE || chain === Chain.STEEM) && (
-                        <div className="flex items-center justify-between bg-dark-900/50 p-2 rounded-lg border border-dark-700">
-                            {/* Balance - Now Right Aligned/Full Width since selector is moved */}
+                    {/* Fund Error Display */}
+                    {fundError && (
+                        <div className="mt-2 bg-red-900/30 text-red-300 border border-red-500/30 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 animate-pulse">
+                            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            {fundError}
+                        </div>
+                    )}
+
+                    {/* Token Selector & Balance Row - Only show if NO error */}
+                    {!fundError && (chain === Chain.HIVE || chain === Chain.STEEM) && (
+                        <div className="flex items-center justify-between bg-dark-900/50 p-2 rounded-lg border border-dark-700 mt-2">
                             <div className="text-[10px] text-slate-400 w-full text-right">
                                 {t('bulk.available')} <span className="text-green-400 font-bold font-mono">
                                     {((selectedToken === 'HBD' || selectedToken === 'SBD') ? account.secondaryBalance : account.balance)?.toFixed(3)}
@@ -479,8 +541,12 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                                 <div className="absolute right-1 top-1 bottom-1 flex items-center">
                                                     {(chain === Chain.HIVE || chain === Chain.STEEM) ? (
                                                         <select
-                                                            value={selectedToken}
-                                                            onChange={(e) => setSelectedToken(e.target.value)}
+                                                            value={item.symbol || selectedToken}
+                                                            onChange={(e) => {
+                                                                const newItems = [...items];
+                                                                newItems[idx].symbol = e.target.value;
+                                                                setItems(newItems);
+                                                            }}
                                                             className="h-full bg-dark-800 text-xs font-bold text-white border-l border-dark-600 rounded-r-lg px-2 outline-none cursor-pointer hover:bg-dark-700"
                                                         >
                                                             {chain === Chain.HIVE ? (
@@ -496,7 +562,7 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                                             )}
                                                         </select>
                                                     ) : (
-                                                        <span className="px-3 text-xs font-bold text-slate-500">{selectedToken}</span>
+                                                        <span className="px-3 text-xs font-bold text-slate-500">{item.symbol || selectedToken}</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -534,7 +600,7 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                     <div className="pt-6 pb-4 flex justify-center">
                         <button
                             onClick={handleInitiateSend}
-                            disabled={validationStatus.invalid.length > 0 || validationStatus.checking || isBroadcasting}
+                            disabled={validationStatus.invalid.length > 0 || validationStatus.checking || isBroadcasting || !!fundError}
                             className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-dark-600 disabled:to-dark-600 disabled:text-slate-500 text-white font-bold py-2 px-6 h-auto min-h-[40px] rounded-full shadow-lg transition-all transform active:scale-[0.98] text-xs tracking-wide whitespace-normal leading-tight max-w-[200px]"
                         >
                             {isBroadcasting ? 'Broadcasting...' : t('bulk.sign_broadcast')}
@@ -560,8 +626,8 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                 }}
                 onCancel={() => setConfirmModal(null)}
                 isLoading={isBroadcasting}
-                confirmLabel={confirmModal?.type === 'warning' ? 'Confirm Send' : 'OK'}
-                cancelLabel={confirmModal?.type === 'warning' ? 'Cancel' : 'Close'}
+                confirmLabel={confirmModal?.type === 'warning' ? t('common.confirm') || 'Confirm' : 'OK'}
+                cancelLabel={confirmModal?.type === 'warning' ? t('common.cancel') || 'Cancel' : t('common.close') || 'Close'}
             />
         </div>
     );
