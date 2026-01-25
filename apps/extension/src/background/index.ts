@@ -352,14 +352,54 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
 
             if (operations && !Array.isArray(operations) && operations.operations) operations = operations.operations;
 
+            // Determine which operations require Active key
+            const requiresActiveKey = Array.isArray(operations) && operations.some((op: any) => {
+                const opName = Array.isArray(op) ? op[0] : op.type || op[0];
+                // Operations that require Active key
+                const activeKeyOps = [
+                    'witness_update',
+                    'witness_set_properties',
+                    'account_update',
+                    'account_update2',
+                    'transfer',
+                    'transfer_to_vesting',
+                    'withdraw_vesting',
+                    'delegate_vesting_shares',
+                    'account_create',
+                    'account_create_with_delegation',
+                    'transfer_to_savings',
+                    'transfer_from_savings',
+                    'escrow_transfer',
+                    'escrow_release',
+                    'escrow_dispute',
+                    'escrow_approve',
+                    'claim_reward_balance',
+                    'delegate_rc',
+                    'create_proposal',
+                    'update_proposal_votes',
+                    'remove_proposal'
+                ];
+                return activeKeyOps.includes(opName);
+            });
+
             let keyStr = "";
             const normalizedKeyType = (keyType || '').toLowerCase();
 
             if (normalizedKeyType === 'posting') keyStr = account.postingKey || "";
             else if (normalizedKeyType === 'active') keyStr = account.activeKey || "";
+            else if (requiresActiveKey) keyStr = account.activeKey || ""; // Auto-detect Active key requirement
             else keyStr = account.activeKey || ""; // Default fallback
 
-            if (!keyStr) return { success: false, error: 'Key required for broadcast operation' };
+            // Debug logging for key selection
+            // Auto-select Active key for operations that require it (e.g., witness_update)
+            if (requiresActiveKey && keyStr !== account.activeKey) {
+                console.log('[Background] Auto-selecting Active key for operation requiring active authority');
+            }
+
+            if (!keyStr) {
+                const requiredType = requiresActiveKey ? 'Active' : (keyType || 'Active');
+                return { success: false, error: `${requiredType} key required for broadcast operation` };
+            }
 
             response = await broadcastOperations(account.chain, keyStr, operations);
 

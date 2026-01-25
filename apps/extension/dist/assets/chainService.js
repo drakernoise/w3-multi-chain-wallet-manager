@@ -88375,6 +88375,10 @@ const formatChainError = (error) => {
   return msg;
 };
 const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
+  const trimmedKey = key ? key.trim() : key;
+  if (trimmedKey !== key) {
+    key = trimmedKey;
+  }
   const propsResponse = await fetch(nodeUrl, {
     method: "POST",
     body: JSON.stringify({
@@ -88391,17 +88395,36 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
   const ref_block_num = props.head_block_number & 65535;
   const ref_block_prefix = Buffer.from(props.head_block_id, "hex").readUInt32LE(4);
   const expiration = new Date(Date.now() + 60 * 1e3).toISOString().slice(0, -5);
-  const tx = {
-    ref_block_num,
-    ref_block_prefix,
-    expiration,
-    operations,
-    extensions: []
-  };
   const config = getChainConfig(Chain.BLURT);
   libExports.config.set("address_prefix", config.addressPrefix);
   libExports.config.set("chain_id", config.chainId);
-  const signedTx = libExports.auth.signTransaction(tx, [key]);
+  const operationsWithBlurt = operations.map((op) => {
+    const opName = op[0];
+    const opData = { ...op[1] };
+    const convertSteemToBlurt = (value) => {
+      if (typeof value === "string") {
+        return value.replace(/ STEEM/g, " BLURT");
+      } else if (Array.isArray(value)) {
+        return value.map(convertSteemToBlurt);
+      } else if (value !== null && typeof value === "object") {
+        const converted = {};
+        for (const k in value) {
+          converted[k] = convertSteemToBlurt(value[k]);
+        }
+        return converted;
+      }
+      return value;
+    };
+    return [opName, convertSteemToBlurt(opData)];
+  });
+  const txWithBlurt = {
+    ref_block_num,
+    ref_block_prefix,
+    expiration,
+    operations: operationsWithBlurt,
+    extensions: []
+  };
+  const signedTx = libExports.auth.signTransaction(txWithBlurt, [key]);
   const broadcastResponse = await fetch(nodeUrl, {
     method: "POST",
     body: JSON.stringify({
@@ -88437,45 +88460,63 @@ const broadcastOperations = async (chain, activeKey, operations) => {
       const result = await client.broadcast.sendOperations(operations, key);
       return { success: true, txId: result.id, opResult: result };
     } else if (chain === Chain.BLURT) {
+      const convertBlurtToSteem = (value) => {
+        if (typeof value === "string") {
+          if (value.includes(" BLURT")) {
+            return value.replace(/ BLURT/g, " STEEM");
+          }
+          return value;
+        } else if (Array.isArray(value)) {
+          return value.map(convertBlurtToSteem);
+        } else if (value !== null && typeof value === "object") {
+          const converted = {};
+          for (const key in value) {
+            converted[key] = convertBlurtToSteem(value[key]);
+          }
+          return converted;
+        }
+        return value;
+      };
       const cleanOperations = operations.map((op) => {
         const opName = op[0];
         const opData = { ...op[1] };
+        const convertedOpData = convertBlurtToSteem(opData);
         const metadataFields = ["json_metadata", "posting_json_metadata"];
         metadataFields.forEach((field) => {
-          if (opData[field] !== void 0 && opData[field] !== null) {
-            if (typeof opData[field] === "object") {
+          if (convertedOpData[field] !== void 0 && convertedOpData[field] !== null) {
+            if (typeof convertedOpData[field] === "object") {
               try {
-                opData[field] = JSON.stringify(opData[field]);
+                convertedOpData[field] = JSON.stringify(convertedOpData[field]);
               } catch (e) {
                 console.error(`[ChainService] Failed to stringify ${field}:`, e);
               }
             }
           } else {
             if (opName === "comment" && field === "json_metadata") {
-              opData[field] = "";
+              convertedOpData[field] = "";
             }
           }
         });
-        if (opData.tags) {
+        if (convertedOpData.tags) {
           try {
             let meta = {};
-            if (opData.json_metadata) {
+            if (convertedOpData.json_metadata) {
               try {
-                meta = typeof opData.json_metadata === "string" ? JSON.parse(opData.json_metadata) : opData.json_metadata;
+                meta = typeof convertedOpData.json_metadata === "string" ? JSON.parse(convertedOpData.json_metadata) : convertedOpData.json_metadata;
               } catch (e) {
               }
             }
-            meta.tags = opData.tags;
-            opData.json_metadata = JSON.stringify(meta);
-            delete opData.tags;
+            meta.tags = convertedOpData.tags;
+            convertedOpData.json_metadata = JSON.stringify(meta);
+            delete convertedOpData.tags;
           } catch (e) {
             console.error("[ChainService] Error merging tags into metadata:", e);
           }
         }
-        if (opData.extensions !== void 0 && !Array.isArray(opData.extensions)) {
-          opData.extensions = [];
+        if (convertedOpData.extensions !== void 0 && !Array.isArray(convertedOpData.extensions)) {
+          convertedOpData.extensions = [];
         }
-        return [opName, opData];
+        return [opName, convertedOpData];
       });
       const result = await broadcastBlurtTransaction(nodeUrl, cleanOperations, activeKey);
       return { success: true, txId: result.id, opResult: result };

@@ -395,6 +395,12 @@ const formatChainError = (error: any): string => {
 
 // Manual Blurt Broadcast to avoid library issues
 const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key: string): Promise<any> => {
+    // Trim the key to remove any whitespace issues
+    const trimmedKey = key ? key.trim() : key;
+    if (trimmedKey !== key) {
+        key = trimmedKey;
+    }
+    
     // 1. Get Dynamic Global Properties
     const propsResponse = await fetch(nodeUrl, {
         method: 'POST',
@@ -415,20 +421,46 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
     const ref_block_prefix = Buffer.from(props.head_block_id, 'hex').readUInt32LE(4);
     const expiration = new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5);
 
-    const tx = {
-        ref_block_num,
-        ref_block_prefix,
-        expiration,
-        operations,
-        extensions: []
-    };
-
     // 3. Sign (using blurtjs auth)
     const config = getChainConfig(Chain.BLURT);
     blurt.config.set('address_prefix', config.addressPrefix);
     blurt.config.set('chain_id', config.chainId);
 
-    const signedTx = blurt.auth.signTransaction(tx, [key]);
+    // CRITICAL FIX: Convert operations from STEEM to BLURT BEFORE signing
+    // The blurtjs serializer accepts BLURT, so we convert before creating the transaction
+    // This ensures the signature is calculated over BLURT from the start
+    const operationsWithBlurt = operations.map((op: any) => {
+        const opName = op[0];
+        const opData = { ...op[1] };
+        
+        const convertSteemToBlurt = (value: any): any => {
+            if (typeof value === 'string') {
+                return value.replace(/ STEEM/g, ' BLURT');
+            } else if (Array.isArray(value)) {
+                return value.map(convertSteemToBlurt);
+            } else if (value !== null && typeof value === 'object') {
+                const converted: any = {};
+                for (const k in value) {
+                    converted[k] = convertSteemToBlurt(value[k]);
+                }
+                return converted;
+            }
+            return value;
+        };
+        
+        return [opName, convertSteemToBlurt(opData)];
+    });
+    
+    const txWithBlurt = {
+        ref_block_num,
+        ref_block_prefix,
+        expiration,
+        operations: operationsWithBlurt,
+        extensions: []
+    };
+
+    // Sign with BLURT - blurtjs serializer accepts BLURT directly
+    const signedTx = blurt.auth.signTransaction(txWithBlurt, [key]);
 
     // 4. Broadcast Synchronous
     const broadcastResponse = await fetch(nodeUrl, {
@@ -481,19 +513,45 @@ export const broadcastOperations = async (
         } else if (chain === Chain.BLURT) {
             // Using manual broadcast implementation for better reliability
 
+            // Helper function to convert BLURT to STEEM in asset strings
+            // This is needed because @hiveio/dhive serializers don't recognize BLURT symbol
+            // BLURT and STEEM have identical serialization (3 decimals), so this is safe
+            const convertBlurtToSteem = (value: any): any => {
+                if (typeof value === 'string') {
+                    // Convert asset strings like "1.000 BLURT" to "1.000 STEEM"
+                    if (value.includes(' BLURT')) {
+                        return value.replace(/ BLURT/g, ' STEEM');
+                    }
+                    return value;
+                } else if (Array.isArray(value)) {
+                    return value.map(convertBlurtToSteem);
+                } else if (value !== null && typeof value === 'object') {
+                    const converted: any = {};
+                    for (const key in value) {
+                        converted[key] = convertBlurtToSteem(value[key]);
+                    }
+                    return converted;
+                }
+                return value;
+            };
+
             // VALIDATION & CLEANUP: Some dApps (like BeBlurt) might send malformed metadata
             const cleanOperations = operations.map(op => {
                 const opName = op[0];
                 const opData = { ...op[1] }; // Shallow copy to avoid mutating original
 
+                // 0. Convert BLURT to STEEM in all asset fields (CRITICAL FIX for witness_update)
+                // This must happen before other cleanup to ensure asset serialization works
+                const convertedOpData = convertBlurtToSteem(opData);
+
                 // 1. Handle Metadata Fields
                 const metadataFields = ['json_metadata', 'posting_json_metadata'];
                 metadataFields.forEach(field => {
-                    if (opData[field] !== undefined && opData[field] !== null) {
+                    if (convertedOpData[field] !== undefined && convertedOpData[field] !== null) {
                         // If it's an object, stringify it
-                        if (typeof opData[field] === 'object') {
+                        if (typeof convertedOpData[field] === 'object') {
                             try {
-                                opData[field] = JSON.stringify(opData[field]);
+                                convertedOpData[field] = JSON.stringify(convertedOpData[field]);
                             } catch (e) {
                                 console.error(`[ChainService] Failed to stringify ${field}:`, e);
                             }
@@ -502,38 +560,38 @@ export const broadcastOperations = async (
                         // Ensure it's at least an empty string if referenced by dApp but null/undefined
                         // Actually, better to just leave it if it's not there, but some nodes prefer ""
                         if (opName === 'comment' && field === 'json_metadata') {
-                            opData[field] = "";
+                            convertedOpData[field] = "";
                         }
                     }
                 });
 
                 // 2. Extra safety for 'tags' (Common issue with BeBlurt and similar dApps)
                 // If 'tags' exists as a top-level field, it MUST be moved to json_metadata
-                if (opData.tags) {
+                if (convertedOpData.tags) {
                     try {
                         let meta = {};
-                        if (opData.json_metadata) {
+                        if (convertedOpData.json_metadata) {
                             try {
-                                meta = typeof opData.json_metadata === 'string'
-                                    ? JSON.parse(opData.json_metadata)
-                                    : opData.json_metadata;
+                                meta = typeof convertedOpData.json_metadata === 'string'
+                                    ? JSON.parse(convertedOpData.json_metadata)
+                                    : convertedOpData.json_metadata;
                             } catch (e) { /* ignore parse error, use empty */ }
                         }
                         // Merge tags into metadata
-                        (meta as any).tags = opData.tags;
-                        opData.json_metadata = JSON.stringify(meta);
-                        delete opData.tags;
+                        (meta as any).tags = convertedOpData.tags;
+                        convertedOpData.json_metadata = JSON.stringify(meta);
+                        delete convertedOpData.tags;
                     } catch (e) {
                         console.error("[ChainService] Error merging tags into metadata:", e);
                     }
                 }
 
                 // 3. Ensure extensions is an array
-                if (opData.extensions !== undefined && !Array.isArray(opData.extensions)) {
-                    opData.extensions = [];
+                if (convertedOpData.extensions !== undefined && !Array.isArray(convertedOpData.extensions)) {
+                    convertedOpData.extensions = [];
                 }
 
-                return [opName, opData];
+                return [opName, convertedOpData];
             });
 
             const result = await broadcastBlurtTransaction(nodeUrl, cleanOperations, activeKey);

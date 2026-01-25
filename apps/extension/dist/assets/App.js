@@ -12921,10 +12921,42 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
             return op;
           });
         }
+        const requiresActiveKey = operations.some((op) => {
+          const opName = Array.isArray(op) ? op[0] : op.type || op[0];
+          const activeKeyOps = [
+            "witness_update",
+            "witness_set_properties",
+            "account_update",
+            "account_update2",
+            "transfer",
+            "transfer_to_vesting",
+            "withdraw_vesting",
+            "delegate_vesting_shares",
+            "account_create",
+            "account_create_with_delegation",
+            "transfer_to_savings",
+            "transfer_from_savings",
+            "escrow_transfer",
+            "escrow_release",
+            "escrow_dispute",
+            "escrow_approve",
+            "claim_reward_balance",
+            "delegate_rc",
+            "create_proposal",
+            "update_proposal_votes",
+            "remove_proposal"
+          ];
+          return activeKeyOps.includes(opName);
+        });
         let key = account.postingKey;
         if (keyType === "Active") key = account.activeKey;
+        else if (requiresActiveKey) key = account.activeKey;
         if (!key && account.activeKey) key = account.activeKey;
-        if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", keyType || "Posting"));
+        const requiredKeyType = requiresActiveKey ? "Active" : keyType || "Posting";
+        if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", requiredKeyType));
+        if (requiresActiveKey && key !== account.activeKey) {
+          console.log("[SignRequest] Auto-selecting Active key for operation requiring active authority");
+        }
         const response = await broadcastOperations(account.chain, key, operations);
         if (!response.success) throw new Error(response.error);
         result = { result: response.opResult || response.txId, message: t("sign.success"), ...response };
