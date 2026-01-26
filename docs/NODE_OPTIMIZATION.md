@@ -5,7 +5,7 @@
 **Tu nodo:** `https://rpc.drakernoise.com`
 - Latencia actual: **359ms**
 - Ranking: 2º lugar (63ms más lento que el primero)
-- Estado: ✅ Funcionando correctamente
+- Estado: Funcionando correctamente
 
 **Objetivo:** Reducir la latencia para competir con `rpc.beblurt.com` (296ms)
 

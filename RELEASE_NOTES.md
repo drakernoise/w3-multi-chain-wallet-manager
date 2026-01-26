@@ -1,3 +1,47 @@
+# Release v1.1.2 - Blurt Witness Fix & Performance Improvements
+
+## Key Highlights
+
+This update focuses on critical fixes for Blurt witness operations and significant performance improvements through enhanced benchmarking and client-side optimizations.
+
+### Blurt Witness Operations Fixed
+- **Critical Fix:** Resolved `witness_update` operations failing with "Invalid asset symbol: BLURT" error
+  - Proper conversion of STEEM to BLURT before transaction signing
+  - Fallback mechanism for serializer compatibility issues
+  - Auto-detection of Active key requirement for witness operations
+- **Status:** Witness enable/disable operations now work correctly on ecosynthesizer.com and other Blurt dApps
+
+### Security Updates
+- **High Priority Fixes:**
+  - Updated `qs` to 6.14.1+ (DoS vulnerability - CVE-2025-15284)
+  - Updated `lodash` to 4.17.23 (Prototype Pollution fix)
+  - Updated `vite` in mobile app to 7.3.1 (esbuild vulnerability fix)
+- **Documentation:** Added comprehensive security analysis in `SECURITY_FIXES.md`
+
+### Performance Enhancements
+- **Improved Node Benchmarking:**
+  - Multiple test iterations (3 per node) for accurate latency measurement
+  - Average latency calculation instead of single measurement
+  - Better node selection based on consistent performance
+- **Client-Side Optimizations:**
+  - In-memory cache for global properties (3s TTL)
+  - Reduced redundant RPC calls by 20-30%
+  - Connection keep-alive headers for HTTP connection reuse
+  - Graceful error handling with stale cache fallback
+
+### Infrastructure
+- **Custom RPC Node Support:**
+  - Added `rpc.drakernoise.com` to Blurt node candidates
+  - Updated Content Security Policy for custom nodes
+  - Enhanced node benchmarking script (`scripts/benchmark-nodes.js`)
+
+### Documentation
+- Added `SECURITY_FIXES.md` - Security vulnerability analysis
+- Added `docs/NODE_OPTIMIZATION.md` - Server-side optimization guide
+- Updated `CHANGELOG.md` with all changes
+
+---
+
 # Release v1.0.5 - Steem History & Stability Fixes
 
 ## Key Highlights

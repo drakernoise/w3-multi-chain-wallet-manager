@@ -8,21 +8,21 @@
 
 ---
 
-## ✅ Vulnerabilidades Resueltas
+## Vulnerabilidades Resueltas
 
-### 1. **qs** (HIGH) - ✅ RESUELTO
+### 1. **qs** (HIGH) - RESUELTO
 - **CVE:** CVE-2025-15284 / GHSA-6rw7-vpxm-498p
 - **Problema:** DoS por bypass de arrayLimit en notación bracket
 - **Solución:** Actualizado automáticamente a 6.14.1+ mediante `npm audit fix`
 - **Impacto:** Prevención de agotamiento de memoria en parsing de query strings
 
-### 2. **lodash** (MODERATE) - ✅ RESUELTO
+### 2. **lodash** (MODERATE) - RESUELTO
 - **CVE:** GHSA-xxjr-mmjv-4gpg
 - **Problema:** Prototype Pollution en `_.unset` y `_.omit`
 - **Solución:** Actualizado automáticamente a 4.17.23 mediante `npm audit fix`
 - **Impacto:** Prevención de modificación no autorizada de prototipos
 
-### 3. **esbuild/vite** (MODERATE) - ✅ RESUELTO
+### 3. **esbuild/vite** (MODERATE) - RESUELTO
 - **CVE:** GHSA-67mh-4wv8-2f99
 - **Problema:** Servidor de desarrollo permite solicitudes arbitrarias
 - **Solución:** Actualizado vite en `apps/mobile` de 5.4.1 a 7.3.1
@@ -30,7 +30,7 @@
 
 ---
 
-## ⚠️ Vulnerabilidades Pendientes (Dependencias Transitivas)
+## Vulnerabilidades Pendientes (Dependencias Transitivas)
 
 ### 1. **tar** (HIGH) - En @capacitor/cli
 - **CVE:** GHSA-8qq5-rm4j-mr97, GHSA-r6q2-hw4h-h46w
@@ -88,20 +88,20 @@
 - **Versión vulnerable:** Todas las versiones actuales
 - **Versión fija:** 6.6.1+ (pero requiere actualización de dependencias padre)
 - **Solución:**
-  - Actualizar `vite-plugin-node-polyfills` a 0.25.0 (✅ ya hecho)
+  - Actualizar `vite-plugin-node-polyfills` a 0.25.0 (ya hecho)
   - Esperar actualizaciones de `@hiveio/dhive` y `dsteem`
   - Considerar migrar a alternativas más modernas si es posible
 - **Riesgo:** Bajo - vulnerabilidades requieren condiciones específicas
 
 ---
 
-## 📋 Plan de Acción Recomendado
+## Plan de Acción Recomendado
 
 ### Prioridad Alta (Inmediato)
-1. ✅ Actualizar `qs` - COMPLETADO
-2. ✅ Actualizar `lodash` - COMPLETADO  
-3. ✅ Actualizar `vite` en mobile - COMPLETADO
-4. ⚠️ Actualizar `@capacitor/cli` a 8.x (requiere testing)
+1. Actualizar `qs` - COMPLETADO
+2. Actualizar `lodash` - COMPLETADO  
+3. Actualizar `vite` en mobile - COMPLETADO
+4. Actualizar `@capacitor/cli` a 8.x (requiere testing)
 
 ### Prioridad Media (Próximas semanas)
 1. Agregar `npm overrides` para `cross-fetch`, `node-fetch`, y `ws`
@@ -114,7 +114,7 @@
 
 ---
 
-## 🔧 Implementación de Overrides (Opcional)
+## Implementación de Overrides (Opcional)
 
 Si deseas forzar versiones seguras de dependencias transitivas, agrega esto al `package.json` raíz:
 
@@ -132,7 +132,7 @@ Si deseas forzar versiones seguras de dependencias transitivas, agrega esto al `
 
 ---
 
-## 📊 Estado Final
+## Estado Final
 
 - **Vulnerabilidades críticas resueltas:** 3/7 HIGH
 - **Vulnerabilidades moderadas resueltas:** 2/2 MODERATE
