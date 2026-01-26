@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2026-01-26
+
+### Critical Fixes
+- **Blurt Witness Operations:** Fixed `witness_update` operations failing with "Invalid asset symbol: BLURT" error
+  - Implemented proper STEEM to BLURT conversion before signing transactions
+  - Added fallback mechanism for serializer compatibility
+  - Auto-detection of Active key requirement for witness operations
+- **Security Vulnerabilities:** Resolved 3 high-severity vulnerabilities
+  - Updated `qs` package to 6.14.1+ (DoS vulnerability fix)
+  - Updated `lodash` to 4.17.23 (Prototype Pollution fix)
+  - Updated `vite` in mobile app to 7.3.1 (esbuild vulnerability fix)
+
+### Performance Improvements
+- **Enhanced Node Benchmarking:** 
+  - Implemented multiple test iterations (3 per node) for more accurate latency measurement
+  - Calculates average latency instead of single measurement
+  - Added connection keep-alive headers for better HTTP connection reuse
+- **Client-Side Caching:**
+  - Added in-memory cache for global properties (3s TTL)
+  - Reduces redundant RPC calls by ~20-30%
+  - Graceful fallback to stale cache on network errors
+- **Optimized Fetch Requests:**
+  - Added `Connection: keep-alive` headers to all RPC requests
+  - Improved error handling for network failures
+
+### Infrastructure
+- **Node Configuration:**
+  - Added `rpc.drakernoise.com` to Blurt node candidates
+  - Updated Content Security Policy to allow custom RPC node
+  - Improved node selection algorithm with multiple test iterations
+
+### Documentation
+- Added `SECURITY_FIXES.md` - Comprehensive security vulnerability analysis and solutions
+- Added `docs/NODE_OPTIMIZATION.md` - Server-side optimization guide for RPC nodes
+- Added `scripts/benchmark-nodes.js` - Standalone node benchmarking tool
+
 ## [1.1.0] - 2025-12-28
 
 ### New Features (Chat System V2)

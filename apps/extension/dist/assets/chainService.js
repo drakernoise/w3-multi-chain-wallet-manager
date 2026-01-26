@@ -10907,8 +10907,8 @@ function requireInherits_browser () {
 function getDefaultExportFromCjs(x) {
   return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
 }
-var browser$e = { exports: {} };
-var process = browser$e.exports = {};
+var browser$f = { exports: {} };
+var process = browser$f.exports = {};
 var cachedSetTimeout;
 var cachedClearTimeout;
 function defaultSetTimout() {
@@ -11064,7 +11064,7 @@ process.chdir = function(dir) {
 process.umask = function() {
   return 0;
 };
-var browserExports = browser$e.exports;
+var browserExports = browser$f.exports;
 const process$1 = /* @__PURE__ */ getDefaultExportFromCjs(browserExports);
 
 var streamBrowser$1;
@@ -16683,17 +16683,17 @@ function requireState () {
 	return state;
 }
 
-var browser$d;
-var hasRequiredBrowser$d;
+var browser$e;
+var hasRequiredBrowser$e;
 
-function requireBrowser$d () {
-	if (hasRequiredBrowser$d) return browser$d;
-	hasRequiredBrowser$d = 1;
+function requireBrowser$e () {
+	if (hasRequiredBrowser$e) return browser$e;
+	hasRequiredBrowser$e = 1;
 	/**
 	 * Module exports.
 	 */
 
-	browser$d = deprecate;
+	browser$e = deprecate;
 
 	/**
 	 * Mark that a method should not be used.
@@ -16755,7 +16755,7 @@ function requireBrowser$d () {
 	  if (null == val) return false;
 	  return String(val).toLowerCase() === 'true';
 	}
-	return browser$d;
+	return browser$e;
 }
 
 var _stream_writable$1;
@@ -16787,7 +16787,7 @@ function require_stream_writable$1 () {
 
 	/*<replacement>*/
 	var internalUtil = {
-	  deprecate: requireBrowser$d()
+	  deprecate: requireBrowser$e()
 	};
 	/*</replacement>*/
 
@@ -26534,7 +26534,7 @@ function requireAssert$2 () {
 
 var cryptoBrowserify = {};
 
-var browser$c = {exports: {}};
+var browser$d = {exports: {}};
 
 var safeBuffer$1 = {exports: {}};
 
@@ -26614,11 +26614,11 @@ function requireSafeBuffer$1 () {
 	return safeBuffer$1.exports;
 }
 
-var hasRequiredBrowser$c;
+var hasRequiredBrowser$d;
 
-function requireBrowser$c () {
-	if (hasRequiredBrowser$c) return browser$c.exports;
-	hasRequiredBrowser$c = 1;
+function requireBrowser$d () {
+	if (hasRequiredBrowser$d) return browser$d.exports;
+	hasRequiredBrowser$d = 1;
 
 	// limit of Crypto.getRandomValues()
 	// https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues
@@ -26636,9 +26636,9 @@ function requireBrowser$c () {
 	var crypto = commonjsGlobal.crypto || commonjsGlobal.msCrypto;
 
 	if (crypto && crypto.getRandomValues) {
-	  browser$c.exports = randomBytes;
+	  browser$d.exports = randomBytes;
 	} else {
-	  browser$c.exports = oldBrowser;
+	  browser$d.exports = oldBrowser;
 	}
 
 	function randomBytes (size, cb) {
@@ -26668,7 +26668,7 @@ function requireBrowser$c () {
 
 	  return bytes
 	}
-	return browser$c.exports;
+	return browser$d.exports;
 }
 
 var isarray$1;
@@ -27353,7 +27353,7 @@ function require_stream_writable () {
 
 	/*<replacement>*/
 	var internalUtil = {
-	  deprecate: requireBrowser$d()
+	  deprecate: requireBrowser$e()
 	};
 	/*</replacement>*/
 
@@ -30919,12 +30919,12 @@ function requireCipherBase () {
 	return cipherBase;
 }
 
-var browser$b;
-var hasRequiredBrowser$b;
+var browser$c;
+var hasRequiredBrowser$c;
 
-function requireBrowser$b () {
-	if (hasRequiredBrowser$b) return browser$b;
-	hasRequiredBrowser$b = 1;
+function requireBrowser$c () {
+	if (hasRequiredBrowser$c) return browser$c;
+	hasRequiredBrowser$c = 1;
 	var inherits = requireInherits_browser();
 	var MD5 = requireMd5_js();
 	var RIPEMD160 = requireRipemd160();
@@ -30947,14 +30947,14 @@ function requireBrowser$b () {
 	  return this._hash.digest()
 	};
 
-	browser$b = function createHash (alg) {
+	browser$c = function createHash (alg) {
 	  alg = alg.toLowerCase();
 	  if (alg === 'md5') return new MD5()
 	  if (alg === 'rmd160' || alg === 'ripemd160') return new RIPEMD160()
 
 	  return new Hash(sha(alg))
 	};
-	return browser$b;
+	return browser$c;
 }
 
 var legacy;
@@ -31025,12 +31025,12 @@ function requireMd5 () {
 	return md5;
 }
 
-var browser$a;
-var hasRequiredBrowser$a;
+var browser$b;
+var hasRequiredBrowser$b;
 
-function requireBrowser$a () {
-	if (hasRequiredBrowser$a) return browser$a;
-	hasRequiredBrowser$a = 1;
+function requireBrowser$b () {
+	if (hasRequiredBrowser$b) return browser$b;
+	hasRequiredBrowser$b = 1;
 	var inherits = requireInherits_browser();
 	var Legacy = requireLegacy();
 	var Base = requireCipherBase();
@@ -31082,7 +31082,7 @@ function requireBrowser$a () {
 	  return hash.update(this._opad).update(h).digest()
 	};
 
-	browser$a = function createHmac (alg, key) {
+	browser$b = function createHmac (alg, key) {
 	  alg = alg.toLowerCase();
 	  if (alg === 'rmd160' || alg === 'ripemd160') {
 	    return new Hmac('rmd160', key)
@@ -31092,7 +31092,7 @@ function requireBrowser$a () {
 	  }
 	  return new Hmac(alg, key)
 	};
-	return browser$a;
+	return browser$b;
 }
 
 const sha224WithRSAEncryption = {"sign":"rsa","hash":"sha224","id":"302d300d06096086480165030402040500041c"};
@@ -31150,7 +31150,7 @@ function requireAlgos () {
 	return algos;
 }
 
-var browser$9 = {};
+var browser$a = {};
 
 var precondition;
 var hasRequiredPrecondition;
@@ -31501,18 +31501,18 @@ function requireAsync () {
 	return async;
 }
 
-var hasRequiredBrowser$9;
+var hasRequiredBrowser$a;
 
-function requireBrowser$9 () {
-	if (hasRequiredBrowser$9) return browser$9;
-	hasRequiredBrowser$9 = 1;
+function requireBrowser$a () {
+	if (hasRequiredBrowser$a) return browser$a;
+	hasRequiredBrowser$a = 1;
 
-	browser$9.pbkdf2 = requireAsync();
-	browser$9.pbkdf2Sync = requireSyncBrowser();
-	return browser$9;
+	browser$a.pbkdf2 = requireAsync();
+	browser$a.pbkdf2Sync = requireSyncBrowser();
+	return browser$a;
 }
 
-var browser$8 = {};
+var browser$9 = {};
 
 var des$1 = {};
 
@@ -32318,7 +32318,7 @@ function requireBrowserifyDes () {
 	return browserifyDes;
 }
 
-var browser$7 = {};
+var browser$8 = {};
 
 var encrypter = {};
 
@@ -33473,11 +33473,11 @@ function requireDecrypter () {
 	return decrypter;
 }
 
-var hasRequiredBrowser$8;
+var hasRequiredBrowser$9;
 
-function requireBrowser$8 () {
-	if (hasRequiredBrowser$8) return browser$7;
-	hasRequiredBrowser$8 = 1;
+function requireBrowser$9 () {
+	if (hasRequiredBrowser$9) return browser$8;
+	hasRequiredBrowser$9 = 1;
 	var ciphers = requireEncrypter();
 	var deciphers = requireDecrypter();
 	var modes = require$$2$1;
@@ -33486,12 +33486,12 @@ function requireBrowser$8 () {
 	  return Object.keys(modes)
 	}
 
-	browser$7.createCipher = browser$7.Cipher = ciphers.createCipher;
-	browser$7.createCipheriv = browser$7.Cipheriv = ciphers.createCipheriv;
-	browser$7.createDecipher = browser$7.Decipher = deciphers.createDecipher;
-	browser$7.createDecipheriv = browser$7.Decipheriv = deciphers.createDecipheriv;
-	browser$7.listCiphers = browser$7.getCiphers = getCiphers;
-	return browser$7;
+	browser$8.createCipher = browser$8.Cipher = ciphers.createCipher;
+	browser$8.createCipheriv = browser$8.Cipheriv = ciphers.createCipheriv;
+	browser$8.createDecipher = browser$8.Decipher = deciphers.createDecipher;
+	browser$8.createDecipheriv = browser$8.Decipheriv = deciphers.createDecipheriv;
+	browser$8.listCiphers = browser$8.getCiphers = getCiphers;
+	return browser$8;
 }
 
 var modes = {};
@@ -33530,13 +33530,13 @@ function requireModes () {
 	return modes;
 }
 
-var hasRequiredBrowser$7;
+var hasRequiredBrowser$8;
 
-function requireBrowser$7 () {
-	if (hasRequiredBrowser$7) return browser$8;
-	hasRequiredBrowser$7 = 1;
+function requireBrowser$8 () {
+	if (hasRequiredBrowser$8) return browser$9;
+	hasRequiredBrowser$8 = 1;
 	var DES = requireBrowserifyDes();
-	var aes = requireBrowser$8();
+	var aes = requireBrowser$9();
 	var aesModes = requireModes$1();
 	var desModes = requireModes();
 	var ebtk = requireEvp_bytestokey();
@@ -33597,15 +33597,15 @@ function requireBrowser$7 () {
 	  return Object.keys(desModes).concat(aes.getCiphers())
 	}
 
-	browser$8.createCipher = browser$8.Cipher = createCipher;
-	browser$8.createCipheriv = browser$8.Cipheriv = createCipheriv;
-	browser$8.createDecipher = browser$8.Decipher = createDecipher;
-	browser$8.createDecipheriv = browser$8.Decipheriv = createDecipheriv;
-	browser$8.listCiphers = browser$8.getCiphers = getCiphers;
-	return browser$8;
+	browser$9.createCipher = browser$9.Cipher = createCipher;
+	browser$9.createCipheriv = browser$9.Cipheriv = createCipheriv;
+	browser$9.createDecipher = browser$9.Decipher = createDecipher;
+	browser$9.createDecipheriv = browser$9.Decipheriv = createDecipheriv;
+	browser$9.listCiphers = browser$9.getCiphers = getCiphers;
+	return browser$9;
 }
 
-var browser$6 = {};
+var browser$7 = {};
 
 var bn$5 = {exports: {}};
 
@@ -37270,7 +37270,7 @@ var hasRequiredGeneratePrime;
 function requireGeneratePrime () {
 	if (hasRequiredGeneratePrime) return generatePrime;
 	hasRequiredGeneratePrime = 1;
-	var randomBytes = requireBrowser$c();
+	var randomBytes = requireBrowser$d();
 	generatePrime = findPrime;
 	findPrime.simpleSieve = simpleSieve;
 	findPrime.fermatTest = fermatTest;
@@ -37412,7 +37412,7 @@ function requireDh () {
 	var THREE = new BN(3);
 	var SEVEN = new BN(7);
 	var primes = requireGeneratePrime();
-	var randomBytes = requireBrowser$c();
+	var randomBytes = requireBrowser$d();
 	dh = DH;
 
 	function setPublicKey(pub, enc) {
@@ -37570,11 +37570,11 @@ function requireDh () {
 	return dh;
 }
 
-var hasRequiredBrowser$6;
+var hasRequiredBrowser$7;
 
-function requireBrowser$6 () {
-	if (hasRequiredBrowser$6) return browser$6;
-	hasRequiredBrowser$6 = 1;
+function requireBrowser$7 () {
+	if (hasRequiredBrowser$7) return browser$7;
+	hasRequiredBrowser$7 = 1;
 	var generatePrime = requireGeneratePrime();
 	var primes = require$$1$3;
 
@@ -37615,9 +37615,9 @@ function requireBrowser$6 () {
 	  return new DH(prime, generator, true)
 	}
 
-	browser$6.DiffieHellmanGroup = browser$6.createDiffieHellmanGroup = browser$6.getDiffieHellman = getDiffieHellman;
-	browser$6.createDiffieHellman = browser$6.DiffieHellman = createDiffieHellman;
-	return browser$6;
+	browser$7.DiffieHellmanGroup = browser$7.createDiffieHellmanGroup = browser$7.getDiffieHellman = getDiffieHellman;
+	browser$7.createDiffieHellman = browser$7.DiffieHellman = createDiffieHellman;
+	return browser$7;
 }
 
 var sign = {exports: {}};
@@ -40993,7 +40993,7 @@ function requireBrowserifyRsa () {
 	hasRequiredBrowserifyRsa = 1;
 
 	var BN = requireBn$1();
-	var randomBytes = requireBrowser$c();
+	var randomBytes = requireBrowser$d();
 	var Buffer = requireSafeBuffer$1().Buffer;
 
 	function getr(priv) {
@@ -52056,7 +52056,7 @@ function requireFixProc () {
 	var startRegex = /^-----BEGIN ((?:.*? KEY)|CERTIFICATE)-----/m;
 	var fullRegex = /^-----BEGIN ((?:.*? KEY)|CERTIFICATE)-----([0-9A-z\n\r+/=]+)-----END \1-----$/m;
 	var evp = requireEvp_bytestokey();
-	var ciphers = requireBrowser$8();
+	var ciphers = requireBrowser$9();
 	var Buffer = requireSafeBuffer$1().Buffer;
 	fixProc = function (okey, password) {
 		var key = okey.toString();
@@ -52095,8 +52095,8 @@ function requireParseAsn1 () {
 	var asn1 = requireAsn1();
 	var aesid = require$$1$2;
 	var fixProc = requireFixProc();
-	var ciphers = requireBrowser$8();
-	var pbkdf2Sync = requireBrowser$9().pbkdf2Sync;
+	var ciphers = requireBrowser$9();
+	var pbkdf2Sync = requireBrowser$a().pbkdf2Sync;
 	var Buffer = requireSafeBuffer$1().Buffer;
 
 	function decrypt(data, password) {
@@ -52221,7 +52221,7 @@ function requireSign () {
 
 	// much of this based on https://github.com/indutny/self-signed/blob/gh-pages/lib/rsa.js
 	var Buffer = requireSafeBuffer$1().Buffer;
-	var createHmac = requireBrowser$a();
+	var createHmac = requireBrowser$b();
 	var crt = /*@__PURE__*/ requireBrowserifyRsa();
 	var EC = requireElliptic$2().ec;
 	var BN = requireBn();
@@ -52464,15 +52464,15 @@ function requireVerify () {
 	return verify_1;
 }
 
-var browser$5;
-var hasRequiredBrowser$5;
+var browser$6;
+var hasRequiredBrowser$6;
 
-function requireBrowser$5 () {
-	if (hasRequiredBrowser$5) return browser$5;
-	hasRequiredBrowser$5 = 1;
+function requireBrowser$6 () {
+	if (hasRequiredBrowser$6) return browser$6;
+	hasRequiredBrowser$6 = 1;
 
 	var Buffer = requireSafeBuffer$1().Buffer;
-	var createHash = requireBrowser$b();
+	var createHash = requireBrowser$c();
 	var stream = requireReadableBrowser();
 	var inherits = requireInherits_browser();
 	var sign = requireSign();
@@ -52555,25 +52555,25 @@ function requireBrowser$5 () {
 	  return new Verify(algorithm);
 	}
 
-	browser$5 = {
+	browser$6 = {
 	  Sign: createSign,
 	  Verify: createVerify,
 	  createSign: createSign,
 	  createVerify: createVerify
 	};
-	return browser$5;
+	return browser$6;
 }
 
-var browser$4;
-var hasRequiredBrowser$4;
+var browser$5;
+var hasRequiredBrowser$5;
 
-function requireBrowser$4 () {
-	if (hasRequiredBrowser$4) return browser$4;
-	hasRequiredBrowser$4 = 1;
+function requireBrowser$5 () {
+	if (hasRequiredBrowser$5) return browser$5;
+	hasRequiredBrowser$5 = 1;
 	var elliptic = requireElliptic$2();
 	var BN = requireBn$2();
 
-	browser$4 = function createECDH (curve) {
+	browser$5 = function createECDH (curve) {
 	  return new ECDH(curve)
 	};
 
@@ -52694,10 +52694,10 @@ function requireBrowser$4 () {
 	    return buf.toString(enc)
 	  }
 	}
-	return browser$4;
+	return browser$5;
 }
 
-var browser$3 = {};
+var browser$4 = {};
 
 var mgf;
 var hasRequiredMgf;
@@ -52705,7 +52705,7 @@ var hasRequiredMgf;
 function requireMgf () {
 	if (hasRequiredMgf) return mgf;
 	hasRequiredMgf = 1;
-	var createHash = requireBrowser$b();
+	var createHash = requireBrowser$c();
 	var Buffer = requireSafeBuffer$1().Buffer;
 
 	mgf = function (seed, len) {
@@ -52772,8 +52772,8 @@ function requirePublicEncrypt () {
 	if (hasRequiredPublicEncrypt) return publicEncrypt;
 	hasRequiredPublicEncrypt = 1;
 	var parseKeys = requireParseAsn1();
-	var randomBytes = requireBrowser$c();
-	var createHash = requireBrowser$b();
+	var randomBytes = requireBrowser$d();
+	var createHash = requireBrowser$c();
 	var mgf = requireMgf();
 	var xor = requireXor();
 	var BN = requireBn$2();
@@ -52873,7 +52873,7 @@ function requirePrivateDecrypt () {
 	var xor = requireXor();
 	var BN = requireBn$2();
 	var crt = /*@__PURE__*/ requireBrowserifyRsa();
-	var createHash = requireBrowser$b();
+	var createHash = requireBrowser$c();
 	var withPublic = requireWithPublic();
 	var Buffer = requireSafeBuffer$1().Buffer;
 
@@ -52976,11 +52976,11 @@ function requirePrivateDecrypt () {
 	return privateDecrypt;
 }
 
-var hasRequiredBrowser$3;
+var hasRequiredBrowser$4;
 
-function requireBrowser$3 () {
-	if (hasRequiredBrowser$3) return browser$3;
-	hasRequiredBrowser$3 = 1;
+function requireBrowser$4 () {
+	if (hasRequiredBrowser$4) return browser$4;
+	hasRequiredBrowser$4 = 1;
 	(function (exports$1) {
 		exports$1.publicEncrypt = requirePublicEncrypt();
 		exports$1.privateDecrypt = requirePrivateDecrypt();
@@ -52992,23 +52992,23 @@ function requireBrowser$3 () {
 		exports$1.publicDecrypt = function publicDecrypt (key, buf) {
 		  return exports$1.privateDecrypt(key, buf, true)
 		}; 
-	} (browser$3));
-	return browser$3;
+	} (browser$4));
+	return browser$4;
 }
 
-var browser$2 = {};
+var browser$3 = {};
 
-var hasRequiredBrowser$2;
+var hasRequiredBrowser$3;
 
-function requireBrowser$2 () {
-	if (hasRequiredBrowser$2) return browser$2;
-	hasRequiredBrowser$2 = 1;
+function requireBrowser$3 () {
+	if (hasRequiredBrowser$3) return browser$3;
+	hasRequiredBrowser$3 = 1;
 
 	function oldBrowser () {
 	  throw new Error('secure random number generation not supported by this browser\nuse chrome, FireFox or Internet Explorer 11')
 	}
 	var safeBuffer = requireSafeBuffer$1();
-	var randombytes = requireBrowser$c();
+	var randombytes = requireBrowser$d();
 	var Buffer = safeBuffer.Buffer;
 	var kBufferMaxLength = safeBuffer.kMaxLength;
 	var crypto = commonjsGlobal.crypto || commonjsGlobal.msCrypto;
@@ -53041,11 +53041,11 @@ function requireBrowser$2 () {
 	  }
 	}
 	if ((crypto && crypto.getRandomValues) || !process$1.browser) {
-	  browser$2.randomFill = randomFill;
-	  browser$2.randomFillSync = randomFillSync;
+	  browser$3.randomFill = randomFill;
+	  browser$3.randomFillSync = randomFillSync;
 	} else {
-	  browser$2.randomFill = oldBrowser;
-	  browser$2.randomFillSync = oldBrowser;
+	  browser$3.randomFill = oldBrowser;
+	  browser$3.randomFillSync = oldBrowser;
 	}
 	function randomFill (buf, offset, size, cb) {
 	  if (!Buffer.isBuffer(buf) && !(buf instanceof commonjsGlobal.Uint8Array)) {
@@ -53110,7 +53110,7 @@ function requireBrowser$2 () {
 
 	  return actualFill(buf, offset, size)
 	}
-	return browser$2;
+	return browser$3;
 }
 
 var hasRequiredCryptoBrowserify;
@@ -53120,13 +53120,13 @@ function requireCryptoBrowserify () {
 	hasRequiredCryptoBrowserify = 1;
 
 	// eslint-disable-next-line no-multi-assign
-	cryptoBrowserify.randomBytes = cryptoBrowserify.rng = cryptoBrowserify.pseudoRandomBytes = cryptoBrowserify.prng = requireBrowser$c();
+	cryptoBrowserify.randomBytes = cryptoBrowserify.rng = cryptoBrowserify.pseudoRandomBytes = cryptoBrowserify.prng = requireBrowser$d();
 
 	// eslint-disable-next-line no-multi-assign
-	cryptoBrowserify.createHash = cryptoBrowserify.Hash = requireBrowser$b();
+	cryptoBrowserify.createHash = cryptoBrowserify.Hash = requireBrowser$c();
 
 	// eslint-disable-next-line no-multi-assign
-	cryptoBrowserify.createHmac = cryptoBrowserify.Hmac = requireBrowser$a();
+	cryptoBrowserify.createHmac = cryptoBrowserify.Hmac = requireBrowser$b();
 
 	var algos = requireAlgos();
 	var algoKeys = Object.keys(algos);
@@ -53144,11 +53144,11 @@ function requireCryptoBrowserify () {
 		return hashes;
 	};
 
-	var p = requireBrowser$9();
+	var p = requireBrowser$a();
 	cryptoBrowserify.pbkdf2 = p.pbkdf2;
 	cryptoBrowserify.pbkdf2Sync = p.pbkdf2Sync;
 
-	var aes = requireBrowser$7();
+	var aes = requireBrowser$8();
 
 	cryptoBrowserify.Cipher = aes.Cipher;
 	cryptoBrowserify.createCipher = aes.createCipher;
@@ -53161,7 +53161,7 @@ function requireCryptoBrowserify () {
 	cryptoBrowserify.getCiphers = aes.getCiphers;
 	cryptoBrowserify.listCiphers = aes.listCiphers;
 
-	var dh = requireBrowser$6();
+	var dh = requireBrowser$7();
 
 	cryptoBrowserify.DiffieHellmanGroup = dh.DiffieHellmanGroup;
 	cryptoBrowserify.createDiffieHellmanGroup = dh.createDiffieHellmanGroup;
@@ -53169,16 +53169,16 @@ function requireCryptoBrowserify () {
 	cryptoBrowserify.createDiffieHellman = dh.createDiffieHellman;
 	cryptoBrowserify.DiffieHellman = dh.DiffieHellman;
 
-	var sign = requireBrowser$5();
+	var sign = requireBrowser$6();
 
 	cryptoBrowserify.createSign = sign.createSign;
 	cryptoBrowserify.Sign = sign.Sign;
 	cryptoBrowserify.createVerify = sign.createVerify;
 	cryptoBrowserify.Verify = sign.Verify;
 
-	cryptoBrowserify.createECDH = requireBrowser$4();
+	cryptoBrowserify.createECDH = requireBrowser$5();
 
-	var publicEncrypt = requireBrowser$3();
+	var publicEncrypt = requireBrowser$4();
 
 	cryptoBrowserify.publicEncrypt = publicEncrypt.publicEncrypt;
 	cryptoBrowserify.privateEncrypt = publicEncrypt.privateEncrypt;
@@ -53194,7 +53194,7 @@ function requireCryptoBrowserify () {
 	//   };
 	// });
 
-	var rf = requireBrowser$2();
+	var rf = requireBrowser$3();
 
 	cryptoBrowserify.randomFill = rf.randomFill;
 	cryptoBrowserify.randomFillSync = rf.randomFillSync;
@@ -56089,7 +56089,7 @@ function requireElliptic$1 () {
 	hasRequiredElliptic$1 = 1;
 	(function (exports$1) {
 		var Buffer = requireSafeBuffer$1().Buffer;
-		var createHash = requireBrowser$b();
+		var createHash = requireBrowser$c();
 		var BN = requireBn$2();
 		var EC = requireElliptic$2().ec;
 
@@ -70382,41 +70382,64 @@ const STEEM_CANDIDATES = [
   "https://api.steememory.com"
 ];
 const BLURT_CANDIDATES = [
+  "https://rpc.drakernoise.com",
+  // Primary node (user's own node)
   "https://rpc.beblurt.com",
-  // 'https://rpc.blurt.one', // REMOVED (502 Error)
+  // Fallback nodes
   "https://blurt-rpc.saboin.com",
   "https://rpc.blurt.world"
+  // 'https://rpc.blurt.one', // REMOVED (502 Error)
   // 'https://kentzz.blurt.world', // REMOVED (SSL Error)
 ];
 let activeNodes = {
   [Chain.HIVE]: HIVE_CANDIDATES[0],
   [Chain.STEEM]: STEEM_CANDIDATES[0],
   [Chain.BLURT]: BLURT_CANDIDATES[0]
+  // https://rpc.drakernoise.com (user's primary node)
 };
-const checkNodeLatency = async (url) => {
-  const start = Date.now();
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5e3);
-    const response = await fetch(url, {
-      method: "POST",
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "condenser_api.get_dynamic_global_properties",
-        params: [],
-        id: 1
-      }),
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const json = await response.json();
-    if (!json.result) throw new Error("Invalid response structure");
-    return Date.now() - start;
-  } catch (e) {
-    return 99999;
+const checkNodeLatency = async (url, iterations = 3) => {
+  const latencies = [];
+  for (let i = 0; i < iterations; i++) {
+    const start = Date.now();
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5e3);
+      const response = await fetch(url, {
+        method: "POST",
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "condenser_api.get_dynamic_global_properties",
+          params: [],
+          id: 1
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          "Connection": "keep-alive"
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        return 99999;
+      }
+      const json = await response.json();
+      if (!json.result) {
+        return 99999;
+      }
+      const latency = Date.now() - start;
+      latencies.push(latency);
+      if (i < iterations - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    } catch (e) {
+      return 99999;
+    }
   }
+  if (latencies.length === iterations) {
+    const sum = latencies.reduce((a, b) => a + b, 0);
+    return Math.round(sum / latencies.length);
+  }
+  return 99999;
 };
 const benchmarkNodes = async () => {
   await Promise.all([
@@ -77131,6 +77154,491 @@ var transports = {};
 
 var http = {};
 
+var browser$2;
+var hasRequiredBrowser$2;
+
+function requireBrowser$2 () {
+	if (hasRequiredBrowser$2) return browser$2;
+	hasRequiredBrowser$2 = 1;
+	var self = {};
+	(function(self) {
+
+	  if (self.fetch) {
+	    return
+	  }
+
+	  var support = {
+	    searchParams: 'URLSearchParams' in self,
+	    iterable: 'Symbol' in self && 'iterator' in Symbol,
+	    blob: 'FileReader' in self && 'Blob' in self && (function() {
+	      try {
+	        new Blob();
+	        return true
+	      } catch(e) {
+	        return false
+	      }
+	    })(),
+	    formData: 'FormData' in self,
+	    arrayBuffer: 'ArrayBuffer' in self
+	  };
+
+	  if (support.arrayBuffer) {
+	    var viewClasses = [
+	      '[object Int8Array]',
+	      '[object Uint8Array]',
+	      '[object Uint8ClampedArray]',
+	      '[object Int16Array]',
+	      '[object Uint16Array]',
+	      '[object Int32Array]',
+	      '[object Uint32Array]',
+	      '[object Float32Array]',
+	      '[object Float64Array]'
+	    ];
+
+	    var isDataView = function(obj) {
+	      return obj && DataView.prototype.isPrototypeOf(obj)
+	    };
+
+	    var isArrayBufferView = ArrayBuffer.isView || function(obj) {
+	      return obj && viewClasses.indexOf(Object.prototype.toString.call(obj)) > -1
+	    };
+	  }
+
+	  function normalizeName(name) {
+	    if (typeof name !== 'string') {
+	      name = String(name);
+	    }
+	    if (/[^a-z0-9\-#$%&'*+.\^_`|~]/i.test(name)) {
+	      throw new TypeError('Invalid character in header field name')
+	    }
+	    return name.toLowerCase()
+	  }
+
+	  function normalizeValue(value) {
+	    if (typeof value !== 'string') {
+	      value = String(value);
+	    }
+	    return value
+	  }
+
+	  // Build a destructive iterator for the value list
+	  function iteratorFor(items) {
+	    var iterator = {
+	      next: function() {
+	        var value = items.shift();
+	        return {done: value === undefined, value: value}
+	      }
+	    };
+
+	    if (support.iterable) {
+	      iterator[Symbol.iterator] = function() {
+	        return iterator
+	      };
+	    }
+
+	    return iterator
+	  }
+
+	  function Headers(headers) {
+	    this.map = {};
+
+	    if (headers instanceof Headers) {
+	      headers.forEach(function(value, name) {
+	        this.append(name, value);
+	      }, this);
+	    } else if (Array.isArray(headers)) {
+	      headers.forEach(function(header) {
+	        this.append(header[0], header[1]);
+	      }, this);
+	    } else if (headers) {
+	      Object.getOwnPropertyNames(headers).forEach(function(name) {
+	        this.append(name, headers[name]);
+	      }, this);
+	    }
+	  }
+
+	  Headers.prototype.append = function(name, value) {
+	    name = normalizeName(name);
+	    value = normalizeValue(value);
+	    var oldValue = this.map[name];
+	    this.map[name] = oldValue ? oldValue+','+value : value;
+	  };
+
+	  Headers.prototype['delete'] = function(name) {
+	    delete this.map[normalizeName(name)];
+	  };
+
+	  Headers.prototype.get = function(name) {
+	    name = normalizeName(name);
+	    return this.has(name) ? this.map[name] : null
+	  };
+
+	  Headers.prototype.has = function(name) {
+	    return this.map.hasOwnProperty(normalizeName(name))
+	  };
+
+	  Headers.prototype.set = function(name, value) {
+	    this.map[normalizeName(name)] = normalizeValue(value);
+	  };
+
+	  Headers.prototype.forEach = function(callback, thisArg) {
+	    for (var name in this.map) {
+	      if (this.map.hasOwnProperty(name)) {
+	        callback.call(thisArg, this.map[name], name, this);
+	      }
+	    }
+	  };
+
+	  Headers.prototype.keys = function() {
+	    var items = [];
+	    this.forEach(function(value, name) { items.push(name); });
+	    return iteratorFor(items)
+	  };
+
+	  Headers.prototype.values = function() {
+	    var items = [];
+	    this.forEach(function(value) { items.push(value); });
+	    return iteratorFor(items)
+	  };
+
+	  Headers.prototype.entries = function() {
+	    var items = [];
+	    this.forEach(function(value, name) { items.push([name, value]); });
+	    return iteratorFor(items)
+	  };
+
+	  if (support.iterable) {
+	    Headers.prototype[Symbol.iterator] = Headers.prototype.entries;
+	  }
+
+	  function consumed(body) {
+	    if (body.bodyUsed) {
+	      return Promise.reject(new TypeError('Already read'))
+	    }
+	    body.bodyUsed = true;
+	  }
+
+	  function fileReaderReady(reader) {
+	    return new Promise(function(resolve, reject) {
+	      reader.onload = function() {
+	        resolve(reader.result);
+	      };
+	      reader.onerror = function() {
+	        reject(reader.error);
+	      };
+	    })
+	  }
+
+	  function readBlobAsArrayBuffer(blob) {
+	    var reader = new FileReader();
+	    var promise = fileReaderReady(reader);
+	    reader.readAsArrayBuffer(blob);
+	    return promise
+	  }
+
+	  function readBlobAsText(blob) {
+	    var reader = new FileReader();
+	    var promise = fileReaderReady(reader);
+	    reader.readAsText(blob);
+	    return promise
+	  }
+
+	  function readArrayBufferAsText(buf) {
+	    var view = new Uint8Array(buf);
+	    var chars = new Array(view.length);
+
+	    for (var i = 0; i < view.length; i++) {
+	      chars[i] = String.fromCharCode(view[i]);
+	    }
+	    return chars.join('')
+	  }
+
+	  function bufferClone(buf) {
+	    if (buf.slice) {
+	      return buf.slice(0)
+	    } else {
+	      var view = new Uint8Array(buf.byteLength);
+	      view.set(new Uint8Array(buf));
+	      return view.buffer
+	    }
+	  }
+
+	  function Body() {
+	    this.bodyUsed = false;
+
+	    this._initBody = function(body) {
+	      this._bodyInit = body;
+	      if (!body) {
+	        this._bodyText = '';
+	      } else if (typeof body === 'string') {
+	        this._bodyText = body;
+	      } else if (support.blob && Blob.prototype.isPrototypeOf(body)) {
+	        this._bodyBlob = body;
+	      } else if (support.formData && FormData.prototype.isPrototypeOf(body)) {
+	        this._bodyFormData = body;
+	      } else if (support.searchParams && URLSearchParams.prototype.isPrototypeOf(body)) {
+	        this._bodyText = body.toString();
+	      } else if (support.arrayBuffer && support.blob && isDataView(body)) {
+	        this._bodyArrayBuffer = bufferClone(body.buffer);
+	        // IE 10-11 can't handle a DataView body.
+	        this._bodyInit = new Blob([this._bodyArrayBuffer]);
+	      } else if (support.arrayBuffer && (ArrayBuffer.prototype.isPrototypeOf(body) || isArrayBufferView(body))) {
+	        this._bodyArrayBuffer = bufferClone(body);
+	      } else {
+	        throw new Error('unsupported BodyInit type')
+	      }
+
+	      if (!this.headers.get('content-type')) {
+	        if (typeof body === 'string') {
+	          this.headers.set('content-type', 'text/plain;charset=UTF-8');
+	        } else if (this._bodyBlob && this._bodyBlob.type) {
+	          this.headers.set('content-type', this._bodyBlob.type);
+	        } else if (support.searchParams && URLSearchParams.prototype.isPrototypeOf(body)) {
+	          this.headers.set('content-type', 'application/x-www-form-urlencoded;charset=UTF-8');
+	        }
+	      }
+	    };
+
+	    if (support.blob) {
+	      this.blob = function() {
+	        var rejected = consumed(this);
+	        if (rejected) {
+	          return rejected
+	        }
+
+	        if (this._bodyBlob) {
+	          return Promise.resolve(this._bodyBlob)
+	        } else if (this._bodyArrayBuffer) {
+	          return Promise.resolve(new Blob([this._bodyArrayBuffer]))
+	        } else if (this._bodyFormData) {
+	          throw new Error('could not read FormData body as blob')
+	        } else {
+	          return Promise.resolve(new Blob([this._bodyText]))
+	        }
+	      };
+
+	      this.arrayBuffer = function() {
+	        if (this._bodyArrayBuffer) {
+	          return consumed(this) || Promise.resolve(this._bodyArrayBuffer)
+	        } else {
+	          return this.blob().then(readBlobAsArrayBuffer)
+	        }
+	      };
+	    }
+
+	    this.text = function() {
+	      var rejected = consumed(this);
+	      if (rejected) {
+	        return rejected
+	      }
+
+	      if (this._bodyBlob) {
+	        return readBlobAsText(this._bodyBlob)
+	      } else if (this._bodyArrayBuffer) {
+	        return Promise.resolve(readArrayBufferAsText(this._bodyArrayBuffer))
+	      } else if (this._bodyFormData) {
+	        throw new Error('could not read FormData body as text')
+	      } else {
+	        return Promise.resolve(this._bodyText)
+	      }
+	    };
+
+	    if (support.formData) {
+	      this.formData = function() {
+	        return this.text().then(decode)
+	      };
+	    }
+
+	    this.json = function() {
+	      return this.text().then(JSON.parse)
+	    };
+
+	    return this
+	  }
+
+	  // HTTP methods whose capitalization should be normalized
+	  var methods = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT'];
+
+	  function normalizeMethod(method) {
+	    var upcased = method.toUpperCase();
+	    return (methods.indexOf(upcased) > -1) ? upcased : method
+	  }
+
+	  function Request(input, options) {
+	    options = options || {};
+	    var body = options.body;
+
+	    if (input instanceof Request) {
+	      if (input.bodyUsed) {
+	        throw new TypeError('Already read')
+	      }
+	      this.url = input.url;
+	      this.credentials = input.credentials;
+	      if (!options.headers) {
+	        this.headers = new Headers(input.headers);
+	      }
+	      this.method = input.method;
+	      this.mode = input.mode;
+	      if (!body && input._bodyInit != null) {
+	        body = input._bodyInit;
+	        input.bodyUsed = true;
+	      }
+	    } else {
+	      this.url = String(input);
+	    }
+
+	    this.credentials = options.credentials || this.credentials || 'omit';
+	    if (options.headers || !this.headers) {
+	      this.headers = new Headers(options.headers);
+	    }
+	    this.method = normalizeMethod(options.method || this.method || 'GET');
+	    this.mode = options.mode || this.mode || null;
+	    this.referrer = null;
+
+	    if ((this.method === 'GET' || this.method === 'HEAD') && body) {
+	      throw new TypeError('Body not allowed for GET or HEAD requests')
+	    }
+	    this._initBody(body);
+	  }
+
+	  Request.prototype.clone = function() {
+	    return new Request(this, { body: this._bodyInit })
+	  };
+
+	  function decode(body) {
+	    var form = new FormData();
+	    body.trim().split('&').forEach(function(bytes) {
+	      if (bytes) {
+	        var split = bytes.split('=');
+	        var name = split.shift().replace(/\+/g, ' ');
+	        var value = split.join('=').replace(/\+/g, ' ');
+	        form.append(decodeURIComponent(name), decodeURIComponent(value));
+	      }
+	    });
+	    return form
+	  }
+
+	  function parseHeaders(rawHeaders) {
+	    var headers = new Headers();
+	    rawHeaders.split(/\r?\n/).forEach(function(line) {
+	      var parts = line.split(':');
+	      var key = parts.shift().trim();
+	      if (key) {
+	        var value = parts.join(':').trim();
+	        headers.append(key, value);
+	      }
+	    });
+	    return headers
+	  }
+
+	  Body.call(Request.prototype);
+
+	  function Response(bodyInit, options) {
+	    if (!options) {
+	      options = {};
+	    }
+
+	    this.type = 'default';
+	    this.status = 'status' in options ? options.status : 200;
+	    this.ok = this.status >= 200 && this.status < 300;
+	    this.statusText = 'statusText' in options ? options.statusText : 'OK';
+	    this.headers = new Headers(options.headers);
+	    this.url = options.url || '';
+	    this._initBody(bodyInit);
+	  }
+
+	  Body.call(Response.prototype);
+
+	  Response.prototype.clone = function() {
+	    return new Response(this._bodyInit, {
+	      status: this.status,
+	      statusText: this.statusText,
+	      headers: new Headers(this.headers),
+	      url: this.url
+	    })
+	  };
+
+	  Response.error = function() {
+	    var response = new Response(null, {status: 0, statusText: ''});
+	    response.type = 'error';
+	    return response
+	  };
+
+	  var redirectStatuses = [301, 302, 303, 307, 308];
+
+	  Response.redirect = function(url, status) {
+	    if (redirectStatuses.indexOf(status) === -1) {
+	      throw new RangeError('Invalid status code')
+	    }
+
+	    return new Response(null, {status: status, headers: {location: url}})
+	  };
+
+	  self.Headers = Headers;
+	  self.Request = Request;
+	  self.Response = Response;
+
+	  self.fetch = function(input, init) {
+	    return new Promise(function(resolve, reject) {
+	      var request = new Request(input, init);
+	      var xhr = new XMLHttpRequest();
+
+	      xhr.onload = function() {
+	        var options = {
+	          status: xhr.status,
+	          statusText: xhr.statusText,
+	          headers: parseHeaders(xhr.getAllResponseHeaders() || '')
+	        };
+	        options.url = 'responseURL' in xhr ? xhr.responseURL : options.headers.get('X-Request-URL');
+	        var body = 'response' in xhr ? xhr.response : xhr.responseText;
+	        resolve(new Response(body, options));
+	      };
+
+	      xhr.onerror = function() {
+	        reject(new TypeError('Network request failed'));
+	      };
+
+	      xhr.ontimeout = function() {
+	        reject(new TypeError('Network request failed'));
+	      };
+
+	      xhr.open(request.method, request.url, true);
+
+	      if (request.credentials === 'include') {
+	        xhr.withCredentials = true;
+	      }
+
+	      if ('responseType' in xhr && support.blob) {
+	        xhr.responseType = 'blob';
+	      }
+
+	      request.headers.forEach(function(value, name) {
+	        xhr.setRequestHeader(name, value);
+	      });
+
+	      xhr.send(typeof request._bodyInit === 'undefined' ? null : request._bodyInit);
+	    })
+	  };
+	  self.fetch.polyfill = true;
+	})(typeof self !== 'undefined' ? self : browser$2);
+
+	/*
+	 * Rollup wraps up the whatwg-fetch code on ponyfill mode in
+	 * order to prevent it from adding fetch to the global object.
+	 */
+
+	      var fetch = self.fetch;
+
+	      fetch.fetch = fetch;
+	      fetch.Response = self.Response;
+	      fetch.Headers = self.Headers;
+	      fetch.Request = self.Request;
+
+	      // fetch now can be imported as the default object
+	      browser$2 = fetch;
+	return browser$2;
+}
+
 var browser$1 = {exports: {}};
 
 var debug = {exports: {}};
@@ -77985,7 +78493,7 @@ function requireHttp () {
 
 	http.jsonRpc = jsonRpc;
 
-	var _crossFetch = requireBrowserPonyfill();
+	var _crossFetch = requireBrowser$2();
 
 	var _crossFetch2 = _interopRequireDefault(_crossFetch);
 
@@ -78518,11 +79026,11 @@ function requireHash () {
 	if (hasRequiredHash) return hash;
 	hasRequiredHash = 1;
 
-	var _createHash = requireBrowser$b();
+	var _createHash = requireBrowser$c();
 
 	var _createHash2 = _interopRequireDefault(_createHash);
 
-	var _createHmac = requireBrowser$a();
+	var _createHmac = requireBrowser$b();
 
 	var _createHmac2 = _interopRequireDefault(_createHmac);
 
@@ -79246,7 +79754,7 @@ function requireAes () {
 
 	var _bytebuffer2 = _interopRequireDefault(_bytebuffer);
 
-	var _browserifyAes = requireBrowser$8();
+	var _browserifyAes = requireBrowser$9();
 
 	var _browserifyAes2 = _interopRequireDefault(_browserifyAes);
 
@@ -88071,7 +88579,11 @@ const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
       params: [],
       id: 1
     }),
-    headers: { "Content-Type": "application/json" }
+    headers: {
+      "Content-Type": "application/json",
+      "Connection": "keep-alive"
+      // Hint for connection reuse (browser handles automatically)
+    }
   });
   const propsJson = await propsResponse.json();
   if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
@@ -88096,7 +88608,11 @@ const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
       params: [signedTx],
       id: 1
     }),
-    headers: { "Content-Type": "application/json" }
+    headers: {
+      "Content-Type": "application/json",
+      "Connection": "keep-alive"
+      // Hint for connection reuse (browser handles automatically)
+    }
   });
   const broadcastResult = await broadcastResponse.json();
   if (broadcastResult.error) {
@@ -88104,7 +88620,15 @@ const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
   }
   return broadcastResult.result;
 };
+const globalPropsCache = /* @__PURE__ */ new Map();
+const GLOBAL_PROPS_CACHE_TTL = 3e3;
 const fetchGlobalProps = async (chain) => {
+  const cacheKey = chain;
+  const cached = globalPropsCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && now - cached.timestamp < GLOBAL_PROPS_CACHE_TTL) {
+    return cached.data;
+  }
   try {
     const nodeUrl = await getActiveNode(chain);
     const response = await fetch(nodeUrl, {
@@ -88115,13 +88639,27 @@ const fetchGlobalProps = async (chain) => {
         params: [],
         id: 1
       }),
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Connection": "keep-alive"
+        // Hint to browser for connection reuse
+      }
+      // Browser handles keep-alive automatically, but we can hint it
     });
+    if (!response.ok) {
+      return cached?.data || null;
+    }
     const json = await response.json();
-    return json.result;
+    const result = json.result;
+    if (result) {
+      globalPropsCache.set(cacheKey, { data: result, timestamp: now });
+    }
+    return result;
   } catch (error) {
-    console.error(`Error fetching global props for ${chain}:`, error);
-    return null;
+    if (error.name !== "TypeError" || !error.message.includes("Failed to fetch")) {
+      console.error(`Error fetching global props for ${chain}:`, error);
+    }
+    return cached?.data || null;
   }
 };
 const convertToVests = async (chain, amountInPower) => {
@@ -88144,8 +88682,15 @@ const fetchBalances = async (chain, username) => {
         params: [[username]],
         id: 1
       }),
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Connection": "keep-alive"
+        // Hint for connection reuse
+      }
     });
+    if (!response.ok) {
+      return { primary: 0, secondary: 0, staked: 0 };
+    }
     const json = await response.json();
     if (!json.result || json.result.length === 0) return { primary: 0, secondary: 0, staked: 0 };
     const acc = json.result[0];
@@ -88180,7 +88725,9 @@ const fetchBalances = async (chain, username) => {
       powerDownAmount
     };
   } catch (error) {
-    console.error(`Error fetching balance for ${username} on ${chain}:`, error);
+    if (error.name !== "TypeError" || !error.message.includes("Failed to fetch")) {
+      console.error(`Error fetching balance for ${username} on ${chain}:`, error);
+    }
     return { primary: 0, secondary: 0, staked: 0 };
   }
 };
@@ -88195,7 +88742,11 @@ const fetchAccountData = async (chain, username) => {
         params: [[username]],
         id: 1
       }),
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Connection": "keep-alive"
+        // Hint for connection reuse (browser handles automatically)
+      }
     });
     const json = await response.json();
     if (json.result && json.result.length > 0) {
@@ -88387,7 +88938,11 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
       params: [],
       id: 1
     }),
-    headers: { "Content-Type": "application/json" }
+    headers: {
+      "Content-Type": "application/json",
+      "Connection": "keep-alive"
+      // Hint for connection reuse (browser handles automatically)
+    }
   });
   const propsJson = await propsResponse.json();
   if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
@@ -88424,7 +88979,64 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
     operations: operationsWithBlurt,
     extensions: []
   };
-  const signedTx = libExports.auth.signTransaction(txWithBlurt, [key]);
+  let signedTx;
+  try {
+    console.log("[Blurt] Attempting to sign with BLURT...");
+    signedTx = libExports.auth.signTransaction(txWithBlurt, [key]);
+    console.log("[Blurt] Successfully signed with BLURT");
+  } catch (e) {
+    console.error("[Blurt] Error signing with BLURT:", e.message || e);
+    if (e.message && (e.message.includes("Invalid asset symbol") || e.message.includes("Unable to serialize"))) {
+      console.warn("[Blurt] BLURT signing failed, falling back to STEEM for serialization");
+      const operationsWithSteem = operations.map((op) => {
+        const opName = op[0];
+        const opData = { ...op[1] };
+        const convertBlurtToSteem = (value) => {
+          if (typeof value === "string") {
+            return value.replace(/ BLURT/g, " STEEM");
+          } else if (Array.isArray(value)) {
+            return value.map(convertBlurtToSteem);
+          } else if (value !== null && typeof value === "object") {
+            const converted = {};
+            for (const k in value) {
+              converted[k] = convertBlurtToSteem(value[k]);
+            }
+            return converted;
+          }
+          return value;
+        };
+        return [opName, convertBlurtToSteem(opData)];
+      });
+      const txWithSteem = {
+        ref_block_num,
+        ref_block_prefix,
+        expiration,
+        operations: operationsWithSteem,
+        extensions: []
+      };
+      signedTx = libExports.auth.signTransaction(txWithSteem, [key]);
+      const convertSteemToBlurtInJson = (obj) => {
+        if (typeof obj === "string") {
+          return obj.replace(/ STEEM/g, " BLURT");
+        } else if (Array.isArray(obj)) {
+          return obj.map(convertSteemToBlurtInJson);
+        } else if (obj !== null && typeof obj === "object") {
+          const converted = {};
+          for (const k in obj) {
+            converted[k] = convertSteemToBlurtInJson(obj[k]);
+          }
+          return converted;
+        }
+        return obj;
+      };
+      signedTx = JSON.parse(JSON.stringify(signedTx));
+      if (signedTx.operations) {
+        signedTx.operations = convertSteemToBlurtInJson(signedTx.operations);
+      }
+    } else {
+      throw e;
+    }
+  }
   const broadcastResponse = await fetch(nodeUrl, {
     method: "POST",
     body: JSON.stringify({
@@ -88433,7 +89045,11 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
       params: [signedTx],
       id: 1
     }),
-    headers: { "Content-Type": "application/json" }
+    headers: {
+      "Content-Type": "application/json",
+      "Connection": "keep-alive"
+      // Hint for connection reuse (browser handles automatically)
+    }
   });
   const broadcastResult = await broadcastResponse.json();
   if (broadcastResult.error) {
@@ -88553,7 +89169,11 @@ const checkAccountExists = async (chain, username) => {
         params: [[username]],
         id: 1
       }),
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Connection": "keep-alive"
+        // Hint for connection reuse (browser handles automatically)
+      }
     });
     const json = await response.json();
     if (json.error) {
@@ -88698,7 +89318,11 @@ const fetchAccountHistory = async (chain, username) => {
       const response = await fetch(node, {
         method: "POST",
         body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_account_history", params: [username, -1, 1e3], id: 1 }),
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          "Connection": "keep-alive"
+          // Hint for connection reuse (browser handles automatically)
+        }
       });
       const json = await response.json();
       if (json.result) {
@@ -88716,7 +89340,11 @@ const fetchAccountHistory = async (chain, username) => {
       const response = await fetch(node, {
         method: "POST",
         body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_account_history", params: [username, -1, 1e3], id: 1 }),
-        headers: { "Content-Type": "application/json" }
+        headers: {
+          "Content-Type": "application/json",
+          "Connection": "keep-alive"
+          // Hint for connection reuse (browser handles automatically)
+        }
       });
       const json = await response.json();
       if (json.result) {

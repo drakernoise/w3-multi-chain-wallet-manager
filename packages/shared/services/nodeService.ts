@@ -17,50 +17,80 @@ export const STEEM_CANDIDATES = [
 ];
 
 export const BLURT_CANDIDATES = [
-    'https://rpc.beblurt.com',
-    // 'https://rpc.blurt.one', // REMOVED (502 Error)
+    'https://rpc.drakernoise.com', // Primary node (user's own node)
+    'https://rpc.beblurt.com', // Fallback nodes
     'https://blurt-rpc.saboin.com',
     'https://rpc.blurt.world',
+    // 'https://rpc.blurt.one', // REMOVED (502 Error)
     // 'https://kentzz.blurt.world', // REMOVED (SSL Error)
 ];
 
 // Active nodes state (in-memory)
 // Defaulting to the first one until benchmarked
+// For Blurt, this is the user's own node (rpc.drakernoise.com)
 let activeNodes: Record<Chain, string> = {
     [Chain.HIVE]: HIVE_CANDIDATES[0],
     [Chain.STEEM]: STEEM_CANDIDATES[0],
-    [Chain.BLURT]: BLURT_CANDIDATES[0]
+    [Chain.BLURT]: BLURT_CANDIDATES[0] // https://rpc.drakernoise.com (user's primary node)
 };
 
-// Simple latency check
-const checkNodeLatency = async (url: string): Promise<number> => {
-    const start = Date.now();
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+// Multiple latency checks for more accurate benchmarking
+const checkNodeLatency = async (url: string, iterations: number = 3): Promise<number> => {
+    const latencies: number[] = [];
+    
+    for (let i = 0; i < iterations; i++) {
+        const start = Date.now();
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-        const response = await fetch(url, {
-            method: 'POST',
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'condenser_api.get_dynamic_global_properties',
-                params: [],
-                id: 1
-            }),
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal
-        });
+            const response = await fetch(url, {
+                method: 'POST',
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'condenser_api.get_dynamic_global_properties',
+                    params: [],
+                    id: 1
+                }),
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Connection': 'keep-alive'
+                },
+                signal: controller.signal
+            });
 
-        clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const json = await response.json();
-        if (!json.result) throw new Error('Invalid response structure');
+            if (!response.ok) {
+                // If any test fails, return penalty
+                return 99999;
+            }
+            
+            const json = await response.json();
+            if (!json.result) {
+                return 99999;
+            }
 
-        return Date.now() - start;
-    } catch (e) {
-        return 99999; // Penalty for failure
+            const latency = Date.now() - start;
+            latencies.push(latency);
+            
+            // Small delay between tests to avoid overwhelming the server
+            if (i < iterations - 1) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        } catch (e) {
+            // If any test fails, return penalty
+            return 99999;
+        }
     }
+    
+    // Return average latency if all tests succeeded
+    if (latencies.length === iterations) {
+        const sum = latencies.reduce((a, b) => a + b, 0);
+        return Math.round(sum / latencies.length);
+    }
+    
+    return 99999; // Penalty for failure
 };
 
 export const benchmarkNodes = async (): Promise<void> => {
@@ -76,6 +106,7 @@ export const benchmarkNodes = async (): Promise<void> => {
 };
 
 const findBestNode = async (chain: Chain, candidates: string[]) => {
+    // Benchmark all nodes and select the fastest one
     const latencies = await Promise.all(
         candidates.map(async (url) => {
             const latency = await checkNodeLatency(url);
@@ -83,7 +114,7 @@ const findBestNode = async (chain: Chain, candidates: string[]) => {
         })
     );
 
-    // Sort by latency
+    // Sort by latency (fastest first)
     latencies.sort((a, b) => a.latency - b.latency);
 
     const best = latencies[0];

@@ -31,7 +31,10 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
             params: [],
             id: 1
         }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        }
     });
     const propsJson = await propsResponse.json();
     if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
@@ -64,7 +67,10 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
             params: [signedTx],
             id: 1
         }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        }
     });
 
     const broadcastResult = await broadcastResponse.json();
@@ -78,7 +84,20 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
 
 // --- PUBLIC API ---
 
+// Simple in-memory cache for global properties (safe, short TTL)
+const globalPropsCache: Map<string, { data: any; timestamp: number }> = new Map();
+const GLOBAL_PROPS_CACHE_TTL = 3000; // 3 seconds - properties change frequently but not instantly
+
 const fetchGlobalProps = async (chain: Chain): Promise<any> => {
+    const cacheKey = chain;
+    const cached = globalPropsCache.get(cacheKey);
+    const now = Date.now();
+    
+    // Return cached data if still valid (reduces redundant requests)
+    if (cached && (now - cached.timestamp) < GLOBAL_PROPS_CACHE_TTL) {
+        return cached.data;
+    }
+    
     try {
         const nodeUrl = await getActiveNode(chain);
         const response = await fetch(nodeUrl, {
@@ -89,13 +108,34 @@ const fetchGlobalProps = async (chain: Chain): Promise<any> => {
                 params: [],
                 id: 1
             }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Connection': 'keep-alive' // Hint to browser for connection reuse
+            },
+            // Browser handles keep-alive automatically, but we can hint it
         });
+        
+        if (!response.ok) {
+            // Silently handle HTTP errors (node might be temporarily unavailable)
+            return cached?.data || null; // Return stale cache if available
+        }
+        
         const json = await response.json();
-        return json.result;
-    } catch (error) {
-        console.error(`Error fetching global props for ${chain}:`, error);
-        return null;
+        const result = json.result;
+        
+        // Cache the result
+        if (result) {
+            globalPropsCache.set(cacheKey, { data: result, timestamp: now });
+        }
+        
+        return result;
+    } catch (error: any) {
+        // Only log unexpected errors, not network failures (which are common)
+        if (error.name !== 'TypeError' || !error.message.includes('Failed to fetch')) {
+            console.error(`Error fetching global props for ${chain}:`, error);
+        }
+        // Return stale cache if available on error
+        return cached?.data || null;
     }
 };
 
@@ -122,8 +162,16 @@ export const fetchBalances = async (chain: Chain, username: string): Promise<{ p
                 params: [[username]],
                 id: 1
             }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                'Connection': 'keep-alive' // Hint for connection reuse
+            }
         });
+
+        if (!response.ok) {
+            // Silently handle HTTP errors (node might be temporarily unavailable)
+            return { primary: 0, secondary: 0, staked: 0 };
+        }
 
         const json = await response.json();
         if (!json.result || json.result.length === 0) return { primary: 0, secondary: 0, staked: 0 };
@@ -166,8 +214,11 @@ export const fetchBalances = async (chain: Chain, username: string): Promise<{ p
             nextPowerDown: nextWithdrawal,
             powerDownAmount: powerDownAmount
         };
-    } catch (error) {
-        console.error(`Error fetching balance for ${username} on ${chain}:`, error);
+    } catch (error: any) {
+        // Only log unexpected errors, not network failures (which are common when nodes are temporarily unavailable)
+        if (error.name !== 'TypeError' || !error.message.includes('Failed to fetch')) {
+            console.error(`Error fetching balance for ${username} on ${chain}:`, error);
+        }
         return { primary: 0, secondary: 0, staked: 0 };
     }
 };
@@ -183,7 +234,10 @@ export const fetchAccountData = async (chain: Chain, username: string): Promise<
                 params: [[username]],
                 id: 1
             }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        }
         });
         const json = await response.json();
         if (json.result && json.result.length > 0) {
@@ -410,7 +464,10 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
             params: [],
             id: 1
         }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        }
     });
     const propsJson = await propsResponse.json();
     if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
@@ -460,7 +517,80 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
     };
 
     // Sign with BLURT - blurtjs serializer accepts BLURT directly
-    const signedTx = blurt.auth.signTransaction(txWithBlurt, [key]);
+    // However, if blurtjs internally uses @hiveio/dhive serializer, it may reject BLURT
+    // In that case, we fall back to signing with STEEM and converting after
+    let signedTx;
+    try {
+        console.log('[Blurt] Attempting to sign with BLURT...');
+        signedTx = blurt.auth.signTransaction(txWithBlurt, [key]);
+        console.log('[Blurt] Successfully signed with BLURT');
+    } catch (e: any) {
+        console.error('[Blurt] Error signing with BLURT:', e.message || e);
+        // If signing with BLURT fails (serializer doesn't accept BLURT), try with STEEM
+        if (e.message && (e.message.includes('Invalid asset symbol') || e.message.includes('Unable to serialize'))) {
+            console.warn('[Blurt] BLURT signing failed, falling back to STEEM for serialization');
+            
+            // Convert back to STEEM for signing
+            const operationsWithSteem = operations.map((op: any) => {
+                const opName = op[0];
+                const opData = { ...op[1] };
+                
+                const convertBlurtToSteem = (value: any): any => {
+                    if (typeof value === 'string') {
+                        return value.replace(/ BLURT/g, ' STEEM');
+                    } else if (Array.isArray(value)) {
+                        return value.map(convertBlurtToSteem);
+                    } else if (value !== null && typeof value === 'object') {
+                        const converted: any = {};
+                        for (const k in value) {
+                            converted[k] = convertBlurtToSteem(value[k]);
+                        }
+                        return converted;
+                    }
+                    return value;
+                };
+                
+                return [opName, convertBlurtToSteem(opData)];
+            });
+            
+            const txWithSteem = {
+                ref_block_num,
+                ref_block_prefix,
+                expiration,
+                operations: operationsWithSteem,
+                extensions: []
+            };
+            
+            // Sign with STEEM
+            signedTx = blurt.auth.signTransaction(txWithSteem, [key]);
+            
+            // Convert STEEM back to BLURT in the signed transaction JSON
+            // This is safe because STEEM and BLURT serialize to identical bytes
+            const convertSteemToBlurtInJson = (obj: any): any => {
+                if (typeof obj === 'string') {
+                    return obj.replace(/ STEEM/g, ' BLURT');
+                } else if (Array.isArray(obj)) {
+                    return obj.map(convertSteemToBlurtInJson);
+                } else if (obj !== null && typeof obj === 'object') {
+                    const converted: any = {};
+                    for (const k in obj) {
+                        converted[k] = convertSteemToBlurtInJson(obj[k]);
+                    }
+                    return converted;
+                }
+                return obj;
+            };
+            
+            // Create deep copy and convert operations back to BLURT
+            signedTx = JSON.parse(JSON.stringify(signedTx));
+            if (signedTx.operations) {
+                signedTx.operations = convertSteemToBlurtInJson(signedTx.operations);
+            }
+        } else {
+            // Re-throw if it's a different error
+            throw e;
+        }
+    }
 
     // 4. Broadcast Synchronous
     const broadcastResponse = await fetch(nodeUrl, {
@@ -471,7 +601,10 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
             params: [signedTx],
             id: 1
         }),
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        }
     });
 
     const broadcastResult = await broadcastResponse.json();
@@ -642,7 +775,10 @@ export const checkAccountExists = async (chain: Chain, username: string): Promis
                 params: [[username]],
                 id: 1
             }),
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        }
         });
         const json = await response.json();
 
@@ -825,7 +961,10 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
             const response = await fetch(node, {
                 method: 'POST',
                 body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 1000], id: 1 }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        }
             });
             const json = await response.json();
             if (json.result) {
@@ -853,7 +992,10 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
             const response = await fetch(node, {
                 method: 'POST',
                 body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 1000], id: 1 }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+            'Content-Type': 'application/json',
+            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        }
             });
             const json = await response.json();
             if (json.result) {
