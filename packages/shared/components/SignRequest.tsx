@@ -126,7 +126,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 const memo = request.params[3] || '';
                 const response = await broadcastTransfer(account.chain, account.name, account.activeKey!, to, amount, memo);
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.opResult || response.txId, message: t('sign.success'), ...response };
+
+                // Compatibility mapping (v1.1.3 robust fix)
+                const opResult = response.opResult || response.txId;
+                result = {
+                    result: opResult,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    message: t('sign.success'),
+                    ...response
+                };
 
             } else if (isVote) {
                 const author = request.params[2];
@@ -139,7 +148,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.opResult || response.txId, message: t('sign.success'), ...response };
+
+                // Compatibility mapping (v1.1.3 robust fix)
+                const opResult = response.opResult || response.txId;
+                result = {
+                    result: opResult,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    message: t('sign.success'),
+                    ...response
+                };
 
             } else if (isCustomJson) {
                 const id = request.params[1];
@@ -153,7 +171,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = await broadcastCustomJson(account.chain, account.name, key!, id, typeof json === 'string' ? json : JSON.stringify(json), type as any);
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.opResult || response.txId, message: t('sign.success'), ...response };
+
+                // Compatibility mapping (v1.1.3 robust fix)
+                const opResult = response.opResult || response.txId;
+                result = {
+                    result: opResult,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    message: t('sign.success'),
+                    ...response
+                };
 
             } else if (isSignBuffer) {
                 const message = request.params[1];
@@ -177,55 +204,20 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
             } else if (isBroadcast) {
                 // Generic Broadcast
-                let operations = request.params[1];
+                let rawOperations = request.params[1];
                 const keyType = request.params[2]; // 'Posting' or 'Active'
 
-                // console.log('SignRequest: isBroadcast - Raw operations:', operations); // Debug only
-
-                // CRITICAL: Sanitize 'comment' operations (Steemit fix)
-                // Create CLEAN objects to avoid __config and other junk
-                if (operations && Array.isArray(operations)) {
-                    operations = operations.map((op: any) => {
-                        if (Array.isArray(op) && op[0] === 'comment' && op[1]) {
-                            const payload = op[1];
-                            // console.log('SignRequest: Found comment, creating clean object...'); // Debug only
-
-                            let parentPermlink = payload.parent_permlink;
-
-                            // Use 'category' field if present (Steemit-specific)
-                            if (!parentPermlink && !payload.parent_author && payload.category) {
-                                parentPermlink = payload.category;
-                                // console.log('SignRequest: Using category:', payload.category); // Debug only
-                            }
-
-                            // Try to recover from json_metadata tags
-                            if (!parentPermlink && payload.json_metadata) {
-                                try {
-                                    const meta = typeof payload.json_metadata === 'string' ? JSON.parse(payload.json_metadata) : payload.json_metadata;
-                                    if (meta.tags && meta.tags[0]) {
-                                        parentPermlink = meta.tags[0];
-                                        // console.log('SignRequest: Recovered from tags:', meta.tags[0]); // Debug only
-                                    }
-                                } catch (e) { }
-                            }
-
-                            // Create CLEAN object with ONLY the fields we need
-                            const cleanPayload = {
-                                parent_author: payload.parent_author || '',
-                                parent_permlink: parentPermlink || 'general',
-                                author: payload.author || '',
-                                permlink: payload.permlink || '',
-                                title: payload.title || '',
-                                body: payload.body || '',
-                                json_metadata: payload.json_metadata || '{}'
-                            };
-
-                            // console.log('SignRequest: Clean payload created'); // Debug only
-                            return ['comment', cleanPayload];
-                        }
-                        return op;
-                    });
-                }
+                // 1. ROBUST NORMALIZATION: Handle both array [name, data] and object { type, ... }
+                // Some dApps (like blurt.blog) send operations as objects inside requestBroadcast
+                let operations = (Array.isArray(rawOperations) ? rawOperations : [rawOperations]).map((op: any) => {
+                    if (Array.isArray(op)) return op;
+                    if (op && typeof op === 'object') {
+                        const type = op.type || op.operation || op.method;
+                        const data = op.data || op.op || op.operation_data || (({ type: _t, operation: _o, method: _m, ...rest }) => rest)(op);
+                        if (type) return [type, data];
+                    }
+                    return op;
+                });
 
                 // Determine which operations require Active key
                 const requiresActiveKey = operations.some((op: any) => {
@@ -275,7 +267,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = await broadcastOperations(account.chain, key, operations);
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.opResult || response.txId, message: t('sign.success'), ...response };
+
+                // Compatibility mapping (v1.1.3 robust fix)
+                const opResult = response.opResult || response.txId;
+                result = {
+                    result: opResult,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    message: t('sign.success'),
+                    ...response
+                };
 
             } else if (isPowerUp) {
                 const to = request.params[1] || account.name; // Already sanitized in Background
@@ -286,9 +287,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 }
                 const response = await broadcastPowerUp(account.chain, account.name, account.activeKey!, to, amount);
                 if (!response.success) throw new Error(response.error);
-                // Ensure result format is object for PeakD if available
-                const finalResult = response.opResult || response.txId;
-                result = { result: finalResult, message: t('sign.success'), ...response };
+
+                // Compatibility mapping (v1.1.3 robust fix)
+                const opResult = response.opResult || response.txId;
+                result = {
+                    result: opResult,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    message: t('sign.success'),
+                    ...response
+                };
 
             } else if (isPowerDown) {
                 let vestingShares = request.params[1];
@@ -297,8 +305,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 }
                 const response = await broadcastPowerDown(account.chain, account.name, account.activeKey!, vestingShares);
                 if (!response.success) throw new Error(response.error);
-                const finalResult = response.opResult || response.txId;
-                result = { result: finalResult, message: t('sign.success'), ...response };
+
+                // Compatibility mapping (v1.1.3 robust fix)
+                const opResult = response.opResult || response.txId;
+                result = {
+                    result: opResult,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    message: t('sign.success'),
+                    ...response
+                };
 
             } else if (isDelegation) {
                 const delegatee = request.params[1]; // Already sanitized in Background
@@ -310,8 +326,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 }
                 const response = await broadcastDelegation(account.chain, account.name, account.activeKey!, delegatee, vestingShares);
                 if (!response.success) throw new Error(response.error);
-                const finalResult = response.opResult || response.txId;
-                result = { result: finalResult, message: t('sign.success'), ...response };
+
+                // Compatibility mapping (v1.1.3 robust fix)
+                const opResult = response.opResult || response.txId;
+                result = {
+                    result: opResult,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    message: t('sign.success'),
+                    ...response
+                };
 
             } else if (isPost) {
                 // console.log('SignRequest: Entering isPost handler'); // Debug only

@@ -479,7 +479,13 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const finalResult = response.opResult || response.txId || response.result || 'success';
         const result = isSignBuffer
             ? { result: response.result, message: 'Signed successfully', ...response }
-            : { result: finalResult, message: 'Signed successfully', ...response };
+            : {
+                result: finalResult,
+                tx_id: response.txId,
+                broadcastPayload: finalResult,
+                message: 'Signed successfully',
+                ...response
+            };
 
         return { success: true, pending: false, ...result };
 

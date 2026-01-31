@@ -12856,7 +12856,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         const memo = request.params[3] || "";
         const response = await broadcastTransfer(account.chain, account.name, account.activeKey, to, amount, memo);
         if (!response.success) throw new Error(response.error);
-        result = { result: response.opResult || response.txId, message: t("sign.success"), ...response };
+        const opResult = response.opResult || response.txId;
+        result = {
+          result: opResult,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          message: t("sign.success"),
+          ...response
+        };
       } else if (isVote2) {
         const author = request.params[2];
         const permlink = request.params[1];
@@ -12865,7 +12872,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!key) throw new Error(t("sign.keys_missing"));
         const response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
         if (!response.success) throw new Error(response.error);
-        result = { result: response.opResult || response.txId, message: t("sign.success"), ...response };
+        const opResult = response.opResult || response.txId;
+        result = {
+          result: opResult,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          message: t("sign.success"),
+          ...response
+        };
       } else if (isCustomJson2) {
         const id = request.params[1];
         const type = request.params[2];
@@ -12875,7 +12889,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", type));
         const response = await broadcastCustomJson(account.chain, account.name, key, id, typeof json === "string" ? json : JSON.stringify(json), type);
         if (!response.success) throw new Error(response.error);
-        result = { result: response.opResult || response.txId, message: t("sign.success"), ...response };
+        const opResult = response.opResult || response.txId;
+        result = {
+          result: opResult,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          message: t("sign.success"),
+          ...response
+        };
       } else if (isSignBuffer2) {
         const message = request.params[1];
         const type = request.params[2];
@@ -12888,39 +12909,17 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!response.success) throw new Error(response.error);
         result = { result: response.result, message: t("sign.success"), ...response };
       } else if (isBroadcast2) {
-        let operations = request.params[1];
+        let rawOperations = request.params[1];
         const keyType = request.params[2];
-        if (operations && Array.isArray(operations)) {
-          operations = operations.map((op) => {
-            if (Array.isArray(op) && op[0] === "comment" && op[1]) {
-              const payload = op[1];
-              let parentPermlink = payload.parent_permlink;
-              if (!parentPermlink && !payload.parent_author && payload.category) {
-                parentPermlink = payload.category;
-              }
-              if (!parentPermlink && payload.json_metadata) {
-                try {
-                  const meta = typeof payload.json_metadata === "string" ? JSON.parse(payload.json_metadata) : payload.json_metadata;
-                  if (meta.tags && meta.tags[0]) {
-                    parentPermlink = meta.tags[0];
-                  }
-                } catch (e) {
-                }
-              }
-              const cleanPayload = {
-                parent_author: payload.parent_author || "",
-                parent_permlink: parentPermlink || "general",
-                author: payload.author || "",
-                permlink: payload.permlink || "",
-                title: payload.title || "",
-                body: payload.body || "",
-                json_metadata: payload.json_metadata || "{}"
-              };
-              return ["comment", cleanPayload];
-            }
-            return op;
-          });
-        }
+        let operations = (Array.isArray(rawOperations) ? rawOperations : [rawOperations]).map((op) => {
+          if (Array.isArray(op)) return op;
+          if (op && typeof op === "object") {
+            const type = op.type || op.operation || op.method;
+            const data = op.data || op.op || op.operation_data || (({ type: _t, operation: _o, method: _m, ...rest }) => rest)(op);
+            if (type) return [type, data];
+          }
+          return op;
+        });
         const requiresActiveKey = operations.some((op) => {
           const opName = Array.isArray(op) ? op[0] : op.type || op[0];
           const activeKeyOps = [
@@ -12959,7 +12958,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         }
         const response = await broadcastOperations(account.chain, key, operations);
         if (!response.success) throw new Error(response.error);
-        result = { result: response.opResult || response.txId, message: t("sign.success"), ...response };
+        const opResult = response.opResult || response.txId;
+        result = {
+          result: opResult,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          message: t("sign.success"),
+          ...response
+        };
       } else if (isPowerUp) {
         const to = request.params[1] || account.name;
         let amount = request.params[2];
@@ -12969,8 +12975,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         }
         const response = await broadcastPowerUp(account.chain, account.name, account.activeKey, to, amount);
         if (!response.success) throw new Error(response.error);
-        const finalResult = response.opResult || response.txId;
-        result = { result: finalResult, message: t("sign.success"), ...response };
+        const opResult = response.opResult || response.txId;
+        result = {
+          result: opResult,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          message: t("sign.success"),
+          ...response
+        };
       } else if (isPowerDown) {
         let vestingShares = request.params[1];
         if (vestingShares && !vestingShares.includes(" ")) {
@@ -12978,8 +12990,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         }
         const response = await broadcastPowerDown(account.chain, account.name, account.activeKey, vestingShares);
         if (!response.success) throw new Error(response.error);
-        const finalResult = response.opResult || response.txId;
-        result = { result: finalResult, message: t("sign.success"), ...response };
+        const opResult = response.opResult || response.txId;
+        result = {
+          result: opResult,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          message: t("sign.success"),
+          ...response
+        };
       } else if (isDelegation) {
         const delegatee = request.params[1];
         const amount = request.params[2];
@@ -12990,8 +13008,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         }
         const response = await broadcastDelegation(account.chain, account.name, account.activeKey, delegatee, vestingShares);
         if (!response.success) throw new Error(response.error);
-        const finalResult = response.opResult || response.txId;
-        result = { result: finalResult, message: t("sign.success"), ...response };
+        const opResult = response.opResult || response.txId;
+        result = {
+          result: opResult,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          message: t("sign.success"),
+          ...response
+        };
       } else if (isPost2) {
         const title = request.params[1];
         const body = request.params[2];
@@ -14515,17 +14539,22 @@ function AppContent() {
     }
   }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, isDataLoaded]);
   reactExports.useEffect(() => {
-    if (!isLocked && needsSave && walletState.encryptedMaster) {
-      const vault = { accounts: walletState.accounts, lastUpdated: Date.now() };
-      saveVault("cached", vault).then(() => setNeedsSave(false)).catch((err) => {
-        console.warn("Auto-save failed:", err);
-        if (err.message && err.message.includes("cache is empty")) {
-          setLockReason("Session expired. Please unlock to save changes.");
-          setIsLocked(true);
-        }
-      });
+    if (!isLocked && walletState.accounts.length > 0) {
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
+        chrome.storage.session.set({ session_accounts: walletState.accounts });
+      }
+      if (needsSave && walletState.encryptedMaster) {
+        const vault = { accounts: walletState.accounts, lastUpdated: Date.now() };
+        saveVault("cached", vault).then(() => setNeedsSave(false)).catch((err) => {
+          console.warn("Auto-save failed:", err);
+          if (err.message && err.message.includes("cache is empty")) {
+            setLockReason("Session expired. Please unlock to save changes.");
+            setIsLocked(true);
+          }
+        });
+      }
     }
-  }, [walletState.accounts, isLocked, needsSave]);
+  }, [walletState.accounts, isLocked, needsSave, walletState.encryptedMaster]);
   const fetchBalancesRef = reactExports.useRef();
   reactExports.useEffect(() => {
     fetchBalancesRef.current = fetchBalances$1;

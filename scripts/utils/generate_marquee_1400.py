@@ -3,9 +3,9 @@ import os
 
 TARGET_SIZE = (1400, 560)
 BG_COLOR = (17, 24, 39) # #111827
-LOGO_PATH = "public/logowallet_big.png"
-SCREENSHOT_PATH = "public/GravityHome.png" # The vertical one
-OUTPUT_PATH = "public/promo_marquee_1400x560.png"
+LOGO_PATH = "apps/extension/public/logowallet_big.png"
+SCREENSHOT_PATH = "apps/extension/public/GravityHome.png" # The vertical one
+OUTPUT_PATH = "apps/extension/public/promo_marquee_1400x560.png"
 
 def generate_marquee():
     canvas = Image.new('RGB', TARGET_SIZE, BG_COLOR)

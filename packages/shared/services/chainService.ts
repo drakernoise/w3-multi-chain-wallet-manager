@@ -31,7 +31,7 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
             params: [],
             id: 1
         }),
-        headers: { 
+        headers: {
             'Content-Type': 'application/json',
             'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
         }
@@ -67,7 +67,7 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
             params: [signedTx],
             id: 1
         }),
-        headers: { 
+        headers: {
             'Content-Type': 'application/json',
             'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
         }
@@ -92,12 +92,12 @@ const fetchGlobalProps = async (chain: Chain): Promise<any> => {
     const cacheKey = chain;
     const cached = globalPropsCache.get(cacheKey);
     const now = Date.now();
-    
+
     // Return cached data if still valid (reduces redundant requests)
     if (cached && (now - cached.timestamp) < GLOBAL_PROPS_CACHE_TTL) {
         return cached.data;
     }
-    
+
     try {
         const nodeUrl = await getActiveNode(chain);
         const response = await fetch(nodeUrl, {
@@ -108,26 +108,26 @@ const fetchGlobalProps = async (chain: Chain): Promise<any> => {
                 params: [],
                 id: 1
             }),
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Connection': 'keep-alive' // Hint to browser for connection reuse
             },
             // Browser handles keep-alive automatically, but we can hint it
         });
-        
+
         if (!response.ok) {
             // Silently handle HTTP errors (node might be temporarily unavailable)
             return cached?.data || null; // Return stale cache if available
         }
-        
+
         const json = await response.json();
         const result = json.result;
-        
+
         // Cache the result
         if (result) {
             globalPropsCache.set(cacheKey, { data: result, timestamp: now });
         }
-        
+
         return result;
     } catch (error: any) {
         // Only log unexpected errors, not network failures (which are common)
@@ -162,7 +162,7 @@ export const fetchBalances = async (chain: Chain, username: string): Promise<{ p
                 params: [[username]],
                 id: 1
             }),
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Connection': 'keep-alive' // Hint for connection reuse
             }
@@ -234,10 +234,10 @@ export const fetchAccountData = async (chain: Chain, username: string): Promise<
                 params: [[username]],
                 id: 1
             }),
-            headers: { 
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
-        }
+            headers: {
+                'Content-Type': 'application/json',
+                'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+            }
         });
         const json = await response.json();
         if (json.result && json.result.length > 0) {
@@ -319,7 +319,7 @@ export const broadcastTransfer = async (
             const key = SteemPrivateKey.fromString(activeKey);
             const transfer = { from, to, amount: `${formattedAmount} ${symbol}`, memo };
             const result = await client.broadcast.transfer(transfer, key);
-            return { success: true, txId: result.id };
+            return { success: true, txId: result.id, opResult: result };
         }
         else if (chain === Chain.BLURT) {
             const config = getChainConfig(Chain.BLURT);
@@ -331,7 +331,7 @@ export const broadcastTransfer = async (
                     if (err) reject(err); else resolve(res);
                 });
             });
-            return { success: true, txId: result.id };
+            return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
@@ -351,7 +351,7 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
             const client = new SteemClient(nodeUrl);
             const privateKey = SteemPrivateKey.fromString(key);
             const result = await client.broadcast.vote({ voter, author, permlink, weight }, privateKey);
-            return { success: true, txId: result.id };
+            return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             const config = getChainConfig(Chain.BLURT);
             blurt.config.set('address_prefix', config.addressPrefix);
@@ -362,7 +362,7 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
                     if (err) reject(err); else resolve(res);
                 });
             });
-            return { success: true, txId: result.id };
+            return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
@@ -390,7 +390,7 @@ export const broadcastCustomJson = async (chain: Chain, username: string, key: s
             const client = new SteemClient(nodeUrl);
             const privateKey = SteemPrivateKey.fromString(key);
             const result = await client.broadcast.json({ id, json, required_auths, required_posting_auths }, privateKey);
-            return { success: true, txId: result.id };
+            return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             const config = getChainConfig(Chain.BLURT);
             blurt.config.set('address_prefix', config.addressPrefix);
@@ -401,7 +401,7 @@ export const broadcastCustomJson = async (chain: Chain, username: string, key: s
                     if (err) reject(err); else resolve(res);
                 });
             });
-            return { success: true, txId: result.id };
+            return { success: true, txId: result.id, opResult: result };
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
@@ -454,7 +454,7 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
     if (trimmedKey !== key) {
         key = trimmedKey;
     }
-    
+
     // 1. Get Dynamic Global Properties
     const propsResponse = await fetch(nodeUrl, {
         method: 'POST',
@@ -464,7 +464,7 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
             params: [],
             id: 1
         }),
-        headers: { 
+        headers: {
             'Content-Type': 'application/json',
             'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
         }
@@ -489,7 +489,7 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
     const operationsWithBlurt = operations.map((op: any) => {
         const opName = op[0];
         const opData = { ...op[1] };
-        
+
         const convertSteemToBlurt = (value: any): any => {
             if (typeof value === 'string') {
                 return value.replace(/ STEEM/g, ' BLURT');
@@ -504,10 +504,10 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
             }
             return value;
         };
-        
+
         return [opName, convertSteemToBlurt(opData)];
     });
-    
+
     const txWithBlurt = {
         ref_block_num,
         ref_block_prefix,
@@ -529,12 +529,12 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
         // If signing with BLURT fails (serializer doesn't accept BLURT), try with STEEM
         if (e.message && (e.message.includes('Invalid asset symbol') || e.message.includes('Unable to serialize'))) {
             console.warn('[Blurt] BLURT signing failed, falling back to STEEM for serialization');
-            
+
             // Convert back to STEEM for signing
             const operationsWithSteem = operations.map((op: any) => {
                 const opName = op[0];
                 const opData = { ...op[1] };
-                
+
                 const convertBlurtToSteem = (value: any): any => {
                     if (typeof value === 'string') {
                         return value.replace(/ BLURT/g, ' STEEM');
@@ -549,10 +549,10 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
                     }
                     return value;
                 };
-                
+
                 return [opName, convertBlurtToSteem(opData)];
             });
-            
+
             const txWithSteem = {
                 ref_block_num,
                 ref_block_prefix,
@@ -560,10 +560,10 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
                 operations: operationsWithSteem,
                 extensions: []
             };
-            
+
             // Sign with STEEM
             signedTx = blurt.auth.signTransaction(txWithSteem, [key]);
-            
+
             // Convert STEEM back to BLURT in the signed transaction JSON
             // This is safe because STEEM and BLURT serialize to identical bytes
             const convertSteemToBlurtInJson = (obj: any): any => {
@@ -580,7 +580,7 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
                 }
                 return obj;
             };
-            
+
             // Create deep copy and convert operations back to BLURT
             signedTx = JSON.parse(JSON.stringify(signedTx));
             if (signedTx.operations) {
@@ -601,7 +601,7 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
             params: [signedTx],
             id: 1
         }),
-        headers: { 
+        headers: {
             'Content-Type': 'application/json',
             'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
         }
@@ -634,99 +634,42 @@ export const broadcastOperations = async (
 ): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const nodeUrl = getActiveNode(chain);
 
+    // 1. ROBUST NORMALIZATION: Handle both array [name, data] and object { type, ... }
+    // Some dApps (like blurt.blog) send operations as objects inside requestBroadcast
+    const normalizedOps = (operations || []).map(op => {
+        if (Array.isArray(op)) return op;
+        if (op && typeof op === 'object') {
+            const type = op.type || op.operation || op.method;
+            const data = op.data || op.op || op.operation_data || (({ type: _t, operation: _o, method: _m, ...rest }) => rest)(op);
+            if (type) return [type, data];
+        }
+        return op;
+    });
+
+    // 2. GLOBAL SANITIZATION: Clean properties like __config, __rshares for ALL chains
+    const cleanOperations = normalizedOps.map(op => {
+        if (Array.isArray(op) && op.length >= 2 && typeof op[1] === 'object') {
+            const data = { ...op[1] };
+            Object.keys(data).forEach(key => {
+                if (key.startsWith('__')) delete data[key];
+            });
+            return [op[0], data];
+        }
+        return op;
+    });
+
     try {
         if (chain === Chain.HIVE) {
-            const result = await broadcastHiveTransaction(nodeUrl, operations, activeKey);
+            const result = await broadcastHiveTransaction(nodeUrl, cleanOperations, activeKey);
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
             const key = SteemPrivateKey.fromString(activeKey);
-            const result = await client.broadcast.sendOperations(operations, key);
+            const result = await client.broadcast.sendOperations(cleanOperations, key);
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
             // Using manual broadcast implementation for better reliability
-
-            // Helper function to convert BLURT to STEEM in asset strings
-            // This is needed because @hiveio/dhive serializers don't recognize BLURT symbol
-            // BLURT and STEEM have identical serialization (3 decimals), so this is safe
-            const convertBlurtToSteem = (value: any): any => {
-                if (typeof value === 'string') {
-                    // Convert asset strings like "1.000 BLURT" to "1.000 STEEM"
-                    if (value.includes(' BLURT')) {
-                        return value.replace(/ BLURT/g, ' STEEM');
-                    }
-                    return value;
-                } else if (Array.isArray(value)) {
-                    return value.map(convertBlurtToSteem);
-                } else if (value !== null && typeof value === 'object') {
-                    const converted: any = {};
-                    for (const key in value) {
-                        converted[key] = convertBlurtToSteem(value[key]);
-                    }
-                    return converted;
-                }
-                return value;
-            };
-
-            // VALIDATION & CLEANUP: Some dApps (like BeBlurt) might send malformed metadata
-            const cleanOperations = operations.map(op => {
-                const opName = op[0];
-                const opData = { ...op[1] }; // Shallow copy to avoid mutating original
-
-                // 0. Convert BLURT to STEEM in all asset fields (CRITICAL FIX for witness_update)
-                // This must happen before other cleanup to ensure asset serialization works
-                const convertedOpData = convertBlurtToSteem(opData);
-
-                // 1. Handle Metadata Fields
-                const metadataFields = ['json_metadata', 'posting_json_metadata'];
-                metadataFields.forEach(field => {
-                    if (convertedOpData[field] !== undefined && convertedOpData[field] !== null) {
-                        // If it's an object, stringify it
-                        if (typeof convertedOpData[field] === 'object') {
-                            try {
-                                convertedOpData[field] = JSON.stringify(convertedOpData[field]);
-                            } catch (e) {
-                                console.error(`[ChainService] Failed to stringify ${field}:`, e);
-                            }
-                        }
-                    } else {
-                        // Ensure it's at least an empty string if referenced by dApp but null/undefined
-                        // Actually, better to just leave it if it's not there, but some nodes prefer ""
-                        if (opName === 'comment' && field === 'json_metadata') {
-                            convertedOpData[field] = "";
-                        }
-                    }
-                });
-
-                // 2. Extra safety for 'tags' (Common issue with BeBlurt and similar dApps)
-                // If 'tags' exists as a top-level field, it MUST be moved to json_metadata
-                if (convertedOpData.tags) {
-                    try {
-                        let meta = {};
-                        if (convertedOpData.json_metadata) {
-                            try {
-                                meta = typeof convertedOpData.json_metadata === 'string'
-                                    ? JSON.parse(convertedOpData.json_metadata)
-                                    : convertedOpData.json_metadata;
-                            } catch (e) { /* ignore parse error, use empty */ }
-                        }
-                        // Merge tags into metadata
-                        (meta as any).tags = convertedOpData.tags;
-                        convertedOpData.json_metadata = JSON.stringify(meta);
-                        delete convertedOpData.tags;
-                    } catch (e) {
-                        console.error("[ChainService] Error merging tags into metadata:", e);
-                    }
-                }
-
-                // 3. Ensure extensions is an array
-                if (convertedOpData.extensions !== undefined && !Array.isArray(convertedOpData.extensions)) {
-                    convertedOpData.extensions = [];
-                }
-
-                return [opName, convertedOpData];
-            });
-
+            // The Blurt logic already handles asset conversion and cleanup inside broadcastBlurtTransaction
             const result = await broadcastBlurtTransaction(nodeUrl, cleanOperations, activeKey);
             return { success: true, txId: result.id, opResult: result };
         }
@@ -775,10 +718,10 @@ export const checkAccountExists = async (chain: Chain, username: string): Promis
                 params: [[username]],
                 id: 1
             }),
-            headers: { 
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
-        }
+            headers: {
+                'Content-Type': 'application/json',
+                'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+            }
         });
         const json = await response.json();
 
@@ -961,10 +904,10 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
             const response = await fetch(node, {
                 method: 'POST',
                 body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 1000], id: 1 }),
-                headers: { 
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
-        }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+                }
             });
             const json = await response.json();
             if (json.result) {
@@ -992,10 +935,10 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
             const response = await fetch(node, {
                 method: 'POST',
                 body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 1000], id: 1 }),
-                headers: { 
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
-        }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+                }
             });
             const json = await response.json();
             if (json.result) {

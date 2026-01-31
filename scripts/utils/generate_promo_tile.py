@@ -3,8 +3,8 @@ import os
 
 TARGET_SIZE = (440, 280)
 BG_COLOR = (17, 24, 39) # #111827
-LOGO_PATH = "public/logowallet_big.png"
-OUTPUT_PATH = "public/promo_tile_440x280.png"
+LOGO_PATH = "apps/extension/public/logowallet_big.png"
+OUTPUT_PATH = "apps/extension/public/promo_tile_440x280.png"
 
 def generate_tile():
     if not os.path.exists(LOGO_PATH):

@@ -18,7 +18,7 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 [![GitHub stars](https://img.shields.io/github/stars/drakernoise/w3-multi-chain-wallet-manager?style=social)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/drakernoise/w3-multi-chain-wallet-manager?style=social)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/network/members)
 
-  <img src="public/logowallet_big.png" alt="Gravity Wallet Banner" width="300" />
+  <img src="apps/extension/public/logowallet_big.png" alt="Gravity Wallet Banner" width="300" />
 </div>
 
 ---

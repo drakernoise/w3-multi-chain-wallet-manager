@@ -180,21 +180,28 @@ function AppContent() {
     }
   }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, isDataLoaded]);
 
-  // 3. Save Vault when accounts change
   useEffect(() => {
-    if (!isLocked && needsSave && walletState.encryptedMaster) {
-      const vault: Vault = { accounts: walletState.accounts, lastUpdated: Date.now() };
-      saveVault('cached', vault)
-        .then(() => setNeedsSave(false))
-        .catch((err: Error) => {
-          console.warn("Auto-save failed:", err);
-          if (err.message && err.message.includes('cache is empty')) {
-            setLockReason("Session expired. Please unlock to save changes.");
-            setIsLocked(true); // Identify lost session -> Lock
-          }
-        });
+    if (!isLocked && walletState.accounts.length > 0) {
+      // 1. Sync to Session Storage (Fixes disappearance on popup close)
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+        chrome.storage.session.set({ session_accounts: walletState.accounts });
+      }
+
+      // 2. Sync to Persistent Vault (if needed)
+      if (needsSave && walletState.encryptedMaster) {
+        const vault: Vault = { accounts: walletState.accounts, lastUpdated: Date.now() };
+        saveVault('cached', vault)
+          .then(() => setNeedsSave(false))
+          .catch((err: Error) => {
+            console.warn("Auto-save failed:", err);
+            if (err.message && err.message.includes('cache is empty')) {
+              setLockReason("Session expired. Please unlock to save changes.");
+              setIsLocked(true);
+            }
+          });
+      }
     }
-  }, [walletState.accounts, isLocked, needsSave]);
+  }, [walletState.accounts, isLocked, needsSave, walletState.encryptedMaster]);
 
   // 4. Poll Balances automatically (Safe closure pattern)
   const fetchBalancesRef = useRef<() => void>();

@@ -357,7 +357,13 @@ async function tryAutoSign(request, sender) {
       return { success: false, error: response.error || "Operation failed" };
     }
     const finalResult = response.opResult || response.txId || response.result || "success";
-    const result = isSignBuffer ? { result: response.result, message: "Signed successfully", ...response } : { result: finalResult, message: "Signed successfully", ...response };
+    const result = isSignBuffer ? { result: response.result, message: "Signed successfully", ...response } : {
+      result: finalResult,
+      tx_id: response.txId,
+      broadcastPayload: finalResult,
+      message: "Signed successfully",
+      ...response
+    };
     return { success: true, pending: false, ...result };
   } catch (e) {
     console.error("Auto-sign failed:", e);
