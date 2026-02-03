@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  chat-server:
+    build: .
+    container_name: gravity-chat-server
+    restart: always
+    ports:
+      - "3030:3030"
+    environment:
+      - PORT=3030
+      - ADMIN_SECRET=gravity-admin-2024
+      - VAPID_PUBLIC_KEY=BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ
+      - VAPID_PRIVATE_KEY=kqF_kPNPKYnCdseLHAzy30ZY_6Qhqcnu_lYFPSt_-8w
+      - DB_PATH=/app/data
+    volumes:
+      - chat-data:/app/data
+
+volumes:
+  chat-data:
+    driver: local

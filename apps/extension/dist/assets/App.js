@@ -8959,7 +8959,7 @@ class ChatService {
     this.onError = null;
     this.onStatusChange = null;
     this.rooms = [];
-    this.serverUrl = "https://gravity-chat-serve.onrender.com";
+    this.serverUrl = "https://chat.gravitywallet.com";
     this.roomUpdateDebounceTimer = null;
   }
   init() {

@@ -49,7 +49,7 @@ class ChatService {
     public onStatusChange: ((status: string, errMsg?: string) => void) | null = null;
 
     private rooms: ChatRoom[] = [];
-    private serverUrl = 'https://gravity-chat-serve.onrender.com';
+    private serverUrl = 'https://chat.gravitywallet.com';
     private roomUpdateDebounceTimer: any = null;
 
     public init() {

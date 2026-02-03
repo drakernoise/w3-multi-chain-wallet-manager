@@ -10,9 +10,10 @@ const path = require('path');
 const crypto = require('crypto');
 const webpush = require('web-push');
 
-// VAPID Keys (Generated via CLI)
-const publicVapidKey = 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
-const privateVapidKey = 'kqF_kPNPKYnCdseLHAzy30ZY_6Qhqcnu_lYFPSt_-8w';
+// VAPID Keys (Generated via CLI or Environment)
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY || 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || 'kqF_kPNPKYnCdseLHAzy30ZY_6Qhqcnu_lYFPSt_-8w';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'gravity-admin-2024';
 
 webpush.setVapidDetails('mailto:drakernoise2013@gmail.com', publicVapidKey, privateVapidKey);
 
@@ -29,7 +30,7 @@ app.get('/health', (req, res) => res.status(200).json({ status: 'ok', timestamp:
 // Admin endpoint to reset database (protected by secret)
 app.post('/admin/reset', (req, res) => {
     const secret = req.query.secret || req.headers['x-admin-secret'];
-    if (secret !== 'gravity-admin-2024') {
+    if (secret !== ADMIN_SECRET) {
         return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -64,7 +65,7 @@ app.post('/admin/delete_user', (req, res) => {
     const secret = req.query.secret || req.headers['x-admin-secret'];
     const targetUsernames = req.query.username; // Can be "user1,user2,user3"
 
-    if (secret !== 'gravity-admin-2024') {
+    if (secret !== ADMIN_SECRET) {
         return res.status(403).json({ error: 'Forbidden' });
     }
 
