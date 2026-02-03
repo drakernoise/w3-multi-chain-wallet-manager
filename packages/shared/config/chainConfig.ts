@@ -96,6 +96,7 @@ export const CHAIN_CONFIGS: Record<Chain, ChainConfig> = {
         addressPrefix: 'BLT',
         chainId: 'cd8d90f29ae273abec3eaa7731e25934c63eb654d55080caff2ebb7f5df6381f',
         rpcNodes: [
+            'https://rpc.drakernoise.com',
             'https://rpc.beblurt.com',
             'https://blurt-rpc.saboin.com',
             'https://rpc.blurt.world',
