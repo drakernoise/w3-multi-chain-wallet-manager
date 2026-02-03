@@ -11,8 +11,7 @@ export const HIVE_CANDIDATES = [
 
 export const STEEM_CANDIDATES = [
     'https://api.steemit.com',
-    'https://api.steem.fans', // Often reliable
-    // 'https://steem.61dom.com', // REMOVED (DNS Error)
+    'https://api.steem.fans',
     'https://api.steememory.com',
 ];
 
@@ -21,8 +20,6 @@ export const BLURT_CANDIDATES = [
     'https://rpc.beblurt.com', // Fallback nodes
     'https://blurt-rpc.saboin.com',
     'https://rpc.blurt.world',
-    // 'https://rpc.blurt.one', // REMOVED (502 Error)
-    // 'https://kentzz.blurt.world', // REMOVED (SSL Error)
 ];
 
 // Active nodes state (in-memory)
@@ -37,7 +34,7 @@ let activeNodes: Record<Chain, string> = {
 // Multiple latency checks for more accurate benchmarking
 const checkNodeLatency = async (url: string, iterations: number = 3): Promise<number> => {
     const latencies: number[] = [];
-    
+
     for (let i = 0; i < iterations; i++) {
         const start = Date.now();
         try {
@@ -52,7 +49,7 @@ const checkNodeLatency = async (url: string, iterations: number = 3): Promise<nu
                     params: [],
                     id: 1
                 }),
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Connection': 'keep-alive'
                 },
@@ -65,7 +62,7 @@ const checkNodeLatency = async (url: string, iterations: number = 3): Promise<nu
                 // If any test fails, return penalty
                 return 99999;
             }
-            
+
             const json = await response.json();
             if (!json.result) {
                 return 99999;
@@ -73,7 +70,7 @@ const checkNodeLatency = async (url: string, iterations: number = 3): Promise<nu
 
             const latency = Date.now() - start;
             latencies.push(latency);
-            
+
             // Small delay between tests to avoid overwhelming the server
             if (i < iterations - 1) {
                 await new Promise(resolve => setTimeout(resolve, 200));
@@ -83,13 +80,13 @@ const checkNodeLatency = async (url: string, iterations: number = 3): Promise<nu
             return 99999;
         }
     }
-    
+
     // Return average latency if all tests succeeded
     if (latencies.length === iterations) {
         const sum = latencies.reduce((a, b) => a + b, 0);
         return Math.round(sum / latencies.length);
     }
-    
+
     return 99999; // Penalty for failure
 };
 
