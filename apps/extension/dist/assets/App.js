@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { j as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, k as checkAccountExists, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, l as broadcastSavingsDeposit, m as broadcastSavingsWithdraw, n as fetchAccountData, o as broadcastRCDelegate, p as broadcastRCUndelegate, q as broadcastBulkTransfer, t as indexBrowserExports, u as indexBrowserExports$1, v as validateAccountKeys, w as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, x as fetchBalances, y as detectWeb3Context, z as benchmarkNodes } from './chainService.js';
+import { k as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, l as checkAccountExists, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, m as broadcastSavingsDeposit, n as broadcastSavingsWithdraw, o as fetchAccountData, p as broadcastRCDelegate, q as broadcastRCUndelegate, t as broadcastBulkTransfer, u as indexBrowserExports, v as indexBrowserExports$1, w as validateAccountKeys, x as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, j as broadcastWitnessVote, y as fetchBalances, z as detectWeb3Context, A as benchmarkNodes } from './chainService.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 import { l as lookup } from './index2.js';
 
@@ -12845,7 +12845,8 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       const isPowerDown = method2 === "requestPowerDown" || method2 === "powerDown";
       const isDelegation = method2 === "requestDelegation" || method2 === "delegation";
       const isPost2 = method2 === "requestPost" || method2 === "post";
-      const needsActive = isTransfer2 || isPowerUp || isPowerDown || isDelegation || isBroadcast2 && !account.postingKey || // Broadcast assumes Active?
+      const isWitnessVote2 = method2 === "requestWitnessVote" || method2 === "witnessVote";
+      const needsActive = isTransfer2 || isPowerUp || isPowerDown || isDelegation || isWitnessVote2 || isBroadcast2 && !account.postingKey || // Broadcast assumes Active?
       isCustomJson2 && request.params[2] === "Active";
       if (needsActive && !account.activeKey) {
         throw new Error(t("sign.active_missing"));
@@ -12925,6 +12926,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           const activeKeyOps = [
             "witness_update",
             "witness_set_properties",
+            "account_witness_vote",
             "account_update",
             "account_update2",
             "transfer",
@@ -13016,6 +13018,19 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           message: t("sign.success"),
           ...response
         };
+      } else if (isWitnessVote2) {
+        const witness = request.params[1];
+        const approve = request.params[2] === true || request.params[2] === "true" || request.params[2] === 1;
+        const response = await broadcastWitnessVote(account.chain, account.name, account.activeKey, witness, approve);
+        if (!response.success) throw new Error(response.error);
+        const opResult = response.opResult || response.txId;
+        result = {
+          result: opResult,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          message: t("sign.success"),
+          ...response
+        };
       } else if (isPost2) {
         const title = request.params[1];
         const body = request.params[2];
@@ -13095,6 +13110,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
   const isCustomJson = method === "requestCustomJson" || method === "customJSON";
   const isSignBuffer = method === "requestSignBuffer" || method === "signBuffer";
   const isPost = method === "requestPost" || method === "post";
+  const isWitnessVote = method === "requestWitnessVote" || method === "witnessVote";
   const isFile = origin === "file" || origin.startsWith("file://");
   const domain = isFile ? t("sign.local_file") : (origin.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/im) || [null, origin])[1];
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full bg-dark-900 text-slate-200 flex flex-col relative overflow-hidden", children: [
@@ -13247,6 +13263,20 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
             "@",
             request.params[0]
           ] })
+        ] })
+      ] })
+    ] }) : isWitnessVote ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-8 h-8 text-blue-400", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }) }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-2", children: request.params[2] === false || request.params[2] === "false" || request.params[2] === 0 ? "UNVOTE WITNESS" : "VOTE WITNESS" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xl font-bold text-white mb-6", children: [
+        "@",
+        request.params[1]
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-4 border-t border-dark-700", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.author") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+          "@",
+          request.params[0]
         ] })
       ] })
     ] }) : (

@@ -799,6 +799,15 @@ export const broadcastDelegation = async (chain: Chain, username: string, active
 };
 
 // HBD/SBD Savings (Staking) - Blurt doesn't have this feature
+export const broadcastWitnessVote = async (chain: Chain, username: string, activeKey: string, witness: string, approve: boolean): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+    const op: any = ['account_witness_vote', {
+        account: username,
+        witness: witness,
+        approve: approve
+    }];
+    return broadcastOperations(chain, activeKey, [op]);
+};
+
 export const broadcastSavingsDeposit = async (chain: Chain, username: string, activeKey: string, amount: string): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     if (chain === Chain.BLURT) {
         return { success: false, error: 'Blurt does not support savings' };

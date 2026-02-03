@@ -1,5 +1,5 @@
 import './ws-polyfill.js';
-import { b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, i as isChainSupported, g as getChainConfig, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation } from './chainService.js';
+import { b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, i as isChainSupported, g as getChainConfig, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, j as broadcastWitnessVote } from './chainService.js';
 import './index.js';
 
 if (typeof globalThis.WebSocket === "undefined") {
@@ -217,6 +217,7 @@ async function tryAutoSign(request, sender) {
     const isPowerDown = method === "requestPowerDown" || method === "powerDown";
     const isDelegation = method === "requestDelegation" || method === "delegation";
     const isPost = method === "requestPost" || method === "post";
+    const isWitnessVote = method === "requestWitnessVote" || method === "witnessVote";
     let response;
     if (isTransfer) {
       const to = request.params[1];
@@ -259,6 +260,7 @@ async function tryAutoSign(request, sender) {
         const activeKeyOps = [
           "witness_update",
           "witness_set_properties",
+          "account_witness_vote",
           "account_update",
           "account_update2",
           "transfer",
@@ -349,6 +351,11 @@ async function tryAutoSign(request, sender) {
       }
       if (!account.activeKey) return { success: false, error: "Gravity Wallet: Missing Active Key for Delegation." };
       response = await broadcastDelegation(account.chain, account.name, account.activeKey, delegatee, vestingShares);
+    } else if (isWitnessVote) {
+      const witness = request.params[1];
+      const approve = request.params[2] === true || request.params[2] === "true" || request.params[2] === 1;
+      if (!account.activeKey) return { success: false, error: "Active key required for witness voting" };
+      response = await broadcastWitnessVote(account.chain, account.name, account.activeKey, witness, approve);
     } else {
       return { success: false, error: "Unsupported operation" };
     }

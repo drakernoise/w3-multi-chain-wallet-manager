@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../contexts/LanguageContext';
 import { Account, Chain } from '../types';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation } from '../services/chainService';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote } from '../services/chainService';
 
 interface SignRequestProps {
     requestId: string;
@@ -110,9 +110,10 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             const isPowerDown = method === 'requestPowerDown' || method === 'powerDown';
             const isDelegation = method === 'requestDelegation' || method === 'delegation';
             const isPost = method === 'requestPost' || method === 'post';
+            const isWitnessVote = method === 'requestWitnessVote' || method === 'witnessVote';
 
             // Check Key Requirement properly
-            const needsActive = isTransfer || isPowerUp || isPowerDown || isDelegation ||
+            const needsActive = isTransfer || isPowerUp || isPowerDown || isDelegation || isWitnessVote ||
                 (isBroadcast && !account.postingKey) || // Broadcast assumes Active?
                 (isCustomJson && request.params[2] === 'Active');
 
@@ -226,6 +227,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     const activeKeyOps = [
                         'witness_update',
                         'witness_set_properties',
+                        'account_witness_vote',
                         'account_update',
                         'account_update2',
                         'transfer',
@@ -337,6 +339,23 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     ...response
                 };
 
+            } else if (isWitnessVote) {
+                const witness = request.params[1];
+                const approve = request.params[2] === true || request.params[2] === "true" || request.params[2] === 1;
+
+                const response = await broadcastWitnessVote(account.chain, account.name, account.activeKey!, witness, approve);
+                if (!response.success) throw new Error(response.error);
+
+                // Compatibility mapping
+                const opResult = response.opResult || response.txId;
+                result = {
+                    result: opResult,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    message: t('sign.success'),
+                    ...response
+                };
+
             } else if (isPost) {
                 // console.log('SignRequest: Entering isPost handler'); // Debug only
                 const title = request.params[1];
@@ -436,6 +455,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
     // @ts-ignore - Used in handleDecision
     const isBroadcast = method === 'requestBroadcast' || method === 'broadcast';
     const isPost = method === 'requestPost' || method === 'post';
+    const isWitnessVote = method === 'requestWitnessVote' || method === 'witnessVote';
     const isFile = origin === 'file' || origin.startsWith('file://');
     const domain = isFile ? t('sign.local_file') : (origin.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/im) || [null, origin])[1];
 
@@ -608,6 +628,25 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                                 <span>{t('sign.author')}</span>
                                 <span className="text-white font-bold">@{request.params[0]}</span>
                             </div>
+                        </div>
+                    </div>
+                ) : isWitnessVote ? (
+                    <div className="w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down">
+                        <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+
+                        <h3 className="text-xs uppercase tracking-widest text-slate-500 mb-2">
+                            {request.params[2] === false || request.params[2] === "false" || request.params[2] === 0 ? "UNVOTE WITNESS" : "VOTE WITNESS"}
+                        </h3>
+
+                        <p className="text-xl font-bold text-white mb-6">@{request.params[1]}</p>
+
+                        <div className="flex justify-between items-center text-xs text-slate-500 pt-4 border-t border-dark-700">
+                            <span>{t('sign.author')}</span>
+                            <span className="text-white font-bold">@{request.params[0]}</span>
                         </div>
                     </div>
                 ) : (

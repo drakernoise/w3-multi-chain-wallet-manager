@@ -82798,25 +82798,25 @@ function requireOperations$1 () {
 		// Merge tmp.js - See "Generated code follows" below
 
 		_types2.default.uint8;
-		    var uint16 = _types2.default.uint16,
-		    int16 = _types2.default.int16,
-		    uint32 = _types2.default.uint32,
-		    uint64 = _types2.default.uint64,
-		    int64 = _types2.default.int64;
-		    _types2.default.uint128;
-		    var string = _types2.default.string,
-		    string_binary = _types2.default.string_binary,
-		    bytes = _types2.default.bytes,
-		    bool = _types2.default.bool,
-		    array = _types2.default.array,
-		    static_variant = _types2.default.static_variant,
-		    map = _types2.default.map,
-		    set = _types2.default.set,
-		    public_key = _types2.default.public_key,
-		    time_point_sec = _types2.default.time_point_sec,
-		    optional = _types2.default.optional,
-		    asset = _types2.default.asset,
-		    asset_symbol = _types2.default.asset_symbol;
+		  var uint16 = _types2.default.uint16,
+		  int16 = _types2.default.int16,
+		  uint32 = _types2.default.uint32,
+		  uint64 = _types2.default.uint64,
+		  int64 = _types2.default.int64;
+		  _types2.default.uint128;
+		  var string = _types2.default.string,
+		  string_binary = _types2.default.string_binary,
+		  bytes = _types2.default.bytes,
+		  bool = _types2.default.bool,
+		  array = _types2.default.array,
+		  static_variant = _types2.default.static_variant,
+		  map = _types2.default.map,
+		  set = _types2.default.set,
+		  public_key = _types2.default.public_key,
+		  time_point_sec = _types2.default.time_point_sec,
+		  optional = _types2.default.optional,
+		  asset = _types2.default.asset,
+		  asset_symbol = _types2.default.asset_symbol;
 
 
 		var future_extensions = _types2.default.void;
@@ -83182,7 +83182,7 @@ function requireOperations$1 () {
 
 		var witness_set_properties = new Serializer("witness_set_properties", {
 		  owner: string,
-		  props: string,
+		  props: map(string, bytes()),
 		  extensions: set(future_extensions)
 		});
 
@@ -89200,6 +89200,14 @@ const broadcastDelegation = async (chain, username, activeKey, delegatee, amount
     return { success: false, error: e.message || "Failed to convert power to vests" };
   }
 };
+const broadcastWitnessVote = async (chain, username, activeKey, witness, approve) => {
+  const op = ["account_witness_vote", {
+    account: username,
+    witness,
+    approve
+  }];
+  return broadcastOperations(chain, activeKey, [op]);
+};
 const broadcastSavingsDeposit = async (chain, username, activeKey, amount) => {
   if (chain === Chain.BLURT) {
     return { success: false, error: "Blurt does not support savings" };
@@ -89393,4 +89401,4 @@ const signMessage = (chain, message, keyStr, _useLegacySigner = false) => {
   }
 };
 
-export { Chain as C, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, global as j, checkAccountExists as k, broadcastSavingsDeposit as l, broadcastSavingsWithdraw as m, fetchAccountData as n, broadcastRCDelegate as o, broadcastRCUndelegate as p, broadcastBulkTransfer as q, requireCryptoBrowserify as r, signMessage as s, indexBrowserExports$1 as t, indexBrowserExports as u, validateAccountKeys as v, fetchAccountHistory as w, fetchBalances as x, detectWeb3Context as y, benchmarkNodes as z };
+export { benchmarkNodes as A, Chain as C, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, broadcastWitnessVote as j, global as k, checkAccountExists as l, broadcastSavingsDeposit as m, broadcastSavingsWithdraw as n, fetchAccountData as o, broadcastRCDelegate as p, broadcastRCUndelegate as q, requireCryptoBrowserify as r, signMessage as s, broadcastBulkTransfer as t, indexBrowserExports$1 as u, indexBrowserExports as v, validateAccountKeys as w, fetchAccountHistory as x, fetchBalances as y, detectWeb3Context as z };
