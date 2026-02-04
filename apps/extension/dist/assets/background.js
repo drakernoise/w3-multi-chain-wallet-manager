@@ -68,25 +68,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: false, error: "Invalid Request: Method name too long or invalid." });
       return false;
     }
-    console.log(`[Gravity] Received request - Method: ${request.method}, Params type: ${Array.isArray(request.params) ? "array" : typeof request.params}`, request.params);
     if (request.params && typeof request.params === "object" && !Array.isArray(request.params)) {
       const params = request.params;
       if (params.operations && params.url && !params.username) {
-        console.error("[Compatibility] ⚠️ CASE 1: DETECTED TWIGGY.LAT FORMAT! {operations, url} object");
+        console.log("[Gravity] Twiggy.lat compatibility: Normalizing {operations, url} object");
         const username = "unknown_broadcast_user";
         const operations = Array.isArray(params.operations) ? params.operations : [params.operations];
         const key = params.key || "";
         request.params = [username, operations, key];
-        console.error("[Compatibility] ✓ Case 1 Normalized");
       }
     }
-    if (Array.isArray(request.params) && request.params[1] && typeof request.params[1] === "object" && !Array.isArray(request.params[1])) {
-      const secondParam = request.params[1];
-      if (secondParam.operations && secondParam.url && !Array.isArray(secondParam.operations)) {
-        console.error("[Compatibility] ⚠️ CASE 2: DETECTED TWIGGY.LAT FORMAT! Array with {operations, url} inside");
-        const operations = Array.isArray(secondParam.operations) ? secondParam.operations : [secondParam.operations];
-        request.params[1] = operations;
-        console.error("[Compatibility] ✓ Case 2 Normalized - params[1] converted to operations array");
+    if (Array.isArray(request.params)) {
+      for (let i = 0; i < request.params.length; i++) {
+        const param = request.params[i];
+        if (param && typeof param === "object" && !Array.isArray(param)) {
+          const obj = param;
+          if (obj.operations && obj.url) {
+            console.log(`[Gravity] Twiggy.lat compatibility: Normalizing params[${i}]`);
+            const operations = Array.isArray(obj.operations) ? obj.operations : [obj.operations];
+            request.params[i] = operations;
+            if (request.method === "requestSignBuffer" && i === 2 && Array.isArray(request.params[i])) {
+              console.log("[Gravity] Converting requestSignBuffer with operations -> requestBroadcast");
+              request.method = "requestBroadcast";
+            }
+            break;
+          }
+        }
       }
     }
     if (request.method === "requestPowerUp" || request.method === "powerUp") {

@@ -92,9 +92,6 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
             return false;
         }
 
-        // DEBUG: Log incoming params structure
-        console.log(`[Gravity] Received request - Method: ${request.method}, Params type: ${Array.isArray(request.params) ? 'array' : typeof request.params}`, request.params);
-
         // COMPATIBILITY FIX: Normalize parameters format from sites like twiggy.lat
         // Some sites send {operations, url} instead of [username, operations, key]
         
@@ -102,24 +99,34 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         if (request.params && typeof request.params === 'object' && !Array.isArray(request.params)) {
             const params = request.params as any;
             if (params.operations && params.url && !params.username) {
-                console.error('[Compatibility] ⚠️ CASE 1: DETECTED TWIGGY.LAT FORMAT! {operations, url} object');
+                console.log('[Gravity] Twiggy.lat compatibility: Normalizing {operations, url} object');
                 const username = 'unknown_broadcast_user';
                 const operations = Array.isArray(params.operations) ? params.operations : [params.operations];
                 const key = params.key || '';
                 request.params = [username, operations, key];
-                console.error('[Compatibility] ✓ Case 1 Normalized');
             }
         }
         
-        // Case 2: params is array [username, {operations, url}, key] - twiggy.lat style
-        if (Array.isArray(request.params) && request.params[1] && typeof request.params[1] === 'object' && !Array.isArray(request.params[1])) {
-            const secondParam = request.params[1] as any;
-            if (secondParam.operations && secondParam.url && !Array.isArray(secondParam.operations)) {
-                console.error('[Compatibility] ⚠️ CASE 2: DETECTED TWIGGY.LAT FORMAT! Array with {operations, url} inside');
-                // Convert the object with {operations, url} to an array of operations
-                const operations = Array.isArray(secondParam.operations) ? secondParam.operations : [secondParam.operations];
-                request.params[1] = operations;
-                console.error('[Compatibility] ✓ Case 2 Normalized - params[1] converted to operations array');
+        // Case 2: params is array with {operations, url} object at ANY position
+        if (Array.isArray(request.params)) {
+            for (let i = 0; i < request.params.length; i++) {
+                const param = request.params[i];
+                if (param && typeof param === 'object' && !Array.isArray(param)) {
+                    const obj = param as any;
+                    if (obj.operations && obj.url) {
+                        console.log(`[Gravity] Twiggy.lat compatibility: Normalizing params[${i}]`);
+                        const operations = Array.isArray(obj.operations) ? obj.operations : [obj.operations];
+                        request.params[i] = operations;
+                        
+                        // CRITICAL FIX: If method is requestSignBuffer but we have operations array, convert to requestBroadcast
+                        if (request.method === 'requestSignBuffer' && i === 2 && Array.isArray(request.params[i])) {
+                            console.log('[Gravity] Converting requestSignBuffer with operations -> requestBroadcast');
+                            request.method = 'requestBroadcast';
+                        }
+                        
+                        break;
+                    }
+                }
             }
         }
 
