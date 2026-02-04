@@ -7,8 +7,16 @@ import * as blurt from '@blurtfoundation/blurtjs';
 
 export interface ChainAccountData {
     name: string;
-    posting: { key_auths: [string, number][] };
-    active: { key_auths: [string, number][] };
+    posting: {
+        key_auths: [string, number][];
+        account_auths: [string, number][];
+        weight_threshold: number;
+    };
+    active: {
+        key_auths: [string, number][];
+        account_auths: [string, number][];
+        weight_threshold: number;
+    };
     memo_key: string;
     balance?: string;
     savings_balance?: string;
@@ -18,6 +26,18 @@ export interface ChainAccountData {
     vesting_withdraw_rate?: string;
     to_withdraw?: string;
     withdrawn?: string;
+}
+
+export interface MultiSigAuthority {
+    threshold: number;
+    keyAuths: [string, number][];
+    accountAuths: [string, number][];
+}
+
+export interface MultisigProgress {
+    currentWeight: number;
+    threshold: number;
+    canBroadcast: boolean;
 }
 
 // --- HELPER: Manual Fetch for HIVE (Service Worker Compatible) ---
@@ -293,6 +313,48 @@ export const validateAccountKeys = async (chain: Chain, username: string, keys: 
         return { valid: false, error: e.message };
     }
 };
+
+export const getAccountAuthorities = async (chain: Chain, username: string, type: 'active' | 'posting' = 'active'): Promise<MultiSigAuthority | null> => {
+    try {
+        const accountData = await fetchAccountData(chain, username);
+        if (!accountData) return null;
+
+        const auth = type === 'active' ? accountData.active : accountData.posting;
+        return {
+            threshold: auth.weight_threshold,
+            keyAuths: auth.key_auths,
+            accountAuths: auth.account_auths
+        };
+    } catch (e) {
+        console.error('Failed to fetch authorities:', e);
+        return null;
+    }
+};
+
+export const calculateThresholdProgress = (auth: MultiSigAuthority, signatures: any[]): MultisigProgress => {
+    // signatures is an array of { pubKey, signature, weight? }
+    // For now, we assume the signatures provided correspond to the auth data provided
+    let currentWeight = 0;
+
+    // In a real multisig, we'd recover the pubkey from the signature and match it
+    // For the UI demonstration, we'll sum the weights of provided signatures
+    signatures.forEach(sig => {
+        // Find matching key weight
+        const keyMatch = auth.keyAuths.find(k => k[0] === sig.pubKey);
+        if (keyMatch) currentWeight += keyMatch[1];
+
+        // Find matching account weight
+        const accMatch = auth.accountAuths.find(a => a[0] === sig.username);
+        if (accMatch) currentWeight += accMatch[1];
+    });
+
+    return {
+        currentWeight,
+        threshold: auth.threshold,
+        canBroadcast: currentWeight >= auth.threshold
+    };
+};
+
 
 export const broadcastTransfer = async (
     chain: Chain,

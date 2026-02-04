@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { chatService, ChatRoom, ChatMessage, ChatUser } from '../services/chatService';
 import { useTranslation } from '../contexts/LanguageContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { t } = useTranslation();
+    const { showNotification } = useNotification();
     // Identity State
     const [user, setUser] = useState<ChatUser | null>(null);
     const [isRegistering, setIsRegistering] = useState(false);
@@ -30,7 +32,6 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [newRoomName, setNewRoomName] = useState('');
     const [isPrivateRoom, setIsPrivateRoom] = useState(false);
     const [showParticipants, setShowParticipants] = useState(false);
-    const [notification, setNotification] = useState<{ msg: string, type: 'success' | 'error' | 'info' | 'warning', roomId?: string } | null>(null);
     const [chatModal, setChatModal] = useState<{ type: 'invite' | 'confirm_delete' | 'confirm_kick' | 'confirm_ban' | 'confirm_delete_message', data?: any } | null>(null);
     const [modalInput, setModalInput] = useState('');
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -99,11 +100,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             });
 
             if (room.type === 'dm' || room.type === 'private') {
-                setNotification({
-                    msg: t('chat.invited_to', { room: room.name }),
-                    type: 'success',
-                    roomId: room.id
-                });
+                showNotification(t('chat.invited_to', { room: room.name }), 'success');
             }
         };
 
@@ -117,13 +114,13 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     console.log('[ChatView] Active room no longer exists, returning to room list:', activeRoomId);
                     setActiveRoomId(null);
                     localStorage.removeItem('gravity_chat_active_room');
-                    setNotification({ msg: 'Room was closed', type: 'warning' });
+                    showNotification('Room was closed', 'info');
                 }
             }
         };
 
         chatService.onError = (err) => {
-            setNotification({ msg: err, type: 'error' });
+            showNotification(err, 'error');
             setIsRegistering(false);
         };
 
@@ -134,7 +131,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         const handleKicked = (e: any) => {
             if (e.detail.roomId === activeRoomId) {
                 setActiveRoomId(null);
-                setNotification({ msg: 'You have been removed from this room', type: 'warning' });
+                showNotification('You have been removed from this room', 'info');
             }
         };
         window.addEventListener('chat-search-results', handleSearch);
@@ -148,25 +145,25 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     // Handle messages for active room
     useEffect(() => {
-        chatService.onMessage = (roomId, msg) => {
+        const chatListener = (roomId: string, msg: ChatMessage) => {
             if (roomId === activeRoomId) {
-                setMessages(prev => [...prev, msg]);
+                setMessages(prev => {
+                    if (prev.find(m => m.id === msg.id)) return prev;
+                    return [...prev, msg];
+                });
                 scrollToBottom();
             } else {
-                // Not in this room? Show notification!
-                const roomName = rooms.find(r => r.id === roomId)?.name || 'Unknown Room';
-                setNotification({ msg: `New message in ${roomName} from ${msg.senderName}`, type: 'info', roomId });
+                // Not in this room? The global App.tsx listener will already show a toast.
+                // But if we want room-specific logic in ChatView (like unread bubbles), we do it here.
             }
         };
-    }, [activeRoomId, rooms]);
 
-    // Notification Timer - longer duration
-    useEffect(() => {
-        if (notification) {
-            const timer = setTimeout(() => setNotification(null), 8000);
-            return () => clearTimeout(timer);
-        }
-    }, [notification]);
+        chatService.addMessageListener(chatListener);
+        return () => chatService.removeMessageListener(chatListener);
+    }, [activeRoomId]);
+
+    // Notification Timer removed (handled by NotificationProvider)
+
 
     // Persist active room
     useEffect(() => {
@@ -200,7 +197,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         const lastError = chrome.runtime.lastError;
                         if (lastError) {
                             console.error("Gravity: Runtime Message Error:", lastError);
-                            setNotification({ msg: "Extension Error: " + lastError.message, type: 'error' });
+                            showNotification("Extension Error: " + lastError.message, 'error');
                             setPushGranted(false);
                             return;
                         }
@@ -210,18 +207,18 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             if (res.subscription) chatService.syncPushSubscription(res.subscription);
                         } else {
                             console.error("Gravity: Push Background Error", res?.error);
-                            setNotification({ msg: "Push Error: " + (res?.error || 'Unknown'), type: 'error' });
+                            showNotification("Push Error: " + (res?.error || 'Unknown'), 'error');
                             setPushGranted(false);
                         }
                     });
                 }
             } else {
                 console.warn("Gravity: Notification permission denied/closed");
-                setNotification({ msg: "Notifications blocked. Please enable them in browser settings.", type: 'warning' });
+                showNotification("Notifications blocked. Please enable them in browser settings.", 'info');
             }
         } catch (e: any) {
             console.error("Gravity: Exception requesting permission", e);
-            setNotification({ msg: "Error: " + e.message, type: 'error' });
+            showNotification("Error: " + e.message, 'error');
         }
     };
 
@@ -309,26 +306,26 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             case 'invite':
                 if (modalInput.trim() && activeRoomId) {
                     chatService.inviteUser(activeRoomId, modalInput.trim());
-                    setNotification({ msg: `Invitation sent to ${modalInput}`, type: 'success' });
+                    showNotification(`Invitation sent to ${modalInput}`, 'success');
                 }
                 break;
             case 'confirm_delete':
                 if (activeRoomId) {
                     chatService.closeRoom(activeRoomId);
                     setActiveRoomId(null);
-                    setNotification({ msg: 'Room deleted', type: 'info' });
+                    showNotification('Room deleted', 'info');
                 }
                 break;
             case 'confirm_kick':
                 if (activeRoomId && data) {
                     chatService.kickUser(activeRoomId, data.id);
-                    setNotification({ msg: `Kicked @${data.username}`, type: 'warning' });
+                    showNotification(`Kicked @${data.username}`, 'info');
                 }
                 break;
             case 'confirm_ban':
                 if (activeRoomId && data) {
                     chatService.banUser(activeRoomId, data.id);
-                    setNotification({ msg: `Banned @${data.username} permanently`, type: 'error' });
+                    showNotification(`Banned @${data.username} permanently`, 'error');
                 }
                 break;
             case 'confirm_delete_message':
@@ -355,7 +352,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         chatService.createDM(targetUserId);
         setSearchResults([]);
         setSearchQuery('');
-        setNotification({ msg: 'Creating DM...', type: 'info' });
+        showNotification('Creating DM...', 'info');
     };
 
 
@@ -886,7 +883,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                             {/* Owner-only actions */}
                                             {rooms.find(r => r.id === activeRoomId)?.owner === user?.id && (
                                                 <>
-                                                    <button onClick={() => { chatService.muteUser(activeRoomId, member.id); setNotification({ msg: `User @${member.username} muted`, type: 'info' }); }} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors">Mute</button>
+                                                    <button onClick={() => { chatService.muteUser(activeRoomId, member.id); showNotification(`User @${member.username} muted`, 'info'); }} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors">Mute</button>
                                                     <button onClick={() => setChatModal({ type: 'confirm_kick', data: member })} className="flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors">Kick</button>
                                                     <button onClick={() => setChatModal({ type: 'confirm_ban', data: member })} className="flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold">Ban</button>
                                                 </>
@@ -928,23 +925,6 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </div>
             )}
 
-            {/* In-App Notifications */}
-            {notification && (
-                <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[200] max-w-[90%] w-auto animate-slideUp">
-                    <div
-                        onClick={() => {
-                            if (notification.roomId) {
-                                setActiveRoomId(notification.roomId);
-                                setNotification(null);
-                            }
-                        }}
-                        className={`px-4 py-3 rounded-xl border shadow-2xl flex items-center gap-3 ${notification.roomId ? 'cursor-pointer hover:scale-105' : ''} transition-transform ${notification.type === 'error' ? 'bg-red-900/90 border-red-500 text-red-100' : notification.type === 'success' ? 'bg-green-900/90 border-green-500 text-green-100' : notification.type === 'warning' ? 'bg-orange-900/90 border-orange-500 text-orange-100' : 'bg-blue-900/90 border-blue-500 text-blue-100'}`}
-                    >
-                        <span className="text-sm font-medium">{notification.msg}</span>
-                        <button onClick={(e) => { e.stopPropagation(); setNotification(null); }} className="ml-2 hover:opacity-70 transition-opacity">X</button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

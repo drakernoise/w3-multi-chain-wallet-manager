@@ -2,7 +2,7 @@ import './modulepreload-polyfill.js';
 import { l as lookup } from './index2.js';
 
 let socket = null;
-const SERVER_URL = "https://gravity-chat-serve.onrender.com";
+const SERVER_URL = "https://chat.gravitywallet.com";
 chrome.runtime.onMessage.addListener((msg, _sender, _sendResponse) => {
   if (msg.type === "INIT_CHAT") {
     initChat(msg.creds);

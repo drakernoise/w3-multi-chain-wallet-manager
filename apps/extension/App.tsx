@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Account, Chain, ViewState, WalletState, Vault } from '@types';
+import { chatService, ChatMessage } from '@services/chatService';
 import { LockScreen } from '@components/LockScreen';
 import { Sidebar } from '@components/Sidebar';
 import { Landing } from '@components/Landing';
@@ -16,7 +17,8 @@ import { SignRequest } from '@components/SignRequest';
 import { HelpView } from '@components/HelpView';
 import { ChatView } from '@components/ChatView';
 import { BridgeModal } from '@components/BridgeModal';
-import { NotificationToast } from '@components/NotificationToast';
+// NotificationToast is now handled by NotificationProvider
+
 
 import {
   fetchBalances as serviceFetchBalances,
@@ -32,13 +34,16 @@ import {
 } from '@services/cryptoService';
 import { benchmarkNodes } from '@services/nodeService';
 import { LanguageProvider, useTranslation } from '@contexts/LanguageContext';
+import { NotificationProvider, useNotification } from '@contexts/NotificationContext';
 
 declare const chrome: any;
 
 export default function App() {
   return (
     <LanguageProvider>
-      <AppContent />
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     </LanguageProvider>
   );
 }
@@ -70,7 +75,7 @@ function AppContent() {
   const [web3Context, setWeb3Context] = useState<string | null>(null);
 
   // Notifications
-  const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const { showNotification } = useNotification();
   const [lockReason, setLockReason] = useState<string | null>(null);
 
   // Signing Request ID
@@ -89,7 +94,24 @@ function AppContent() {
     return () => window.removeEventListener('open-bridge', handleOpenBridge);
   }, []);
 
-  // 1. Load Initial State & Session
+  // 1. Global Chat Listeners for Toasts
+  useEffect(() => {
+    chatService.init();
+
+    // Set up a global onMessage handler for toasts
+    const chatListener = (_roomId: string, message: ChatMessage) => {
+      // If message is not from US, show toast
+      const myUser = chatService.getCurrentUser();
+      if (myUser && message.senderId !== myUser.id) {
+        showNotification(`${message.senderName}: ${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}`, 'info');
+      }
+    };
+
+    chatService.addMessageListener(chatListener);
+    return () => chatService.removeMessageListener(chatListener);
+  }, [showNotification]);
+
+  // 2. Load Initial State & Session
   useEffect(() => {
     console.log("Gravity: App useEffect mounted");
     const loadState = async () => {
@@ -283,11 +305,11 @@ function AppContent() {
         setWalletState(prev => ({ ...prev, accounts: updatedAccounts }));
       }
 
-      setNotification({ msg: 'Account imported successfully', type: 'success' });
+      showNotification('Account imported successfully', 'success');
       setShowImport(false);
     } catch (e) {
       console.error("Import Save Failed:", e);
-      setNotification({ msg: 'Failed to save account. Please try again.', type: 'error' });
+      showNotification('Failed to save account. Please try again.', 'error');
     }
   };
 
@@ -317,7 +339,7 @@ function AppContent() {
 
   const handleTransfer = async (fromAcc: Account, to: string, amount: string, memo: string, symbol?: string) => {
     if (!fromAcc.activeKey) {
-      setNotification({ msg: "No active key found for this account.", type: 'error' });
+      showNotification("No active key found for this account.", 'error');
       return;
     }
 
@@ -333,13 +355,13 @@ function AppContent() {
       );
 
       if (result.success) {
-        setNotification({ msg: `TX: ${result.txId?.substring(0, 8)}...`, type: 'success' });
+        showNotification(`TX: ${result.txId?.substring(0, 8)}...`, 'success');
         fetchBalances();
       } else {
-        setNotification({ msg: `Failed: ${result.error}`, type: 'error' });
+        showNotification(`Failed: ${result.error}`, 'error');
       }
     } catch (e) {
-      setNotification({ msg: "Unexpected error during broadcast.", type: 'error' });
+      showNotification("Unexpected error during broadcast.", 'error');
     }
   };
 
@@ -660,13 +682,6 @@ function AppContent() {
         />
       )}
 
-      {notification && (
-        <NotificationToast
-          message={notification.msg}
-          type={notification.type}
-          onClose={() => setNotification(null)}
-        />
-      )}
       {showBridge && (
         <BridgeModal onClose={() => setShowBridge(false)} />
       )}

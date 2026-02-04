@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../contexts/LanguageContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { Account, Chain } from '../types';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote } from '../services/chainService';
+import { MultiSigProgress } from './MultiSigProgress';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, getAccountAuthorities, MultiSigAuthority, MultisigProgress as IMultisigProgress } from '../services/chainService';
 
 interface SignRequestProps {
     requestId: string;
@@ -13,6 +15,7 @@ declare const chrome: any;
 
 export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, onComplete }) => {
     const { t } = useTranslation();
+    const { showNotification } = useNotification();
     const [request, setRequest] = useState<any>(null);
     const [origin, setOrigin] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -20,6 +23,9 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
     const [processing, setProcessing] = useState(false);
     const [voteWeight, setVoteWeight] = useState<number>(10000);
     const [chainHint, setChainHint] = useState<Chain | null>(null);
+    const [authority, setAuthority] = useState<MultiSigAuthority | null>(null);
+    const [multisigProgress, setMultisigProgress] = useState<IMultisigProgress | null>(null);
+    const [isMultisig, setIsMultisig] = useState(false);
 
     useEffect(() => {
         chrome.runtime.sendMessage({ type: 'gravity_get_request', requestId }, (resp: any) => {
@@ -41,6 +47,38 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
     }, [requestId, t]);
 
     const [trustDomain, setTrustDomain] = useState(false);
+
+    useEffect(() => {
+        if (!request || !accounts.length) return;
+
+        const checkMultisig = async () => {
+            const username = request.params[0];
+            let targetChain = chainHint;
+            let account = accounts.find(a => a.name === username && (targetChain ? a.chain === targetChain : true));
+            if (!account && !targetChain) {
+                account = accounts.find(a => a.name === username && a.chain === 'HIVE');
+            }
+            if (!account) account = accounts.find(a => a.name === username);
+            if (!account) return;
+
+            const isActiveOp = ['requestTransfer', 'requestPowerUp', 'requestPowerDown', 'requestDelegation', 'requestWitnessVote'].includes(request.method);
+            const authType = isActiveOp ? 'active' : 'posting';
+
+            const auth = await getAccountAuthorities(account.chain, account.name, authType);
+            if (auth && auth.threshold > 1) {
+                setAuthority(auth);
+                setIsMultisig(true);
+                // Initialize progress as empty for now (will be fetched from chat server later)
+                setMultisigProgress({
+                    currentWeight: 0,
+                    threshold: auth.threshold,
+                    canBroadcast: false
+                });
+            }
+        };
+
+        checkMultisig();
+    }, [request, accounts, chainHint]);
 
     // ... (keep handleDecision logic, but verify placement) ...
     // NOTE: I will insert the logic inside handleDecision via a separate chunk or modify the entire function block if needed.
@@ -95,8 +133,15 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 throw new Error(t('sign.account_not_found'));
             }
 
-            // Check permissions based on operation type
-            // ...
+            if (isMultisig && multisigProgress && !multisigProgress.canBroadcast) {
+                // If it's a multisig account and we haven't reached the threshold yet,
+                // we perform a "Partial Sign" (Authorized Step)
+                const msResult = await handleMultisigSign(account);
+                showNotification(msResult.message || 'Signature collected', 'success');
+                notifyBackground(msResult, null);
+                return;
+            }
+            // --- END MULTISIG LOGIC ---
 
             // Actual Signing Logic
             let result: any = { success: false };
@@ -432,6 +477,20 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
         return () => window.removeEventListener('keydown', handleKeyPress);
     }, [processing, loading, error, request]);
 
+    const handleMultisigSign = async (account: Account) => {
+        // This is a placeholder for the actual partial signing logic
+        // It will interact with the chat server to coordinate signatures
+        console.log(`[Multisig] Partial signing for @${account.name} on ${account.chain}`);
+
+        // Return a successful but "pending" result
+        return {
+            success: true,
+            status: 'PARTIAL',
+            message: 'Signature submitted! Waiting for other co-signers.',
+            txId: 'pending-' + Date.now()
+        };
+    };
+
     const notifyBackground = (result: any, err: string | null) => {
         chrome.runtime.sendMessage({
             type: 'gravity_resolve_request',
@@ -472,6 +531,17 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
+
+                {isMultisig && authority && multisigProgress && (
+                    <div className="w-full mb-6">
+                        <MultiSigProgress
+                            authority={authority}
+                            progress={multisigProgress}
+                            currentUser={request.params[0]}
+                            currentUserWeight={0} // To be calculated based on user keys
+                        />
+                    </div>
+                )}
 
                 {isTransfer ? (
                     <div className="w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down">
@@ -703,7 +773,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                         disabled={processing}
                         className="flex-1 py-3 px-2 h-auto min-h-[48px] rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-900/20 transition-all transform hover:scale-[1.02] whitespace-normal leading-tight"
                     >
-                        {processing ? t('sign.signing') : t('sign.confirm')}
+                        {processing ? t('sign.signing') : (isMultisig && !multisigProgress?.canBroadcast ? "Partial Sign" : t('sign.confirm'))}
                     </button>
                 </div>
             </div>

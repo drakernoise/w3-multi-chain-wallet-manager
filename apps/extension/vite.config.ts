@@ -53,6 +53,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         background: path.resolve(__dirname, 'src/background/index.ts'),
+        chatBackground: path.resolve(__dirname, 'src/background/chatBackground.ts'),
         content: path.resolve(__dirname, 'src/content/index.ts'),
         provider: path.resolve(__dirname, 'src/content/provider.ts'),
         offscreen: path.resolve(__dirname, 'src/offscreen/offscreen.html')

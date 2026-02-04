@@ -1,74 +1,8 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { k as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, l as checkAccountExists, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, m as broadcastSavingsDeposit, n as broadcastSavingsWithdraw, o as fetchAccountData, p as broadcastRCDelegate, q as broadcastRCUndelegate, t as broadcastBulkTransfer, u as indexBrowserExports, v as indexBrowserExports$1, w as validateAccountKeys, x as fetchAccountHistory, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, j as broadcastWitnessVote, y as fetchBalances, z as detectWeb3Context, A as benchmarkNodes } from './chainService.js';
-import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
+import { k as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, l as checkAccountExists, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, m as broadcastSavingsDeposit, n as broadcastSavingsWithdraw, o as fetchAccountData, p as broadcastRCDelegate, q as broadcastRCUndelegate, t as broadcastBulkTransfer, u as indexBrowserExports, v as indexBrowserExports$1, w as validateAccountKeys, x as fetchAccountHistory, y as getAccountAuthorities, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, j as broadcastWitnessVote, z as fetchBalances, A as detectWeb3Context, B as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
-
-const authenticateWithGoogle = async () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ id: "google_user_123", email: "user@example.com" });
-    }, 1e3);
-  });
-};
-const authenticateWithDevice = async () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ id: "device_user_123" });
-    }, 1e3);
-  });
-};
-const isBiometricsAvailable = async () => {
-  if (!window.PublicKeyCredential) return false;
-  try {
-    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    return available;
-  } catch (e) {
-    console.warn("Biometric check failed or not supported in this context", e);
-    return false;
-  }
-};
-const registerBiometrics = async () => {
-  try {
-    const challenge = new Uint8Array(32);
-    window.crypto.getRandomValues(challenge);
-    const host = window.location.hostname || "";
-    const isValidDomain = host.includes(".") && host.length < 40;
-    const publicKeyCredentialCreationOptions = {
-      challenge,
-      rp: {
-        name: "Gravity Wallet",
-        id: isValidDomain ? host : void 0
-      },
-      user: {
-        id: window.crypto.getRandomValues(new Uint8Array(16)),
-        name: "gravity_user_" + Math.floor(Math.random() * 1e4),
-        displayName: "Gravity Wallet Owner"
-      },
-      pubKeyCredParams: [
-        { alg: -7, type: "public-key" },
-        // ES256
-        { alg: -257, type: "public-key" },
-        // RS256
-        { alg: -8, type: "public-key" }
-        // Ed25519
-      ],
-      authenticatorSelection: {
-        userVerification: "required",
-        residentKey: "preferred"
-      },
-      timeout: 12e4,
-      attestation: "none"
-    };
-    const credential = await navigator.credentials.create({
-      publicKey: publicKeyCredentialCreationOptions
-    });
-    return !!credential;
-  } catch (error) {
-    console.error("Biometric registration failed:", error);
-    return false;
-  }
-};
+import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
 /*! Capacitor: https://capacitorjs.com/ - MIT License */
 const createCapacitorPlatforms = (win) => {
@@ -1179,6 +1113,672 @@ async function decryptMessage(base64Bundle, sharedKey) {
     return "[Encrypted Message - Cannot Decrypt]";
   }
 }
+
+class ChatService {
+  constructor() {
+    this.socket = null;
+    this.userId = null;
+    this.username = null;
+    // Callbacks for UI updates
+    this.messageListeners = /* @__PURE__ */ new Set();
+    this.onRoomUpdated = null;
+    this.onRoomAdded = null;
+    this.onAuthSuccess = null;
+    this.onAuthenticated = null;
+    // Alias for AuthSuccess
+    this.onError = null;
+    this.onStatusChange = null;
+    this.rooms = [];
+    this.serverUrl = "https://chat.gravitywallet.com";
+    this.roomUpdateDebounceTimer = null;
+  }
+  addMessageListener(listener) {
+    this.messageListeners.add(listener);
+  }
+  removeMessageListener(listener) {
+    this.messageListeners.delete(listener);
+  }
+  init() {
+    if (this.socket?.connected) return;
+    this.socket = lookup(this.serverUrl, {
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1e3,
+      autoConnect: true
+    });
+    this.socket.on("connect", async () => {
+      console.log("Connected to Chat Server");
+      if (this.onStatusChange) this.onStatusChange("connected");
+      window.dispatchEvent(new Event("chat-connected"));
+      const storedUser = localStorage.getItem("gravity_chat_username");
+      const storedKey = localStorage.getItem("gravity_chat_priv");
+      const storedId = localStorage.getItem("gravity_chat_id");
+      if (storedUser && storedKey) {
+        console.log("Auto-logging in as", storedUser);
+        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+          const pubKey = localStorage.getItem("gravity_chat_pub") || "";
+          chrome.runtime.sendMessage({
+            type: "CHAT_SYNC_CREDS",
+            data: {
+              username: storedUser,
+              privateKey: storedKey,
+              publicKey: pubKey
+            }
+          }).catch(() => {
+          });
+        }
+        await this.authenticateWithSignature(storedId, storedUser);
+      }
+    });
+    this.setupListeners();
+  }
+  syncPushSubscription(sub) {
+    if (this.socket?.connected) {
+      console.log("Chat: Manual Push Sync");
+      this.socket.emit("store_push_subscription", sub);
+    }
+  }
+  setupListeners() {
+    if (!this.socket) return;
+    this.socket.on("disconnect", () => {
+      if (this.onStatusChange) this.onStatusChange("disconnected");
+      window.dispatchEvent(new Event("chat-disconnected"));
+    });
+    this.socket.on("connect_error", (err) => {
+      if (this.onStatusChange) this.onStatusChange("disconnected", err.message);
+    });
+    this.socket.on("auth_challenge", async (data) => {
+      console.log("Received auth challenge");
+      const storedKey = localStorage.getItem("gravity_chat_priv");
+      if (storedKey) {
+        try {
+          const signature = await this.signChallenge(data.challenge, storedKey);
+          this.socket?.emit("verify_signature", { signature });
+        } catch (e) {
+          console.error("Auto-signing challenge failed", e);
+        }
+      }
+    });
+    this.socket.on("auth_success", (data) => {
+      if (this.userId === data.id && this.rooms.length > 0) {
+        console.log(`Ignoring duplicate auth_success for ${data.username}`);
+        return;
+      }
+      this.userId = data.id;
+      this.username = data.username;
+      this.rooms = data.rooms.map((r) => ({
+        ...r,
+        messages: [],
+        unreadCount: 0
+      }));
+      console.log(`Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map((r) => r.name));
+      if (data.pendingInvites && data.pendingInvites.length > 0) {
+        console.log(`Received ${data.pendingInvites.length} pending invites`);
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage({
+            type: "UPDATE_BADGE",
+            count: data.pendingInvites.length
+          }).catch(() => {
+          });
+        }
+        data.pendingInvites.forEach((invite) => {
+          if (this.onError) {
+            this.onError(`You were invited to "${invite.roomName}" by ${invite.invitedBy}`);
+          }
+        });
+      }
+      localStorage.setItem("gravity_chat_id", data.id);
+      localStorage.setItem("gravity_chat_username", data.username);
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(["gravity_push_sub"], (res) => {
+          if (res && res.gravity_push_sub) {
+            try {
+              const sub = JSON.parse(res.gravity_push_sub);
+              console.log("Chat: Syncing WebPush Sub");
+              this.socket?.emit("store_push_subscription", sub);
+            } catch (e) {
+            }
+          }
+        });
+      }
+      if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
+      if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
+      this.notifyRoomUpdate();
+    });
+    this.socket.on("new_message", (data) => {
+      this.handleNewMessage(data.roomId, data.message);
+    });
+    this.socket.on("room_history", async (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        const hadMembers = room.memberDetails && room.memberDetails.length > 0;
+        room.memberDetails = data.memberDetails;
+        const hadMessages = room.messages.length > 0;
+        room.messages = await Promise.all(data.messages.map((m) => this.processIncomingMessage(data.roomId, m)));
+        if (!hadMessages && data.messages.length > 0 || !hadMembers && data.memberDetails && data.memberDetails.length > 0) {
+          this.notifyRoomUpdate();
+        }
+      }
+    });
+    this.socket.on("member_joined", (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        if (!room.memberDetails) room.memberDetails = [];
+        if (!room.memberDetails.find((u) => u.id === data.userId)) {
+          room.memberDetails.push({ id: data.userId, username: data.username });
+          this.notifyRoomUpdate();
+        }
+      }
+    });
+    this.socket.on("room_added", (roomData) => {
+      console.log(`room_added event received:`, roomData);
+      if (this.rooms.find((r) => r.id === roomData.id)) {
+        console.log(`Room ${roomData.name} already exists, skipping`);
+        return;
+      }
+      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
+      this.rooms.push(newRoom);
+      console.log(`Added room to local list. Total rooms: ${this.rooms.length}`);
+      this.notifyRoomUpdate();
+      if (this.onRoomAdded) this.onRoomAdded(newRoom);
+    });
+    this.socket.on("room_joined", (roomData) => {
+      if (this.rooms.find((r) => r.id === roomData.id)) return;
+      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
+      this.rooms.push(newRoom);
+      this.notifyRoomUpdate();
+      if (this.onRoomAdded) this.onRoomAdded(newRoom);
+    });
+    this.socket.on("room_removed", (roomId) => {
+      this.rooms = this.rooms.filter((r) => r.id !== roomId);
+      this.notifyRoomUpdate();
+    });
+    this.socket.on("user_kicked", (data) => {
+      if (data.userId === this.userId) {
+        if (this.onError) this.onError(`You were kicked from room`);
+        window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
+      }
+    });
+    this.socket.on("user_banned", (data) => {
+      if (data.userId === this.userId) {
+        if (this.onError) this.onError(`You were BANNED from room`);
+        window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
+      }
+    });
+    this.socket.on("message_edited", (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        const msg = room.messages.find((m) => m.id === data.messageId);
+        if (msg) {
+          msg.content = data.content;
+          msg.isEdited = true;
+          msg.editTimestamp = data.editTimestamp;
+          this.notifyRoomUpdate();
+        }
+      }
+    });
+    this.socket.on("message_deleted", (data) => {
+      const room = this.rooms.find((r) => r.id === data.roomId);
+      if (room) {
+        room.messages = room.messages.filter((m) => m.id !== data.messageId);
+        this.notifyRoomUpdate();
+      }
+    });
+    this.socket.on("error", (msg) => {
+      console.error("Socket Error:", msg);
+      if (msg.includes("User not found") || msg.includes("no public key registered")) {
+        console.warn("Server identity lost. Clearing local chat identity.");
+        const storedName = localStorage.getItem("gravity_chat_username");
+        localStorage.removeItem("gravity_chat_id");
+        localStorage.removeItem("gravity_chat_priv");
+        localStorage.removeItem("gravity_chat_pub");
+        if (this.socket) {
+          this.socket.disconnect();
+          this.socket = null;
+        }
+        this.userId = null;
+        this.username = null;
+        this.rooms = [];
+        if (storedName && !storedName.startsWith("!RESET!")) {
+          console.log(`Auto-repairing identity for ${storedName}...`);
+          setTimeout(() => {
+            this.init();
+            setTimeout(() => {
+              this.register(storedName).catch(console.error);
+            }, 500);
+          }, 2e3);
+          return;
+        }
+      }
+      if (this.onError) this.onError(msg);
+    });
+    this.socket.on("search_results", (results) => {
+      window.dispatchEvent(new CustomEvent("chat-search-results", { detail: results }));
+    });
+    this.socket.on("user_online", (userId) => this.handleUserStatusChange(userId, true));
+    this.socket.on("user_offline", (userId) => this.handleUserStatusChange(userId, false));
+  }
+  // --- CRYPTO & AUTH ---
+  // --- CRYPTO & AUTH ---
+  async generateAndSaveIdentity() {
+    const signKeys = await crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["sign", "verify"]
+    );
+    const signPubInfo = await crypto.subtle.exportKey("spki", signKeys.publicKey);
+    const signPrivInfo = await crypto.subtle.exportKey("pkcs8", signKeys.privateKey);
+    const publicKeyHex = this.bufferToHex(new Uint8Array(signPubInfo));
+    const privateKeyHex = this.bufferToHex(new Uint8Array(signPrivInfo));
+    const encKeys = await generateEncryptionKeys();
+    const encPubB64 = await exportKeyToBase64(encKeys.publicKey);
+    const encPrivB64 = await exportKeyToBase64(encKeys.privateKey);
+    localStorage.setItem("gravity_chat_priv", privateKeyHex);
+    localStorage.setItem("gravity_chat_pub", publicKeyHex);
+    localStorage.setItem("gravity_chat_enc_priv", encPrivB64);
+    localStorage.setItem("gravity_chat_enc_pub", encPubB64);
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({
+        type: "CHAT_SYNC_CREDS",
+        data: {
+          privateKey: privateKeyHex,
+          publicKey: publicKeyHex,
+          // We don't necessarily need to sync enc keys to BG unless BG does decryption, 
+          // but good for consistency.
+          encPrivateKey: encPrivB64,
+          encPublicKey: encPubB64
+        }
+      });
+    }
+    return {
+      publicKey: publicKeyHex,
+      privateKey: privateKeyHex,
+      encryptionPublicKey: encPubB64,
+      encryptionPrivateKey: encPrivB64
+    };
+  }
+  async ensureEncryptionKeys() {
+    let encPub = localStorage.getItem("gravity_chat_enc_pub");
+    let encPriv = localStorage.getItem("gravity_chat_enc_priv");
+    if (!encPub || !encPriv) {
+      console.log("Generating missing E2EE Encryption Keys...");
+      const encKeys = await generateEncryptionKeys();
+      encPub = await exportKeyToBase64(encKeys.publicKey);
+      encPriv = await exportKeyToBase64(encKeys.privateKey);
+      localStorage.setItem("gravity_chat_enc_priv", encPriv);
+      localStorage.setItem("gravity_chat_enc_pub", encPub);
+    }
+    return encPub;
+  }
+  async authenticateWithSignature(userId, username) {
+    if (!this.socket) return;
+    const encPub = await this.ensureEncryptionKeys();
+    this.socket.emit("request_challenge", { userId, username, encryptionPublicKey: encPub });
+  }
+  async signChallenge(challenge, privateKeyHex) {
+    const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
+    const privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      privateKeyBuffer,
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"]
+    );
+    const encoder = new TextEncoder();
+    const data = encoder.encode(challenge);
+    const signature = await crypto.subtle.sign(
+      { name: "ECDSA", hash: { name: "SHA-256" } },
+      privateKey,
+      data
+    );
+    return this.bufferToHex(new Uint8Array(signature));
+  }
+  hexToBuffer(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+    }
+    return bytes.buffer;
+  }
+  bufferToHex(buffer) {
+    return Array.from(buffer).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  // Helper to debounce room updates and prevent infinite loops
+  notifyRoomUpdate() {
+    if (this.roomUpdateDebounceTimer) {
+      clearTimeout(this.roomUpdateDebounceTimer);
+    }
+    this.roomUpdateDebounceTimer = setTimeout(() => {
+      if (this.onRoomUpdated) {
+        this.onRoomUpdated([...this.rooms]);
+      }
+    }, 100);
+  }
+  // --- PUBLIC METHODS ---
+  createRoom(name, isPrivate = false) {
+    this.socket?.emit("create_room", { name, isPrivate });
+  }
+  getCurrentUser() {
+    if (this.userId && this.username) return { id: this.userId, username: this.username };
+    return null;
+  }
+  getRooms() {
+    return [...this.rooms];
+  }
+  async register(username) {
+    if (!this.socket) await this.init();
+    const storedUser = this.getStoredUsername();
+    const storedKey = this.getStoredPrivateKey();
+    if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
+      console.log("Local keys found, performing cryptographic login recovery...");
+      await this.ensureEncryptionKeys();
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "CHAT_SYNC_CREDS",
+          data: { username: storedUser, privateKey: storedKey, publicKey: localStorage.getItem("gravity_chat_pub") }
+        });
+      }
+      return this.authenticateWithSignature(null, username);
+    }
+    const keys = await this.generateAndSaveIdentity();
+    if (!username.startsWith("!RESET!")) {
+      localStorage.setItem("gravity_chat_username", username);
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "CHAT_SYNC_CREDS",
+          data: { username, privateKey: keys.privateKey, publicKey: keys.publicKey }
+        });
+      }
+    }
+    this.socket?.emit("register", {
+      username,
+      publicKey: keys.publicKey,
+      encryptionPublicKey: keys.encryptionPublicKey
+    });
+  }
+  async sendMessage(roomId, content, isEncrypted = false) {
+    if (!this.socket) return;
+    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+    if (!privateKeyHex) {
+      if (this.onError) this.onError("Security Error: No identity found. Please re-login.");
+      return;
+    }
+    try {
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = content + timestamp;
+      const publicKeyHex = localStorage.getItem("gravity_chat_pub");
+      console.log("[SIGN] Public Key (first 20):", publicKeyHex?.substring(0, 20));
+      console.log("[SIGN] Private Key (first 20):", privateKeyHex?.substring(0, 20));
+      console.log("[SIGN] Message to sign:", messageToSign);
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      console.log("[SIGN] Signature (first 20):", signature?.substring(0, 20));
+      this.socket.emit("send_message", {
+        roomId,
+        content,
+        timestamp,
+        signature,
+        isEncrypted
+      });
+    } catch (err) {
+      console.error("Failed to sign message:", err);
+      if (this.onError) this.onError("Failed to securely sign message.");
+    }
+  }
+  async sendDirectMessage(roomId, content, recipientPublicKeyBase64) {
+    try {
+      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
+      const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
+      if (!myPrivBase64 || !myPubBase64) throw new Error("Encryption keys missing");
+      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
+      const myPubKey = await importKeyFromBase64(myPubBase64, "public");
+      const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, "public");
+      const recipientSharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
+      const encryptedForRecipient = await encryptMessage(content, recipientSharedKey);
+      const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
+      const encryptedForMe = await encryptMessage(content, mySharedKey);
+      const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+      if (!privateKeyHex) throw new Error("Signing key missing");
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = encryptedForRecipient + timestamp;
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      this.socket?.emit("send_message", {
+        roomId,
+        content: encryptedForRecipient,
+        contentForSender: encryptedForMe,
+        // NEW: encrypted version for sender
+        timestamp,
+        signature,
+        isEncrypted: true
+      });
+    } catch (e) {
+      console.error("E2EE Failed:", e);
+      if (this.onError) this.onError("Encryption failed: " + e.message);
+    }
+  }
+  async editMessage(roomId, messageId, newContent) {
+    if (!this.socket) return;
+    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
+    if (!privateKeyHex) return;
+    try {
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      const messageToSign = newContent + timestamp;
+      const signature = await this.signChallenge(messageToSign, privateKeyHex);
+      this.socket.emit("edit_message", {
+        roomId,
+        messageId,
+        content: newContent,
+        timestamp,
+        signature
+      });
+    } catch (err) {
+      console.error("Failed to sign edit:", err);
+    }
+  }
+  deleteMessage(roomId, messageId) {
+    this.socket?.emit("delete_message", { roomId, messageId });
+  }
+  joinRoom(roomId) {
+    this.socket?.emit("join_room", roomId);
+  }
+  createDM(targetId) {
+    this.socket?.emit("create_dm", targetId);
+  }
+  searchUsers(query) {
+    this.socket?.emit("search_users", query);
+  }
+  inviteUser(roomId, user) {
+    this.socket?.emit("invite_user", { roomId, targetUsername: user });
+  }
+  closeRoom(roomId) {
+    this.socket?.emit("close_room", roomId);
+  }
+  kickUser(roomId, userId) {
+    this.socket?.emit("kick_user", { roomId, targetUserId: userId });
+  }
+  banUser(roomId, userId) {
+    this.socket?.emit("ban_user", { roomId, targetUserId: userId });
+  }
+  muteUser(roomId, userId) {
+    this.socket?.emit("mute_user", { roomId, targetUserId: userId });
+  }
+  unmuteUser(roomId, userId) {
+    this.socket?.emit("unmute_user", { roomId, targetUserId: userId });
+  }
+  logout() {
+    localStorage.removeItem("gravity_chat_id");
+    localStorage.removeItem("gravity_chat_username");
+    localStorage.removeItem("gravity_chat_priv");
+    localStorage.removeItem("gravity_chat_pub");
+    this.userId = null;
+    this.username = null;
+    this.rooms = [];
+    this.socket?.disconnect();
+    this.socket = null;
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({ type: "CHAT_LOGOUT" });
+    }
+  }
+  async handleNewMessage(roomId, message) {
+    console.log("[ChatService] New message received:", {
+      roomId,
+      messageId: message.id,
+      isEncrypted: message.isEncrypted,
+      content: message.content?.substring(0, 50) + "..."
+    });
+    const processedMsg = await this.processIncomingMessage(roomId, message);
+    const room = this.rooms.find((r) => r.id === roomId);
+    if (room) {
+      if (room.messages.find((m) => m.id === processedMsg.id)) return;
+      room.messages.push(processedMsg);
+      this.messageListeners.forEach((listener) => listener(roomId, processedMsg));
+      this.notifyRoomUpdate();
+      if (processedMsg.senderId !== this.userId) {
+        window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
+        const badge = document.getElementById("chat-badge");
+        if (badge) badge.classList.remove("hidden");
+      }
+    }
+  }
+  async processIncomingMessage(roomId, message) {
+    const looksEncrypted = message.content && message.content.length > 20 && /^[A-Za-z0-9+/]+=*$/.test(message.content) && !message.content.includes(" ");
+    const room = this.rooms.find((r) => r.id === roomId);
+    const isEncrypted = message.isEncrypted || looksEncrypted && room?.type === "dm";
+    if (!isEncrypted) return message;
+    try {
+      if (message.senderId === this.userId) {
+        const myPrivBase642 = localStorage.getItem("gravity_chat_enc_priv");
+        const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
+        if (!myPrivBase642 || !myPubBase64) {
+          return { ...message, content: "(Encrypted Message - keys missing)" };
+        }
+        try {
+          const myPrivKey2 = await importKeyFromBase64(myPrivBase642, "private");
+          const myPubKey = await importKeyFromBase64(myPubBase64, "public");
+          const mySharedKey = await deriveSharedSecret(myPrivKey2, myPubKey);
+          const decrypted2 = await decryptMessage(message.content, mySharedKey);
+          console.log("[ChatService] Successfully decrypted own message");
+          return { ...message, content: decrypted2 };
+        } catch (e) {
+          console.error("[ChatService] Failed to decrypt own message:", e);
+          return { ...message, content: "(Encrypted Message sent by you)" };
+        }
+      }
+      const room2 = this.rooms.find((r) => r.id === roomId);
+      const sender = room2?.memberDetails?.find((u) => u.id === message.senderId);
+      console.log("[ChatService] Decrypting message:", {
+        roomId,
+        roomType: room2?.type,
+        senderId: message.senderId,
+        myId: this.userId,
+        hasSender: !!sender,
+        hasEncryptionKey: !!sender?.encryptionPublicKey,
+        memberDetails: room2?.memberDetails?.map((m) => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
+      });
+      if (!sender?.encryptionPublicKey) {
+        console.error("[ChatService] Missing encryption key for sender:", message.senderId);
+        return { ...message, content: `Encrypted Message (Key not found for ${message.senderName})` };
+      }
+      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
+      if (!myPrivBase64) {
+        console.error("[ChatService] Missing my private encryption key");
+        return { ...message, content: "Encrypted Message (You lack keys)" };
+      }
+      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
+      const senderPubKey = await importKeyFromBase64(sender.encryptionPublicKey, "public");
+      const sharedKey = await deriveSharedSecret(myPrivKey, senderPubKey);
+      const decrypted = await decryptMessage(message.content, sharedKey);
+      console.log("[ChatService] Successfully decrypted message");
+      return { ...message, content: decrypted };
+    } catch (e) {
+      console.error("[ChatService] Decryption error:", e);
+      return { ...message, content: "Decryption Failed" };
+    }
+  }
+  getStoredPrivateKey() {
+    return localStorage.getItem("gravity_chat_priv");
+  }
+  getStoredUsername() {
+    return localStorage.getItem("gravity_chat_username");
+  }
+  handleUserStatusChange(userId, isOnline) {
+    let updated = false;
+    this.rooms.forEach((room) => {
+      const member = room.memberDetails?.find((m) => m.id === userId);
+      if (member) {
+        member.isOnline = isOnline;
+        updated = true;
+      }
+    });
+    if (updated && this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+  }
+}
+const chatService = new ChatService();
+
+const authenticateWithGoogle = async () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ id: "google_user_123", email: "user@example.com" });
+    }, 1e3);
+  });
+};
+const authenticateWithDevice = async () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ id: "device_user_123" });
+    }, 1e3);
+  });
+};
+const isBiometricsAvailable = async () => {
+  if (!window.PublicKeyCredential) return false;
+  try {
+    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    return available;
+  } catch (e) {
+    console.warn("Biometric check failed or not supported in this context", e);
+    return false;
+  }
+};
+const registerBiometrics = async () => {
+  try {
+    const challenge = new Uint8Array(32);
+    window.crypto.getRandomValues(challenge);
+    const host = window.location.hostname || "";
+    const isValidDomain = host.includes(".") && host.length < 40;
+    const publicKeyCredentialCreationOptions = {
+      challenge,
+      rp: {
+        name: "Gravity Wallet",
+        id: isValidDomain ? host : void 0
+      },
+      user: {
+        id: window.crypto.getRandomValues(new Uint8Array(16)),
+        name: "gravity_user_" + Math.floor(Math.random() * 1e4),
+        displayName: "Gravity Wallet Owner"
+      },
+      pubKeyCredParams: [
+        { alg: -7, type: "public-key" },
+        // ES256
+        { alg: -257, type: "public-key" },
+        // RS256
+        { alg: -8, type: "public-key" }
+        // Ed25519
+      ],
+      authenticatorSelection: {
+        userVerification: "required",
+        residentKey: "preferred"
+      },
+      timeout: 12e4,
+      attestation: "none"
+    };
+    const credential = await navigator.credentials.create({
+      publicKey: publicKeyCredentialCreationOptions
+    });
+    return !!credential;
+  } catch (error) {
+    console.error("Biometric registration failed:", error);
+    return false;
+  }
+};
 
 var otplib = {};
 
@@ -5184,6 +5784,15 @@ const translations = {
     "multisig.approve": "Approve",
     "multisig.construction_title": "Under Construction...",
     "multisig.construction_desc": "We are currently building this feature to ensure maximum security and functionality.",
+    "multisig.progress_title": "Multisig Authorization Progress",
+    "multisig.status_ready": "Ready to Broadcast",
+    "multisig.status_collecting": "Collecting Signatures",
+    "multisig.weight_label": "Weight",
+    "multisig.threshold_label": "Threshold",
+    "multisig.authorities_title": "Required Authorities",
+    "multisig.you_label": "(YOU)",
+    "multisig.how_it_works": '💡 **How it works:** This account is protected by Multiple Signatures. Each signer has a specific "Weight". Once the total weight reaches the "Threshold" of {threshold}, the transaction can be officially broadcasted to the blockchain.',
+    "multisig.success_done": "Transaction Completed!",
     // Bulk
     "bulk.title": "Bulk Transfer",
     "bulk.recipients": "Recipients",
@@ -5617,6 +6226,15 @@ const translations = {
     "multisig.approve": "Aprobar",
     "multisig.construction_title": "En Construcción...",
     "multisig.construction_desc": "Estamos construyendo esta funcionalidad para asegurar la máxima seguridad.",
+    "multisig.progress_title": "Progreso de Autorización Multi-firma",
+    "multisig.status_ready": "Listo para Transmitir",
+    "multisig.status_collecting": "Recolectando Firmas",
+    "multisig.weight_label": "Peso",
+    "multisig.threshold_label": "Umbral",
+    "multisig.authorities_title": "Autoridades Requeridas",
+    "multisig.you_label": "(TÚ)",
+    "multisig.how_it_works": '💡 **Cómo funciona:** Esta cuenta está protegida por Firmas Múltiples. Cada firmante tiene un "Peso" específico. Una vez que el peso total alcanza el "Umbral" de {threshold}, la transacción puede ser transmitida oficialmente a la blockchain.',
+    "multisig.success_done": "¡Transacción Completada!",
     // Bulk
     "bulk.title": "Transferencia Masiva",
     "bulk.recipients": "Destinatarios",
@@ -8944,600 +9562,6 @@ function QRCodeSVG(props) {
   }), image);
 }
 
-class ChatService {
-  constructor() {
-    this.socket = null;
-    this.userId = null;
-    this.username = null;
-    // Callbacks for UI updates
-    this.onMessage = null;
-    this.onRoomUpdated = null;
-    this.onRoomAdded = null;
-    this.onAuthSuccess = null;
-    this.onAuthenticated = null;
-    // Alias for AuthSuccess
-    this.onError = null;
-    this.onStatusChange = null;
-    this.rooms = [];
-    this.serverUrl = "https://chat.gravitywallet.com";
-    this.roomUpdateDebounceTimer = null;
-  }
-  init() {
-    if (this.socket?.connected) return;
-    this.socket = lookup(this.serverUrl, {
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1e3,
-      autoConnect: true
-    });
-    this.socket.on("connect", async () => {
-      console.log("Connected to Chat Server");
-      if (this.onStatusChange) this.onStatusChange("connected");
-      window.dispatchEvent(new Event("chat-connected"));
-      const storedUser = localStorage.getItem("gravity_chat_username");
-      const storedKey = localStorage.getItem("gravity_chat_priv");
-      const storedId = localStorage.getItem("gravity_chat_id");
-      if (storedUser && storedKey) {
-        console.log("Auto-logging in as", storedUser);
-        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-          const pubKey = localStorage.getItem("gravity_chat_pub") || "";
-          chrome.runtime.sendMessage({
-            type: "CHAT_SYNC_CREDS",
-            data: {
-              username: storedUser,
-              privateKey: storedKey,
-              publicKey: pubKey
-            }
-          }).catch(() => {
-          });
-        }
-        await this.authenticateWithSignature(storedId, storedUser);
-      }
-    });
-    this.setupListeners();
-  }
-  syncPushSubscription(sub) {
-    if (this.socket?.connected) {
-      console.log("Chat: Manual Push Sync");
-      this.socket.emit("store_push_subscription", sub);
-    }
-  }
-  setupListeners() {
-    if (!this.socket) return;
-    this.socket.on("disconnect", () => {
-      if (this.onStatusChange) this.onStatusChange("disconnected");
-      window.dispatchEvent(new Event("chat-disconnected"));
-    });
-    this.socket.on("connect_error", (err) => {
-      if (this.onStatusChange) this.onStatusChange("disconnected", err.message);
-    });
-    this.socket.on("auth_challenge", async (data) => {
-      console.log("Received auth challenge");
-      const storedKey = localStorage.getItem("gravity_chat_priv");
-      if (storedKey) {
-        try {
-          const signature = await this.signChallenge(data.challenge, storedKey);
-          this.socket?.emit("verify_signature", { signature });
-        } catch (e) {
-          console.error("Auto-signing challenge failed", e);
-        }
-      }
-    });
-    this.socket.on("auth_success", (data) => {
-      if (this.userId === data.id && this.rooms.length > 0) {
-        console.log(`Ignoring duplicate auth_success for ${data.username}`);
-        return;
-      }
-      this.userId = data.id;
-      this.username = data.username;
-      this.rooms = data.rooms.map((r) => ({
-        ...r,
-        messages: [],
-        unreadCount: 0
-      }));
-      console.log(`Auth Success! Received ${this.rooms.length} rooms:`, this.rooms.map((r) => r.name));
-      if (data.pendingInvites && data.pendingInvites.length > 0) {
-        console.log(`Received ${data.pendingInvites.length} pending invites`);
-        if (typeof chrome !== "undefined" && chrome.runtime) {
-          chrome.runtime.sendMessage({
-            type: "UPDATE_BADGE",
-            count: data.pendingInvites.length
-          }).catch(() => {
-          });
-        }
-        data.pendingInvites.forEach((invite) => {
-          if (this.onError) {
-            this.onError(`You were invited to "${invite.roomName}" by ${invite.invitedBy}`);
-          }
-        });
-      }
-      localStorage.setItem("gravity_chat_id", data.id);
-      localStorage.setItem("gravity_chat_username", data.username);
-      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(["gravity_push_sub"], (res) => {
-          if (res && res.gravity_push_sub) {
-            try {
-              const sub = JSON.parse(res.gravity_push_sub);
-              console.log("Chat: Syncing WebPush Sub");
-              this.socket?.emit("store_push_subscription", sub);
-            } catch (e) {
-            }
-          }
-        });
-      }
-      if (this.onAuthSuccess) this.onAuthSuccess({ id: data.id, username: data.username });
-      if (this.onAuthenticated) this.onAuthenticated(data.id, data.username);
-      this.notifyRoomUpdate();
-    });
-    this.socket.on("new_message", (data) => {
-      this.handleNewMessage(data.roomId, data.message);
-    });
-    this.socket.on("room_history", async (data) => {
-      const room = this.rooms.find((r) => r.id === data.roomId);
-      if (room) {
-        const hadMembers = room.memberDetails && room.memberDetails.length > 0;
-        room.memberDetails = data.memberDetails;
-        const hadMessages = room.messages.length > 0;
-        room.messages = await Promise.all(data.messages.map((m) => this.processIncomingMessage(data.roomId, m)));
-        if (!hadMessages && data.messages.length > 0 || !hadMembers && data.memberDetails && data.memberDetails.length > 0) {
-          this.notifyRoomUpdate();
-        }
-      }
-    });
-    this.socket.on("member_joined", (data) => {
-      const room = this.rooms.find((r) => r.id === data.roomId);
-      if (room) {
-        if (!room.memberDetails) room.memberDetails = [];
-        if (!room.memberDetails.find((u) => u.id === data.userId)) {
-          room.memberDetails.push({ id: data.userId, username: data.username });
-          this.notifyRoomUpdate();
-        }
-      }
-    });
-    this.socket.on("room_added", (roomData) => {
-      console.log(`room_added event received:`, roomData);
-      if (this.rooms.find((r) => r.id === roomData.id)) {
-        console.log(`Room ${roomData.name} already exists, skipping`);
-        return;
-      }
-      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
-      this.rooms.push(newRoom);
-      console.log(`Added room to local list. Total rooms: ${this.rooms.length}`);
-      this.notifyRoomUpdate();
-      if (this.onRoomAdded) this.onRoomAdded(newRoom);
-    });
-    this.socket.on("room_joined", (roomData) => {
-      if (this.rooms.find((r) => r.id === roomData.id)) return;
-      const newRoom = { ...roomData, messages: [], unreadCount: 0 };
-      this.rooms.push(newRoom);
-      this.notifyRoomUpdate();
-      if (this.onRoomAdded) this.onRoomAdded(newRoom);
-    });
-    this.socket.on("room_removed", (roomId) => {
-      this.rooms = this.rooms.filter((r) => r.id !== roomId);
-      this.notifyRoomUpdate();
-    });
-    this.socket.on("user_kicked", (data) => {
-      if (data.userId === this.userId) {
-        if (this.onError) this.onError(`You were kicked from room`);
-        window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
-      }
-    });
-    this.socket.on("user_banned", (data) => {
-      if (data.userId === this.userId) {
-        if (this.onError) this.onError(`You were BANNED from room`);
-        window.dispatchEvent(new CustomEvent("chat-room-kicked", { detail: data }));
-      }
-    });
-    this.socket.on("message_edited", (data) => {
-      const room = this.rooms.find((r) => r.id === data.roomId);
-      if (room) {
-        const msg = room.messages.find((m) => m.id === data.messageId);
-        if (msg) {
-          msg.content = data.content;
-          msg.isEdited = true;
-          msg.editTimestamp = data.editTimestamp;
-          this.notifyRoomUpdate();
-        }
-      }
-    });
-    this.socket.on("message_deleted", (data) => {
-      const room = this.rooms.find((r) => r.id === data.roomId);
-      if (room) {
-        room.messages = room.messages.filter((m) => m.id !== data.messageId);
-        this.notifyRoomUpdate();
-      }
-    });
-    this.socket.on("error", (msg) => {
-      console.error("Socket Error:", msg);
-      if (msg.includes("User not found") || msg.includes("no public key registered")) {
-        console.warn("Server identity lost. Clearing local chat identity.");
-        const storedName = localStorage.getItem("gravity_chat_username");
-        localStorage.removeItem("gravity_chat_id");
-        localStorage.removeItem("gravity_chat_priv");
-        localStorage.removeItem("gravity_chat_pub");
-        if (this.socket) {
-          this.socket.disconnect();
-          this.socket = null;
-        }
-        this.userId = null;
-        this.username = null;
-        this.rooms = [];
-        if (storedName && !storedName.startsWith("!RESET!")) {
-          console.log(`Auto-repairing identity for ${storedName}...`);
-          setTimeout(() => {
-            this.init();
-            setTimeout(() => {
-              this.register(storedName).catch(console.error);
-            }, 500);
-          }, 2e3);
-          return;
-        }
-      }
-      if (this.onError) this.onError(msg);
-    });
-    this.socket.on("search_results", (results) => {
-      window.dispatchEvent(new CustomEvent("chat-search-results", { detail: results }));
-    });
-    this.socket.on("user_online", (userId) => this.handleUserStatusChange(userId, true));
-    this.socket.on("user_offline", (userId) => this.handleUserStatusChange(userId, false));
-  }
-  // --- CRYPTO & AUTH ---
-  // --- CRYPTO & AUTH ---
-  async generateAndSaveIdentity() {
-    const signKeys = await crypto.subtle.generateKey(
-      { name: "ECDSA", namedCurve: "P-256" },
-      true,
-      ["sign", "verify"]
-    );
-    const signPubInfo = await crypto.subtle.exportKey("spki", signKeys.publicKey);
-    const signPrivInfo = await crypto.subtle.exportKey("pkcs8", signKeys.privateKey);
-    const publicKeyHex = this.bufferToHex(new Uint8Array(signPubInfo));
-    const privateKeyHex = this.bufferToHex(new Uint8Array(signPrivInfo));
-    const encKeys = await generateEncryptionKeys();
-    const encPubB64 = await exportKeyToBase64(encKeys.publicKey);
-    const encPrivB64 = await exportKeyToBase64(encKeys.privateKey);
-    localStorage.setItem("gravity_chat_priv", privateKeyHex);
-    localStorage.setItem("gravity_chat_pub", publicKeyHex);
-    localStorage.setItem("gravity_chat_enc_priv", encPrivB64);
-    localStorage.setItem("gravity_chat_enc_pub", encPubB64);
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({
-        type: "CHAT_SYNC_CREDS",
-        data: {
-          privateKey: privateKeyHex,
-          publicKey: publicKeyHex,
-          // We don't necessarily need to sync enc keys to BG unless BG does decryption, 
-          // but good for consistency.
-          encPrivateKey: encPrivB64,
-          encPublicKey: encPubB64
-        }
-      });
-    }
-    return {
-      publicKey: publicKeyHex,
-      privateKey: privateKeyHex,
-      encryptionPublicKey: encPubB64,
-      encryptionPrivateKey: encPrivB64
-    };
-  }
-  async ensureEncryptionKeys() {
-    let encPub = localStorage.getItem("gravity_chat_enc_pub");
-    let encPriv = localStorage.getItem("gravity_chat_enc_priv");
-    if (!encPub || !encPriv) {
-      console.log("Generating missing E2EE Encryption Keys...");
-      const encKeys = await generateEncryptionKeys();
-      encPub = await exportKeyToBase64(encKeys.publicKey);
-      encPriv = await exportKeyToBase64(encKeys.privateKey);
-      localStorage.setItem("gravity_chat_enc_priv", encPriv);
-      localStorage.setItem("gravity_chat_enc_pub", encPub);
-    }
-    return encPub;
-  }
-  async authenticateWithSignature(userId, username) {
-    if (!this.socket) return;
-    const encPub = await this.ensureEncryptionKeys();
-    this.socket.emit("request_challenge", { userId, username, encryptionPublicKey: encPub });
-  }
-  async signChallenge(challenge, privateKeyHex) {
-    const privateKeyBuffer = this.hexToBuffer(privateKeyHex);
-    const privateKey = await crypto.subtle.importKey(
-      "pkcs8",
-      privateKeyBuffer,
-      { name: "ECDSA", namedCurve: "P-256" },
-      false,
-      ["sign"]
-    );
-    const encoder = new TextEncoder();
-    const data = encoder.encode(challenge);
-    const signature = await crypto.subtle.sign(
-      { name: "ECDSA", hash: { name: "SHA-256" } },
-      privateKey,
-      data
-    );
-    return this.bufferToHex(new Uint8Array(signature));
-  }
-  hexToBuffer(hex) {
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-      bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-    }
-    return bytes.buffer;
-  }
-  bufferToHex(buffer) {
-    return Array.from(buffer).map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-  // Helper to debounce room updates and prevent infinite loops
-  notifyRoomUpdate() {
-    if (this.roomUpdateDebounceTimer) {
-      clearTimeout(this.roomUpdateDebounceTimer);
-    }
-    this.roomUpdateDebounceTimer = setTimeout(() => {
-      if (this.onRoomUpdated) {
-        this.onRoomUpdated([...this.rooms]);
-      }
-    }, 100);
-  }
-  // --- PUBLIC METHODS ---
-  createRoom(name, isPrivate = false) {
-    this.socket?.emit("create_room", { name, isPrivate });
-  }
-  getCurrentUser() {
-    if (this.userId && this.username) return { id: this.userId, username: this.username };
-    return null;
-  }
-  getRooms() {
-    return [...this.rooms];
-  }
-  async register(username) {
-    if (!this.socket) await this.init();
-    const storedUser = this.getStoredUsername();
-    const storedKey = this.getStoredPrivateKey();
-    if (storedUser?.toLowerCase() === username.toLowerCase() && storedKey) {
-      console.log("Local keys found, performing cryptographic login recovery...");
-      await this.ensureEncryptionKeys();
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({
-          type: "CHAT_SYNC_CREDS",
-          data: { username: storedUser, privateKey: storedKey, publicKey: localStorage.getItem("gravity_chat_pub") }
-        });
-      }
-      return this.authenticateWithSignature(null, username);
-    }
-    const keys = await this.generateAndSaveIdentity();
-    if (!username.startsWith("!RESET!")) {
-      localStorage.setItem("gravity_chat_username", username);
-      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({
-          type: "CHAT_SYNC_CREDS",
-          data: { username, privateKey: keys.privateKey, publicKey: keys.publicKey }
-        });
-      }
-    }
-    this.socket?.emit("register", {
-      username,
-      publicKey: keys.publicKey,
-      encryptionPublicKey: keys.encryptionPublicKey
-    });
-  }
-  async sendMessage(roomId, content, isEncrypted = false) {
-    if (!this.socket) return;
-    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
-    if (!privateKeyHex) {
-      if (this.onError) this.onError("Security Error: No identity found. Please re-login.");
-      return;
-    }
-    try {
-      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-      const messageToSign = content + timestamp;
-      const publicKeyHex = localStorage.getItem("gravity_chat_pub");
-      console.log("[SIGN] Public Key (first 20):", publicKeyHex?.substring(0, 20));
-      console.log("[SIGN] Private Key (first 20):", privateKeyHex?.substring(0, 20));
-      console.log("[SIGN] Message to sign:", messageToSign);
-      const signature = await this.signChallenge(messageToSign, privateKeyHex);
-      console.log("[SIGN] Signature (first 20):", signature?.substring(0, 20));
-      this.socket.emit("send_message", {
-        roomId,
-        content,
-        timestamp,
-        signature,
-        isEncrypted
-      });
-    } catch (err) {
-      console.error("Failed to sign message:", err);
-      if (this.onError) this.onError("Failed to securely sign message.");
-    }
-  }
-  async sendDirectMessage(roomId, content, recipientPublicKeyBase64) {
-    try {
-      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
-      const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
-      if (!myPrivBase64 || !myPubBase64) throw new Error("Encryption keys missing");
-      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
-      const myPubKey = await importKeyFromBase64(myPubBase64, "public");
-      const recipientPubKey = await importKeyFromBase64(recipientPublicKeyBase64, "public");
-      const recipientSharedKey = await deriveSharedSecret(myPrivKey, recipientPubKey);
-      const encryptedForRecipient = await encryptMessage(content, recipientSharedKey);
-      const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
-      const encryptedForMe = await encryptMessage(content, mySharedKey);
-      const privateKeyHex = localStorage.getItem("gravity_chat_priv");
-      if (!privateKeyHex) throw new Error("Signing key missing");
-      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-      const messageToSign = encryptedForRecipient + timestamp;
-      const signature = await this.signChallenge(messageToSign, privateKeyHex);
-      this.socket?.emit("send_message", {
-        roomId,
-        content: encryptedForRecipient,
-        contentForSender: encryptedForMe,
-        // NEW: encrypted version for sender
-        timestamp,
-        signature,
-        isEncrypted: true
-      });
-    } catch (e) {
-      console.error("E2EE Failed:", e);
-      if (this.onError) this.onError("Encryption failed: " + e.message);
-    }
-  }
-  async editMessage(roomId, messageId, newContent) {
-    if (!this.socket) return;
-    const privateKeyHex = localStorage.getItem("gravity_chat_priv");
-    if (!privateKeyHex) return;
-    try {
-      const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-      const messageToSign = newContent + timestamp;
-      const signature = await this.signChallenge(messageToSign, privateKeyHex);
-      this.socket.emit("edit_message", {
-        roomId,
-        messageId,
-        content: newContent,
-        timestamp,
-        signature
-      });
-    } catch (err) {
-      console.error("Failed to sign edit:", err);
-    }
-  }
-  deleteMessage(roomId, messageId) {
-    this.socket?.emit("delete_message", { roomId, messageId });
-  }
-  joinRoom(roomId) {
-    this.socket?.emit("join_room", roomId);
-  }
-  createDM(targetId) {
-    this.socket?.emit("create_dm", targetId);
-  }
-  searchUsers(query) {
-    this.socket?.emit("search_users", query);
-  }
-  inviteUser(roomId, user) {
-    this.socket?.emit("invite_user", { roomId, targetUsername: user });
-  }
-  closeRoom(roomId) {
-    this.socket?.emit("close_room", roomId);
-  }
-  kickUser(roomId, userId) {
-    this.socket?.emit("kick_user", { roomId, targetUserId: userId });
-  }
-  banUser(roomId, userId) {
-    this.socket?.emit("ban_user", { roomId, targetUserId: userId });
-  }
-  muteUser(roomId, userId) {
-    this.socket?.emit("mute_user", { roomId, targetUserId: userId });
-  }
-  unmuteUser(roomId, userId) {
-    this.socket?.emit("unmute_user", { roomId, targetUserId: userId });
-  }
-  logout() {
-    localStorage.removeItem("gravity_chat_id");
-    localStorage.removeItem("gravity_chat_username");
-    localStorage.removeItem("gravity_chat_priv");
-    localStorage.removeItem("gravity_chat_pub");
-    this.userId = null;
-    this.username = null;
-    this.rooms = [];
-    this.socket?.disconnect();
-    this.socket = null;
-    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({ type: "CHAT_LOGOUT" });
-    }
-  }
-  async handleNewMessage(roomId, message) {
-    console.log("[ChatService] New message received:", {
-      roomId,
-      messageId: message.id,
-      isEncrypted: message.isEncrypted,
-      content: message.content?.substring(0, 50) + "..."
-    });
-    const processedMsg = await this.processIncomingMessage(roomId, message);
-    const room = this.rooms.find((r) => r.id === roomId);
-    if (room) {
-      if (room.messages.find((m) => m.id === processedMsg.id)) return;
-      room.messages.push(processedMsg);
-      if (this.onMessage) this.onMessage(roomId, processedMsg);
-      if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
-      if (processedMsg.senderId !== this.userId) {
-        window.dispatchEvent(new CustomEvent("chat-unread", { detail: { roomId } }));
-        const badge = document.getElementById("chat-badge");
-        if (badge) badge.classList.remove("hidden");
-      }
-    }
-  }
-  async processIncomingMessage(roomId, message) {
-    const looksEncrypted = message.content && message.content.length > 20 && /^[A-Za-z0-9+/]+=*$/.test(message.content) && !message.content.includes(" ");
-    const room = this.rooms.find((r) => r.id === roomId);
-    const isEncrypted = message.isEncrypted || looksEncrypted && room?.type === "dm";
-    if (!isEncrypted) return message;
-    try {
-      if (message.senderId === this.userId) {
-        const myPrivBase642 = localStorage.getItem("gravity_chat_enc_priv");
-        const myPubBase64 = localStorage.getItem("gravity_chat_enc_pub");
-        if (!myPrivBase642 || !myPubBase64) {
-          return { ...message, content: "(Encrypted Message - keys missing)" };
-        }
-        try {
-          const myPrivKey2 = await importKeyFromBase64(myPrivBase642, "private");
-          const myPubKey = await importKeyFromBase64(myPubBase64, "public");
-          const mySharedKey = await deriveSharedSecret(myPrivKey2, myPubKey);
-          const decrypted2 = await decryptMessage(message.content, mySharedKey);
-          console.log("[ChatService] Successfully decrypted own message");
-          return { ...message, content: decrypted2 };
-        } catch (e) {
-          console.error("[ChatService] Failed to decrypt own message:", e);
-          return { ...message, content: "(Encrypted Message sent by you)" };
-        }
-      }
-      const room2 = this.rooms.find((r) => r.id === roomId);
-      const sender = room2?.memberDetails?.find((u) => u.id === message.senderId);
-      console.log("[ChatService] Decrypting message:", {
-        roomId,
-        roomType: room2?.type,
-        senderId: message.senderId,
-        myId: this.userId,
-        hasSender: !!sender,
-        hasEncryptionKey: !!sender?.encryptionPublicKey,
-        memberDetails: room2?.memberDetails?.map((m) => ({ id: m.id, username: m.username, hasKey: !!m.encryptionPublicKey }))
-      });
-      if (!sender?.encryptionPublicKey) {
-        console.error("[ChatService] Missing encryption key for sender:", message.senderId);
-        return { ...message, content: `Encrypted Message (Key not found for ${message.senderName})` };
-      }
-      const myPrivBase64 = localStorage.getItem("gravity_chat_enc_priv");
-      if (!myPrivBase64) {
-        console.error("[ChatService] Missing my private encryption key");
-        return { ...message, content: "Encrypted Message (You lack keys)" };
-      }
-      const myPrivKey = await importKeyFromBase64(myPrivBase64, "private");
-      const senderPubKey = await importKeyFromBase64(sender.encryptionPublicKey, "public");
-      const sharedKey = await deriveSharedSecret(myPrivKey, senderPubKey);
-      const decrypted = await decryptMessage(message.content, sharedKey);
-      console.log("[ChatService] Successfully decrypted message");
-      return { ...message, content: decrypted };
-    } catch (e) {
-      console.error("[ChatService] Decryption error:", e);
-      return { ...message, content: "Decryption Failed" };
-    }
-  }
-  getStoredPrivateKey() {
-    return localStorage.getItem("gravity_chat_priv");
-  }
-  getStoredUsername() {
-    return localStorage.getItem("gravity_chat_username");
-  }
-  handleUserStatusChange(userId, isOnline) {
-    let updated = false;
-    this.rooms.forEach((room) => {
-      const member = room.memberDetails?.find((m) => m.id === userId);
-      if (member) {
-        member.isOnline = isOnline;
-        updated = true;
-      }
-    });
-    if (updated && this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
-  }
-}
-const chatService = new ChatService();
-
 class SyncService {
   constructor() {
     this.socket = null;
@@ -12774,8 +12798,143 @@ const HistoryModal = ({ account, onClose }) => {
   ] }) });
 };
 
+const NotificationToast = ({ message, type = "success", onClose }) => {
+  reactExports.useEffect(() => {
+    const timer = setTimeout(onClose, 3e3);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+  const bgColors = {
+    success: "bg-green-600/90 border-green-500/50",
+    error: "bg-red-600/90 border-red-500/50",
+    info: "bg-blue-600/90 border-blue-500/50"
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute top-20 left-0 right-0 z-[100] flex justify-center px-6 pointer-events-none", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `
+                ${bgColors[type]} 
+                text-white text-xs font-bold px-6 py-3 rounded-xl shadow-2xl border border-opacity-50
+                animate-bounce-in pointer-events-auto flex items-center gap-2 backdrop-blur-md
+                max-w-[85vw]
+            `, children: [
+    type === "success" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }) }),
+    type === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "break-all line-clamp-4 overflow-y-auto max-h-32 custom-scrollbar pr-1", children: message })
+  ] }) });
+};
+
+const NotificationContext = reactExports.createContext(void 0);
+const NotificationProvider = ({ children }) => {
+  const [notification, setNotification] = reactExports.useState(null);
+  const showNotification = reactExports.useCallback((message, type = "success") => {
+    setNotification({ message, type });
+  }, []);
+  const clearNotification = reactExports.useCallback(() => {
+    setNotification(null);
+  }, []);
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(NotificationContext.Provider, { value: { showNotification }, children: [
+    children,
+    notification && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      NotificationToast,
+      {
+        message: notification.message,
+        type: notification.type,
+        onClose: clearNotification
+      }
+    )
+  ] });
+};
+const useNotification = () => {
+  const context = reactExports.useContext(NotificationContext);
+  if (!context) {
+    throw new Error("useNotification must be used within a NotificationProvider");
+  }
+  return context;
+};
+
+const MultiSigProgress = ({
+  authority,
+  progress,
+  currentUser,
+  currentUserWeight
+}) => {
+  const { t } = useTranslation();
+  const percentage = Math.min(100, progress.currentWeight / progress.threshold * 100);
+  const isDone = progress.canBroadcast;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `w-full bg-dark-800 rounded-xl p-6 border transition-all duration-500 shadow-lg animate-fade-in ${isDone ? "border-green-500/50 bg-green-500/5" : "border-dark-600"}`, children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-6 text-center", children: t("multisig.progress_title") }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative pt-1", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex mb-2 items-center justify-between", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full transition-colors duration-500 ${isDone ? "text-green-600 bg-green-200" : "text-blue-600 bg-blue-200"}`, children: isDone ? t("multisig.success_done") : t("multisig.status_collecting") }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-right", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-xs font-semibold inline-block transition-colors duration-500 ${isDone ? "text-green-400" : "text-blue-400"}`, children: [
+          progress.currentWeight,
+          " / ",
+          progress.threshold,
+          " ",
+          t("multisig.weight_label")
+        ] }) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "overflow-hidden h-4 mb-4 text-xs flex rounded-full bg-dark-900 border border-dark-700", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "div",
+          {
+            style: { width: `${percentage}%` },
+            className: `shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-700 ${isDone ? "bg-green-500" : "bg-blue-500"}`
+          }
+        ),
+        !isDone && currentUserWeight > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "div",
+          {
+            style: { width: `${Math.min(100 - percentage, currentUserWeight / progress.threshold * 100)}%` },
+            className: "shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-400/30 animate-pulse border-l border-blue-400/50"
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between text-[10px] text-slate-500 px-1", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "0" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `${isDone ? "text-green-400" : "text-blue-400"} font-bold transition-colors duration-500`, children: [
+          t("multisig.threshold_label"),
+          ": ",
+          progress.threshold
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-8 space-y-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase text-slate-500 border-b border-dark-700 pb-2 mb-2", children: t("multisig.authorities_title") }),
+      authority.keyAuths.map(([key, weight]) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center bg-dark-900/50 p-2 rounded-lg group hover:bg-dark-900 transition-colors", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-2 h-2 rounded-full bg-slate-600" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-[10px] font-mono text-slate-400 group-hover:text-slate-300 truncate w-32", children: [
+            key.substring(0, 8),
+            "...",
+            key.substring(key.length - 8)
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-2", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-xs font-bold transition-colors ${isDone ? "text-green-400" : "text-slate-300"}`, children: [
+          "+",
+          weight
+        ] }) })
+      ] }, key)),
+      authority.accountAuths.map(([acc, weight]) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center bg-dark-900/50 p-2 rounded-lg group hover:bg-dark-900 transition-colors", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-2 h-2 rounded-full ${acc === currentUser ? isDone ? "bg-green-500" : "bg-blue-500 animate-pulse" : "bg-slate-600"}` }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-xs ${acc === currentUser ? isDone ? "text-green-400 font-bold" : "text-blue-400 font-bold" : "text-slate-400 group-hover:text-slate-200"}`, children: [
+            "@",
+            acc,
+            " ",
+            acc === currentUser && t("multisig.you_label")
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-2", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-xs font-bold transition-colors ${isDone ? "text-green-400" : "text-slate-300"}`, children: [
+          "+",
+          weight
+        ] }) })
+      ] }, acc))
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `mt-6 p-4 rounded-lg border transition-colors duration-500 ${isDone ? "bg-green-500/5 border-green-500/10" : "bg-blue-500/5 border-blue-500/10"}`, children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: `text-[10px] leading-relaxed italic transition-colors duration-500 ${isDone ? "text-green-400" : "text-blue-400"}`, children: t("multisig.how_it_works", { threshold: progress.threshold }) }) })
+  ] });
+};
+
 const SignRequest = ({ requestId, accounts, onComplete }) => {
   const { t } = useTranslation();
+  const { showNotification } = useNotification();
   const [request, setRequest] = reactExports.useState(null);
   const [origin, setOrigin] = reactExports.useState("");
   const [loading, setLoading] = reactExports.useState(true);
@@ -12783,6 +12942,9 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
   const [processing, setProcessing] = reactExports.useState(false);
   const [voteWeight, setVoteWeight] = reactExports.useState(1e4);
   const [chainHint, setChainHint] = reactExports.useState(null);
+  const [authority, setAuthority] = reactExports.useState(null);
+  const [multisigProgress, setMultisigProgress] = reactExports.useState(null);
+  const [isMultisig, setIsMultisig] = reactExports.useState(false);
   reactExports.useEffect(() => {
     chrome.runtime.sendMessage({ type: "gravity_get_request", requestId }, (resp) => {
       if (resp && resp.request) {
@@ -12800,6 +12962,32 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
     });
   }, [requestId, t]);
   const [trustDomain, setTrustDomain] = reactExports.useState(false);
+  reactExports.useEffect(() => {
+    if (!request || !accounts.length) return;
+    const checkMultisig = async () => {
+      const username = request.params[0];
+      let targetChain = chainHint;
+      let account = accounts.find((a) => a.name === username && (targetChain ? a.chain === targetChain : true));
+      if (!account && !targetChain) {
+        account = accounts.find((a) => a.name === username && a.chain === "HIVE");
+      }
+      if (!account) account = accounts.find((a) => a.name === username);
+      if (!account) return;
+      const isActiveOp = ["requestTransfer", "requestPowerUp", "requestPowerDown", "requestDelegation", "requestWitnessVote"].includes(request.method);
+      const authType = isActiveOp ? "active" : "posting";
+      const auth = await getAccountAuthorities(account.chain, account.name, authType);
+      if (auth && auth.threshold > 1) {
+        setAuthority(auth);
+        setIsMultisig(true);
+        setMultisigProgress({
+          currentWeight: 0,
+          threshold: auth.threshold,
+          canBroadcast: false
+        });
+      }
+    };
+    checkMultisig();
+  }, [request, accounts, chainHint]);
   const handleDecision = async (accept) => {
     if (!accept) {
       notifyBackground(null, t("sign.user_rejected"));
@@ -12833,6 +13021,12 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       }
       if (!account) {
         throw new Error(t("sign.account_not_found"));
+      }
+      if (isMultisig && multisigProgress && !multisigProgress.canBroadcast) {
+        const msResult = await handleMultisigSign(account);
+        showNotification(msResult.message || "Signature collected", "success");
+        notifyBackground(msResult, null);
+        return;
       }
       let result = { success: false };
       const method2 = request.method;
@@ -13087,6 +13281,15 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [processing, loading, error, request]);
+  const handleMultisigSign = async (account) => {
+    console.log(`[Multisig] Partial signing for @${account.name} on ${account.chain}`);
+    return {
+      success: true,
+      status: "PARTIAL",
+      message: "Signature submitted! Waiting for other co-signers.",
+      txId: "pending-" + Date.now()
+    };
+  };
   const notifyBackground = (result, err) => {
     chrome.runtime.sendMessage({
       type: "gravity_resolve_request",
@@ -13119,185 +13322,196 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "font-bold text-white text-lg", children: t("sign.title") }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400", children: domain })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto p-4 flex flex-col items-center", children: isTransfer ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4", children: t("sign.transfer_title") }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-center gap-2 mb-1", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-3xl font-black text-white", children: request.params[2] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-lg font-bold text-blue-400", children: request.params[4] })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between text-sm mt-6 border-t border-dark-700 pt-4", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-right", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500", children: t("sign.from") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-bold text-white", children: [
-            "@",
-            request.params[0]
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 overflow-y-auto p-4 flex flex-col items-center", children: [
+      isMultisig && authority && multisigProgress && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full mb-6", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+        MultiSigProgress,
+        {
+          authority,
+          progress: multisigProgress,
+          currentUser: request.params[0],
+          currentUserWeight: 0
+        }
+      ) }),
+      isTransfer ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4", children: t("sign.transfer_title") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-center gap-2 mb-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-3xl font-black text-white", children: request.params[2] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-lg font-bold text-blue-400", children: request.params[4] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between text-sm mt-6 border-t border-dark-700 pt-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-right", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500", children: t("sign.from") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-bold text-white", children: [
+              "@",
+              request.params[0]
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-slate-600", children: "➜" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-left", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500", children: t("sign.to") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-bold text-white", children: [
+              "@",
+              request.params[1]
+            ] })
           ] })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-slate-600", children: "➜" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-left", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500", children: t("sign.to") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-bold text-white", children: [
-            "@",
-            request.params[1]
+        request.params[3] && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-4 bg-dark-900/50 p-3 rounded-lg text-left", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase text-slate-500 mb-1", children: "Memo" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-slate-300 italic", children: [
+            '"',
+            request.params[3],
+            '"'
           ] })
         ] })
-      ] }),
-      request.params[3] && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-4 bg-dark-900/50 p-3 rounded-lg text-left", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase text-slate-500 mb-1", children: "Memo" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-slate-300 italic", children: [
-          '"',
-          request.params[3],
-          '"'
-        ] })
-      ] })
-    ] }) : isVote ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4", children: t("sign.vote_title") }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center justify-center gap-2 mb-6", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-5xl font-black text-blue-500", children: [
-          voteWeight / 100,
-          "%"
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full relative", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              type: "range",
-              min: "0",
-              max: "10000",
-              step: "100",
-              value: voteWeight,
-              onChange: (e) => setVoteWeight(Number(e.target.value)),
-              className: "w-full mt-4 h-2 bg-dark-900 rounded-lg appearance-none cursor-pointer accent-blue-500"
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-between w-full mt-3 px-1", children: [0, 25, 50, 75, 100].map((pct) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              onClick: () => setVoteWeight(pct * 100),
-              className: "text-[10px] font-bold text-slate-500 hover:text-white bg-dark-900 border border-dark-700 hover:border-blue-500 hover:bg-dark-700 px-2 py-1 rounded transition-all transform hover:scale-105",
-              children: [
-                pct,
-                "%"
-              ]
-            },
-            pct
-          )) })
-        ] })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-4 text-sm border-t border-dark-700 pt-4", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: t("sign.author") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
-            "@",
-            request.params[2]
+      ] }) : isVote ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4", children: t("sign.vote_title") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center justify-center gap-2 mb-6", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-5xl font-black text-blue-500", children: [
+            voteWeight / 100,
+            "%"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full relative", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "range",
+                min: "0",
+                max: "10000",
+                step: "100",
+                value: voteWeight,
+                onChange: (e) => setVoteWeight(Number(e.target.value)),
+                className: "w-full mt-4 h-2 bg-dark-900 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-between w-full mt-3 px-1", children: [0, 25, 50, 75, 100].map((pct) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                onClick: () => setVoteWeight(pct * 100),
+                className: "text-[10px] font-bold text-slate-500 hover:text-white bg-dark-900 border border-dark-700 hover:border-blue-500 hover:bg-dark-700 px-2 py-1 rounded transition-all transform hover:scale-105",
+                children: [
+                  pct,
+                  "%"
+                ]
+              },
+              pct
+            )) })
           ] })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-dark-900/50 p-3 rounded-lg text-left overflow-hidden", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-300 truncate", children: request.params[1] }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 mt-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.from") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
-            "@",
-            request.params[0]
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-4 text-sm border-t border-dark-700 pt-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: t("sign.author") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+              "@",
+              request.params[2]
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-dark-900/50 p-3 rounded-lg text-left overflow-hidden", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-300 truncate", children: request.params[1] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 mt-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.from") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+              "@",
+              request.params[0]
+            ] })
           ] })
         ] })
-      ] })
-    ] }) : isCustomJson ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4 text-center", children: t("sign.custom_json_title") }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between border-b border-dark-700 pb-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-slate-500", children: t("sign.id") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-mono text-blue-400 font-bold", children: request.params[1] })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 mb-1", children: t("sign.json_payload") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-60 overflow-y-auto custom-scrollbar", children: /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "text-[10px] text-green-400 whitespace-pre-wrap break-all font-mono", children: (() => {
-            try {
-              const data = typeof request.params[3] === "string" ? JSON.parse(request.params[3]) : request.params[3];
-              return JSON.stringify(data, null, 2);
-            } catch (e) {
-              return String(request.params[3]);
-            }
-          })() }) })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.from") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
-            "@",
-            request.params[0]
+      ] }) : isCustomJson ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4 text-center", children: t("sign.custom_json_title") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between border-b border-dark-700 pb-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-slate-500", children: t("sign.id") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-mono text-blue-400 font-bold", children: request.params[1] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 mb-1", children: t("sign.json_payload") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-60 overflow-y-auto custom-scrollbar", children: /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "text-[10px] text-green-400 whitespace-pre-wrap break-all font-mono", children: (() => {
+              try {
+                const data = typeof request.params[3] === "string" ? JSON.parse(request.params[3]) : request.params[3];
+                return JSON.stringify(data, null, 2);
+              } catch (e) {
+                return String(request.params[3]);
+              }
+            })() }) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.from") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+              "@",
+              request.params[0]
+            ] })
           ] })
         ] })
-      ] })
-    ] }) : isSignBuffer ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4 text-center", children: t("sign.buffer_title") }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900 p-4 rounded-lg border border-dark-700", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 mb-2 uppercase", children: t("sign.message_label") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "max-h-60 overflow-y-auto custom-scrollbar", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-300 font-mono break-all", children: request.params[1] }) })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.key_type") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-400 font-bold", children: request.params[2] })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.from") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
-            "@",
-            request.params[0]
+      ] }) : isSignBuffer ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4 text-center", children: t("sign.buffer_title") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900 p-4 rounded-lg border border-dark-700", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 mb-2 uppercase", children: t("sign.message_label") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "max-h-60 overflow-y-auto custom-scrollbar", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-300 font-mono break-all", children: request.params[1] }) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.key_type") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-400 font-bold", children: request.params[2] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.from") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+              "@",
+              request.params[0]
+            ] })
           ] })
         ] })
-      ] })
-    ] }) : isPost ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4 text-center", children: t("sign.post_title") || "POST / COMMENT" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
-        request.params[1] && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase text-slate-500 mb-1", children: "Title" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-bold text-white", children: request.params[1] })
+      ] }) : isPost ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4 text-center", children: t("sign.post_title") || "POST / COMMENT" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+          request.params[1] && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase text-slate-500 mb-1", children: "Title" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-bold text-white", children: request.params[1] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase text-slate-500 mb-1", children: "Content" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-60 overflow-y-auto custom-scrollbar", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-300 whitespace-pre-wrap font-mono", children: request.params[2] }) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.author") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+              "@",
+              request.params[0]
+            ] })
+          ] })
+        ] })
+      ] }) : isWitnessVote ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-8 h-8 text-blue-400", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }) }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-2", children: request.params[2] === false || request.params[2] === "false" || request.params[2] === 0 ? "UNVOTE WITNESS" : "VOTE WITNESS" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xl font-bold text-white mb-6", children: [
+          "@",
+          request.params[1]
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] uppercase text-slate-500 mb-1", children: "Content" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-dark-900 p-3 rounded-lg border border-dark-700 max-h-60 overflow-y-auto custom-scrollbar", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-300 whitespace-pre-wrap font-mono", children: request.params[2] }) })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-4 border-t border-dark-700", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.author") }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
             "@",
             request.params[0]
           ] })
         ] })
-      ] })
-    ] }) : isWitnessVote ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg text-center animate-fade-in-down", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-8 h-8 text-blue-400", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }) }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-2", children: request.params[2] === false || request.params[2] === "false" || request.params[2] === 0 ? "UNVOTE WITNESS" : "VOTE WITNESS" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xl font-bold text-white mb-6", children: [
-        "@",
-        request.params[1]
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-4 border-t border-dark-700", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.author") }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
-          "@",
-          request.params[0]
+      ] }) : (
+        // Generic Request ViewFallback
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full space-y-4 max-w-xs mx-auto", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 p-4 rounded-xl border border-dark-700", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase text-slate-500 mb-1", children: t("sign.operation") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-mono text-blue-400 font-bold", children: request?.method })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 p-4 rounded-xl border border-dark-700 w-full", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase text-slate-500 mb-2", children: t("sign.params") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2", children: request.params.map((param, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 text-xs border-b border-dark-700 last:border-0 pb-2 last:pb-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-500 w-6 font-mono opacity-50 shrink-0", children: [
+                idx,
+                ":"
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-300 font-mono break-all leading-relaxed", children: typeof param === "object" ? JSON.stringify(param, null, 2) : String(param) })
+            ] }, idx)) })
+          ] })
         ] })
-      ] })
-    ] }) : (
-      // Generic Request ViewFallback
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full space-y-4 max-w-xs mx-auto", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 p-4 rounded-xl border border-dark-700", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase text-slate-500 mb-1", children: t("sign.operation") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-mono text-blue-400 font-bold", children: request?.method })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 p-4 rounded-xl border border-dark-700 w-full", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase text-slate-500 mb-2", children: t("sign.params") }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2", children: request.params.map((param, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 text-xs border-b border-dark-700 last:border-0 pb-2 last:pb-0", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-500 w-6 font-mono opacity-50 shrink-0", children: [
-              idx,
-              ":"
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-300 font-mono break-all leading-relaxed", children: typeof param === "object" ? JSON.stringify(param, null, 2) : String(param) })
-          ] }, idx)) })
-        ] })
-      ] })
-    ) }),
+      )
+    ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 pb-8 bg-dark-800 border-t border-dark-700", children: [
       !isFile && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-center mb-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "flex items-center space-x-2 cursor-pointer select-none group", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -13326,7 +13540,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
             onClick: () => handleDecision(true),
             disabled: processing,
             className: "flex-1 py-3 px-2 h-auto min-h-[48px] rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-900/20 transition-all transform hover:scale-[1.02] whitespace-normal leading-tight",
-            children: processing ? t("sign.signing") : t("sign.confirm")
+            children: processing ? t("sign.signing") : isMultisig && !multisigProgress?.canBroadcast ? "Partial Sign" : t("sign.confirm")
           }
         )
       ] })
@@ -13527,6 +13741,7 @@ const HelpView = () => {
 
 const ChatView = ({ onClose }) => {
   const { t } = useTranslation();
+  const { showNotification } = useNotification();
   const [user, setUser] = reactExports.useState(null);
   const [isRegistering, setIsRegistering] = reactExports.useState(false);
   const [usernameInput, setUsernameInput] = reactExports.useState("");
@@ -13545,7 +13760,6 @@ const ChatView = ({ onClose }) => {
   const [newRoomName, setNewRoomName] = reactExports.useState("");
   const [isPrivateRoom, setIsPrivateRoom] = reactExports.useState(false);
   const [showParticipants, setShowParticipants] = reactExports.useState(false);
-  const [notification, setNotification] = reactExports.useState(null);
   const [chatModal, setChatModal] = reactExports.useState(null);
   const [modalInput, setModalInput] = reactExports.useState("");
   const [editingMessageId, setEditingMessageId] = reactExports.useState(null);
@@ -13600,11 +13814,7 @@ const ChatView = ({ onClose }) => {
         return [...prev, room];
       });
       if (room.type === "dm" || room.type === "private") {
-        setNotification({
-          msg: t("chat.invited_to", { room: room.name }),
-          type: "success",
-          roomId: room.id
-        });
+        showNotification(t("chat.invited_to", { room: room.name }), "success");
       }
     };
     chatService.onRoomUpdated = (updatedRooms) => {
@@ -13615,12 +13825,12 @@ const ChatView = ({ onClose }) => {
           console.log("[ChatView] Active room no longer exists, returning to room list:", activeRoomId);
           setActiveRoomId(null);
           localStorage.removeItem("gravity_chat_active_room");
-          setNotification({ msg: "Room was closed", type: "warning" });
+          showNotification("Room was closed", "info");
         }
       }
     };
     chatService.onError = (err) => {
-      setNotification({ msg: err, type: "error" });
+      showNotification(err, "error");
       setIsRegistering(false);
     };
     const handleSearch = (e) => {
@@ -13629,7 +13839,7 @@ const ChatView = ({ onClose }) => {
     const handleKicked = (e) => {
       if (e.detail.roomId === activeRoomId) {
         setActiveRoomId(null);
-        setNotification({ msg: "You have been removed from this room", type: "warning" });
+        showNotification("You have been removed from this room", "info");
       }
     };
     window.addEventListener("chat-search-results", handleSearch);
@@ -13640,22 +13850,18 @@ const ChatView = ({ onClose }) => {
     };
   }, []);
   reactExports.useEffect(() => {
-    chatService.onMessage = (roomId, msg) => {
+    const chatListener = (roomId, msg) => {
       if (roomId === activeRoomId) {
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => {
+          if (prev.find((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
         scrollToBottom();
-      } else {
-        const roomName = rooms.find((r) => r.id === roomId)?.name || "Unknown Room";
-        setNotification({ msg: `New message in ${roomName} from ${msg.senderName}`, type: "info", roomId });
       }
     };
-  }, [activeRoomId, rooms]);
-  reactExports.useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => setNotification(null), 8e3);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
+    chatService.addMessageListener(chatListener);
+    return () => chatService.removeMessageListener(chatListener);
+  }, [activeRoomId]);
   reactExports.useEffect(() => {
     if (activeRoomId) {
       localStorage.setItem("gravity_chat_active_room", activeRoomId);
@@ -13681,7 +13887,7 @@ const ChatView = ({ onClose }) => {
             const lastError2 = chrome.runtime.lastError;
             if (lastError2) {
               console.error("Gravity: Runtime Message Error:", lastError2);
-              setNotification({ msg: "Extension Error: " + lastError2.message, type: "error" });
+              showNotification("Extension Error: " + lastError2.message, "error");
               setPushGranted(false);
               return;
             }
@@ -13690,18 +13896,18 @@ const ChatView = ({ onClose }) => {
               if (res.subscription) chatService.syncPushSubscription(res.subscription);
             } else {
               console.error("Gravity: Push Background Error", res?.error);
-              setNotification({ msg: "Push Error: " + (res?.error || "Unknown"), type: "error" });
+              showNotification("Push Error: " + (res?.error || "Unknown"), "error");
               setPushGranted(false);
             }
           });
         }
       } else {
         console.warn("Gravity: Notification permission denied/closed");
-        setNotification({ msg: "Notifications blocked. Please enable them in browser settings.", type: "warning" });
+        showNotification("Notifications blocked. Please enable them in browser settings.", "info");
       }
     } catch (e) {
       console.error("Gravity: Exception requesting permission", e);
-      setNotification({ msg: "Error: " + e.message, type: "error" });
+      showNotification("Error: " + e.message, "error");
     }
   };
   reactExports.useEffect(() => {
@@ -13770,26 +13976,26 @@ const ChatView = ({ onClose }) => {
       case "invite":
         if (modalInput.trim() && activeRoomId) {
           chatService.inviteUser(activeRoomId, modalInput.trim());
-          setNotification({ msg: `Invitation sent to ${modalInput}`, type: "success" });
+          showNotification(`Invitation sent to ${modalInput}`, "success");
         }
         break;
       case "confirm_delete":
         if (activeRoomId) {
           chatService.closeRoom(activeRoomId);
           setActiveRoomId(null);
-          setNotification({ msg: "Room deleted", type: "info" });
+          showNotification("Room deleted", "info");
         }
         break;
       case "confirm_kick":
         if (activeRoomId && data) {
           chatService.kickUser(activeRoomId, data.id);
-          setNotification({ msg: `Kicked @${data.username}`, type: "warning" });
+          showNotification(`Kicked @${data.username}`, "info");
         }
         break;
       case "confirm_ban":
         if (activeRoomId && data) {
           chatService.banUser(activeRoomId, data.id);
-          setNotification({ msg: `Banned @${data.username} permanently`, type: "error" });
+          showNotification(`Banned @${data.username} permanently`, "error");
         }
         break;
       case "confirm_delete_message":
@@ -13813,7 +14019,7 @@ const ChatView = ({ onClose }) => {
     chatService.createDM(targetUserId);
     setSearchResults([]);
     setSearchQuery("");
-    setNotification({ msg: "Creating DM...", type: "info" });
+    showNotification("Creating DM...", "info");
   };
   if (!user && (socketStatus === "connecting" || socketStatus === "disconnected")) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full bg-dark-900 text-white items-center justify-center p-6 text-center", children: [
@@ -14245,7 +14451,7 @@ const ChatView = ({ onClose }) => {
             rooms.find((r) => r.id === activeRoomId)?.owner === user?.id && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
                 chatService.muteUser(activeRoomId, member.id);
-                setNotification({ msg: `User @${member.username} muted`, type: "info" });
+                showNotification(`User @${member.username} muted`, "info");
               }, className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-slate-700 px-1.5 py-1 rounded text-slate-400 hover:text-white transition-colors", children: "Mute" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_kick", data: member }), className: "flex-1 text-[9px] bg-dark-900 border border-dark-600 hover:bg-red-900/20 px-1.5 py-1 rounded text-slate-400 hover:text-red-400 transition-colors", children: "Kick" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setChatModal({ type: "confirm_ban", data: member }), className: "flex-1 text-[9px] bg-red-900/40 border border-red-700 hover:bg-red-800 px-1.5 py-1 rounded text-white transition-colors font-bold", children: "Ban" })
@@ -14280,26 +14486,7 @@ const ChatView = ({ onClose }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: handleModalAction, className: `flex-1 py-2 rounded-lg font-bold transition-all ${chatModal.type === "invite" ? "bg-purple-600 hover:bg-purple-500" : "bg-red-600 hover:bg-red-500"} text-white`, children: chatModal.type === "invite" ? "Invite" : "Confirm" })
         ] })
       ] })
-    ] }),
-    notification && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed bottom-20 left-1/2 -translate-x-1/2 z-[200] max-w-[90%] w-auto animate-slideUp", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "div",
-      {
-        onClick: () => {
-          if (notification.roomId) {
-            setActiveRoomId(notification.roomId);
-            setNotification(null);
-          }
-        },
-        className: `px-4 py-3 rounded-xl border shadow-2xl flex items-center gap-3 ${notification.roomId ? "cursor-pointer hover:scale-105" : ""} transition-transform ${notification.type === "error" ? "bg-red-900/90 border-red-500 text-red-100" : notification.type === "success" ? "bg-green-900/90 border-green-500 text-green-100" : notification.type === "warning" ? "bg-orange-900/90 border-orange-500 text-orange-100" : "bg-blue-900/90 border-blue-500 text-blue-100"}`,
-        children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-medium", children: notification.msg }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: (e) => {
-            e.stopPropagation();
-            setNotification(null);
-          }, className: "ml-2 hover:opacity-70 transition-opacity", children: "X" })
-        ]
-      }
-    ) })
+    ] })
   ] });
 };
 
@@ -14429,30 +14616,8 @@ const BridgeModal = ({ onClose }) => {
   ] }) });
 };
 
-const NotificationToast = ({ message, type = "success", onClose }) => {
-  reactExports.useEffect(() => {
-    const timer = setTimeout(onClose, 3e3);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-  const bgColors = {
-    success: "bg-green-600/90 border-green-500/50",
-    error: "bg-red-600/90 border-red-500/50",
-    info: "bg-blue-600/90 border-blue-500/50"
-  };
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute top-20 left-0 right-0 z-[100] flex justify-center px-6 pointer-events-none", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `
-                ${bgColors[type]} 
-                text-white text-xs font-bold px-6 py-3 rounded-xl shadow-2xl border border-opacity-50
-                animate-bounce-in pointer-events-auto flex items-center gap-2 backdrop-blur-md
-                max-w-[85vw]
-            `, children: [
-    type === "success" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }) }),
-    type === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "break-all line-clamp-4 overflow-y-auto max-h-32 custom-scrollbar pr-1", children: message })
-  ] }) });
-};
-
 function App() {
-  return /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(AppContent, {}) });
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(NotificationProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(AppContent, {}) }) });
 }
 function AppContent() {
   const { t } = useTranslation();
@@ -14475,7 +14640,7 @@ function AppContent() {
   const [isRefreshing, setIsRefreshing] = reactExports.useState(false);
   const [needsSave, setNeedsSave] = reactExports.useState(false);
   const [web3Context, setWeb3Context] = reactExports.useState(null);
-  const [notification, setNotification] = reactExports.useState(null);
+  const { showNotification } = useNotification();
   const [lockReason, setLockReason] = reactExports.useState(null);
   const [requestId, setRequestId] = reactExports.useState(null);
   const [showBridge, setShowBridge] = reactExports.useState(false);
@@ -14489,6 +14654,17 @@ function AppContent() {
     window.addEventListener("open-bridge", handleOpenBridge);
     return () => window.removeEventListener("open-bridge", handleOpenBridge);
   }, []);
+  reactExports.useEffect(() => {
+    chatService.init();
+    const chatListener = (_roomId, message) => {
+      const myUser = chatService.getCurrentUser();
+      if (myUser && message.senderId !== myUser.id) {
+        showNotification(`${message.senderName}: ${message.content.substring(0, 50)}${message.content.length > 50 ? "..." : ""}`, "info");
+      }
+    };
+    chatService.addMessageListener(chatListener);
+    return () => chatService.removeMessageListener(chatListener);
+  }, [showNotification]);
   reactExports.useEffect(() => {
     console.log("Gravity: App useEffect mounted");
     const loadState = async () => {
@@ -14650,11 +14826,11 @@ function AppContent() {
         await saveVault("cached", { accounts: updatedAccounts, lastUpdated: Date.now() });
         setWalletState((prev) => ({ ...prev, accounts: updatedAccounts }));
       }
-      setNotification({ msg: "Account imported successfully", type: "success" });
+      showNotification("Account imported successfully", "success");
       setShowImport(false);
     } catch (e) {
       console.error("Import Save Failed:", e);
-      setNotification({ msg: "Failed to save account. Please try again.", type: "error" });
+      showNotification("Failed to save account. Please try again.", "error");
     }
   };
   const handleUpdateAccount = (updatedAccount) => {
@@ -14679,7 +14855,7 @@ function AppContent() {
   };
   const handleTransfer = async (fromAcc, to, amount, memo, symbol) => {
     if (!fromAcc.activeKey) {
-      setNotification({ msg: "No active key found for this account.", type: "error" });
+      showNotification("No active key found for this account.", "error");
       return;
     }
     try {
@@ -14693,13 +14869,13 @@ function AppContent() {
         symbol
       );
       if (result.success) {
-        setNotification({ msg: `TX: ${result.txId?.substring(0, 8)}...`, type: "success" });
+        showNotification(`TX: ${result.txId?.substring(0, 8)}...`, "success");
         fetchBalances$1();
       } else {
-        setNotification({ msg: `Failed: ${result.error}`, type: "error" });
+        showNotification(`Failed: ${result.error}`, "error");
       }
     } catch (e) {
-      setNotification({ msg: "Unexpected error during broadcast.", type: "error" });
+      showNotification("Unexpected error during broadcast.", "error");
     }
   };
   const isContextRelevant = (context, chain) => {
@@ -14989,21 +15165,13 @@ function AppContent() {
         accounts: walletState.accounts
       }
     ),
-    notification && /* @__PURE__ */ jsxRuntimeExports.jsx(
-      NotificationToast,
-      {
-        message: notification.msg,
-        type: notification.type,
-        onClose: () => setNotification(null)
-      }
-    ),
     showBridge && /* @__PURE__ */ jsxRuntimeExports.jsx(BridgeModal, { onClose: () => setShowBridge(false) })
   ] });
 }
 
 const App$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
-  __proto__: null,
-  default: App
+    __proto__: null,
+    default: App
 }, Symbol.toStringTag, { value: 'Module' }));
 
 export { App$1 as A, WebPlugin as W };

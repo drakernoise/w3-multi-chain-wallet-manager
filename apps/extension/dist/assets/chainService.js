@@ -70502,6 +70502,7 @@ const CHAIN_CONFIGS = {
     addressPrefix: "BLT",
     chainId: "cd8d90f29ae273abec3eaa7731e25934c63eb654d55080caff2ebb7f5df6381f",
     rpcNodes: [
+      "https://rpc.drakernoise.com",
       "https://rpc.beblurt.com",
       "https://blurt-rpc.saboin.com",
       "https://rpc.blurt.world",
@@ -88796,6 +88797,21 @@ const validateAccountKeys = async (chain, username, keys) => {
     return { valid: false, error: e.message };
   }
 };
+const getAccountAuthorities = async (chain, username, type = "active") => {
+  try {
+    const accountData = await fetchAccountData(chain, username);
+    if (!accountData) return null;
+    const auth = type === "active" ? accountData.active : accountData.posting;
+    return {
+      threshold: auth.weight_threshold,
+      keyAuths: auth.key_auths,
+      accountAuths: auth.account_auths
+    };
+  } catch (e) {
+    console.error("Failed to fetch authorities:", e);
+    return null;
+  }
+};
 const broadcastTransfer = async (chain, from, activeKey, to, amount, memo, tokenSymbol) => {
   const formattedAmount = parseFloat(amount).toFixed(3);
   const nodeUrl = getActiveNode(chain);
@@ -89401,4 +89417,4 @@ const signMessage = (chain, message, keyStr, _useLegacySigner = false) => {
   }
 };
 
-export { benchmarkNodes as A, Chain as C, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, broadcastWitnessVote as j, global as k, checkAccountExists as l, broadcastSavingsDeposit as m, broadcastSavingsWithdraw as n, fetchAccountData as o, broadcastRCDelegate as p, broadcastRCUndelegate as q, requireCryptoBrowserify as r, signMessage as s, broadcastBulkTransfer as t, indexBrowserExports$1 as u, indexBrowserExports as v, validateAccountKeys as w, fetchAccountHistory as x, fetchBalances as y, detectWeb3Context as z };
+export { detectWeb3Context as A, benchmarkNodes as B, Chain as C, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, broadcastWitnessVote as j, global as k, checkAccountExists as l, broadcastSavingsDeposit as m, broadcastSavingsWithdraw as n, fetchAccountData as o, broadcastRCDelegate as p, broadcastRCUndelegate as q, requireCryptoBrowserify as r, signMessage as s, broadcastBulkTransfer as t, indexBrowserExports$1 as u, indexBrowserExports as v, validateAccountKeys as w, fetchAccountHistory as x, getAccountAuthorities as y, fetchBalances as z };

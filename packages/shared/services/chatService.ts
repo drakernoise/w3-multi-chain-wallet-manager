@@ -40,13 +40,21 @@ class ChatService {
     private username: string | null = null;
 
     // Callbacks for UI updates
-    public onMessage: ((roomId: string, message: ChatMessage) => void) | null = null;
+    private messageListeners: Set<(roomId: string, message: ChatMessage) => void> = new Set();
     public onRoomUpdated: ((rooms: ChatRoom[]) => void) | null = null;
     public onRoomAdded: ((room: ChatRoom) => void) | null = null;
     public onAuthSuccess: ((user: ChatUser) => void) | null = null;
     public onAuthenticated: ((userId: string, username: string) => void) | null = null; // Alias for AuthSuccess
     public onError: ((err: string) => void) | null = null;
     public onStatusChange: ((status: string, errMsg?: string) => void) | null = null;
+
+    public addMessageListener(listener: (roomId: string, message: ChatMessage) => void) {
+        this.messageListeners.add(listener);
+    }
+
+    public removeMessageListener(listener: (roomId: string, message: ChatMessage) => void) {
+        this.messageListeners.delete(listener);
+    }
 
     private rooms: ChatRoom[] = [];
     private serverUrl = 'https://chat.gravitywallet.com';
@@ -667,9 +675,9 @@ class ChatService {
 
             room.messages.push(processedMsg);
 
-            // UI Handler
-            if (this.onMessage) this.onMessage(roomId, processedMsg);
-            if (this.onRoomUpdated) this.onRoomUpdated([...this.rooms]);
+            // Notify all listeners
+            this.messageListeners.forEach(listener => listener(roomId, processedMsg));
+            this.notifyRoomUpdate();
 
             // Trigger notification only if message is NOT from me
             if (processedMsg.senderId !== this.userId) {

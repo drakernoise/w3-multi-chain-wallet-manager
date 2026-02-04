@@ -43,6 +43,7 @@ scripts/test-*.cjs
 .env
 .env.local
 .env.*
+.secrets.env
 
 # Security Audits & Releases (Non-Source)
 release/

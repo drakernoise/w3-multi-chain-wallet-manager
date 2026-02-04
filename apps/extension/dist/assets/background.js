@@ -36,6 +36,13 @@ async function setupOffscreenDocument(path) {
 if (chrome.offscreen) {
   setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
 }
+chrome.alarms.create("offscreenKeepAlive", { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "offscreenKeepAlive") {
+    console.log("Gravity: Checking Offscreen Keep-Alive Status...");
+    setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
+  }
+});
 let unreadCount = 0;
 function detectChainFromUrl(url = "") {
   if (!url) return null;
@@ -61,6 +68,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: false, error: "Invalid Request: Method name too long or invalid." });
       return false;
     }
+    console.log(`[Gravity] Received request - Method: ${request.method}, Params type: ${Array.isArray(request.params) ? "array" : typeof request.params}`, request.params);
+    if (request.params && typeof request.params === "object" && !Array.isArray(request.params)) {
+      const params = request.params;
+      if (params.operations && params.url && !params.username) {
+        console.error("[Compatibility] ⚠️ CASE 1: DETECTED TWIGGY.LAT FORMAT! {operations, url} object");
+        const username = "unknown_broadcast_user";
+        const operations = Array.isArray(params.operations) ? params.operations : [params.operations];
+        const key = params.key || "";
+        request.params = [username, operations, key];
+        console.error("[Compatibility] ✓ Case 1 Normalized");
+      }
+    }
+    if (Array.isArray(request.params) && request.params[1] && typeof request.params[1] === "object" && !Array.isArray(request.params[1])) {
+      const secondParam = request.params[1];
+      if (secondParam.operations && secondParam.url && !Array.isArray(secondParam.operations)) {
+        console.error("[Compatibility] ⚠️ CASE 2: DETECTED TWIGGY.LAT FORMAT! Array with {operations, url} inside");
+        const operations = Array.isArray(secondParam.operations) ? secondParam.operations : [secondParam.operations];
+        request.params[1] = operations;
+        console.error("[Compatibility] ✓ Case 2 Normalized - params[1] converted to operations array");
+      }
+    }
     if (request.method === "requestPowerUp" || request.method === "powerUp") {
       if (request.params && request.params[1] && typeof request.params[1] === "string") {
         request.params[1] = request.params[1].replace(/^@/, "");
@@ -81,8 +109,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse(autoResult);
       } else {
         const chainHint = detectChainFromUrl(sender.url || sender.tab?.url);
+        const normalizedRequest = { ...request };
         const reqData = {
-          data: request,
+          data: normalizedRequest,
           tabId: sender.tab?.id,
           frameId: sender.frameId,
           origin: sender.origin || sender.url,
@@ -100,6 +129,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const requestId = request.requestId;
     chrome.storage.session.get([`req_${requestId}`]).then((res) => {
       const req = res[`req_${requestId}`];
+      if (req && req.data && req.data.params) {
+        const data = req.data;
+        if (Array.isArray(data.params) && data.params[1] && typeof data.params[1] === "object" && !Array.isArray(data.params[1])) {
+          const secondParam = data.params[1];
+          if (secondParam.operations && secondParam.url) {
+            console.error("[Background] Defensive fix: Converting {operations, url} in params[1]");
+            data.params[1] = Array.isArray(secondParam.operations) ? secondParam.operations : [secondParam.operations];
+          }
+        }
+      }
       sendResponse({
         request: req ? req.data : null,
         origin: req ? req.origin : null,
@@ -129,10 +168,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
   if (request.type === "OFFSCREEN_NEW_MESSAGE") {
-    const count = request.count || 1;
-    unreadCount += count;
-    chrome.action.setBadgeText({ text: unreadCount > 9 ? "9+" : String(unreadCount) });
-    chrome.action.setBadgeBackgroundColor({ color: "#FF0000" });
+    unreadCount++;
+    updateBadge();
     sendResponse({ ack: true });
     return false;
   }
@@ -166,13 +203,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const count = request.count || 0;
     if (count === 0) unreadCount = 0;
     else unreadCount += count;
-    const text = unreadCount > 0 ? unreadCount > 9 ? "9+" : String(unreadCount) : "";
-    chrome.action.setBadgeText({ text });
-    chrome.action.setBadgeBackgroundColor({ color: "#FF0000" });
+    updateBadge();
     sendResponse({ ack: true });
     return false;
   }
 });
+function updateBadge() {
+  const text = unreadCount > 0 ? unreadCount > 9 ? "9+" : String(unreadCount) : "";
+  chrome.action.setBadgeText({ text });
+  chrome.action.setBadgeBackgroundColor({ color: "#FF0000" });
+}
 async function tryAutoSign(request, sender) {
   try {
     const local = await chrome.storage.local.get(["gravity_whitelist"]);
@@ -254,7 +294,16 @@ async function tryAutoSign(request, sender) {
     } else if (isBroadcast) {
       let operations = request.params[1];
       const keyType = request.params[2];
-      if (operations && !Array.isArray(operations) && operations.operations) operations = operations.operations;
+      if (operations && typeof operations === "object" && !Array.isArray(operations)) {
+        console.error("[Broadcast] ⚠️ Detected non-array operations object:", Object.keys(operations));
+        if (operations.operations) {
+          operations = operations.operations;
+          console.error("[Broadcast] ✓ Extracted operations array from object");
+        } else {
+          console.error("[Broadcast] ❌ ERROR: operations object has no .operations property!");
+          return { success: false, error: "Invalid broadcast format: operations is not an array" };
+        }
+      }
       const requiresActiveKey = Array.isArray(operations) && operations.some((op) => {
         const opName = Array.isArray(op) ? op[0] : op.type || op[0];
         const activeKeyOps = [
