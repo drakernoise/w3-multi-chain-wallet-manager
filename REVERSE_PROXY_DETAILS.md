@@ -5,7 +5,7 @@ Para que el chat funcione en una extensión de Chrome de forma segura, el navega
 ## El Flujo de Conexión
 Sin un proxy, la extensión intentaría conectar a `http://136.243.80.162:3030`. Chrome bloquearía esto por no ser seguro. Con el proxy, el flujo es:
 
-1. **Extensión**: Solicita conexión a `wss://chat.gravitywallet.com` (Puerto 443).
+1. **Extensión**: Solicita conexión a `wss://chat.gravitywallet.drakernoise.com` (Puerto 443).
 2. **Nginx (Hetzner)**: Recibe la conexión cifrada, valida el certificado SSL.
 3. **Nginx**: "Desencripta" internamente y pasa la comunicación al contenedor Docker en `http://localhost:3030`.
 4. **Respuesta**: El camino de vuelta se cifra de nuevo antes de salir del servidor.
@@ -15,18 +15,24 @@ WSS es el equivalente a HTTPS para WebSockets. A diferencia de una web normal, l
 
 Nginx necesita reglas específicas para no cortar esta conexión.
 
-### Ejemplo de Configuración Nginx (`/etc/nginx/sites-available/chat`)
+### Ejemplo de Configuración Nginx (`/etc/nginx/sites-available/chat.gravitywallet.drakernoise.com`)
+
+```bash
+sudo nano /etc/nginx/sites-available/chat.gravitywallet.drakernoise.com
+```
 
 ```nginx
+# (Pega la configuración que te di en REVERSE_PROXY_DETAILS.md)
+
 server {
     listen 80;
-    server_name chat.tunombre.com;
+    server_name chat.gravitywallet.drakernoise.com;
     return 301 https://$host$request_uri; # Redirigir todo a HTTPS
 }
 
 server {
     listen 443 ssl;
-    server_name chat.tunombre.com;
+    server_name chat.gravitywallet.drakernoise.com;
 
     # Certificados gestionados por Certbot (Let's Encrypt)
     ssl_certificate /etc/letsencrypt/live/chat.tunombre.com/fullchain.pem;

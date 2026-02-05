@@ -8,7 +8,7 @@ interface ChatCreds {
 }
 
 let socket: Socket | null = null;
-const SERVER_URL = 'https://chat.gravitywallet.com'; // Updated from old Render URL
+const SERVER_URL = 'https://chat.gravitywallet.drakernoise.com'; // Updated from old Render URL
 
 declare var chrome: any;
 

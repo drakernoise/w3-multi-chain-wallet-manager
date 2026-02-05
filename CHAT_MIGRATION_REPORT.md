@@ -44,19 +44,23 @@ docker compose up -d --build
 ```
 *Esto levantará el servidor en el puerto 3030.*
 
+### Server URL
+The new production chat server is located at:
+`https://chat.gravitywallet.drakernoise.com` (Hetzner production server)
+
 ### 3. Configurar Nginx y Let's Encrypt
 ```bash
 # Crear configuración
-sudo nano /etc/nginx/sites-available/chat.gravitywallet.com
+sudo nano /etc/nginx/sites-available/chat.gravitywallet.drakernoise.com
 
 # (Pega la configuración que te di en REVERSE_PROXY_DETAILS.md)
 
 # Activar sitio
-sudo ln -s /etc/nginx/sites-available/chat.gravitywallet.com /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/chat.gravitywallet.drakernoise.com /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
 # Obtener certificado SSL
-sudo certbot --nginx -d chat.gravitywallet.com
+sudo certbot --nginx -d chat.gravitywallet.drakernoise.com
 ```
 
 ### 4. Verificar Conexión

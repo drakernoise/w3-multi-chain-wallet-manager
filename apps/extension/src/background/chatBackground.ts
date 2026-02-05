@@ -10,7 +10,7 @@ interface ChatCreds {
 
 let socket: Socket | null = null;
 let unreadCount = 0;
-const SERVER_URL = 'https://chat.gravitywallet.com'; // Production URL (Hetzner)
+const SERVER_URL = 'https://chat.gravitywallet.drakernoise.com'; // Production URL (Hetzner)
 
 // FORCE WEBSOCKET POLYFILL FOR SERVICE WORKER
 if (typeof WebSocket === 'undefined' && typeof (self as any).WebSocket !== 'undefined') {

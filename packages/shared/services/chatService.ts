@@ -57,7 +57,7 @@ class ChatService {
     }
 
     private rooms: ChatRoom[] = [];
-    private serverUrl = 'https://chat.gravitywallet.com';
+    private serverUrl = 'https://chat.gravitywallet.drakernoise.com';
     private roomUpdateDebounceTimer: any = null;
 
     public init() {
