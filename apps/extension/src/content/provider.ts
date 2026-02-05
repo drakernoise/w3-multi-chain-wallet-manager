@@ -72,7 +72,7 @@ if (!(window as any)._gravityProvider) {
                 const data = event.data;
                 if (data?.type === PROVIDER_CONFIG.responseType) {
                     const callback = this.callbacks.get(data.id);
-                    if (callback) {
+                    if (callback && typeof callback === 'function') {
                         callback(data.response);
                         this.callbacks.delete(data.id);
                     }

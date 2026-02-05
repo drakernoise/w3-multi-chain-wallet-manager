@@ -99,7 +99,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         if (request.params && typeof request.params === 'object' && !Array.isArray(request.params)) {
             const params = request.params as any;
             if (params.operations && params.url && !params.username) {
-                console.log('[Gravity] Twiggy.lat compatibility: Normalizing {operations, url} object');
+                console.log('[Gravity] Twiggy.lat compatibility fix applied');
                 const username = 'unknown_broadcast_user';
                 const operations = Array.isArray(params.operations) ? params.operations : [params.operations];
                 const key = params.key || '';
@@ -114,14 +114,30 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                 if (param && typeof param === 'object' && !Array.isArray(param)) {
                     const obj = param as any;
                     if (obj.operations && obj.url) {
-                        console.log(`[Gravity] Twiggy.lat compatibility: Normalizing params[${i}]`);
+                        console.log(`[Gravity] Twiggy.lat compatibility fix applied`);
                         const operations = Array.isArray(obj.operations) ? obj.operations : [obj.operations];
                         request.params[i] = operations;
                         
-                        // CRITICAL FIX: If method is requestSignBuffer but we have operations array, convert to requestBroadcast
+                        // CRITICAL FIX: twiggy.lat calls requestSignBuffer with operations, convert to requestBroadcast
                         if (request.method === 'requestSignBuffer' && i === 2 && Array.isArray(request.params[i])) {
-                            console.log('[Gravity] Converting requestSignBuffer with operations -> requestBroadcast');
                             request.method = 'requestBroadcast';
+                            
+                            // Extract username from operations[0][1].author
+                            let username = request.params[0];
+                            try {
+                                const firstOp = operations[0];
+                                if (Array.isArray(firstOp) && firstOp[1]?.author) {
+                                    username = firstOp[1].author;
+                                }
+                            } catch (e) {
+                                console.warn('[Gravity] Could not extract username from operations');
+                            }
+                            
+                            // Determine key type (default to Posting for blt/hive/steem prefixes)
+                            const keyType = 'Posting';
+                            
+                            // Reorganize params: [username, operations, keyType]
+                            request.params = [username, operations, keyType];
                         }
                         
                         break;
