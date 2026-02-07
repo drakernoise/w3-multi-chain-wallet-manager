@@ -38,6 +38,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [editBuffer, setEditBuffer] = useState('');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const pendingRoomResetRef = useRef<number | null>(null);
 
     const handleCreateRoom = () => {
         if (newRoomName.trim().length < 3) return;
@@ -108,10 +109,22 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             if (activeRoomId) {
                 const roomExists = updatedRooms.find(r => r.id === activeRoomId);
                 if (!roomExists) {
-                    console.log('[ChatView] Active room no longer exists, returning to room list:', activeRoomId);
-                    setActiveRoomId(null);
-                    localStorage.removeItem('gravity_chat_active_room');
-                    showNotification('Room was closed', 'info');
+                    // Allow a short grace period for room_added/room_joined updates
+                    if (pendingRoomResetRef.current) {
+                        window.clearTimeout(pendingRoomResetRef.current);
+                    }
+                    pendingRoomResetRef.current = window.setTimeout(() => {
+                        const stillMissing = !chatService.getRooms().find(r => r.id === activeRoomId);
+                        if (stillMissing) {
+                            console.log('[ChatView] Active room no longer exists, returning to room list:', activeRoomId);
+                            setActiveRoomId(null);
+                            localStorage.removeItem('gravity_chat_active_room');
+                            showNotification('Room was closed', 'info');
+                        }
+                    }, 1500);
+                } else if (pendingRoomResetRef.current) {
+                    window.clearTimeout(pendingRoomResetRef.current);
+                    pendingRoomResetRef.current = null;
                 }
             }
         };

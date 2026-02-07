@@ -13778,6 +13778,7 @@ const ChatView = ({ onClose }) => {
   const [editingMessageId, setEditingMessageId] = reactExports.useState(null);
   const [editBuffer, setEditBuffer] = reactExports.useState("");
   const messagesEndRef = reactExports.useRef(null);
+  const pendingRoomResetRef = reactExports.useRef(null);
   const handleCreateRoom = () => {
     if (newRoomName.trim().length < 3) return;
     chatService.createRoom(newRoomName.trim(), isPrivateRoom);
@@ -13833,10 +13834,21 @@ const ChatView = ({ onClose }) => {
       if (activeRoomId) {
         const roomExists = updatedRooms.find((r) => r.id === activeRoomId);
         if (!roomExists) {
-          console.log("[ChatView] Active room no longer exists, returning to room list:", activeRoomId);
-          setActiveRoomId(null);
-          localStorage.removeItem("gravity_chat_active_room");
-          showNotification("Room was closed", "info");
+          if (pendingRoomResetRef.current) {
+            window.clearTimeout(pendingRoomResetRef.current);
+          }
+          pendingRoomResetRef.current = window.setTimeout(() => {
+            const stillMissing = !chatService.getRooms().find((r) => r.id === activeRoomId);
+            if (stillMissing) {
+              console.log("[ChatView] Active room no longer exists, returning to room list:", activeRoomId);
+              setActiveRoomId(null);
+              localStorage.removeItem("gravity_chat_active_room");
+              showNotification("Room was closed", "info");
+            }
+          }, 1500);
+        } else if (pendingRoomResetRef.current) {
+          window.clearTimeout(pendingRoomResetRef.current);
+          pendingRoomResetRef.current = null;
         }
       }
     };
