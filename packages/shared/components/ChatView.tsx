@@ -62,6 +62,12 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             setRooms(existingRooms);
         }
 
+        // Clear stale active room if it no longer exists
+        if (activeRoomId && !existingRooms.find(r => r.id === activeRoomId)) {
+            setActiveRoomId(null);
+            localStorage.removeItem('gravity_chat_active_room');
+        }
+
         // Check if already logged in
         const existing = chatService.getCurrentUser();
         if (existing) {

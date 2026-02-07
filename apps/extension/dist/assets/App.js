@@ -13796,6 +13796,10 @@ const ChatView = ({ onClose }) => {
       console.log("[ChatView] Restoring", existingRooms.length, "rooms from service");
       setRooms(existingRooms);
     }
+    if (activeRoomId && !existingRooms.find((r) => r.id === activeRoomId)) {
+      setActiveRoomId(null);
+      localStorage.removeItem("gravity_chat_active_room");
+    }
     const existing = chatService.getCurrentUser();
     if (existing) {
       setUser(existing);
