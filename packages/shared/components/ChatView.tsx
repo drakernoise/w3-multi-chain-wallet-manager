@@ -573,7 +573,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         >
                             <div className="font-bold text-sm flex items-center gap-2 relative">
                                 <span className="opacity-70 text-xs">{room.type === 'public' ? '#' : '[P]'}</span> {room.name}
-                                {room.unreadCount && room.unreadCount > 0 && activeRoomId !== room.id && (
+                                {(room.unreadCount ?? 0) > 0 && activeRoomId !== room.id && (
                                     <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto"></div>
                                 )}
                             </div>
@@ -594,7 +594,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             <div className="font-bold text-sm flex items-center gap-2 relative">
                                 <div className="w-2 h-2 rounded-full bg-green-500"></div>
                                 {room.name.replace(user.username, '').replace(' & ', '').trim() || 'Chat'}
-                                {room.unreadCount && room.unreadCount > 0 && activeRoomId !== room.id && (
+                                {(room.unreadCount ?? 0) > 0 && activeRoomId !== room.id && (
                                     <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse ml-auto"></div>
                                 )}
                             </div>
@@ -608,7 +608,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </div>
 
             {/* Right: Active Chat Area */}
-            <div className={`flex-1 flex flex-col bg-dark-900 ${!activeRoomId ? 'hidden' : 'flex'} ${showParticipants ? 'pr-64' : ''} transition-all duration-300`}>
+            <div className={`flex-1 flex flex-col bg-dark-900 ${!activeRoomId ? 'hidden' : 'flex'} ${showParticipants ? 'pr-64' : 'pr-0'} transition-all duration-300`}>
                 {!activeRoomId ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-600 opacity-50">
                         <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8S21 7.582 21 12z" /></svg>

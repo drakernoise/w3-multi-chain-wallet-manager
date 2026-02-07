@@ -761,7 +761,7 @@ class ChatService {
             });
 
             if (!sender?.encryptionPublicKey) {
-                console.error('[ChatService] Missing encryption key for sender:', message.senderId);
+                console.warn('[ChatService] Missing encryption key for sender:', message.senderId);
                 return { ...message, content: `Encrypted Message (Key not found for ${message.senderName})` };
             }
 

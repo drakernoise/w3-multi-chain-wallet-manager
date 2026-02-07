@@ -1980,6 +1980,9 @@ video {
 .pl-8 {
   padding-left: 2rem;
 }
+.pr-0 {
+  padding-right: 0px;
+}
 .pr-1 {
   padding-right: 0.25rem;
 }
