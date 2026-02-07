@@ -489,7 +489,6 @@ const formatChainError = (error: any): string => {
     }
 
     // Handle Fee / Balance error
-    // Handle Fee / Balance error
     if (msg.includes('balance >= fee')) {
         return "Insufficient funds to pay transaction fee (Blurt fees depend on message size).";
     }

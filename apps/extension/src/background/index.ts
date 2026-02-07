@@ -210,7 +210,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                     typeof data.params[1] === 'object' && !Array.isArray(data.params[1])) {
                     const secondParam = data.params[1] as any;
                     if (secondParam.operations && secondParam.url) {
-                        console.error('[Background] Defensive fix: Converting {operations, url} in params[1]');
+                        console.log('[Background] Defensive fix: Converting {operations, url} in params[1]');
                         data.params[1] = Array.isArray(secondParam.operations) ? 
                             secondParam.operations : [secondParam.operations];
                     }
