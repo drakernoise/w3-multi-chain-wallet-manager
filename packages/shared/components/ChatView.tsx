@@ -39,6 +39,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const pendingRoomResetRef = useRef<number | null>(null);
+    const activeRoomIdRef = useRef<string | null>(null);
 
     const handleCreateRoom = () => {
         if (newRoomName.trim().length < 3) return;
@@ -112,22 +113,23 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             setRooms(updatedRooms);
 
             // Validate that active room still exists
-            if (activeRoomId) {
-                const roomExists = updatedRooms.find(r => r.id === activeRoomId);
+            const currentActive = activeRoomIdRef.current;
+            if (currentActive) {
+                const roomExists = updatedRooms.find(r => r.id === currentActive);
                 if (!roomExists) {
                     // Allow a short grace period for room_added/room_joined updates
                     if (pendingRoomResetRef.current) {
                         window.clearTimeout(pendingRoomResetRef.current);
                     }
                     pendingRoomResetRef.current = window.setTimeout(() => {
-                        const stillMissing = !chatService.getRooms().find(r => r.id === activeRoomId);
+                        const stillMissing = !chatService.getRooms().find(r => r.id === currentActive);
                         if (stillMissing) {
-                            console.log('[ChatView] Active room no longer exists, returning to room list:', activeRoomId);
+                            console.log('[ChatView] Active room no longer exists, returning to room list:', currentActive);
                             setActiveRoomId(null);
                             localStorage.removeItem('gravity_chat_active_room');
                             showNotification('Room was closed', 'info');
                         }
-                    }, 1500);
+                    }, 400);
                 } else if (pendingRoomResetRef.current) {
                     window.clearTimeout(pendingRoomResetRef.current);
                     pendingRoomResetRef.current = null;
@@ -168,6 +170,10 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             window.removeEventListener('chat-room-kicked', handleKicked);
         };
     }, []); // Empty deps - run ONCE
+
+    useEffect(() => {
+        activeRoomIdRef.current = activeRoomId;
+    }, [activeRoomId]);
 
     // Handle messages for active room
     useEffect(() => {
@@ -602,7 +608,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </div>
 
             {/* Right: Active Chat Area */}
-            <div className={`flex-1 flex flex-col bg-dark-900 ${!activeRoomId ? 'hidden md:flex' : 'flex'} ${showParticipants ? 'pr-64' : ''} transition-all duration-300`}>
+            <div className={`flex-1 flex flex-col bg-dark-900 ${!activeRoomId ? 'hidden' : 'flex'} ${showParticipants ? 'pr-64' : ''} transition-all duration-300`}>
                 {!activeRoomId ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-600 opacity-50">
                         <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8S21 7.582 21 12z" /></svg>
