@@ -1663,11 +1663,12 @@ class ChatService {
         if (!myPrivBase642 || !myPubBase64) {
           return { ...message, content: "(Encrypted Message - keys missing)" };
         }
+        const encryptedContent = message.contentForSender || message.content;
         try {
           const myPrivKey2 = await importKeyFromBase64(myPrivBase642, "private");
           const myPubKey = await importKeyFromBase64(myPubBase64, "public");
           const mySharedKey = await deriveSharedSecret(myPrivKey2, myPubKey);
-          const decrypted2 = await decryptMessage(message.content, mySharedKey);
+          const decrypted2 = await decryptMessage(encryptedContent, mySharedKey);
           console.log("[ChatService] Successfully decrypted own message");
           return { ...message, content: decrypted2 };
         } catch (e) {

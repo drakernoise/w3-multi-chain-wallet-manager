@@ -16,6 +16,7 @@ export interface ChatMessage {
     senderId: string;
     senderName: string;
     content: string;
+    contentForSender?: string;
     timestamp: string;
     isVerified?: boolean;
     isEncrypted?: boolean;
@@ -728,11 +729,14 @@ class ChatService {
                     return { ...message, content: "(Encrypted Message - keys missing)" };
                 }
 
+                // Prefer sender-specific encrypted payload when present (room history includes contentForSender)
+                const encryptedContent = message.contentForSender || message.content;
+
                 try {
                     const myPrivKey = await importKeyFromBase64(myPrivBase64, 'private');
                     const myPubKey = await importKeyFromBase64(myPubBase64, 'public');
                     const mySharedKey = await deriveSharedSecret(myPrivKey, myPubKey);
-                    const decrypted = await decryptMessage(message.content, mySharedKey);
+                    const decrypted = await decryptMessage(encryptedContent, mySharedKey);
 
                     console.log('[ChatService] Successfully decrypted own message');
                     return { ...message, content: decrypted };
