@@ -11,6 +11,9 @@ const OFFSCREEN_DOCUMENT_PATH = 'src/offscreen/offscreen.html';
 
 async function setupOffscreenDocument(path: string) {
     try {
+        // Guard: offscreen API may be unavailable in some environments
+        // @ts-ignore
+        if (!chrome.offscreen) return;
         // @ts-ignore
         if (await chrome.offscreen.hasDocument()) return;
         // @ts-ignore
@@ -36,7 +39,6 @@ if (chrome.offscreen) {
 chrome.alarms.create('offscreenKeepAlive', { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm: any) => {
     if (alarm.name === 'offscreenKeepAlive') {
-        console.log("Gravity: Checking Offscreen Keep-Alive Status...");
         setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
     }
 });
@@ -99,7 +101,6 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         if (request.params && typeof request.params === 'object' && !Array.isArray(request.params)) {
             const params = request.params as any;
             if (params.operations && params.url && !params.username) {
-                console.log('[Gravity] Twiggy.lat compatibility fix applied');
                 const username = 'unknown_broadcast_user';
                 const operations = Array.isArray(params.operations) ? params.operations : [params.operations];
                 const key = params.key || '';
@@ -114,7 +115,6 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                 if (param && typeof param === 'object' && !Array.isArray(param)) {
                     const obj = param as any;
                     if (obj.operations && obj.url) {
-                        console.log(`[Gravity] Twiggy.lat compatibility fix applied`);
                         const operations = Array.isArray(obj.operations) ? obj.operations : [obj.operations];
                         request.params[i] = operations;
                         

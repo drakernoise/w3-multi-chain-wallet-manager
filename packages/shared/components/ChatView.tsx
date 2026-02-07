@@ -54,9 +54,6 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             chrome.runtime.sendMessage({ type: 'CHAT_UI_OPENED' }).catch(() => { });
         }
 
-        chatService.init(); // CRITICAL: Start connection
-        setSocketStatus(chatService.getCurrentUser() ? 'authenticated' : 'connecting');
-
         // Restore rooms from service if they exist
         const existingRooms = chatService.getRooms();
         if (existingRooms.length > 0) {
@@ -118,6 +115,16 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 }
             }
         };
+
+        // Start connection AFTER handlers are registered to avoid missing early connect events
+        if (chatService.getCurrentUser()) {
+            setSocketStatus('authenticated');
+        } else if (chatService.isConnected()) {
+            setSocketStatus('connected');
+        } else {
+            setSocketStatus('connecting');
+        }
+        chatService.init(); // CRITICAL: Start connection
 
         chatService.onError = (err) => {
             showNotification(err, 'error');

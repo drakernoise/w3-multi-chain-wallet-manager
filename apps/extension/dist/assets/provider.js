@@ -67,7 +67,7 @@ if (!window._gravityProvider) {
         const data = event.data;
         if (data?.type === PROVIDER_CONFIG.responseType) {
           const callback = this.callbacks.get(data.id);
-          if (callback) {
+          if (callback && typeof callback === "function") {
             callback(data.response);
             this.callbacks.delete(data.id);
           }
@@ -96,7 +96,7 @@ if (!window._gravityProvider) {
           appName: PROVIDER_CONFIG.name
         }, window.location.origin);
       };
-      if (callback) {
+      if (typeof callback === "function") {
         this.callbacks.set(id, callback);
         sendMessage();
       } else {
@@ -123,7 +123,7 @@ if (!window._gravityProvider) {
         version: this.version,
         name: this.name
       };
-      if (callback) {
+      if (typeof callback === "function") {
         setTimeout(() => callback(response), 0);
       } else {
         return Promise.resolve(response);

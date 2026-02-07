@@ -1129,7 +1129,7 @@ class ChatService {
     this.onError = null;
     this.onStatusChange = null;
     this.rooms = [];
-    this.serverUrl = "https://chat.gravitywallet.com";
+    this.serverUrl = "https://chat.gravitywallet.drakernoise.com";
     this.roomUpdateDebounceTimer = null;
   }
   addMessageListener(listener) {
@@ -1153,6 +1153,15 @@ class ChatService {
       const storedUser = localStorage.getItem("gravity_chat_username");
       const storedKey = localStorage.getItem("gravity_chat_priv");
       const storedId = localStorage.getItem("gravity_chat_id");
+      if (storedUser && !storedKey) {
+        console.warn("Chat: Stored username without private key. Clearing stale identity.");
+        localStorage.removeItem("gravity_chat_id");
+        localStorage.removeItem("gravity_chat_username");
+        localStorage.removeItem("gravity_chat_priv");
+        localStorage.removeItem("gravity_chat_pub");
+        if (this.onStatusChange) this.onStatusChange("disconnected", "Missing chat key");
+        return;
+      }
       if (storedUser && storedKey) {
         console.log("Auto-logging in as", storedUser);
         if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
@@ -1171,6 +1180,9 @@ class ChatService {
       }
     });
     this.setupListeners();
+  }
+  isConnected() {
+    return !!this.socket?.connected;
   }
   syncPushSubscription(sub) {
     if (this.socket?.connected) {
@@ -13777,8 +13789,6 @@ const ChatView = ({ onClose }) => {
       chrome.runtime.sendMessage({ type: "CHAT_UI_OPENED" }).catch(() => {
       });
     }
-    chatService.init();
-    setSocketStatus(chatService.getCurrentUser() ? "authenticated" : "connecting");
     const existingRooms = chatService.getRooms();
     if (existingRooms.length > 0) {
       console.log("[ChatView] Restoring", existingRooms.length, "rooms from service");
@@ -13829,6 +13839,14 @@ const ChatView = ({ onClose }) => {
         }
       }
     };
+    if (chatService.getCurrentUser()) {
+      setSocketStatus("authenticated");
+    } else if (chatService.isConnected()) {
+      setSocketStatus("connected");
+    } else {
+      setSocketStatus("connecting");
+    }
+    chatService.init();
     chatService.onError = (err) => {
       showNotification(err, "error");
       setIsRegistering(false);

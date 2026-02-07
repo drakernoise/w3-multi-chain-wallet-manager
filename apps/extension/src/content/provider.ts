@@ -105,7 +105,7 @@ if (!(window as any)._gravityProvider) {
                 }, window.location.origin);
             };
 
-            if (callback) {
+            if (typeof callback === 'function') {
                 this.callbacks.set(id, callback);
                 sendMessage();
             } else {
@@ -135,7 +135,7 @@ if (!(window as any)._gravityProvider) {
                 name: this.name
             };
 
-            if (callback) {
+            if (typeof callback === 'function') {
                 // Immediate callback response
                 setTimeout(() => callback(response), 0);
             } else {

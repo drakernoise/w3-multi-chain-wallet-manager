@@ -23,6 +23,7 @@ self.exports = {};
 const OFFSCREEN_DOCUMENT_PATH = "src/offscreen/offscreen.html";
 async function setupOffscreenDocument(path) {
   try {
+    if (!chrome.offscreen) return;
     if (await chrome.offscreen.hasDocument()) return;
     await chrome.offscreen.createDocument({
       url: path,
@@ -39,7 +40,6 @@ if (chrome.offscreen) {
 chrome.alarms.create("offscreenKeepAlive", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "offscreenKeepAlive") {
-    console.log("Gravity: Checking Offscreen Keep-Alive Status...");
     setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
   }
 });
@@ -71,7 +71,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.params && typeof request.params === "object" && !Array.isArray(request.params)) {
       const params = request.params;
       if (params.operations && params.url && !params.username) {
-        console.log("[Gravity] Twiggy.lat compatibility: Normalizing {operations, url} object");
         const username = "unknown_broadcast_user";
         const operations = Array.isArray(params.operations) ? params.operations : [params.operations];
         const key = params.key || "";
@@ -84,12 +83,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (param && typeof param === "object" && !Array.isArray(param)) {
           const obj = param;
           if (obj.operations && obj.url) {
-            console.log(`[Gravity] Twiggy.lat compatibility: Normalizing params[${i}]`);
             const operations = Array.isArray(obj.operations) ? obj.operations : [obj.operations];
             request.params[i] = operations;
             if (request.method === "requestSignBuffer" && i === 2 && Array.isArray(request.params[i])) {
-              console.log("[Gravity] Converting requestSignBuffer with operations -> requestBroadcast");
               request.method = "requestBroadcast";
+              let username = request.params[0];
+              try {
+                const firstOp = operations[0];
+                if (Array.isArray(firstOp) && firstOp[1]?.author) {
+                  username = firstOp[1].author;
+                }
+              } catch (e) {
+                console.warn("[Gravity] Could not extract username from operations");
+              }
+              const keyType = "Posting";
+              request.params = [username, operations, keyType];
             }
             break;
           }

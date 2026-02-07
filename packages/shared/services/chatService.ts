@@ -80,6 +80,16 @@ class ChatService {
             const storedKey = localStorage.getItem('gravity_chat_priv');
             const storedId = localStorage.getItem('gravity_chat_id');
 
+            if (storedUser && !storedKey) {
+                console.warn('Chat: Stored username without private key. Clearing stale identity.');
+                localStorage.removeItem('gravity_chat_id');
+                localStorage.removeItem('gravity_chat_username');
+                localStorage.removeItem('gravity_chat_priv');
+                localStorage.removeItem('gravity_chat_pub');
+                if (this.onStatusChange) this.onStatusChange('disconnected', 'Missing chat key');
+                return;
+            }
+
             if (storedUser && storedKey) {
                 console.log('Auto-logging in as', storedUser);
 
@@ -106,6 +116,10 @@ class ChatService {
 
 
         this.setupListeners();
+    }
+
+    public isConnected(): boolean {
+        return !!this.socket?.connected;
     }
 
     public syncPushSubscription(sub: any) {

@@ -93,10 +93,18 @@ const checkNodeLatency = async (url: string, iterations: number = 3): Promise<nu
 export const benchmarkNodes = async (): Promise<void> => {
     // console.log("Starting Node Benchmark...");
 
+    // Prefer primary Blurt node if it is reachable, to respect custom infrastructure
+    const primaryBlurt = BLURT_CANDIDATES[0];
+    const primaryBlurtLatency = await checkNodeLatency(primaryBlurt, 1);
+    if (primaryBlurtLatency < 99999) {
+        activeNodes[Chain.BLURT] = primaryBlurt;
+    } else {
+        await findBestNode(Chain.BLURT, BLURT_CANDIDATES);
+    }
+
     await Promise.all([
         findBestNode(Chain.HIVE, HIVE_CANDIDATES),
-        findBestNode(Chain.STEEM, STEEM_CANDIDATES),
-        findBestNode(Chain.BLURT, BLURT_CANDIDATES),
+        findBestNode(Chain.STEEM, STEEM_CANDIDATES)
     ]);
 
     // console.log("Benchmark Complete:", activeNodes);

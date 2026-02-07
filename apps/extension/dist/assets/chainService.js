@@ -70377,8 +70377,6 @@ const HIVE_CANDIDATES = [
 const STEEM_CANDIDATES = [
   "https://api.steemit.com",
   "https://api.steem.fans",
-  // Often reliable
-  // 'https://steem.61dom.com', // REMOVED (DNS Error)
   "https://api.steememory.com"
 ];
 const BLURT_CANDIDATES = [
@@ -70388,8 +70386,6 @@ const BLURT_CANDIDATES = [
   // Fallback nodes
   "https://blurt-rpc.saboin.com",
   "https://rpc.blurt.world"
-  // 'https://rpc.blurt.one', // REMOVED (502 Error)
-  // 'https://kentzz.blurt.world', // REMOVED (SSL Error)
 ];
 let activeNodes = {
   [Chain.HIVE]: HIVE_CANDIDATES[0],
@@ -70442,10 +70438,16 @@ const checkNodeLatency = async (url, iterations = 3) => {
   return 99999;
 };
 const benchmarkNodes = async () => {
+  const primaryBlurt = BLURT_CANDIDATES[0];
+  const primaryBlurtLatency = await checkNodeLatency(primaryBlurt, 1);
+  if (primaryBlurtLatency < 99999) {
+    activeNodes[Chain.BLURT] = primaryBlurt;
+  } else {
+    await findBestNode(Chain.BLURT, BLURT_CANDIDATES);
+  }
   await Promise.all([
     findBestNode(Chain.HIVE, HIVE_CANDIDATES),
-    findBestNode(Chain.STEEM, STEEM_CANDIDATES),
-    findBestNode(Chain.BLURT, BLURT_CANDIDATES)
+    findBestNode(Chain.STEEM, STEEM_CANDIDATES)
   ]);
 };
 const findBestNode = async (chain, candidates) => {
