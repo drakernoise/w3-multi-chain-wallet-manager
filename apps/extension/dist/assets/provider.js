@@ -70,6 +70,14 @@ if (!window._gravityProvider) {
           if (callback && typeof callback === "function") {
             callback(data.response);
             this.callbacks.delete(data.id);
+            try {
+              const responseEvent = new CustomEvent("hive_keychain_response", {
+                detail: { ...data.response, request_id: data.id }
+              });
+              window.dispatchEvent(responseEvent);
+              document.dispatchEvent(responseEvent);
+            } catch (e) {
+            }
           }
         }
       });

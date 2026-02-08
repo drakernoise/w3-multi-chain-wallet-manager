@@ -12978,13 +12978,31 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
   reactExports.useEffect(() => {
     if (!request || !accounts.length) return;
     const checkMultisig = async () => {
-      const username = request.params[0];
+      let username = request.params[0];
       let targetChain = chainHint;
       let account = accounts.find((a) => a.name === username && (targetChain ? a.chain === targetChain : true));
       if (!account && !targetChain) {
         account = accounts.find((a) => a.name === username && a.chain === "HIVE");
       }
       if (!account) account = accounts.find((a) => a.name === username);
+      if (!account && Array.isArray(request.params) && Array.isArray(request.params[1])) {
+        const operations = request.params[1];
+        const accountNames = accounts.map((a) => a.name.toLowerCase());
+        for (const op of operations) {
+          if (Array.isArray(op) && op.length >= 2 && typeof op[1] === "object") {
+            const opData = op[1];
+            const possibleUsers = [opData.voter, opData.from, opData.author, opData.delegator, opData.account].filter((u) => typeof u === "string");
+            for (const possibleUser of possibleUsers) {
+              if (accountNames.includes(possibleUser.toLowerCase())) {
+                username = possibleUser;
+                account = accounts.find((a) => a.name.toLowerCase() === possibleUser.toLowerCase());
+                if (account) break;
+              }
+            }
+            if (account) break;
+          }
+        }
+      }
       if (!account) return;
       const isActiveOp = ["requestTransfer", "requestPowerUp", "requestPowerDown", "requestDelegation", "requestWitnessVote"].includes(request.method);
       const authType = isActiveOp ? "active" : "posting";
@@ -13023,7 +13041,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
     }
     setProcessing(true);
     try {
-      const username = request.params[0];
+      let username = request.params[0];
       let targetChain = chainHint;
       let account = accounts.find((a) => a.name === username && (targetChain ? a.chain === targetChain : true));
       if (!account && !targetChain) {
@@ -13031,6 +13049,43 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       }
       if (!account) {
         account = accounts.find((a) => a.name === username);
+      }
+      if (!account && Array.isArray(request.params) && Array.isArray(request.params[1])) {
+        const operations = request.params[1];
+        const accountNames = accounts.map((a) => a.name.toLowerCase());
+        for (const op of operations) {
+          if (Array.isArray(op) && op.length >= 2 && typeof op[1] === "object") {
+            const opData = op[1];
+            const possibleUsers = [
+              opData.voter,
+              // vote operation
+              opData.from,
+              // transfer operation  
+              opData.author,
+              // comment/post operation (when user is posting)
+              opData.delegator,
+              // delegation operation
+              opData.account
+              // witness_vote, account_update, etc.
+            ].filter((u) => typeof u === "string");
+            for (const possibleUser of possibleUsers) {
+              if (accountNames.includes(possibleUser.toLowerCase())) {
+                username = possibleUser;
+                account = accounts.find((a) => a.name.toLowerCase() === possibleUser.toLowerCase() && (targetChain ? a.chain === targetChain : true)) || accounts.find((a) => a.name.toLowerCase() === possibleUser.toLowerCase());
+                if (account) break;
+              }
+            }
+            if (account) break;
+          }
+        }
+      }
+      if (!account && Array.isArray(request.params)) {
+        const accountNames = accounts.map((a) => a.name.toLowerCase());
+        const matched = request.params.find((p) => typeof p === "string" && accountNames.includes(p.toLowerCase()));
+        if (typeof matched === "string") {
+          username = matched;
+          account = accounts.find((a) => a.name === username && (targetChain ? a.chain === targetChain : true)) || accounts.find((a) => a.name === username);
+        }
       }
       if (!account) {
         throw new Error(t("sign.account_not_found"));

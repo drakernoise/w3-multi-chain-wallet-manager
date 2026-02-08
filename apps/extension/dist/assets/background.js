@@ -113,6 +113,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         request.params[1] = request.params[1].replace(/^@/, "");
       }
     }
+    if ((request.method === "requestVote" || request.method === "vote") && Array.isArray(request.params)) {
+      console.log("[Twiggy Vote] Raw params:", request.params);
+      const params = request.params;
+      const first = params[0];
+      if (typeof first === "string" && first.includes(".")) {
+        if (params.length >= 5 && typeof params[1] === "string") {
+          request.params = [params[1], params[2], params[3], params[4]];
+        }
+      }
+    }
     if (request.method === "requestHandshake") {
       sendResponse({ success: true, version: "1.1", msg: "Gravity Wallet Active" });
       return false;
@@ -120,7 +130,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const requestId = request.params?.requestId || request.id || Date.now().toString();
     tryAutoSign(request, sender).then((autoResult) => {
       if (autoResult) {
-        console.log("Gravity: Auto-signed request from whitelist");
         sendResponse(autoResult);
       } else {
         const chainHint = detectChainFromUrl(sender.url || sender.tab?.url);

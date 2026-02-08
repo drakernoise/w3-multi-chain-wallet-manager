@@ -75,6 +75,17 @@ if (!(window as any)._gravityProvider) {
                     if (callback && typeof callback === 'function') {
                         callback(data.response);
                         this.callbacks.delete(data.id);
+                        
+                        // Dispatch compatibility events for dApps that listen to events instead of callbacks
+                        try {
+                            const responseEvent = new CustomEvent('hive_keychain_response', { 
+                                detail: { ...data.response, request_id: data.id }
+                            });
+                            window.dispatchEvent(responseEvent);
+                            document.dispatchEvent(responseEvent);
+                        } catch (e) {
+                            // Ignore event dispatch errors
+                        }
                     }
                 }
             });

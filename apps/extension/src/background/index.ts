@@ -157,6 +157,20 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
             }
         }
 
+        // Twiggy Vote Fix: Some dApps pass domain as params[0]
+        if ((request.method === 'requestVote' || request.method === 'vote') && Array.isArray(request.params)) {
+            console.log('[Twiggy Vote] Raw params:', request.params);
+            const params = request.params;
+            const first = params[0];
+            if (typeof first === 'string' && first.includes('.')) {
+                // Expected: [username, permlink, author, weight]
+                // Possible: [domain, username, permlink, author, weight]
+                if (params.length >= 5 && typeof params[1] === 'string') {
+                    request.params = [params[1], params[2], params[3], params[4]];
+                }
+            }
+        }
+
         // Handshake is auto-approved
         if (request.method === 'requestHandshake') {
             sendResponse({ success: true, version: '1.1', msg: 'Gravity Wallet Active' });
@@ -168,7 +182,6 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         // Check Whitelist & auto-sign
         tryAutoSign(request, sender).then((autoResult) => {
             if (autoResult) {
-                console.log('Gravity: Auto-signed request from whitelist');
                 sendResponse(autoResult);
             } else {
                 const chainHint = detectChainFromUrl(sender.url || sender.tab?.url);
