@@ -1,5 +1,5 @@
 import './ws-polyfill.js';
-import { b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, i as isChainSupported, g as getChainConfig, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, j as broadcastWitnessVote } from './chainService.js';
+import { b as benchmarkNodes, C as Chain, g as getActiveNode, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, i as isChainSupported, f as getChainConfig, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, l as broadcastWitnessVote } from './chainService.js';
 import './index.js';
 
 if (typeof globalThis.WebSocket === "undefined") {
@@ -42,7 +42,25 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "offscreenKeepAlive") {
     setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
   }
+  if (alarm.name === "rpcBenchmark") {
+    runBenchmark();
+  }
 });
+async function runBenchmark() {
+  try {
+    await benchmarkNodes();
+    const activeNodes = {};
+    for (const chain of Object.values(Chain)) {
+      activeNodes[chain] = getActiveNode(chain);
+    }
+    await chrome.storage.local.set({ gravity_active_nodes: activeNodes });
+    console.log("[Gravity] RPC Benchmark complete and stored:", activeNodes);
+  } catch (e) {
+    console.error("[Gravity] RPC Benchmark failed:", e);
+  }
+}
+runBenchmark();
+chrome.alarms.create("rpcBenchmark", { periodInMinutes: 10 });
 let unreadCount = 0;
 function detectChainFromUrl(url = "") {
   if (!url) return null;
@@ -62,7 +80,9 @@ function detectChainFromUrl(url = "") {
 }
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request) return false;
+  console.log("[Gravity Background] onMessage received:", request.type, request.method || "");
   if (request.type === "gravity_request") {
+    console.log("[Gravity Background] Received request:", request.method, "from:", sender.origin || sender.url);
     if (typeof request.method !== "string" || request.method.length > 64) {
       console.warn("Gravity: Rejected invalid method (length/type)", request.method);
       sendResponse({ success: false, error: "Invalid Request: Method name too long or invalid." });
@@ -124,15 +144,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     }
     if (request.method === "requestHandshake") {
-      sendResponse({ success: true, version: "1.1", msg: "Gravity Wallet Active" });
+      const chain = detectChainFromUrl(sender.url || sender.tab?.url) || "BLURT";
+      const node = getActiveNode(chain);
+      sendResponse({
+        success: true,
+        version: "1.2",
+        msg: "Gravity Wallet Active",
+        rpc: node
+        // Provide the active RPC node to the dApp
+      });
       return false;
     }
     const requestId = request.params?.requestId || request.id || Date.now().toString();
+    console.log("[Gravity Background] Request ID:", requestId, "Checking whitelist...");
     tryAutoSign(request, sender).then((autoResult) => {
+      console.log("[Gravity Background] tryAutoSign result:", autoResult ? "auto-signed" : "needs user prompt");
       if (autoResult) {
-        sendResponse(autoResult);
+        try {
+          sendResponse(autoResult);
+        } catch (e) {
+          console.warn("[Gravity] Failed to send auto-sign response:", e);
+        }
       } else {
         const chainHint = detectChainFromUrl(sender.url || sender.tab?.url);
+        console.log("[Gravity Background] Chain hint:", chainHint, "Tab ID:", sender.tab?.id);
         const normalizedRequest = { ...request };
         const reqData = {
           data: normalizedRequest,
@@ -142,9 +177,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           chain: chainHint
         };
         chrome.storage.session.set({ [`req_${requestId}`]: reqData }, () => {
+          const lastError = chrome.runtime.lastError;
+          if (lastError) {
+            console.error("[Gravity] Session storage set failed:", lastError);
+            return;
+          }
+          console.log("[Gravity Background] Request stored, opening prompt...");
           openPrompt(requestId);
-          sendResponse({ success: true, pending: true, note: "User prompt opened" });
+          try {
+            sendResponse({ success: true, pending: true, note: "User prompt opened" });
+          } catch (e) {
+            console.warn("[Gravity] Port closed before pending response could be sent:", e);
+          }
         });
+      }
+    }).catch((err) => {
+      console.error("[Gravity] Auto-sign logic failed:", err);
+      try {
+        sendResponse({ success: false, error: "Internal auto-sign processing error" });
+      } catch (e) {
       }
     });
     return true;
@@ -158,7 +209,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (Array.isArray(data.params) && data.params[1] && typeof data.params[1] === "object" && !Array.isArray(data.params[1])) {
           const secondParam = data.params[1];
           if (secondParam.operations && secondParam.url) {
-            console.error("[Background] Defensive fix: Converting {operations, url} in params[1]");
+            console.log("[Background] Defensive fix: Converting {operations, url} in params[1]");
             data.params[1] = Array.isArray(secondParam.operations) ? secondParam.operations : [secondParam.operations];
           }
         }
@@ -170,6 +221,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     });
     return true;
+  }
+  if (request.type === "gravity_get_rpc") {
+    const chain = (request.chain || "BLURT").toUpperCase();
+    const node = getActiveNode(chain);
+    sendResponse({ success: true, rpc: node });
+    return false;
   }
   if (request.type === "gravity_resolve_request") {
     const { requestId, result, error } = request;
@@ -184,9 +241,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           id: requestId,
           // Use the original ID
           response: payload
-        }, targetOptions);
+        }, targetOptions, () => {
+          const lastError = chrome.runtime.lastError;
+          if (lastError) {
+            const errMsg = lastError.message || JSON.stringify(lastError);
+            console.error(`[Gravity] Failed to send response to tab ${pending.tabId} (frame ${pending.frameId}): ${errMsg}`);
+            if (targetOptions.frameId) {
+              console.log(`[Gravity] Attempting fallback response to entire tab ${pending.tabId}...`);
+              chrome.tabs.sendMessage(pending.tabId, {
+                type: "gravity_response",
+                id: requestId,
+                response: payload
+              }, () => {
+                if (chrome.runtime.lastError) {
+                  console.error(`[Gravity] Fallback also failed: ${chrome.runtime.lastError.message}`);
+                }
+              });
+            }
+          }
+        });
         chrome.storage.session.remove([`req_${requestId}`]);
       }
+    }).catch((err) => {
+      console.error("[Gravity] Error resolving request from storage:", err);
     });
     sendResponse({ ack: true });
     return false;
@@ -231,6 +308,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ack: true });
     return false;
   }
+  if (request.type === "CHAT_CHECK_PUSH") {
+    getExistingSubscription().then((sub) => sendResponse({ success: true, subscription: sub })).catch((err) => sendResponse({ success: false, error: err.toString() }));
+    return true;
+  }
+  if (request.type === "CHAT_ENABLE_PUSH") {
+    manualPushSubscribe().then((sub) => sendResponse({ success: true, subscription: sub })).catch((err) => sendResponse({ success: false, error: err.message || err.toString() }));
+    return true;
+  }
+  return false;
 });
 function updateBadge() {
   const text = unreadCount > 0 ? unreadCount > 9 ? "9+" : String(unreadCount) : "";
@@ -315,9 +401,13 @@ async function tryAutoSign(request, sender) {
       const targetChain = request.requestChain || account.chain;
       const useLegacySigner = url.includes("tribaldex") || url.includes("hive-engine");
       response = await signMessage(targetChain, message, keyStr, useLegacySigner);
+      console.log("[AutoSign] signMessage response:", response);
+      console.log("[AutoSign] Chain:", targetChain, "Message length:", typeof message === "string" ? message.length : "non-string");
     } else if (isBroadcast) {
       let operations = request.params[1];
       const keyType = request.params[2];
+      console.log("[Broadcast] Full request.params:", JSON.stringify(request.params, null, 2));
+      console.log("[Broadcast] Account used:", { name: account.name, chain: account.chain });
       if (operations && typeof operations === "object" && !Array.isArray(operations)) {
         console.error("[Broadcast] ⚠️ Detected non-array operations object:", Object.keys(operations));
         if (operations.operations) {
@@ -352,16 +442,36 @@ async function tryAutoSign(request, sender) {
           "delegate_rc",
           "create_proposal",
           "update_proposal_votes",
-          "remove_proposal"
+          "remove_proposal",
+          // Market operations (wallet.hive.blog, etc.)
+          "limit_order_create",
+          "limit_order_create2",
+          "limit_order_cancel",
+          "convert",
+          "collateralized_convert",
+          "fill_convert_request",
+          "cancel_transfer_from_savings",
+          "set_withdraw_vesting_route"
         ];
         return activeKeyOps.includes(opName);
       });
       let keyStr = "";
       const normalizedKeyType = (keyType || "").toLowerCase();
+      console.log("[Broadcast] Key selection debug:", {
+        keyType,
+        normalizedKeyType,
+        requiresActiveKey,
+        hasActiveKey: !!account.activeKey,
+        activeKeyPrefix: account.activeKey ? account.activeKey.substring(0, 10) + "..." : "NONE",
+        hasPostingKey: !!account.postingKey,
+        chain: account.chain,
+        username: account.name
+      });
       if (normalizedKeyType === "posting") keyStr = account.postingKey || "";
       else if (normalizedKeyType === "active") keyStr = account.activeKey || "";
       else if (requiresActiveKey) keyStr = account.activeKey || "";
       else keyStr = account.activeKey || "";
+      console.log("[Broadcast] Selected key prefix:", keyStr ? keyStr.substring(0, 10) + "..." : "EMPTY");
       if (requiresActiveKey && keyStr !== account.activeKey) {
         console.log("[Background] Auto-selecting Active key for operation requiring active authority");
       }
@@ -437,13 +547,31 @@ async function tryAutoSign(request, sender) {
       return { success: false, error: response.error || "Operation failed" };
     }
     const finalResult = response.opResult || response.txId || response.result || "success";
-    const result = isSignBuffer ? { result: response.result, message: "Signed successfully", ...response } : {
+    const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
+    const result = isSignBuffer ? {
+      success: true,
+      result: response.result,
+      signature: response.result,
+      // Compatibility
+      publicKey: response.publicKey,
+      pubkey: response.publicKey,
+      // Compatibility
+      // CRITICAL: blurt.media/peerhub expects data.username
+      data: {
+        username,
+        publicKey: response.publicKey,
+        signature: response.result
+      },
+      message: "Signed successfully",
+      ...restResponse
+    } : {
       result: finalResult,
       tx_id: response.txId,
       broadcastPayload: finalResult,
       message: "Signed successfully",
       ...response
     };
+    console.log("[AutoSign] Final result to send:", result);
     return { success: true, pending: false, ...result };
   } catch (e) {
     console.error("Auto-sign failed:", e);
@@ -511,16 +639,6 @@ async function manualPushSubscribe() {
     throw e;
   }
 }
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.type === "CHAT_CHECK_PUSH") {
-    getExistingSubscription().then((sub) => sendResponse({ success: true, subscription: sub })).catch((err) => sendResponse({ success: false, error: err.toString() }));
-    return true;
-  }
-  if (msg.type === "CHAT_ENABLE_PUSH") {
-    manualPushSubscribe().then((sub) => sendResponse({ success: true, subscription: sub })).catch((err) => sendResponse({ success: false, error: err.message || err.toString() }));
-    return true;
-  }
-});
 self.addEventListener("push", (event) => {
   console.log("Gravity: Push Event Received");
   let data = {};

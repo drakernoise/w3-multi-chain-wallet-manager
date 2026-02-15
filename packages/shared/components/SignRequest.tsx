@@ -200,6 +200,17 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 throw new Error(t('sign.account_not_found'));
             }
 
+            // DEBUG: Log account keys availability
+            console.log('[SignRequest] Account found:', {
+                name: account.name,
+                chain: account.chain,
+                hasActiveKey: !!account.activeKey,
+                activeKeyPrefix: account.activeKey ? account.activeKey.substring(0, 8) + '...' : 'NONE',
+                hasPostingKey: !!account.postingKey,
+                postingKeyPrefix: account.postingKey ? account.postingKey.substring(0, 8) + '...' : 'NONE',
+                hasMemoKey: !!account.memoKey
+            });
+
             if (isMultisig && multisigProgress && !multisigProgress.canBroadcast) {
                 // If it's a multisig account and we haven't reached the threshold yet,
                 // we perform a "Partial Sign" (Authorized Step)
@@ -299,6 +310,15 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 const message = request.params[1];
                 const type = request.params[2]; // Key type: 'Posting', 'Active', 'Memo'
 
+                console.log('[SignRequest] signBuffer request:', {
+                    chain: account.chain,
+                    username: account.name,
+                    keyType: type,
+                    messageType: typeof message,
+                    messageLength: typeof message === 'string' ? message.length : 'N/A',
+                    messagePreview: typeof message === 'string' ? message.substring(0, 100) : JSON.stringify(message).substring(0, 100)
+                });
+
                 let keyStr = "";
                 if (type === 'Posting') keyStr = account.postingKey || "";
                 else if (type === 'Active') keyStr = account.activeKey || "";
@@ -308,12 +328,41 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = signMessage(account.chain, message, keyStr);
 
-                // console.log('SignRequest: signMessage response:', response); // Debug only
+                console.log('[SignRequest] signMessage response:', {
+                    success: response.success,
+                    error: response.error,
+                    resultLength: response.result ? response.result.length : 0,
+                    resultPreview: response.result ? response.result.substring(0, 40) + '...' : 'NONE',
+                    publicKey: response.publicKey
+                });
 
                 if (!response.success) throw new Error(response.error);
-                result = { result: response.result, message: t('sign.success'), ...response };
+                
+                // Compatibility: Add multiple field names for different dApp expectations
+                // Note: response already contains success, result, publicKey
+                const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
+                result = { 
+                    success: true,
+                    result: response.result,
+                    signature: response.result,  // Some dApps expect 'signature'
+                    publicKey: response.publicKey,
+                    pubkey: response.publicKey,  // Some dApps expect 'pubkey'
+                    // CRITICAL: blurt.media/peerhub expects data.username
+                    data: {
+                        username: account.name,
+                        message: message,
+                        publicKey: response.publicKey,
+                        signature: response.result
+                    },
+                    message: t('sign.success'),
+                    ...restResponse 
+                };
 
-                // console.log('SignRequest: signBuffer result:', result); // Debug only
+                console.log('[SignRequest] Final result to return:', {
+                    hasResult: !!result.result,
+                    hasPublicKey: !!result.publicKey,
+                    keys: Object.keys(result)
+                });
 
             } else if (isBroadcast) {
                 // Generic Broadcast
@@ -358,7 +407,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                         'delegate_rc',
                         'create_proposal',
                         'update_proposal_votes',
-                        'remove_proposal'
+                        'remove_proposal',
+                        // Market operations (wallet.hive.blog, etc.)
+                        'limit_order_create',
+                        'limit_order_create2',
+                        'limit_order_cancel',
+                        'convert',
+                        'collateralized_convert',
+                        'fill_convert_request',
+                        'cancel_transfer_from_savings',
+                        'set_withdraw_vesting_route'
                     ];
                     return activeKeyOps.includes(opName);
                 });
@@ -371,13 +429,31 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // If Posting requested but missing, try Active
                 if (!key && account.activeKey) key = account.activeKey;
 
+                // DEBUG: Log key selection
+                console.log('[SignRequest Broadcast] Key selection:', {
+                    keyType,
+                    requiresActiveKey,
+                    hasActiveKey: !!account.activeKey,
+                    hasPostingKey: !!account.postingKey,
+                    selectedKeyPrefix: key ? key.substring(0, 10) + '...' : 'NONE',
+                    operations: operations.map((op: any) => Array.isArray(op) ? op[0] : op.type)
+                });
+
                 const requiredKeyType = requiresActiveKey ? 'Active' : (keyType || 'Posting');
                 if (!key) throw new Error(t('sign.key_missing_type').replace('{type}', requiredKeyType));
 
-                // Auto-select Active key for operations that require it (e.g., witness_update)
-                if (requiresActiveKey && key !== account.activeKey) {
-                    console.log('[SignRequest] Auto-selecting Active key for operation requiring active authority');
+                // CRITICAL: If operation requires Active key but we selected wrong key, force Active
+                if (requiresActiveKey && key !== account.activeKey && account.activeKey) {
+                    console.log('[SignRequest] FORCING Active key for operation requiring active authority');
+                    key = account.activeKey;
                 }
+
+                // Final verification log
+                console.log('[SignRequest Broadcast] FINAL key being used:', {
+                    keyPrefix: key.substring(0, 10) + '...',
+                    isActiveKey: key === account.activeKey,
+                    requiresActiveKey
+                });
 
                 const response = await broadcastOperations(account.chain, key, operations);
                 if (!response.success) throw new Error(response.error);

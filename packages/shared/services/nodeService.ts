@@ -17,9 +17,10 @@ export const STEEM_CANDIDATES = [
 
 export const BLURT_CANDIDATES = [
     'https://rpc.drakernoise.com', // Primary node (user's own node)
-    'https://rpc.beblurt.com', // Fallback nodes
+    'https://rpc.beblurt.com',     // Fallback nodes
     'https://blurt-rpc.saboin.com',
-    'https://rpc.blurt.world',
+    'https://api.blurt.blog',
+    'https://rpc.blurt.world'      // Last resort fallback
 ];
 
 // Active nodes state (in-memory)
@@ -30,6 +31,33 @@ let activeNodes: Record<Chain, string> = {
     [Chain.STEEM]: STEEM_CANDIDATES[0],
     [Chain.BLURT]: BLURT_CANDIDATES[0] // https://rpc.drakernoise.com (user's primary node)
 };
+
+// Flag to track if we've synced from storage
+let nodesSyncedFromStorage = false;
+
+// Sync nodes from chrome.storage.local (for popup/content script contexts)
+const syncNodesFromStorage = async (): Promise<void> => {
+    if (nodesSyncedFromStorage) return;
+    try {
+        // @ts-ignore - chrome may not exist in all contexts
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            const result = await chrome.storage.local.get(['gravity_active_nodes']);
+            if (result.gravity_active_nodes) {
+                const stored = result.gravity_active_nodes;
+                if (stored.HIVE) activeNodes[Chain.HIVE] = stored.HIVE;
+                if (stored.STEEM) activeNodes[Chain.STEEM] = stored.STEEM;
+                if (stored.BLURT) activeNodes[Chain.BLURT] = stored.BLURT;
+                console.log('[NodeService] Synced nodes from storage:', activeNodes);
+            }
+        }
+    } catch (e) {
+        // Ignore - storage may not be available
+    }
+    nodesSyncedFromStorage = true;
+};
+
+// Initialize sync on module load
+syncNodesFromStorage();
 
 // Multiple latency checks for more accurate benchmarking
 const checkNodeLatency = async (url: string, iterations: number = 3): Promise<number> => {
@@ -137,7 +165,24 @@ const findBestNode = async (chain: Chain, candidates: string[]) => {
 };
 
 export const getActiveNode = (chain: Chain): string => {
-    return activeNodes[chain];
+    // Ensure we have a valid URL - never return undefined
+    const node = activeNodes[chain];
+    if (!node) {
+        // Fallback to defaults if somehow undefined
+        const defaults: Record<Chain, string> = {
+            [Chain.HIVE]: 'https://api.hive.blog',
+            [Chain.STEEM]: 'https://api.steemit.com',
+            [Chain.BLURT]: 'https://rpc.drakernoise.com'
+        };
+        return defaults[chain] || 'https://api.hive.blog';
+    }
+    return node;
+};
+
+// Ensure sync happens and return active node (async version for reliability)
+export const getActiveNodeAsync = async (chain: Chain): Promise<string> => {
+    await syncNodesFromStorage();
+    return getActiveNode(chain);
 };
 
 export const updateActiveNode = (chain: Chain, url: string): void => {

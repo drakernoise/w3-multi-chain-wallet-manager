@@ -1,8 +1,24 @@
+chrome.storage.local.get(["gravity_active_nodes"], (res) => {
+  if (res.gravity_active_nodes) {
+    document.documentElement.dataset.gravityActiveRpc = JSON.stringify(res.gravity_active_nodes);
+  }
+});
 window.addEventListener("message", (event) => {
-  if (event.source !== window || !event.data || event.data.type !== "gravity_request") {
+  if (event.source !== window || !event.data) {
     return;
   }
+  if (event.data.type !== "gravity_request") {
+    return;
+  }
+  console.log("[Gravity Content] Received request:", event.data.method, event.data.id);
+  console.log("[Gravity Content] Sending to background...");
   chrome.runtime.sendMessage(event.data, (response) => {
+    const lastError = chrome.runtime.lastError;
+    if (lastError) {
+      console.error("[Gravity Content] sendMessage FAILED:", lastError.message);
+      return;
+    }
+    console.log("[Gravity Content] Got response from background:", response);
     if (response && response.pending !== true) {
       window.postMessage({
         type: "gravity_response",
@@ -12,8 +28,14 @@ window.addEventListener("message", (event) => {
     }
   });
 });
-chrome.runtime.onMessage.addListener((msg, _sender, _sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  console.log("[Gravity Content] Message from background:", msg.type);
   if (msg.type === "gravity_response") {
+    console.log("[Gravity Content] Posting response to page:", msg.id);
     window.postMessage(msg, "*");
+    if (typeof sendResponse === "function") {
+      sendResponse({ ack: true });
+    }
   }
+  return false;
 });

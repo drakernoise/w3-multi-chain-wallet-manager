@@ -70385,7 +70385,9 @@ const BLURT_CANDIDATES = [
   "https://rpc.beblurt.com",
   // Fallback nodes
   "https://blurt-rpc.saboin.com",
+  "https://api.blurt.blog",
   "https://rpc.blurt.world"
+  // Last resort fallback
 ];
 let activeNodes = {
   [Chain.HIVE]: HIVE_CANDIDATES[0],
@@ -70393,6 +70395,25 @@ let activeNodes = {
   [Chain.BLURT]: BLURT_CANDIDATES[0]
   // https://rpc.drakernoise.com (user's primary node)
 };
+let nodesSyncedFromStorage = false;
+const syncNodesFromStorage = async () => {
+  if (nodesSyncedFromStorage) return;
+  try {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      const result = await chrome.storage.local.get(["gravity_active_nodes"]);
+      if (result.gravity_active_nodes) {
+        const stored = result.gravity_active_nodes;
+        if (stored.HIVE) activeNodes[Chain.HIVE] = stored.HIVE;
+        if (stored.STEEM) activeNodes[Chain.STEEM] = stored.STEEM;
+        if (stored.BLURT) activeNodes[Chain.BLURT] = stored.BLURT;
+        console.log("[NodeService] Synced nodes from storage:", activeNodes);
+      }
+    }
+  } catch (e) {
+  }
+  nodesSyncedFromStorage = true;
+};
+syncNodesFromStorage();
 const checkNodeLatency = async (url, iterations = 3) => {
   const latencies = [];
   for (let i = 0; i < iterations; i++) {
@@ -70438,14 +70459,17 @@ const checkNodeLatency = async (url, iterations = 3) => {
   return 99999;
 };
 const benchmarkNodes = async () => {
-  const primaryBlurt = BLURT_CANDIDATES[0];
-  const primaryBlurtLatency = await checkNodeLatency(primaryBlurt, 1);
-  if (primaryBlurtLatency < 99999) {
-    activeNodes[Chain.BLURT] = primaryBlurt;
-  } else {
-    await findBestNode(Chain.BLURT, BLURT_CANDIDATES);
-  }
+  const benchmarkBlurt = async () => {
+    const primaryBlurt = BLURT_CANDIDATES[0];
+    const primaryLatency = await checkNodeLatency(primaryBlurt);
+    if (primaryLatency < 99999) {
+      activeNodes[Chain.BLURT] = primaryBlurt;
+    } else {
+      await findBestNode(Chain.BLURT, BLURT_CANDIDATES.slice(1));
+    }
+  };
   await Promise.all([
+    benchmarkBlurt(),
     findBestNode(Chain.HIVE, HIVE_CANDIDATES),
     findBestNode(Chain.STEEM, STEEM_CANDIDATES)
   ]);
@@ -70464,7 +70488,16 @@ const findBestNode = async (chain, candidates) => {
   }
 };
 const getActiveNode = (chain) => {
-  return activeNodes[chain];
+  const node = activeNodes[chain];
+  if (!node) {
+    const defaults = {
+      [Chain.HIVE]: "https://api.hive.blog",
+      [Chain.STEEM]: "https://api.steemit.com",
+      [Chain.BLURT]: "https://rpc.drakernoise.com"
+    };
+    return defaults[chain] || "https://api.hive.blog";
+  }
+  return node;
 };
 
 const CHAIN_CONFIGS = {
@@ -70507,8 +70540,8 @@ const CHAIN_CONFIGS = {
       "https://rpc.drakernoise.com",
       "https://rpc.beblurt.com",
       "https://blurt-rpc.saboin.com",
-      "https://rpc.blurt.world",
-      "https://api.blurt.blog"
+      "https://api.blurt.blog",
+      "https://rpc.blurt.world"
     ],
     explorerUrl: {
       transaction: "https://blocks.blurtwallet.com/#/tx/{tx}",
@@ -88573,6 +88606,17 @@ function requireLib () {
 
 var libExports = requireLib();
 
+const parseJsonResponse = async (response, nodeUrl) => {
+  const text = await response.text();
+  if (text.trim().startsWith("<") || text.includes("<!DOCTYPE") || text.includes("<html")) {
+    throw new Error(`Node ${nodeUrl} returned HTML instead of JSON (likely maintenance or Cloudflare error)`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Unable to parse endpoint data. Response: ${text.substring(0, 100)}...`);
+  }
+};
 const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
   const propsResponse = await fetch(nodeUrl, {
     method: "POST",
@@ -88588,7 +88632,10 @@ const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
       // Hint for connection reuse (browser handles automatically)
     }
   });
-  const propsJson = await propsResponse.json();
+  if (!propsResponse.ok) {
+    throw new Error(`Node ${nodeUrl} returned HTTP ${propsResponse.status}`);
+  }
+  const propsJson = await parseJsonResponse(propsResponse, nodeUrl);
   if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
   const props = propsJson.result;
   const ref_block_num = props.head_block_number & 65535;
@@ -88617,7 +88664,10 @@ const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
       // Hint for connection reuse (browser handles automatically)
     }
   });
-  const broadcastResult = await broadcastResponse.json();
+  if (!broadcastResponse.ok) {
+    throw new Error(`Node ${nodeUrl} returned HTTP ${broadcastResponse.status}`);
+  }
+  const broadcastResult = await parseJsonResponse(broadcastResponse, nodeUrl);
   if (broadcastResult.error) {
     throw new Error(broadcastResult.error.message || JSON.stringify(broadcastResult.error));
   }
@@ -89084,6 +89134,7 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
 };
 const broadcastOperations = async (chain, activeKey, operations) => {
   const nodeUrl = getActiveNode(chain);
+  console.log("[BroadcastOps] Chain:", chain, "NodeUrl:", nodeUrl, "Operations:", operations);
   const normalizedOps = (operations || []).map((op) => {
     if (Array.isArray(op)) return op;
     if (op && typeof op === "object") {
@@ -89103,24 +89154,67 @@ const broadcastOperations = async (chain, activeKey, operations) => {
     }
     return op;
   });
-  try {
+  const getFallbackNodes = (chain2) => {
+    const nodes = {
+      [Chain.HIVE]: ["https://api.deathwing.me", "https://techcoderx.com", "https://rpc.mahdiyari.info", "https://hive-api.3speak.tv"],
+      [Chain.STEEM]: ["https://api.steemit.com", "https://api.steem.fans", "https://api.justyy.com"],
+      [Chain.BLURT]: ["https://rpc.drakernoise.com", "https://rpc.beblurt.com", "https://api.blurt.blog"]
+    };
+    return nodes[chain2] || [];
+  };
+  const isAuthorityError = (errorMsg) => {
+    const authorityPatterns = [
+      "missing required active authority",
+      "missing required posting authority",
+      "Missing Active Authority",
+      "Missing Posting Authority",
+      "check_authority",
+      "Invalid key",
+      "Key not found"
+    ];
+    return authorityPatterns.some((p) => errorMsg.toLowerCase().includes(p.toLowerCase()));
+  };
+  const tryBroadcast = async (node) => {
     if (chain === Chain.HIVE) {
-      const result = await broadcastHiveTransaction(nodeUrl, cleanOperations, activeKey);
-      return { success: true, txId: result.id, opResult: result };
+      return await broadcastHiveTransaction(node, cleanOperations, activeKey);
     } else if (chain === Chain.STEEM) {
-      const client = new indexBrowserExports.Client(nodeUrl);
+      const client = new indexBrowserExports.Client(node);
       const key = indexBrowserExports.PrivateKey.fromString(activeKey);
-      const result = await client.broadcast.sendOperations(cleanOperations, key);
-      return { success: true, txId: result.id, opResult: result };
+      return await client.broadcast.sendOperations(cleanOperations, key);
     } else if (chain === Chain.BLURT) {
-      const result = await broadcastBlurtTransaction(nodeUrl, cleanOperations, activeKey);
-      return { success: true, txId: result.id, opResult: result };
+      return await broadcastBlurtTransaction(node, cleanOperations, activeKey);
     }
-    return { success: false, error: "Chain not supported" };
-  } catch (e) {
-    console.error("Broadcast Ops Error:", e);
-    return { success: false, error: formatChainError(e) };
+    throw new Error("Chain not supported");
+  };
+  const nodesToTry = [nodeUrl, ...getFallbackNodes(chain).filter((n) => n !== nodeUrl)];
+  let lastError = null;
+  let authorityErrorOccurred = false;
+  for (const node of nodesToTry) {
+    try {
+      console.log("[BroadcastOps] Trying node:", node);
+      const result = await tryBroadcast(node);
+      console.log("[BroadcastOps] Success with node:", node);
+      return { success: true, txId: result.id, opResult: result };
+    } catch (e) {
+      const errMsg = e.message || String(e);
+      console.warn("[BroadcastOps] Node failed:", node, errMsg);
+      if (isAuthorityError(errMsg)) {
+        console.error("[BroadcastOps] Authority error detected, not retrying");
+        authorityErrorOccurred = true;
+        lastError = e;
+        break;
+      }
+      if (errMsg.includes("Unexpected token") && errMsg.includes("<")) {
+        console.warn("[BroadcastOps] Node returned HTML, skipping:", node);
+      }
+      lastError = e;
+    }
   }
+  console.error("Broadcast Ops Error:", lastError);
+  if (authorityErrorOccurred) {
+    return { success: false, error: "Missing required authority. Please verify you have the correct Active key for this account." };
+  }
+  return { success: false, error: formatChainError(lastError) };
 };
 const broadcastBulkTransfer = async (chain, from, activeKey, items, tokenSymbol) => {
   const defaultToken = chain === Chain.HIVE ? "HIVE" : chain === Chain.STEEM ? "STEEM" : "BLURT";
@@ -89419,4 +89513,4 @@ const signMessage = (chain, message, keyStr, _useLegacySigner = false) => {
   }
 };
 
-export { detectWeb3Context as A, benchmarkNodes as B, Chain as C, ViewState as V, broadcastVote as a, broadcastTransfer as b, broadcastCustomJson as c, broadcastOperations as d, broadcastPowerUp as e, broadcastPowerDown as f, getChainConfig as g, broadcastDelegation as h, isChainSupported as i, broadcastWitnessVote as j, global as k, checkAccountExists as l, broadcastSavingsDeposit as m, broadcastSavingsWithdraw as n, fetchAccountData as o, broadcastRCDelegate as p, broadcastRCUndelegate as q, requireCryptoBrowserify as r, signMessage as s, broadcastBulkTransfer as t, indexBrowserExports$1 as u, indexBrowserExports as v, validateAccountKeys as w, fetchAccountHistory as x, getAccountAuthorities as y, fetchBalances as z };
+export { getAccountAuthorities as A, fetchBalances as B, Chain as C, detectWeb3Context as D, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, global as m, checkAccountExists as n, broadcastSavingsDeposit as o, broadcastSavingsWithdraw as p, fetchAccountData as q, requireCryptoBrowserify as r, signMessage as s, broadcastRCDelegate as t, broadcastRCUndelegate as u, broadcastBulkTransfer as v, indexBrowserExports$1 as w, indexBrowserExports as x, validateAccountKeys as y, fetchAccountHistory as z };

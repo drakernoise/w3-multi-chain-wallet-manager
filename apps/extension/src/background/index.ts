@@ -1,6 +1,8 @@
 import './polyfill';
 import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote } from '@services/chainService';
 import { getChainConfig, isChainSupported } from '@config/chainConfig';
+import { getActiveNode, benchmarkNodes } from '@services/nodeService';
+import { Chain } from 'gravity-shared/types';
 
 declare var chrome: any;
 
@@ -41,7 +43,30 @@ chrome.alarms.onAlarm.addListener((alarm: any) => {
     if (alarm.name === 'offscreenKeepAlive') {
         setupOffscreenDocument(OFFSCREEN_DOCUMENT_PATH);
     }
+    if (alarm.name === 'rpcBenchmark') {
+        runBenchmark();
+    }
 });
+
+// RPC Benchmarking & Synchronization
+async function runBenchmark() {
+    try {
+        await benchmarkNodes();
+        const activeNodes: any = {};
+        // Store healthy nodes for all supported chains
+        for (const chain of Object.values(Chain)) {
+            activeNodes[chain] = getActiveNode(chain as Chain);
+        }
+        await chrome.storage.local.set({ gravity_active_nodes: activeNodes });
+        console.log('[Gravity] RPC Benchmark complete and stored:', activeNodes);
+    } catch (e) {
+        console.error('[Gravity] RPC Benchmark failed:', e);
+    }
+}
+
+// Initial benchmark
+runBenchmark();
+chrome.alarms.create('rpcBenchmark', { periodInMinutes: 10 });
 
 let unreadCount = 0;
 
@@ -82,11 +107,13 @@ function detectChainFromUrl(url: string = ""): string | null {
 // Listen for messages from Content Script or Popup
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
     if (!request) return false;
-    // console.log("Gravity Debug: MESSAGE RECEIVED", request.type, request.method); // Debug only
-    // console.log("Gravity: MSG", request.type, request.method); // Debug only
+    
+    console.log('[Gravity Background] onMessage received:', request.type, request.method || '');
 
     // 1. Request from Web Page (via Content Script)
     if (request.type === 'gravity_request') {
+        console.log('[Gravity Background] Received request:', request.method, 'from:', sender.origin || sender.url);
+        
         // Validation: Prevent giant strings or invalid types (Fuzzer protection)
         if (typeof request.method !== 'string' || request.method.length > 64) {
             console.warn("Gravity: Rejected invalid method (length/type)", request.method);
@@ -96,7 +123,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
 
         // COMPATIBILITY FIX: Normalize parameters format from sites like twiggy.lat
         // Some sites send {operations, url} instead of [username, operations, key]
-        
+
         // Case 1: params is entire object {operations, url}
         if (request.params && typeof request.params === 'object' && !Array.isArray(request.params)) {
             const params = request.params as any;
@@ -107,7 +134,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                 request.params = [username, operations, key];
             }
         }
-        
+
         // Case 2: params is array with {operations, url} object at ANY position
         if (Array.isArray(request.params)) {
             for (let i = 0; i < request.params.length; i++) {
@@ -117,11 +144,11 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                     if (obj.operations && obj.url) {
                         const operations = Array.isArray(obj.operations) ? obj.operations : [obj.operations];
                         request.params[i] = operations;
-                        
+
                         // CRITICAL FIX: twiggy.lat calls requestSignBuffer with operations, convert to requestBroadcast
                         if (request.method === 'requestSignBuffer' && i === 2 && Array.isArray(request.params[i])) {
                             request.method = 'requestBroadcast';
-                            
+
                             // Extract username from operations[0][1].author
                             let username = request.params[0];
                             try {
@@ -132,14 +159,14 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                             } catch (e) {
                                 console.warn('[Gravity] Could not extract username from operations');
                             }
-                            
+
                             // Determine key type (default to Posting for blt/hive/steem prefixes)
                             const keyType = 'Posting';
-                            
+
                             // Reorganize params: [username, operations, keyType]
                             request.params = [username, operations, keyType];
                         }
-                        
+
                         break;
                     }
                 }
@@ -173,22 +200,36 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
 
         // Handshake is auto-approved
         if (request.method === 'requestHandshake') {
-            sendResponse({ success: true, version: '1.1', msg: 'Gravity Wallet Active' });
+            const chain = detectChainFromUrl(sender.url || sender.tab?.url) || 'BLURT';
+            const node = getActiveNode(chain as Chain);
+            sendResponse({
+                success: true,
+                version: '1.2',
+                msg: 'Gravity Wallet Active',
+                rpc: node // Provide the active RPC node to the dApp
+            });
             return false;
         }
 
         const requestId = request.params?.requestId || request.id || Date.now().toString();
+        console.log('[Gravity Background] Request ID:', requestId, 'Checking whitelist...');
 
         // Check Whitelist & auto-sign
         tryAutoSign(request, sender).then((autoResult) => {
+            console.log('[Gravity Background] tryAutoSign result:', autoResult ? 'auto-signed' : 'needs user prompt');
             if (autoResult) {
-                sendResponse(autoResult);
+                try {
+                    sendResponse(autoResult);
+                } catch (e) {
+                    console.warn('[Gravity] Failed to send auto-sign response:', e);
+                }
             } else {
                 const chainHint = detectChainFromUrl(sender.url || sender.tab?.url);
+                console.log('[Gravity Background] Chain hint:', chainHint, 'Tab ID:', sender.tab?.id);
 
                 // ENSURE normalization happened before storing
                 const normalizedRequest = { ...request };
-                
+
                 // Store request consistently in Session Storage (Persists across SW sleep)
                 const reqData = {
                     data: normalizedRequest,
@@ -199,13 +240,30 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                 };
 
                 chrome.storage.session.set({ [`req_${requestId}`]: reqData }, () => {
+                    const lastError = chrome.runtime.lastError;
+                    if (lastError) {
+                        console.error('[Gravity] Session storage set failed:', lastError);
+                        return;
+                    }
+                    
+                    console.log('[Gravity Background] Request stored, opening prompt...');
                     openPrompt(requestId);
-                    sendResponse({ success: true, pending: true, note: 'User prompt opened' });
+
+                    try {
+                        sendResponse({ success: true, pending: true, note: 'User prompt opened' });
+                    } catch (e) {
+                        console.warn('[Gravity] Port closed before pending response could be sent:', e);
+                    }
                 });
             }
+        }).catch(err => {
+            console.error('[Gravity] Auto-sign logic failed:', err);
+            try {
+                sendResponse({ success: false, error: 'Internal auto-sign processing error' });
+            } catch (e) { }
         });
 
-        return true; // Keep channel open
+        return true; // Explicitly KEEP CHANNEL OPEN for async response
     }
 
     // 3. Popup asking for Request Details
@@ -213,23 +271,23 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         const requestId = request.requestId;
         chrome.storage.session.get([`req_${requestId}`]).then((res: any) => {
             const req = res[`req_${requestId}`];
-            
+
             // Defensive normalization when retrieving from storage
             if (req && req.data && req.data.params) {
                 const data = req.data;
-                
+
                 // Check if params[1] is the problematic {operations, url} object
-                if (Array.isArray(data.params) && data.params[1] && 
+                if (Array.isArray(data.params) && data.params[1] &&
                     typeof data.params[1] === 'object' && !Array.isArray(data.params[1])) {
                     const secondParam = data.params[1] as any;
                     if (secondParam.operations && secondParam.url) {
                         console.log('[Background] Defensive fix: Converting {operations, url} in params[1]');
-                        data.params[1] = Array.isArray(secondParam.operations) ? 
+                        data.params[1] = Array.isArray(secondParam.operations) ?
                             secondParam.operations : [secondParam.operations];
                     }
                 }
             }
-            
+
             sendResponse({
                 request: req ? req.data : null,
                 origin: req ? req.origin : null,
@@ -237,6 +295,14 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
             });
         });
         return true; // Async response
+    }
+
+    // 4. Request for Active RPC Node
+    if (request.type === 'gravity_get_rpc') {
+        const chain = (request.chain || 'BLURT').toUpperCase();
+        const node = getActiveNode(chain as Chain);
+        sendResponse({ success: true, rpc: node });
+        return false;
     }
 
     // 2. Response from Popup (User Accepted/Rejected)
@@ -256,11 +322,35 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                     type: 'gravity_response',
                     id: requestId, // Use the original ID
                     response: payload
-                }, targetOptions);
+                }, targetOptions, () => {
+                    const lastError = chrome.runtime.lastError;
+                    if (lastError) {
+                        const errMsg = lastError.message || JSON.stringify(lastError);
+                        console.error(`[Gravity] Failed to send response to tab ${pending.tabId} (frame ${pending.frameId}): ${errMsg}`);
+
+                        // Fallback: Try sending to the tab in general if frame-specific failed
+                        if (targetOptions.frameId) {
+                            console.log(`[Gravity] Attempting fallback response to entire tab ${pending.tabId}...`);
+                            chrome.tabs.sendMessage(pending.tabId, {
+                                type: 'gravity_response',
+                                id: requestId,
+                                response: payload
+                            }, () => {
+                                if (chrome.runtime.lastError) {
+                                    console.error(`[Gravity] Fallback also failed: ${chrome.runtime.lastError.message}`);
+                                }
+                            });
+                        }
+                    }
+                });
+
                 // Cleanup
                 chrome.storage.session.remove([`req_${requestId}`]);
             }
+        }).catch((err: any) => {
+            console.error('[Gravity] Error resolving request from storage:', err);
         });
+
         // We don't necessarily need to sendResponse to the popup, but good practice
         sendResponse({ ack: true });
         return false;
@@ -322,6 +412,24 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         sendResponse({ ack: true });
         return false;
     }
+
+    // === WEB PUSH UI REQUESTS (Merged from secondary listener) ===
+    if (request.type === 'CHAT_CHECK_PUSH') {
+        getExistingSubscription()
+            .then(sub => sendResponse({ success: true, subscription: sub }))
+            .catch(err => sendResponse({ success: false, error: err.toString() }));
+        return true; // Async response
+    }
+
+    if (request.type === 'CHAT_ENABLE_PUSH') {
+        manualPushSubscribe()
+            .then(sub => sendResponse({ success: true, subscription: sub }))
+            .catch(err => sendResponse({ success: false, error: err.message || err.toString() }));
+        return true; // Async response
+    }
+
+    // console.log("[Gravity] Message not handled by main listener:", request.type || request.method || request);
+    return false;
 });
 
 function updateBadge() {
@@ -443,10 +551,16 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             const useLegacySigner = url.includes('tribaldex') || url.includes('hive-engine');
 
             response = await signMessage(targetChain, message, keyStr, useLegacySigner);
+            console.log('[AutoSign] signMessage response:', response);
+            console.log('[AutoSign] Chain:', targetChain, 'Message length:', typeof message === 'string' ? message.length : 'non-string');
 
         } else if (isBroadcast) {
             let operations = request.params[1];
             const keyType = request.params[2];
+
+            // DEBUG: Full broadcast request
+            console.log('[Broadcast] Full request.params:', JSON.stringify(request.params, null, 2));
+            console.log('[Broadcast] Account used:', { name: account.name, chain: account.chain });
 
             // ROBUST CHECK: Handle {operations, url} object that might slip through
             if (operations && typeof operations === 'object' && !Array.isArray(operations)) {
@@ -486,7 +600,16 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                     'delegate_rc',
                     'create_proposal',
                     'update_proposal_votes',
-                    'remove_proposal'
+                    'remove_proposal',
+                    // Market operations (wallet.hive.blog, etc.)
+                    'limit_order_create',
+                    'limit_order_create2',
+                    'limit_order_cancel',
+                    'convert',
+                    'collateralized_convert',
+                    'fill_convert_request',
+                    'cancel_transfer_from_savings',
+                    'set_withdraw_vesting_route'
                 ];
                 return activeKeyOps.includes(opName);
             });
@@ -494,10 +617,24 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             let keyStr = "";
             const normalizedKeyType = (keyType || '').toLowerCase();
 
+            // DEBUG: Log key selection process
+            console.log('[Broadcast] Key selection debug:', {
+                keyType,
+                normalizedKeyType,
+                requiresActiveKey,
+                hasActiveKey: !!account.activeKey,
+                activeKeyPrefix: account.activeKey ? account.activeKey.substring(0, 10) + '...' : 'NONE',
+                hasPostingKey: !!account.postingKey,
+                chain: account.chain,
+                username: account.name
+            });
+
             if (normalizedKeyType === 'posting') keyStr = account.postingKey || "";
             else if (normalizedKeyType === 'active') keyStr = account.activeKey || "";
             else if (requiresActiveKey) keyStr = account.activeKey || ""; // Auto-detect Active key requirement
             else keyStr = account.activeKey || ""; // Default fallback
+
+            console.log('[Broadcast] Selected key prefix:', keyStr ? keyStr.substring(0, 10) + '...' : 'EMPTY');
 
             // Debug logging for key selection
             // Auto-select Active key for operations that require it (e.g., witness_update)
@@ -592,8 +729,26 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         }
 
         const finalResult = response.opResult || response.txId || response.result || 'success';
+        
+        // Extract fields to avoid duplicating 'success' when spreading
+        const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
+        
         const result = isSignBuffer
-            ? { result: response.result, message: 'Signed successfully', ...response }
+            ? { 
+                success: true,
+                result: response.result, 
+                signature: response.result,  // Compatibility
+                publicKey: response.publicKey, 
+                pubkey: response.publicKey,  // Compatibility
+                // CRITICAL: blurt.media/peerhub expects data.username
+                data: {
+                    username: username,
+                    publicKey: response.publicKey,
+                    signature: response.result
+                },
+                message: 'Signed successfully', 
+                ...restResponse 
+            }
             : {
                 result: finalResult,
                 tx_id: response.txId,
@@ -601,6 +756,8 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                 message: 'Signed successfully',
                 ...response
             };
+        
+        console.log('[AutoSign] Final result to send:', result);
 
         return { success: true, pending: false, ...result };
 
@@ -685,22 +842,8 @@ async function manualPushSubscribe() {
     }
 }
 
-// Handler for UI requests
-chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
-    if (msg.type === 'CHAT_CHECK_PUSH') {
-        getExistingSubscription()
-            .then(sub => sendResponse({ success: true, subscription: sub }))
-            .catch(err => sendResponse({ success: false, error: err.toString() }));
-        return true;
-    }
-
-    if (msg.type === 'CHAT_ENABLE_PUSH') {
-        manualPushSubscribe()
-            .then(sub => sendResponse({ success: true, subscription: sub }))
-            .catch(err => sendResponse({ success: false, error: err.message || err.toString() }));
-        return true; // Async response
-    }
-});
+// Handler for UI requests - MERGED into main listener above
+// CHAT_CHECK_PUSH and CHAT_ENABLE_PUSH are now handled in the main onMessage listener.
 
 // === WEB PUSH LISTENER ===
 // Handler for incoming Push Notifications

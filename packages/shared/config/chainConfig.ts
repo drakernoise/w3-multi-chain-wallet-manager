@@ -99,8 +99,8 @@ export const CHAIN_CONFIGS: Record<Chain, ChainConfig> = {
             'https://rpc.drakernoise.com',
             'https://rpc.beblurt.com',
             'https://blurt-rpc.saboin.com',
-            'https://rpc.blurt.world',
-            'https://api.blurt.blog'
+            'https://api.blurt.blog',
+            'https://rpc.blurt.world'
         ],
         explorerUrl: {
             transaction: 'https://blocks.blurtwallet.com/#/tx/{tx}',

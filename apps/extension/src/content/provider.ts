@@ -46,19 +46,41 @@ if (!(window as any)._gravityProvider) {
         [key: string]: any;
     }
 
-    /**
-     * Main provider class implementing Keychain/WhaleVault API
-     */
     class GravityProvider {
         private callbacks: Map<string, Function>;
         public readonly name: string;
         public readonly version: string;
+        public current_rpc: string;
 
         constructor() {
             this.name = PROVIDER_CONFIG.name;
             this.version = PROVIDER_CONFIG.version;
             this.callbacks = new Map();
             this.setupListener();
+
+            // Synchronous RPC Discovery from injected dataset (provided by content script)
+            let activeNodes: any = {};
+            try {
+                const datasetRpc = document.documentElement.dataset.gravityActiveRpc;
+                if (datasetRpc) {
+                    activeNodes = JSON.parse(datasetRpc);
+                }
+            } catch (e) { }
+
+            // Detect current chain from URL to avoid cross-chain RPC leaks
+            const host = window.location.hostname.toLowerCase();
+            let chain = 'HIVE';
+            if (host.includes('blurt')) chain = 'BLURT';
+            else if (host.includes('steem')) chain = 'STEEM';
+
+            // Set default RPC based on detected chain or injected nodes
+            const defaults: Record<string, string> = {
+                'HIVE': 'https://api.hive.blog',
+                'STEEM': 'https://api.steemit.com',
+                'BLURT': 'https://rpc.drakernoise.com'
+            };
+
+            this.current_rpc = activeNodes[chain] || defaults[chain];
         }
 
         /**
@@ -71,14 +93,23 @@ if (!(window as any)._gravityProvider) {
 
                 const data = event.data;
                 if (data?.type === PROVIDER_CONFIG.responseType) {
+                    console.log('[Gravity Provider] Received response:', {
+                        id: data.id,
+                        success: data.response?.success,
+                        hasResult: !!data.response?.result,
+                        hasPublicKey: !!data.response?.publicKey,
+                        responseKeys: data.response ? Object.keys(data.response) : [],
+                        response: data.response
+                    });
+                    
                     const callback = this.callbacks.get(data.id);
                     if (callback && typeof callback === 'function') {
                         callback(data.response);
                         this.callbacks.delete(data.id);
-                        
+
                         // Dispatch compatibility events for dApps that listen to events instead of callbacks
                         try {
-                            const responseEvent = new CustomEvent('hive_keychain_response', { 
+                            const responseEvent = new CustomEvent('hive_keychain_response', {
                                 detail: { ...data.response, request_id: data.id }
                             });
                             window.dispatchEvent(responseEvent);
@@ -105,6 +136,7 @@ if (!(window as any)._gravityProvider) {
          */
         private send(method: string, params: any[], callback?: Function): Promise<any> | void {
             const id = this.generateId();
+            console.log('[Gravity Provider] Sending request:', method, id);
 
             const sendMessage = (): void => {
                 window.postMessage({
@@ -143,7 +175,8 @@ if (!(window as any)._gravityProvider) {
                 success: true,
                 message: 'Handshake successful',
                 version: this.version,
-                name: this.name
+                name: this.name,
+                rpc: this.current_rpc
             };
 
             if (typeof callback === 'function') {
@@ -326,6 +359,30 @@ if (!(window as any)._gravityProvider) {
         ): Promise<any> | void => {
             return this.send('requestDelegation', [username, delegatee, amount, unit], callback);
         }
+
+        /**
+         * Get the current RPC node being used by the wallet
+         */
+        requestRpc = (callback?: Function): Promise<any> | void => {
+            if (typeof callback === 'function') {
+                callback({ rpc: this.current_rpc });
+            } else {
+                return Promise.resolve({ rpc: this.current_rpc });
+            }
+        }
+
+        /**
+         * Request the wallet to switch to a different RPC node
+         */
+        requestSwitchRpc = (rpc: string, callback?: Function): Promise<any> | void => {
+            this.current_rpc = rpc;
+            if (typeof callback === 'function') {
+                callback({ success: true, message: 'RPC switch requested' });
+            } else {
+                return Promise.resolve({ success: true, message: 'RPC switch requested' });
+            }
+        }
+
     }
 
     // ==================== Initialization ====================

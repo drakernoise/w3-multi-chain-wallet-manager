@@ -40,6 +40,22 @@ export interface MultisigProgress {
     canBroadcast: boolean;
 }
 
+// --- HELPER: Parse JSON response with HTML error detection ---
+const parseJsonResponse = async (response: Response, nodeUrl: string): Promise<any> => {
+    const text = await response.text();
+    
+    // Detect HTML responses (Cloudflare, nginx error pages, etc.)
+    if (text.trim().startsWith('<') || text.includes('<!DOCTYPE') || text.includes('<html')) {
+        throw new Error(`Node ${nodeUrl} returned HTML instead of JSON (likely maintenance or Cloudflare error)`);
+    }
+    
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        throw new Error(`Unable to parse endpoint data. Response: ${text.substring(0, 100)}...`);
+    }
+};
+
 // --- HELPER: Manual Fetch for HIVE (Service Worker Compatible) ---
 const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key: string): Promise<any> => {
     // 1. Get Dynamic Global Properties
@@ -56,7 +72,12 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
             'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
         }
     });
-    const propsJson = await propsResponse.json();
+    
+    if (!propsResponse.ok) {
+        throw new Error(`Node ${nodeUrl} returned HTTP ${propsResponse.status}`);
+    }
+    
+    const propsJson = await parseJsonResponse(propsResponse, nodeUrl);
     if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
     const props = propsJson.result;
 
@@ -93,7 +114,11 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
         }
     });
 
-    const broadcastResult = await broadcastResponse.json();
+    if (!broadcastResponse.ok) {
+        throw new Error(`Node ${nodeUrl} returned HTTP ${broadcastResponse.status}`);
+    }
+
+    const broadcastResult = await parseJsonResponse(broadcastResponse, nodeUrl);
     if (broadcastResult.error) {
         throw new Error(broadcastResult.error.message || JSON.stringify(broadcastResult.error));
     }
@@ -694,6 +719,7 @@ export const broadcastOperations = async (
     operations: any[]
 ): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
     const nodeUrl = getActiveNode(chain);
+    console.log('[BroadcastOps] Chain:', chain, 'NodeUrl:', nodeUrl, 'Operations:', operations);
 
     // 1. ROBUST NORMALIZATION: Handle both array [name, data] and object { type, ... }
     // Some dApps (like blurt.blog) send operations as objects inside requestBroadcast
@@ -719,26 +745,84 @@ export const broadcastOperations = async (
         return op;
     });
 
-    try {
+    // 3. Get fallback nodes for retry (prioritized by reliability)
+    const getFallbackNodes = (chain: Chain): string[] => {
+        const nodes: Record<Chain, string[]> = {
+            [Chain.HIVE]: ['https://api.deathwing.me', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://hive-api.3speak.tv'],
+            [Chain.STEEM]: ['https://api.steemit.com', 'https://api.steem.fans', 'https://api.justyy.com'],
+            [Chain.BLURT]: ['https://rpc.drakernoise.com', 'https://rpc.beblurt.com', 'https://api.blurt.blog']
+        };
+        return nodes[chain] || [];
+    };
+
+    // Check if an error is an authority/key error (don't retry these)
+    const isAuthorityError = (errorMsg: string): boolean => {
+        const authorityPatterns = [
+            'missing required active authority',
+            'missing required posting authority',
+            'Missing Active Authority',
+            'Missing Posting Authority',
+            'check_authority',
+            'Invalid key',
+            'Key not found'
+        ];
+        return authorityPatterns.some(p => errorMsg.toLowerCase().includes(p.toLowerCase()));
+    };
+
+    const tryBroadcast = async (node: string): Promise<any> => {
         if (chain === Chain.HIVE) {
-            const result = await broadcastHiveTransaction(nodeUrl, cleanOperations, activeKey);
-            return { success: true, txId: result.id, opResult: result };
+            return await broadcastHiveTransaction(node, cleanOperations, activeKey);
         } else if (chain === Chain.STEEM) {
-            const client = new SteemClient(nodeUrl);
+            const client = new SteemClient(node);
             const key = SteemPrivateKey.fromString(activeKey);
-            const result = await client.broadcast.sendOperations(cleanOperations, key);
-            return { success: true, txId: result.id, opResult: result };
+            return await client.broadcast.sendOperations(cleanOperations, key);
         } else if (chain === Chain.BLURT) {
-            // Using manual broadcast implementation for better reliability
-            // The Blurt logic already handles asset conversion and cleanup inside broadcastBlurtTransaction
-            const result = await broadcastBlurtTransaction(nodeUrl, cleanOperations, activeKey);
-            return { success: true, txId: result.id, opResult: result };
+            return await broadcastBlurtTransaction(node, cleanOperations, activeKey);
         }
-        return { success: false, error: "Chain not supported" };
-    } catch (e: any) {
-        console.error("Broadcast Ops Error:", e);
-        return { success: false, error: formatChainError(e) };
+        throw new Error("Chain not supported");
+    };
+
+    // Try primary node first, then fallbacks
+    const nodesToTry = [nodeUrl, ...getFallbackNodes(chain).filter(n => n !== nodeUrl)];
+    let lastError: any = null;
+    let authorityErrorOccurred = false;
+
+    for (const node of nodesToTry) {
+        try {
+            console.log('[BroadcastOps] Trying node:', node);
+            const result = await tryBroadcast(node);
+            console.log('[BroadcastOps] Success with node:', node);
+            return { success: true, txId: result.id, opResult: result };
+        } catch (e: any) {
+            const errMsg = e.message || String(e);
+            console.warn('[BroadcastOps] Node failed:', node, errMsg);
+            
+            // If it's an authority error, don't retry - it will fail on all nodes
+            if (isAuthorityError(errMsg)) {
+                console.error('[BroadcastOps] Authority error detected, not retrying');
+                authorityErrorOccurred = true;
+                lastError = e;
+                break;
+            }
+            
+            // Skip nodes returning HTML (Cloudflare errors, maintenance pages)
+            if (errMsg.includes('Unexpected token') && errMsg.includes('<')) {
+                console.warn('[BroadcastOps] Node returned HTML, skipping:', node);
+            }
+            
+            lastError = e;
+            // Continue to next node
+        }
     }
+
+    console.error("Broadcast Ops Error:", lastError);
+    
+    // Provide clearer error message for authority issues
+    if (authorityErrorOccurred) {
+        return { success: false, error: "Missing required authority. Please verify you have the correct Active key for this account." };
+    }
+    
+    return { success: false, error: formatChainError(lastError) };
 };
 
 export const broadcastBulkTransfer = async (

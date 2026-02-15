@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { k as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, l as checkAccountExists, e as broadcastPowerUp, f as broadcastPowerDown, h as broadcastDelegation, m as broadcastSavingsDeposit, n as broadcastSavingsWithdraw, o as fetchAccountData, p as broadcastRCDelegate, q as broadcastRCUndelegate, t as broadcastBulkTransfer, u as indexBrowserExports, v as indexBrowserExports$1, w as validateAccountKeys, x as fetchAccountHistory, y as getAccountAuthorities, b as broadcastTransfer, a as broadcastVote, c as broadcastCustomJson, s as signMessage, d as broadcastOperations, j as broadcastWitnessVote, z as fetchBalances, A as detectWeb3Context, B as benchmarkNodes } from './chainService.js';
+import { m as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, n as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, o as broadcastSavingsDeposit, p as broadcastSavingsWithdraw, q as fetchAccountData, t as broadcastRCDelegate, u as broadcastRCUndelegate, v as broadcastBulkTransfer, w as indexBrowserExports, x as indexBrowserExports$1, y as validateAccountKeys, z as fetchAccountHistory, A as getAccountAuthorities, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, B as fetchBalances, D as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -13090,6 +13090,15 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       if (!account) {
         throw new Error(t("sign.account_not_found"));
       }
+      console.log("[SignRequest] Account found:", {
+        name: account.name,
+        chain: account.chain,
+        hasActiveKey: !!account.activeKey,
+        activeKeyPrefix: account.activeKey ? account.activeKey.substring(0, 8) + "..." : "NONE",
+        hasPostingKey: !!account.postingKey,
+        postingKeyPrefix: account.postingKey ? account.postingKey.substring(0, 8) + "..." : "NONE",
+        hasMemoKey: !!account.memoKey
+      });
       if (isMultisig && multisigProgress && !multisigProgress.canBroadcast) {
         const msResult = await handleMultisigSign(account);
         showNotification(msResult.message || "Signature collected", "success");
@@ -13163,14 +13172,52 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       } else if (isSignBuffer2) {
         const message = request.params[1];
         const type = request.params[2];
+        console.log("[SignRequest] signBuffer request:", {
+          chain: account.chain,
+          username: account.name,
+          keyType: type,
+          messageType: typeof message,
+          messageLength: typeof message === "string" ? message.length : "N/A",
+          messagePreview: typeof message === "string" ? message.substring(0, 100) : JSON.stringify(message).substring(0, 100)
+        });
         let keyStr = "";
         if (type === "Posting") keyStr = account.postingKey || "";
         else if (type === "Active") keyStr = account.activeKey || "";
         else if (type === "Memo") keyStr = account.memoKey || "";
         if (!keyStr) throw new Error(t("sign.key_missing_generic").replace("{type}", type));
         const response = signMessage(account.chain, message, keyStr);
+        console.log("[SignRequest] signMessage response:", {
+          success: response.success,
+          error: response.error,
+          resultLength: response.result ? response.result.length : 0,
+          resultPreview: response.result ? response.result.substring(0, 40) + "..." : "NONE",
+          publicKey: response.publicKey
+        });
         if (!response.success) throw new Error(response.error);
-        result = { result: response.result, message: t("sign.success"), ...response };
+        const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
+        result = {
+          success: true,
+          result: response.result,
+          signature: response.result,
+          // Some dApps expect 'signature'
+          publicKey: response.publicKey,
+          pubkey: response.publicKey,
+          // Some dApps expect 'pubkey'
+          // CRITICAL: blurt.media/peerhub expects data.username
+          data: {
+            username: account.name,
+            message,
+            publicKey: response.publicKey,
+            signature: response.result
+          },
+          message: t("sign.success"),
+          ...restResponse
+        };
+        console.log("[SignRequest] Final result to return:", {
+          hasResult: !!result.result,
+          hasPublicKey: !!result.publicKey,
+          keys: Object.keys(result)
+        });
       } else if (isBroadcast2) {
         let rawOperations = request.params[1];
         const keyType = request.params[2];
@@ -13207,7 +13254,16 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
             "delegate_rc",
             "create_proposal",
             "update_proposal_votes",
-            "remove_proposal"
+            "remove_proposal",
+            // Market operations (wallet.hive.blog, etc.)
+            "limit_order_create",
+            "limit_order_create2",
+            "limit_order_cancel",
+            "convert",
+            "collateralized_convert",
+            "fill_convert_request",
+            "cancel_transfer_from_savings",
+            "set_withdraw_vesting_route"
           ];
           return activeKeyOps.includes(opName);
         });
@@ -13215,11 +13271,25 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (keyType === "Active") key = account.activeKey;
         else if (requiresActiveKey) key = account.activeKey;
         if (!key && account.activeKey) key = account.activeKey;
+        console.log("[SignRequest Broadcast] Key selection:", {
+          keyType,
+          requiresActiveKey,
+          hasActiveKey: !!account.activeKey,
+          hasPostingKey: !!account.postingKey,
+          selectedKeyPrefix: key ? key.substring(0, 10) + "..." : "NONE",
+          operations: operations.map((op) => Array.isArray(op) ? op[0] : op.type)
+        });
         const requiredKeyType = requiresActiveKey ? "Active" : keyType || "Posting";
         if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", requiredKeyType));
-        if (requiresActiveKey && key !== account.activeKey) {
-          console.log("[SignRequest] Auto-selecting Active key for operation requiring active authority");
+        if (requiresActiveKey && key !== account.activeKey && account.activeKey) {
+          console.log("[SignRequest] FORCING Active key for operation requiring active authority");
+          key = account.activeKey;
         }
+        console.log("[SignRequest Broadcast] FINAL key being used:", {
+          keyPrefix: key.substring(0, 10) + "...",
+          isActiveKey: key === account.activeKey,
+          requiresActiveKey
+        });
         const response = await broadcastOperations(account.chain, key, operations);
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
