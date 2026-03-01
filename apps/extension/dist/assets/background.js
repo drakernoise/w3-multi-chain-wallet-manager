@@ -69,7 +69,7 @@ function detectChainFromUrl(url = "") {
     const host = u.hostname.toLowerCase();
     const hiveHosts = ["peakd.com", "ecency.com", "tribaldex.com"];
     if (hiveHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("hive")) return "HIVE";
-    const blurtHosts = ["blurt.blog", "blurtwallet.com"];
+    const blurtHosts = ["blurt.blog", "blurtwallet.com", "twiggy.lat"];
     if (blurtHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("blurt")) return "BLURT";
     const steemHosts = ["steemit.com"];
     if (steemHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("steem")) return "STEEM";
@@ -133,13 +133,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         request.params[1] = request.params[1].replace(/^@/, "");
       }
     }
-    if ((request.method === "requestVote" || request.method === "vote") && Array.isArray(request.params)) {
-      console.log("[Twiggy Vote] Raw params:", request.params);
+    const methodsWithDomainFix = ["requestVote", "vote", "requestPost", "post", "requestBroadcast", "broadcast", "requestSignBuffer", "signBuffer"];
+    if (methodsWithDomainFix.includes(request.method) && Array.isArray(request.params)) {
       const params = request.params;
       const first = params[0];
       if (typeof first === "string" && first.includes(".")) {
-        if (params.length >= 5 && typeof params[1] === "string") {
-          request.params = [params[1], params[2], params[3], params[4]];
+        console.log(`[Gravity] Detected domain as first parameter in ${request.method}, normalizing...`);
+        if (params.length > 2) {
+          request.params = params.slice(1);
         }
       }
     }
@@ -409,12 +410,12 @@ async function tryAutoSign(request, sender) {
       console.log("[Broadcast] Full request.params:", JSON.stringify(request.params, null, 2));
       console.log("[Broadcast] Account used:", { name: account.name, chain: account.chain });
       if (operations && typeof operations === "object" && !Array.isArray(operations)) {
-        console.error("[Broadcast] ⚠️ Detected non-array operations object:", Object.keys(operations));
+        console.error("[Broadcast] WARNING: Detected non-array operations object:", Object.keys(operations));
         if (operations.operations) {
           operations = operations.operations;
-          console.error("[Broadcast] ✓ Extracted operations array from object");
+          console.error("[Broadcast] SUCCESS: Extracted operations array from object");
         } else {
-          console.error("[Broadcast] ❌ ERROR: operations object has no .operations property!");
+          console.error("[Broadcast] ERROR: operations object has no .operations property!");
           return { success: false, error: "Invalid broadcast format: operations is not an array" };
         }
       }
@@ -547,7 +548,7 @@ async function tryAutoSign(request, sender) {
       return { success: false, error: response.error || "Operation failed" };
     }
     const finalResult = response.opResult || response.txId || response.result || "success";
-    const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
+    const { success: _s, result: _r, publicKey: _pk, error: _e, ...restResponse } = response;
     const result = isSignBuffer ? {
       success: true,
       result: response.result,
@@ -565,14 +566,15 @@ async function tryAutoSign(request, sender) {
       message: "Signed successfully",
       ...restResponse
     } : {
+      success: true,
       result: finalResult,
       tx_id: response.txId,
       broadcastPayload: finalResult,
       message: "Signed successfully",
-      ...response
+      ...restResponse
     };
     console.log("[AutoSign] Final result to send:", result);
-    return { success: true, pending: false, ...result };
+    return result;
   } catch (e) {
     console.error("Auto-sign failed:", e);
     return null;

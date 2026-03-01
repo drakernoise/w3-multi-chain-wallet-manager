@@ -85,7 +85,7 @@ function detectChainFromUrl(url: string = ""): string | null {
         ) return 'HIVE';
 
         // BLURT
-        const blurtHosts = ['blurt.blog', 'blurtwallet.com'];
+        const blurtHosts = ['blurt.blog', 'blurtwallet.com', 'twiggy.lat'];
         if (
             blurtHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
             host.includes('blurt')
@@ -731,7 +731,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const finalResult = response.opResult || response.txId || response.result || 'success';
 
         // Extract fields to avoid duplicating 'success' when spreading
-        const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
+        const { success: _s, result: _r, publicKey: _pk, error: _e, ...restResponse } = response;
 
         const result = isSignBuffer
             ? {
@@ -750,16 +750,17 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                 ...restResponse
             }
             : {
+                success: true,
                 result: finalResult,
                 tx_id: response.txId,
                 broadcastPayload: finalResult,
                 message: 'Signed successfully',
-                ...response
+                ...restResponse
             };
 
         console.log('[AutoSign] Final result to send:', result);
 
-        return { success: true, pending: false, ...result };
+        return result;
 
     } catch (e) {
         console.error("Auto-sign failed:", e);

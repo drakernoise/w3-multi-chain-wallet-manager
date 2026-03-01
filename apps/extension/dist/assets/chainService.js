@@ -88912,21 +88912,15 @@ const broadcastVote = async (chain, voter, key, author, permlink, weight) => {
       const result = await client.broadcast.vote({ voter, author, permlink, weight }, privateKey);
       return { success: true, txId: result.id, opResult: result };
     } else if (chain === Chain.BLURT) {
-      const config = getChainConfig(Chain.BLURT);
-      libExports.config.set("address_prefix", config.addressPrefix);
-      libExports.config.set("chain_id", config.chainId);
-      libExports.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
-      const result = await new Promise((resolve, reject) => {
-        libExports.broadcast.vote(key, voter, author, permlink, weight, (err, res) => {
-          if (err) reject(err);
-          else resolve(res);
-        });
-      });
-      return { success: true, txId: result.id, opResult: result };
+      const vote = ["vote", { voter, author, permlink, weight }];
+      const result = await broadcastOperations(Chain.BLURT, key, [vote]);
+      if (!result.success) throw new Error(result.error || "Vote failed");
+      return result;
     }
     return { success: false, error: "Chain not supported" };
   } catch (e) {
-    return { success: false, error: e.message || "Vote failed" };
+    const errorMsg = e.message || (typeof e === "string" ? e : "Vote failed");
+    return { success: false, error: errorMsg };
   }
 };
 const broadcastCustomJson = async (chain, username, key, id, json, keyType) => {
@@ -88988,6 +88982,12 @@ const formatChainError = (error) => {
   }
   if (msg.includes("balance")) return "Insufficient balance for this operation.";
   if (msg.includes("authority")) return "Missing required authority. Check your Active key.";
+  if (msg.includes("Assert Exception") && msg.includes("doesn't exist")) {
+    return "Blockchain error: Account or data not found on the current node. Try switching RPC nodes.";
+  }
+  if (msg.includes("comment_is_required") || msg.includes("Assert Exception") && msg.includes("comment")) {
+    return "Comment or post not found. If you just created it, please wait a few seconds for blockchain synchronization and try again.";
+  }
   if (msg.includes("Error Signature") || msg.includes("32602")) {
     return `Signature/Params Error (-32602). Node response: ${msg}`;
   }
@@ -89199,10 +89199,15 @@ const broadcastOperations = async (chain, activeKey, operations) => {
       const errMsg = e.message || String(e);
       console.warn("[BroadcastOps] Node failed:", node, errMsg);
       if (isAuthorityError(errMsg)) {
-        console.error("[BroadcastOps] Authority error detected, not retrying");
         authorityErrorOccurred = true;
         lastError = e;
         break;
+      }
+      if (chain === Chain.BLURT && (errMsg.includes("comment_is_required") || errMsg.includes("comment"))) {
+        console.log("[BroadcastOps] Blurt sync issue detected, waiting 2s before retry on next node...");
+        await new Promise((resolve) => setTimeout(resolve, 2e3));
+        lastError = e;
+        continue;
       }
       if (errMsg.includes("Unexpected token") && errMsg.includes("<")) {
         console.warn("[BroadcastOps] Node returned HTML, skipping:", node);

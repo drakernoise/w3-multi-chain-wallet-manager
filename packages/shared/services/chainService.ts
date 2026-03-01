@@ -43,12 +43,12 @@ export interface MultisigProgress {
 // --- HELPER: Parse JSON response with HTML error detection ---
 const parseJsonResponse = async (response: Response, nodeUrl: string): Promise<any> => {
     const text = await response.text();
-    
+
     // Detect HTML responses (Cloudflare, nginx error pages, etc.)
     if (text.trim().startsWith('<') || text.includes('<!DOCTYPE') || text.includes('<html')) {
         throw new Error(`Node ${nodeUrl} returned HTML instead of JSON (likely maintenance or Cloudflare error)`);
     }
-    
+
     try {
         return JSON.parse(text);
     } catch (e) {
@@ -72,11 +72,11 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
             'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
         }
     });
-    
+
     if (!propsResponse.ok) {
         throw new Error(`Node ${nodeUrl} returned HTTP ${propsResponse.status}`);
     }
-    
+
     const propsJson = await parseJsonResponse(propsResponse, nodeUrl);
     if (!propsJson.result) throw new Error("Failed to fetch props from " + nodeUrl);
     const props = propsJson.result;
@@ -440,20 +440,15 @@ export const broadcastVote = async (chain: Chain, voter: string, key: string, au
             const result = await client.broadcast.vote({ voter, author, permlink, weight }, privateKey);
             return { success: true, txId: result.id, opResult: result };
         } else if (chain === Chain.BLURT) {
-            const config = getChainConfig(Chain.BLURT);
-            blurt.config.set('address_prefix', config.addressPrefix);
-            blurt.config.set('chain_id', config.chainId);
-            blurt.api.setOptions({ url: nodeUrl, useAppbaseApi: true });
-            const result = await new Promise<any>((resolve, reject) => {
-                blurt.broadcast.vote(key, voter, author, permlink, weight, (err: any, res: any) => {
-                    if (err) reject(err); else resolve(res);
-                });
-            });
-            return { success: true, txId: result.id, opResult: result };
+            const vote = ['vote', { voter, author, permlink, weight }];
+            const result = await broadcastOperations(Chain.BLURT, key, [vote]);
+            if (!result.success) throw new Error(result.error || "Vote failed");
+            return result;
         }
         return { success: false, error: "Chain not supported" };
     } catch (e: any) {
-        return { success: false, error: e.message || "Vote failed" };
+        const errorMsg = e.message || (typeof e === 'string' ? e : "Vote failed");
+        return { success: false, error: errorMsg };
     }
 };
 
@@ -524,6 +519,15 @@ const formatChainError = (error: any): string => {
     // Handle other common errors
     if (msg.includes('balance')) return "Insufficient balance for this operation.";
     if (msg.includes('authority')) return "Missing required authority. Check your Active key.";
+
+    // Handle Blurt specific assertion errors
+    if (msg.includes('Assert Exception') && msg.includes("doesn't exist")) {
+        return "Blockchain error: Account or data not found on the current node. Try switching RPC nodes.";
+    }
+
+    if (msg.includes('comment_is_required') || (msg.includes('Assert Exception') && msg.includes('comment'))) {
+        return "Comment or post not found. If you just created it, please wait a few seconds for blockchain synchronization and try again.";
+    }
 
     // Handle signature errors with hints
     if (msg.includes('Error Signature') || msg.includes('32602')) {
@@ -796,32 +800,39 @@ export const broadcastOperations = async (
         } catch (e: any) {
             const errMsg = e.message || String(e);
             console.warn('[BroadcastOps] Node failed:', node, errMsg);
-            
+
             // If it's an authority error, don't retry - it will fail on all nodes
             if (isAuthorityError(errMsg)) {
-                console.error('[BroadcastOps] Authority error detected, not retrying');
                 authorityErrorOccurred = true;
                 lastError = e;
                 break;
             }
-            
+
+            // BLURT SPECIFIC: retry "comment not found" errors on DIFFERENT nodes
+            // This often happens if the dApp tries to vote immediately after posting
+            if (chain === Chain.BLURT && (errMsg.includes('comment_is_required') || errMsg.includes('comment'))) {
+                console.log('[BroadcastOps] Blurt sync issue detected, waiting 2s before retry on next node...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                lastError = e;
+                continue;
+            }
+
             // Skip nodes returning HTML (Cloudflare errors, maintenance pages)
             if (errMsg.includes('Unexpected token') && errMsg.includes('<')) {
                 console.warn('[BroadcastOps] Node returned HTML, skipping:', node);
             }
-            
+
             lastError = e;
-            // Continue to next node
         }
     }
 
     console.error("Broadcast Ops Error:", lastError);
-    
+
     // Provide clearer error message for authority issues
     if (authorityErrorOccurred) {
         return { success: false, error: "Missing required authority. Please verify you have the correct Active key for this account." };
     }
-    
+
     return { success: false, error: formatChainError(lastError) };
 };
 

@@ -13408,6 +13408,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
     } catch (e) {
       setError(e.message);
       setProcessing(false);
+      notifyBackground(null, e.message);
     }
   };
   reactExports.useEffect(() => {
@@ -13484,7 +13485,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
               request.params[0]
             ] })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-slate-600", children: "➜" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-slate-600", children: "->" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-left", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500", children: t("sign.to") }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-bold text-white", children: [

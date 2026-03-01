@@ -191,7 +191,7 @@ if (!window._gravityProvider) {
             if (response?.success) {
               resolve({ success: true, result: response.result });
             } else {
-              reject(response?.error || "Unknown error");
+              reject(response);
             }
           });
         });
