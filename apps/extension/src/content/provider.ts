@@ -101,7 +101,7 @@ if (!(window as any)._gravityProvider) {
                         responseKeys: data.response ? Object.keys(data.response) : [],
                         response: data.response
                     });
-                    
+
                     const callback = this.callbacks.get(data.id);
                     if (callback && typeof callback === 'function') {
                         callback(data.response);
@@ -241,7 +241,7 @@ if (!(window as any)._gravityProvider) {
                         if (response?.success) {
                             resolve({ success: true, result: response.result });
                         } else {
-                            reject(response?.error || 'Unknown error');
+                            reject(response);
                         }
                     });
                 });

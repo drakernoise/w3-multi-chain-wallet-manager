@@ -59,18 +59,18 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 account = accounts.find(a => a.name === username && a.chain === 'HIVE');
             }
             if (!account) account = accounts.find(a => a.name === username);
-            
+
             // Extract user from broadcast operations if not found
             if (!account && Array.isArray(request.params) && Array.isArray(request.params[1])) {
                 const operations = request.params[1];
                 const accountNames = accounts.map(a => a.name.toLowerCase());
-                
+
                 for (const op of operations) {
                     if (Array.isArray(op) && op.length >= 2 && typeof op[1] === 'object') {
                         const opData = op[1];
                         const possibleUsers = [opData.voter, opData.from, opData.author, opData.delegator, opData.account]
                             .filter(u => typeof u === 'string');
-                        
+
                         for (const possibleUser of possibleUsers) {
                             if (accountNames.includes(possibleUser.toLowerCase())) {
                                 username = possibleUser;
@@ -82,7 +82,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     }
                 }
             }
-            
+
             if (!account) return;
 
             const isActiveOp = ['requestTransfer', 'requestPowerUp', 'requestPowerDown', 'requestDelegation', 'requestWitnessVote'].includes(request.method);
@@ -158,7 +158,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             if (!account && Array.isArray(request.params) && Array.isArray(request.params[1])) {
                 const operations = request.params[1];
                 const accountNames = accounts.map(a => a.name.toLowerCase());
-                
+
                 for (const op of operations) {
                     if (Array.isArray(op) && op.length >= 2 && typeof op[1] === 'object') {
                         const opData = op[1];
@@ -170,11 +170,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                             opData.delegator,  // delegation operation
                             opData.account,    // witness_vote, account_update, etc.
                         ].filter(u => typeof u === 'string');
-                        
+
                         for (const possibleUser of possibleUsers) {
                             if (accountNames.includes(possibleUser.toLowerCase())) {
                                 username = possibleUser;
-                                account = accounts.find(a => a.name.toLowerCase() === possibleUser.toLowerCase() && 
+                                account = accounts.find(a => a.name.toLowerCase() === possibleUser.toLowerCase() &&
                                     (targetChain ? a.chain === targetChain : true))
                                     || accounts.find(a => a.name.toLowerCase() === possibleUser.toLowerCase());
                                 if (account) break;
@@ -337,11 +337,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 });
 
                 if (!response.success) throw new Error(response.error);
-                
+
                 // Compatibility: Add multiple field names for different dApp expectations
                 // Note: response already contains success, result, publicKey
                 const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
-                result = { 
+                result = {
                     success: true,
                     result: response.result,
                     signature: response.result,  // Some dApps expect 'signature'
@@ -355,7 +355,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                         signature: response.result
                     },
                     message: t('sign.success'),
-                    ...restResponse 
+                    ...restResponse
                 };
 
                 console.log('[SignRequest] Final result to return:', {
@@ -605,6 +605,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
         } catch (e: any) {
             setError(e.message);
             setProcessing(false);
+            notifyBackground(null, e.message);
         }
     };
 
@@ -700,7 +701,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                                 <p className="text-xs text-slate-500">{t('sign.from')}</p>
                                 <p className="font-bold text-white">@{request.params[0]}</p>
                             </div>
-                            <div className="text-slate-600">➜</div>
+                            <div className="text-slate-600">{"->"}</div>
                             <div className="text-left">
                                 <p className="text-xs text-slate-500">{t('sign.to')}</p>
                                 <p className="font-bold text-white">@{request.params[1]}</p>

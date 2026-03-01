@@ -107,13 +107,13 @@ function detectChainFromUrl(url: string = ""): string | null {
 // Listen for messages from Content Script or Popup
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
     if (!request) return false;
-    
+
     console.log('[Gravity Background] onMessage received:', request.type, request.method || '');
 
     // 1. Request from Web Page (via Content Script)
     if (request.type === 'gravity_request') {
         console.log('[Gravity Background] Received request:', request.method, 'from:', sender.origin || sender.url);
-        
+
         // Validation: Prevent giant strings or invalid types (Fuzzer protection)
         if (typeof request.method !== 'string' || request.method.length > 64) {
             console.warn("Gravity: Rejected invalid method (length/type)", request.method);
@@ -184,16 +184,16 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
             }
         }
 
-        // Twiggy Vote Fix: Some dApps pass domain as params[0]
-        if ((request.method === 'requestVote' || request.method === 'vote') && Array.isArray(request.params)) {
-            console.log('[Twiggy Vote] Raw params:', request.params);
+        // Twiggy/General Fix: Some dApps pass domain as params[0]
+        const methodsWithDomainFix = ['requestVote', 'vote', 'requestPost', 'post', 'requestBroadcast', 'broadcast', 'requestSignBuffer', 'signBuffer'];
+        if (methodsWithDomainFix.includes(request.method as string) && Array.isArray(request.params)) {
             const params = request.params;
             const first = params[0];
             if (typeof first === 'string' && first.includes('.')) {
-                // Expected: [username, permlink, author, weight]
-                // Possible: [domain, username, permlink, author, weight]
-                if (params.length >= 5 && typeof params[1] === 'string') {
-                    request.params = [params[1], params[2], params[3], params[4]];
+                console.log(`[Gravity] Detected domain as first parameter in ${request.method}, normalizing...`);
+                // If domain is first, shift everything
+                if (params.length > 2) {
+                    request.params = params.slice(1);
                 }
             }
         }
@@ -245,7 +245,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                         console.error('[Gravity] Session storage set failed:', lastError);
                         return;
                     }
-                    
+
                     console.log('[Gravity Background] Request stored, opening prompt...');
                     openPrompt(requestId);
 
@@ -564,12 +564,12 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
 
             // ROBUST CHECK: Handle {operations, url} object that might slip through
             if (operations && typeof operations === 'object' && !Array.isArray(operations)) {
-                console.error('[Broadcast] ⚠️ Detected non-array operations object:', Object.keys(operations));
+                console.error('[Broadcast] WARNING: Detected non-array operations object:', Object.keys(operations));
                 if ((operations as any).operations) {
                     operations = (operations as any).operations;
-                    console.error('[Broadcast] ✓ Extracted operations array from object');
+                    console.error('[Broadcast] SUCCESS: Extracted operations array from object');
                 } else {
-                    console.error('[Broadcast] ❌ ERROR: operations object has no .operations property!');
+                    console.error('[Broadcast] ERROR: operations object has no .operations property!');
                     return { success: false, error: 'Invalid broadcast format: operations is not an array' };
                 }
             }
@@ -729,16 +729,16 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         }
 
         const finalResult = response.opResult || response.txId || response.result || 'success';
-        
+
         // Extract fields to avoid duplicating 'success' when spreading
         const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
-        
+
         const result = isSignBuffer
-            ? { 
+            ? {
                 success: true,
-                result: response.result, 
+                result: response.result,
                 signature: response.result,  // Compatibility
-                publicKey: response.publicKey, 
+                publicKey: response.publicKey,
                 pubkey: response.publicKey,  // Compatibility
                 // CRITICAL: blurt.media/peerhub expects data.username
                 data: {
@@ -746,8 +746,8 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                     publicKey: response.publicKey,
                     signature: response.result
                 },
-                message: 'Signed successfully', 
-                ...restResponse 
+                message: 'Signed successfully',
+                ...restResponse
             }
             : {
                 result: finalResult,
@@ -756,7 +756,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                 message: 'Signed successfully',
                 ...response
             };
-        
+
         console.log('[AutoSign] Final result to send:', result);
 
         return { success: true, pending: false, ...result };
