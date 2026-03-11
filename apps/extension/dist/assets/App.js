@@ -14693,8 +14693,8 @@ const ChatView = ({ onClose }) => {
 class BridgeService {
   constructor() {
     this.socket = null;
-    this.serverUrl = "https://gravity-chat-serve.onrender.com";
-    // Reusing chat server for demo
+    this.serverUrl = "http://136.243.80.162:3030";
+    // New dedicated bridge server on Hetzner
     this.sessionId = null;
     this.sharedKey = null;
     this.myKeyPair = null;
@@ -14705,14 +14705,24 @@ class BridgeService {
   }
   async init() {
     if (this.socket?.connected) return;
+    console.log("[Bridge] Initializing socket connection to:", this.serverUrl);
     this.socket = lookup(this.serverUrl, {
-      transports: ["websocket"],
-      autoConnect: true
+      transports: ["polling", "websocket"],
+      // Try polling first for better compatibility
+      autoConnect: true,
+      reconnectionAttempts: 5,
+      timeout: 1e4
     });
     this.socket.on("connect", () => {
+      console.log("[Bridge] Socket connected! ID:", this.socket?.id);
       if (this.onStatusChange) this.onStatusChange("connected");
     });
-    this.socket.on("disconnect", () => {
+    this.socket.on("connect_error", (err) => {
+      console.error("[Bridge] Socket connection error:", err.message);
+      if (this.onStatusChange) this.onStatusChange("error: " + err.message);
+    });
+    this.socket.on("disconnect", (reason) => {
+      console.log("[Bridge] Socket disconnected. Reason:", reason);
       if (this.onStatusChange) this.onStatusChange("disconnected");
     });
     this.socket.on("bridge_request", async (data) => {
