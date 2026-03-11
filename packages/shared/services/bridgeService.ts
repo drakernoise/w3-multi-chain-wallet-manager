@@ -26,7 +26,7 @@ export interface SignResponse {
 
 class BridgeService {
     private socket: Socket | null = null;
-    private serverUrl = 'https://gravity-chat-serve.onrender.com'; // Reusing chat server for demo
+    private serverUrl = 'http://136.243.80.162:3030'; // New dedicated bridge server on Hetzner
     private sessionId: string | null = null;
     private sharedKey: CryptoKey | null = null;
     private myKeyPair: CryptoKeyPair | null = null;
