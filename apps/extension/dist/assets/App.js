@@ -6159,7 +6159,24 @@ const translations = {
     "mobile.no_permissions": "No permissions granted",
     "mobile.revoke": "Revoke",
     "mobile.domain": "Domain",
-    "mobile.access": "Access"
+    "mobile.access": "Access",
+    "mobile.sign_request": "Sign Request",
+    "mobile.operation": "Operation",
+    "mobile.details": "Details",
+    "mobile.remember_permission": "Remember this permission",
+    "mobile.remember_permission_desc": "Auto-approve future requests from this site",
+    "mobile.duration": "Duration",
+    "mobile.1day": "1 Day",
+    "mobile.1week": "1 Week",
+    "mobile.1month": "1 Month",
+    "mobile.sign_warning": "Only approve if you trust this site. This action cannot be undone.",
+    "mobile.operation_transfer": "Transfer",
+    "mobile.operation_vote": "Vote",
+    "mobile.operation_post": "Post",
+    "mobile.operation_comment": "Comment",
+    "mobile.operation_delegate": "Delegate",
+    "mobile.operation_powerup": "Power Up",
+    "mobile.operation_powerdown": "Power Down"
   },
   es: {
     "landing.welcome": "Bienvenido",
@@ -6527,6 +6544,23 @@ const translations = {
     "mobile.revoke": "Revocar",
     "mobile.domain": "Dominio",
     "mobile.access": "Acceso",
+    "mobile.sign_request": "Solicitud de Firma",
+    "mobile.operation": "Operación",
+    "mobile.details": "Detalles",
+    "mobile.remember_permission": "Recordar este permiso",
+    "mobile.remember_permission_desc": "Auto-aprobar futuras solicitudes de este sitio",
+    "mobile.duration": "Duración",
+    "mobile.1day": "1 Día",
+    "mobile.1week": "1 Semana",
+    "mobile.1month": "1 Mes",
+    "mobile.sign_warning": "Solo aprueba si confías en este sitio. Esta acción no se puede deshacer.",
+    "mobile.operation_transfer": "Transferencia",
+    "mobile.operation_vote": "Votar",
+    "mobile.operation_post": "Publicar",
+    "mobile.operation_comment": "Comentar",
+    "mobile.operation_delegate": "Delegar",
+    "mobile.operation_powerup": "Power Up",
+    "mobile.operation_powerdown": "Power Down",
     "help.section_navigation": "Navegación Principal",
     "help.chat_memo_required": "Los Mensajes Directos (DMs) están Encriptados de Extremo a Extremo. Las salas públicas no están encriptadas.",
     "help.2fa_title": "Autenticación de Dos Factores",
@@ -14666,6 +14700,8 @@ class BridgeService {
     this.myKeyPair = null;
     this.onStatusChange = null;
     this.onSignRequest = null;
+    this.onSyncAccounts = null;
+    this.onValidatePIN = null;
   }
   async init() {
     if (this.socket?.connected) return;
@@ -14687,6 +14723,26 @@ class BridgeService {
         if (this.onSignRequest) this.onSignRequest(request);
       } catch (e) {
         console.error("Bridge decryption failed", e);
+      }
+    });
+    this.socket.on("bridge_sync_accounts", async (data) => {
+      if (!this.sharedKey) return;
+      try {
+        const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
+        const accounts = JSON.parse(decrypted);
+        if (this.onSyncAccounts) this.onSyncAccounts(accounts);
+      } catch (e) {
+        console.error("Bridge accounts sync failed", e);
+      }
+    });
+    this.socket.on("bridge_validate_pin", async (data) => {
+      if (!this.sharedKey) return;
+      try {
+        const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
+        const { pin } = JSON.parse(decrypted);
+        if (this.onValidatePIN) this.onValidatePIN(pin);
+      } catch (e) {
+        console.error("Bridge PIN validation failed", e);
       }
     });
   }
@@ -14738,10 +14794,20 @@ class BridgeService {
       });
     });
   }
+  async syncAccounts(accounts) {
+    if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
+    const encrypted = await encryptMessage(JSON.stringify(accounts), this.sharedKey);
+    this.socket.emit("bridge_sync_accounts", { sessionId: this.sessionId, encrypted });
+  }
+  async validatePairing(pin) {
+    if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
+    const encrypted = await encryptMessage(JSON.stringify({ pin }), this.sharedKey);
+    this.socket.emit("bridge_validate_pin", { sessionId: this.sessionId, encrypted });
+  }
 }
 const bridgeService = new BridgeService();
 
-const BridgeModal = ({ onClose }) => {
+const BridgeModal = ({ onClose, onSync }) => {
   const [qrData, setQrData] = reactExports.useState(null);
   const [status, setStatus] = reactExports.useState("generating");
   reactExports.useEffect(() => {
@@ -14751,6 +14817,7 @@ const BridgeModal = ({ onClose }) => {
       setStatus("waiting");
       await bridgeService.waitForSigner();
       setStatus("connected");
+      if (onSync) onSync();
     };
     initBridge();
   }, []);
@@ -14764,7 +14831,10 @@ const BridgeModal = ({ onClose }) => {
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mb-4 border border-green-500/30", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-10 h-10", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 3, d: "M5 13l4 4L19 7" }) }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: "Linked Successfully" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 mt-2", children: "You can now sign transactions on your phone." }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "mt-8 px-6 py-2 bg-dark-700 hover:bg-dark-600 rounded-xl text-xs font-bold transition-all", children: "Continue" })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 mt-8 w-full", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onSync, className: "flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95", children: "Sync Accounts" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "px-4 py-3 bg-dark-700 hover:bg-dark-600 rounded-xl text-xs font-bold transition-all border border-dark-600", children: "Done" })
+      ] })
     ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-4 bg-white rounded-3xl shadow-inner-xl animate-scaleIn", children: qrData ? /* @__PURE__ */ jsxRuntimeExports.jsx(QRCodeSVG, { value: qrData, size: 200, level: "H" }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[200px] h-[200px] flex items-center justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" }) }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full space-y-3", children: [
@@ -14775,6 +14845,21 @@ const BridgeModal = ({ onClose }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3 bg-dark-900/50 p-3 rounded-2xl border border-dark-700/50", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-6 h-6 bg-purple-600 rounded-lg flex items-center justify-center text-[10px] font-black italic", children: "2" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-slate-400 font-bold", children: 'Tap "Pair" and Scan QR Code' })
+        ] })
+      ] }),
+      qrData && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full mt-4 p-3 bg-dark-900/80 rounded-2xl border border-dark-700/50 animate-fadeIn", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[9px] text-slate-500 uppercase font-black tracking-widest mb-2 opacity-70", children: "Manual Pairing String" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("code", { className: "flex-1 text-[9px] text-purple-400 font-mono break-all line-clamp-2 select-all cursor-pointer bg-black/40 p-2 rounded-lg border border-purple-500/10", children: qrData }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              onClick: () => navigator.clipboard.writeText(qrData),
+              className: "p-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-slate-400 transition-colors shrink-0 flex items-center justify-center border border-dark-600",
+              title: "Copy to clipboard",
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" }) })
+            }
+          )
         ] })
       ] })
     ] }) }),
@@ -14830,6 +14915,25 @@ function AppContent() {
     };
     chatService.addMessageListener(chatListener);
     return () => chatService.removeMessageListener(chatListener);
+  }, [showNotification]);
+  reactExports.useEffect(() => {
+    bridgeService.onValidatePIN = async (pin) => {
+      console.log("[Bridge] PIN validation request received:", pin);
+      try {
+        const vault = await unlockVault(pin);
+        if (vault) {
+          console.log("[Bridge] PIN valid! Syncing", vault.accounts.length, "accounts...");
+          bridgeService.syncAccounts(vault.accounts);
+          showNotification("Mobile device paired and synced!", "success");
+        } else {
+          console.error("[Bridge] Invalid PIN: Vault decryption failed");
+          showNotification("Pairing failed: Invalid PIN", "error");
+        }
+      } catch (e) {
+        console.error("[Bridge] Critical error during PIN validation:", e);
+        showNotification("Pairing failed: Error validating PIN", "error");
+      }
+    };
   }, [showNotification]);
   reactExports.useEffect(() => {
     console.log("Gravity: App useEffect mounted");
@@ -15331,7 +15435,13 @@ function AppContent() {
         accounts: walletState.accounts
       }
     ),
-    showBridge && /* @__PURE__ */ jsxRuntimeExports.jsx(BridgeModal, { onClose: () => setShowBridge(false) })
+    showBridge && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      BridgeModal,
+      {
+        onClose: () => setShowBridge(false),
+        onSync: () => bridgeService.syncAccounts(walletState.accounts)
+      }
+    )
   ] });
 }
 

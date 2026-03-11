@@ -4,11 +4,12 @@ import { Chain, WalletState, Account, Vault } from '@types'
 import { LanguageProvider } from '@contexts/LanguageContext'
 import { LockScreen } from '@components/LockScreen'
 import { bridgeService, SignRequest, SignResponse } from '@services/bridgeService'
-import { broadcastTransfer } from '@services/chainService'
+import { broadcastTransfer, broadcastOperations } from '@services/chainService'
 import { getVault, saveVault, tryRestoreSession } from '@services/cryptoService'
 import { mobileProvider, SignRequest as MobileSignRequest } from './services/mobileProvider'
 import { SignRequestModal } from './components/SignRequestModal'
 import { PermissionsManager } from './components/PermissionsManager'
+import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning'
 import 'gravity-shared/styles/global.css'
 
 // Shared Components
@@ -52,9 +53,14 @@ function MobileContent() {
   const [mobileSignRequest, setMobileSignRequest] = useState<MobileSignRequest | null>(null)
   const [showPermissions, setShowPermissions] = useState(false)
 
-  // Wallet Modal States
   const [activeModal, setActiveModal] = useState<'transfer' | 'receive' | 'history' | 'import' | 'manage' | null>(null)
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
+
+  // QR & PIN Pairing State
+  const [isScanning, setIsScanning] = useState(false)
+  const [showPinPrompt, setShowPinPrompt] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [pinValue, setPinValue] = useState('')
 
   useEffect(() => {
     // 1. Initialize Services
@@ -62,6 +68,14 @@ function MobileContent() {
     bridgeService.onSignRequest = (req) => {
       setActiveRequest(req)
       setCurrentView('bridge')
+    }
+    bridgeService.onSyncAccounts = (accounts) => {
+      console.log('[Mobile] Sync accounts received:', accounts)
+      setWalletState(prev => ({ ...prev, accounts, encryptedMaster: true }))
+      setNeedsSave(true)
+      setIsVerifying(false)
+      setShowPinPrompt(false)
+      alert("Accounts imported from extension successfully!")
     }
     bridgeService.init()
 
@@ -77,18 +91,25 @@ function MobileContent() {
     // 2. Load Persisted State
     const loadState = async () => {
       try {
+        console.log('[Mobile] Checking for existing vault...');
         const vaultData = await getVault();
         if (vaultData) {
+          console.log('[Mobile] Vault found, showing lock screen');
           setWalletState(prev => ({
             ...prev,
             accounts: [],
             encryptedMaster: true,
           }));
-        } else {
           setIsLocked(true);
+        } else {
+          console.log('[Mobile] No vault found, showing onboarding');
+          setIsLocked(false);
+          setCurrentView('bridge');
         }
       } catch (e) {
         console.error("Failed to load state", e);
+        setIsLocked(false);
+        setCurrentView('bridge');
       }
     };
     loadState();
@@ -176,38 +197,71 @@ function MobileContent() {
       await mobileProvider.grantPermission(request.domain, [request.operation], duration)
     }
 
+    // 1. Find suitable account
     let account = walletState.accounts.find(a => a.name === request.params.username || a.name === request.params.from);
     if (!account) account = walletState.accounts[0];
 
-    if (!account || !account.activeKey) {
-      alert("No suitable account found to sign this request.");
+    if (!account) {
+      alert("No accounts found. Please import an account first.");
+      mobileProvider.rejectRequest(requestId);
+      setMobileSignRequest(null);
+      return;
+    }
+
+    // 2. Identify required key type and get the key
+    const postingOps = ['vote', 'comment', 'post', 'custom_json'];
+    const needsPosting = postingOps.includes(request.operation);
+    const signingKey = needsPosting ? account.postingKey : account.activeKey;
+
+    if (!signingKey) {
+      alert(`Missing ${needsPosting ? 'Posting' : 'Active'} key for @${account.name}. Please update your account keys.`);
       mobileProvider.rejectRequest(requestId);
       setMobileSignRequest(null);
       return;
     }
 
     try {
-      let result
+      let result;
+
+      // Use specialized broadcast for transfer if needed, or generic broadcastOperations
       if (request.operation === 'transfer') {
         result = await broadcastTransfer(
           account.chain as Chain,
           account.name,
-          account.activeKey,
+          signingKey,
           request.params.to,
           request.params.amount,
           request.params.memo || '',
-          request.params.symbol || 'HIVE'
+          request.params.symbol || (account.chain === Chain.HIVE ? 'HIVE' : account.chain === Chain.STEEM ? 'STEEM' : 'BLURT')
         )
+      } else {
+        // Generic operation handling
+        // Convert request params to standard operation array [type, data]
+        const { domain, operation, callback, ...opData } = request.params;
+
+        // Specific normalization for some ops if needed
+        if (operation === 'vote') {
+          opData.weight = parseInt(opData.weight) || 10000;
+        }
+
+        const op = [operation, opData];
+        result = await broadcastOperations(
+          account.chain as Chain,
+          signingKey,
+          [op]
+        );
       }
 
       if (result?.success) {
         const signature = result.txId || 'signed'
         mobileProvider.approveRequest(requestId, signature)
       } else {
+        alert("Operation failed: " + (result?.error || 'Unknown error'));
         mobileProvider.rejectRequest(requestId)
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('[Mobile] Operation failed:', e)
+      alert("Error: " + (e.message || String(e)));
       mobileProvider.rejectRequest(requestId)
     }
     setMobileSignRequest(null)
@@ -218,11 +272,113 @@ function MobileContent() {
     setMobileSignRequest(null)
   }
 
-  const simulateScan = () => {
-    const mockQr = prompt("Enter Bridge Connection String (from Extension):")
-    if (mockQr) {
-      bridgeService.connectToExtension(mockQr)
+  const startScan = async () => {
+    try {
+      console.log('[Scanner] Checking ML Kit module availability...');
+      const isAvailable = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+      if (!isAvailable.available) {
+        console.log('[Scanner] ML Kit module not found. Installing...');
+        alert("Preparing scanner... (Downloading assets, please wait)");
+        await BarcodeScanner.installGoogleBarcodeScannerModule();
+      }
+
+      // 1. Check Permissions
+      const status = await BarcodeScanner.checkPermissions();
+      if (status.camera !== 'granted') {
+        const req = await BarcodeScanner.requestPermissions();
+        if (req.camera !== 'granted') {
+          alert("Camera permission is required to scan QR codes.");
+          return;
+        }
+      }
+
+      // 2. Start Scanning
+      console.log('[Scanner] Starting scan sequence...');
+      document.documentElement.classList.add('barcode-scanner-active');
+      document.body.classList.add('barcode-scanner-active');
+      setIsScanning(true);
+
+      // Radical delay to ensure all CSS classes are parsed and applied
+      await new Promise(r => setTimeout(r, 500));
+
+      const listener = await BarcodeScanner.addListener('barcodeScanned', async (result) => {
+        console.log('[Scanner] Barcode detected!', result.barcode.displayValue);
+
+        await BarcodeScanner.stopScan();
+        document.documentElement.classList.remove('barcode-scanner-active');
+        document.body.classList.remove('barcode-scanner-active');
+        setIsScanning(false);
+        listener.remove();
+
+        const qrData = result.barcode.displayValue;
+        if (qrData.startsWith('gravity:bridge:')) {
+          console.log('[Scanner] Valid Gravity Bridge QR found');
+          try {
+            await bridgeService.connectToExtension(qrData);
+            setShowPinPrompt(true);
+          } catch (err) {
+            console.error('[Scanner] Bridge connection failed', err);
+            alert("Connection failed: " + err);
+          }
+        } else {
+          alert("Invalid QR Code: Not a Gravity Bridge session");
+        }
+      });
+
+      console.log('[Scanner] Calling BarcodeScanner.startScan()...');
+      await BarcodeScanner.startScan({
+        formats: [BarcodeFormat.QrCode]
+      });
+
+    } catch (e) {
+      console.error("[Scanner] StartScan failed", e);
+      setIsScanning(false);
+      document.documentElement.classList.remove('barcode-scanner-active');
+      document.body.classList.remove('barcode-scanner-active');
+      alert("Error opening scanner: " + e);
     }
+  }
+
+  const handleValidatePin = async () => {
+    if (!pinValue) return;
+    setIsVerifying(true);
+    try {
+      await bridgeService.validatePairing(pinValue);
+      // We don't close showPinPrompt here, we wait for onSyncAccounts or an error timeout
+      setTimeout(() => {
+        if (isVerifying) {
+          setIsVerifying(false);
+          alert("Pairing timeout: Please check if the extension is open and the PIN is correct.");
+        }
+      }, 10000);
+    } catch (e) {
+      setIsVerifying(false);
+      alert("Error sending validation: " + e);
+    }
+  }
+
+  const cancelScan = async () => {
+    console.log('[Scanner] Cancelling scan...');
+    await BarcodeScanner.stopScan();
+    setIsScanning(false);
+    document.documentElement.classList.remove('barcode-scanner-active');
+    document.body.classList.remove('barcode-scanner-active');
+  }
+
+  if (isScanning) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-between pb-20 pt-10 bg-transparent scanner-ui-overlay">
+        <div className="w-64 h-64 border-2 border-white/50 rounded-3xl relative">
+          <div className="absolute inset-0 border-4 border-purple-500 rounded-3xl animate-pulse"></div>
+        </div>
+        <button
+          onClick={cancelScan}
+          className="bg-red-600/80 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-sm backdrop-blur-md"
+        >
+          Cancel Scan
+        </button>
+      </div>
+    );
   }
 
   if (isLocked) {
@@ -238,25 +394,27 @@ function MobileContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-dark-900 text-white p-6 relative overflow-hidden">
+    <div className={`flex flex-col h-screen w-screen text-white p-6 relative overflow-hidden transition-colors ${isScanning ? 'bg-transparent' : 'bg-dark-900'}`}>
       {/* Header */}
-      <header className="flex justify-between items-center mb-4 shrink-0">
-        <div>
-          <h1 className="text-2xl font-black tracking-tighter">GRAVITY</h1>
-          <div className="flex items-center gap-1.5 mt-1">
-            {currentView === 'bridge' && (
-              <>
-                <div className={`w-1.5 h-1.5 rounded-full ${bridgeStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{bridgeStatus}</span>
-              </>
-            )}
-            {/* Nav Labels removed from Header for cleaner look as they are in nav bar now */}
+      {!isScanning && (
+        <header className="flex justify-between items-center mb-4 shrink-0 transition-opacity">
+          <div>
+            <h1 className="text-2xl font-black tracking-tighter">GRAVITY</h1>
+            <div className="flex items-center gap-1.5 mt-1">
+              {currentView === 'bridge' && (
+                <>
+                  <div className={`w-1.5 h-1.5 rounded-full ${bridgeStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{bridgeStatus}</span>
+                </>
+              )}
+              {/* Nav Labels removed from Header for cleaner look as they are in nav bar now */}
+            </div>
           </div>
-        </div>
-        <div className="w-10 h-10 rounded-2xl bg-dark-800 border border-dark-700 flex items-center justify-center font-bold text-purple-400">
-          {walletState.accounts[0]?.name?.substring(0, 1).toUpperCase() || 'G'}
-        </div>
-      </header>
+          <div className="w-10 h-10 rounded-2xl bg-dark-800 border border-dark-700 flex items-center justify-center font-bold text-purple-400">
+            {walletState.accounts[0]?.name?.substring(0, 1).toUpperCase() || 'G'}
+          </div>
+        </header>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-0 overflow-y-auto relative no-scrollbar">
@@ -274,7 +432,7 @@ function MobileContent() {
               </div>
 
               <button
-                onClick={simulateScan}
+                onClick={startScan}
                 className="w-full max-w-[280px] bg-white text-black py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
               >
                 Pair Device
@@ -494,6 +652,55 @@ function MobileContent() {
             setActiveModal(null);
           }}
         />
+      )}
+
+      {/* 4. Pairing PIN Prompt */}
+      {showPinPrompt && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-dark-900/95 backdrop-blur-md animate-fadeIn">
+          <div className="bg-dark-800 border border-dark-600 rounded-[32px] p-8 max-w-sm w-full shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-purple-600/20 rounded-full flex items-center justify-center text-purple-400 mx-auto mb-4">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              </div>
+              <h2 className="text-xl font-black text-white mb-2">Authorize Sync</h2>
+              <p className="text-xs text-slate-500 font-medium">Enter your extension PIN to import accounts.</p>
+            </div>
+
+            <div className="space-y-6">
+              <input
+                type="password"
+                value={pinValue}
+                onChange={(e) => setPinValue(e.target.value)}
+                placeholder="Enter PIN"
+                className="w-full bg-dark-900 border border-dark-600 rounded-2xl py-4 px-4 text-center text-xl font-bold tracking-[0.5em] focus:outline-none focus:border-purple-500 transition-colors"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowPinPrompt(false); setPinValue(''); setIsVerifying(false); }}
+                  disabled={isVerifying}
+                  className="flex-1 py-4 bg-dark-700 hover:bg-dark-600 disabled:opacity-30 rounded-2xl text-xs font-bold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleValidatePin}
+                  disabled={!pinValue || isVerifying}
+                  className="flex-1 py-4 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                >
+                  {isVerifying ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Verifying</span>
+                    </>
+                  ) : (
+                    "Verify"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

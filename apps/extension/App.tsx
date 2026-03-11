@@ -30,9 +30,11 @@ import {
   getVault,
   clearCryptoCache,
   tryRestoreSession,
-  enablePasswordless
+  enablePasswordless,
+  unlockVault
 } from '@services/cryptoService';
 import { benchmarkNodes } from '@services/nodeService';
+import { bridgeService } from '@services/bridgeService';
 import { LanguageProvider, useTranslation } from '@contexts/LanguageContext';
 import { NotificationProvider, useNotification } from '@contexts/NotificationContext';
 
@@ -109,6 +111,27 @@ function AppContent() {
 
     chatService.addMessageListener(chatListener);
     return () => chatService.removeMessageListener(chatListener);
+  }, [showNotification]);
+
+  // 1.5. Bridge PIN Validation Listener
+  useEffect(() => {
+    bridgeService.onValidatePIN = async (pin) => {
+      console.log("[Bridge] PIN validation request received:", pin);
+      try {
+        const vault = await unlockVault(pin);
+        if (vault) {
+          console.log("[Bridge] PIN valid! Syncing", vault.accounts.length, "accounts...");
+          bridgeService.syncAccounts(vault.accounts);
+          showNotification("Mobile device paired and synced!", "success");
+        } else {
+          console.error("[Bridge] Invalid PIN: Vault decryption failed");
+          showNotification("Pairing failed: Invalid PIN", "error");
+        }
+      } catch (e) {
+        console.error("[Bridge] Critical error during PIN validation:", e);
+        showNotification("Pairing failed: Error validating PIN", "error");
+      }
+    };
   }, [showNotification]);
 
   // 2. Load Initial State & Session
@@ -683,7 +706,10 @@ function AppContent() {
       )}
 
       {showBridge && (
-        <BridgeModal onClose={() => setShowBridge(false)} />
+        <BridgeModal
+          onClose={() => setShowBridge(false)}
+          onSync={() => bridgeService.syncAccounts(walletState.accounts)}
+        />
       )}
     </div>
   );

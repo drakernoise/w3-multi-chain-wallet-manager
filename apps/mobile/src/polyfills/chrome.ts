@@ -9,7 +9,7 @@ if (typeof window !== 'undefined' && !window.chrome) {
     window.chrome = {
         storage: {
             local: {
-                get: (keys: string[] | string, callback: (result: any) => void) => {
+                get: (keys: string[] | string, callback?: (result: any) => void) => {
                     const result: any = {};
                     const keysArray = Array.isArray(keys) ? keys : [keys];
                     keysArray.forEach(key => {
@@ -22,13 +22,21 @@ if (typeof window !== 'undefined' && !window.chrome) {
                             }
                         }
                     });
-                    callback(result);
+                    if (callback) {
+                        callback(result);
+                        return;
+                    }
+                    return Promise.resolve(result);
                 },
                 set: (items: Record<string, any>, callback?: () => void) => {
                     Object.entries(items).forEach(([key, value]) => {
                         localStorage.setItem(key, JSON.stringify(value));
                     });
-                    if (callback) callback();
+                    if (callback) {
+                        callback();
+                        return;
+                    }
+                    return Promise.resolve();
                 }
             }
         },

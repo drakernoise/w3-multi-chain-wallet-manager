@@ -2,8 +2,8 @@ declare global {
     const chrome: {
         storage: {
             local: {
-                get: (keys: string[] | string, callback: (result: any) => void) => void;
-                set: (items: Record<string, any>, callback?: () => void) => void;
+                get: (keys: string[] | string, callback?: (result: any) => void) => Promise<any> | void;
+                set: (items: Record<string, any>, callback?: () => void) => Promise<void> | void;
             };
         };
         runtime: {

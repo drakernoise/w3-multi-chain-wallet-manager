@@ -33,20 +33,32 @@ class BridgeService {
 
     public onStatusChange: ((status: string) => void) | null = null;
     public onSignRequest: ((request: SignRequest) => void) | null = null;
+    public onSyncAccounts: ((accounts: any[]) => void) | null = null;
+    public onValidatePIN: ((pin: string) => void) | null = null;
 
     public async init() {
         if (this.socket?.connected) return;
 
+        console.log('[Bridge] Initializing socket connection to:', this.serverUrl);
         this.socket = io(this.serverUrl, {
-            transports: ['websocket'],
-            autoConnect: true
+            transports: ['polling', 'websocket'], // Try polling first for better compatibility
+            autoConnect: true,
+            reconnectionAttempts: 5,
+            timeout: 10000
         });
 
         this.socket.on('connect', () => {
+            console.log('[Bridge] Socket connected! ID:', this.socket?.id);
             if (this.onStatusChange) this.onStatusChange('connected');
         });
 
-        this.socket.on('disconnect', () => {
+        this.socket.on('connect_error', (err) => {
+            console.error('[Bridge] Socket connection error:', err.message);
+            if (this.onStatusChange) this.onStatusChange('error: ' + err.message);
+        });
+
+        this.socket.on('disconnect', (reason) => {
+            console.log('[Bridge] Socket disconnected. Reason:', reason);
             if (this.onStatusChange) this.onStatusChange('disconnected');
         });
 
@@ -58,6 +70,28 @@ class BridgeService {
                 if (this.onSignRequest) this.onSignRequest(request);
             } catch (e) {
                 console.error("Bridge decryption failed", e);
+            }
+        });
+
+        this.socket.on('bridge_sync_accounts', async (data: { encrypted: string }) => {
+            if (!this.sharedKey) return;
+            try {
+                const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
+                const accounts = JSON.parse(decrypted);
+                if (this.onSyncAccounts) this.onSyncAccounts(accounts);
+            } catch (e) {
+                console.error("Bridge accounts sync failed", e);
+            }
+        });
+
+        this.socket.on('bridge_validate_pin', async (data: { encrypted: string }) => {
+            if (!this.sharedKey) return;
+            try {
+                const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
+                const { pin } = JSON.parse(decrypted);
+                if (this.onValidatePIN) this.onValidatePIN(pin);
+            } catch (e) {
+                console.error("Bridge PIN validation failed", e);
             }
         });
     }
@@ -126,6 +160,18 @@ class BridgeService {
                 resolve(JSON.parse(decrypted));
             });
         });
+    }
+
+    public async syncAccounts(accounts: any[]) {
+        if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
+        const encrypted = await encryptMessage(JSON.stringify(accounts), this.sharedKey);
+        this.socket.emit('bridge_sync_accounts', { sessionId: this.sessionId, encrypted });
+    }
+
+    public async validatePairing(pin: string) {
+        if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
+        const encrypted = await encryptMessage(JSON.stringify({ pin }), this.sharedKey);
+        this.socket.emit('bridge_validate_pin', { sessionId: this.sessionId, encrypted });
     }
 }
 
