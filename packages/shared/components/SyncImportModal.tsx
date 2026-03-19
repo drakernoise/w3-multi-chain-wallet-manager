@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SyncPayload } from '../types';
 import { deviceTransferService } from '../services/deviceTransferService';
 
@@ -14,6 +14,13 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
     const [status, setStatus] = useState<ImportStatus>('preparing');
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+    const onCloseRef = useRef(onClose);
+    const onImportRef = useRef(onImport);
+
+    useEffect(() => {
+        onCloseRef.current = onClose;
+        onImportRef.current = onImport;
+    }, [onClose, onImport]);
 
     useEffect(() => {
         let mounted = true;
@@ -38,7 +45,7 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
                 const payload = await deviceTransferService.waitForIncomingPayload();
                 if (!mounted) return;
                 setStatus('importing');
-                await onImport(payload);
+                await onImportRef.current(payload);
                 if (!mounted) return;
                 setSuccessMsg(`Wallet received successfully. Imported ${payload.accounts.length} account${payload.accounts.length === 1 ? '' : 's'}.`);
                 setStatus('done');
@@ -56,7 +63,7 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
             deviceTransferService.onStatusChange(null);
             deviceTransferService.disconnect();
         };
-    }, [onClose, onImport]);
+    }, []);
 
     const handleCopy = async () => {
         if (!pairCode) return;
@@ -67,7 +74,7 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn overflow-y-auto">
             <div className="bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar my-auto">
                 <button
-                    onClick={onClose}
+                    onClick={() => onCloseRef.current()}
                     className="absolute top-4 right-4 text-slate-400 hover:text-white"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -128,7 +135,7 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
 
                     {status === 'done' && (
                         <button
-                            onClick={onClose}
+                            onClick={() => onCloseRef.current()}
                             className="w-full py-3 bg-green-500/15 hover:bg-green-500/25 border border-green-500/30 rounded-xl font-bold text-sm text-green-300 transition-all active:scale-95"
                         >
                             Close

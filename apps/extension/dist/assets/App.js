@@ -9197,6 +9197,12 @@ const SyncImportModal = ({ onClose, onImport }) => {
   const [status, setStatus] = reactExports.useState("preparing");
   const [errorMsg, setErrorMsg] = reactExports.useState("");
   const [successMsg, setSuccessMsg] = reactExports.useState("");
+  const onCloseRef = reactExports.useRef(onClose);
+  const onImportRef = reactExports.useRef(onImport);
+  reactExports.useEffect(() => {
+    onCloseRef.current = onClose;
+    onImportRef.current = onImport;
+  }, [onClose, onImport]);
   reactExports.useEffect(() => {
     let mounted = true;
     deviceTransferService.onStatusChange((nextStatus, detail) => {
@@ -9217,7 +9223,7 @@ const SyncImportModal = ({ onClose, onImport }) => {
         const payload = await deviceTransferService.waitForIncomingPayload();
         if (!mounted) return;
         setStatus("importing");
-        await onImport(payload);
+        await onImportRef.current(payload);
         if (!mounted) return;
         setSuccessMsg(`Wallet received successfully. Imported ${payload.accounts.length} account${payload.accounts.length === 1 ? "" : "s"}.`);
         setStatus("done");
@@ -9233,7 +9239,7 @@ const SyncImportModal = ({ onClose, onImport }) => {
       deviceTransferService.onStatusChange(null);
       deviceTransferService.disconnect();
     };
-  }, [onClose, onImport]);
+  }, []);
   const handleCopy = async () => {
     if (!pairCode) return;
     await navigator.clipboard.writeText(pairCode);
@@ -9242,7 +9248,7 @@ const SyncImportModal = ({ onClose, onImport }) => {
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       "button",
       {
-        onClick: onClose,
+        onClick: () => onCloseRef.current(),
         className: "absolute top-4 right-4 text-slate-400 hover:text-white",
         children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
       }
@@ -9278,7 +9284,7 @@ const SyncImportModal = ({ onClose, onImport }) => {
       status === "done" && /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
-          onClick: onClose,
+          onClick: () => onCloseRef.current(),
           className: "w-full py-3 bg-green-500/15 hover:bg-green-500/25 border border-green-500/30 rounded-xl font-bold text-sm text-green-300 transition-all active:scale-95",
           children: "Close"
         }
