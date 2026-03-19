@@ -1,35 +1,72 @@
-import React, { useState } from 'react';
-import { syncService } from '../services/syncService';
+import React, { useEffect, useState } from 'react';
 import { SyncPayload } from '../types';
+import { deviceTransferService } from '../services/deviceTransferService';
 
 interface SyncImportModalProps {
     onClose: () => void;
     onImport: (payload: SyncPayload) => Promise<void>;
 }
 
+type ImportStatus = 'preparing' | 'waiting' | 'importing' | 'done' | 'error';
+
 export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImport }) => {
-    const [code, setCode] = useState('');
-    const [status, setStatus] = useState<'idle' | 'scanning' | 'syncing' | 'error'>('idle');
+    const [pairCode, setPairCode] = useState('');
+    const [status, setStatus] = useState<ImportStatus>('preparing');
     const [errorMsg, setErrorMsg] = useState('');
 
-    const handleSync = async () => {
-        if (!code) return;
-        setStatus('syncing');
-        setErrorMsg('');
+    useEffect(() => {
+        let mounted = true;
 
-        try {
-            const payload = await syncService.startImportSession(code);
-            await onImport(payload);
-            onClose();
-        } catch (e: any) {
-            setStatus('error');
-            setErrorMsg(e.message || "Sync Failed");
-        }
+        deviceTransferService.onStatusChange((nextStatus, detail) => {
+            if (!mounted) return;
+            if (nextStatus === 'waiting') setStatus('waiting');
+            if (nextStatus === 'paired') setStatus('waiting');
+            if (nextStatus === 'error') {
+                setStatus('error');
+                setErrorMsg(detail || 'Transfer failed');
+            }
+        });
+
+        const prepare = async () => {
+            try {
+                const { code } = await deviceTransferService.startReceiveSession();
+                if (!mounted) return;
+                setPairCode(code);
+                setStatus('waiting');
+
+                const payload = await deviceTransferService.waitForIncomingPayload();
+                if (!mounted) return;
+                setStatus('importing');
+                await onImport(payload);
+                if (!mounted) return;
+                setStatus('done');
+                setTimeout(() => {
+                    if (mounted) onClose();
+                }, 900);
+            } catch (e: any) {
+                if (!mounted) return;
+                setStatus('error');
+                setErrorMsg(e?.message || 'Unable to receive data');
+            }
+        };
+
+        prepare();
+
+        return () => {
+            mounted = false;
+            deviceTransferService.onStatusChange(null);
+            deviceTransferService.disconnect();
+        };
+    }, [onClose, onImport]);
+
+    const handleCopy = async () => {
+        if (!pairCode) return;
+        await navigator.clipboard.writeText(pairCode);
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-            <div className="bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn overflow-y-auto">
+            <div className="bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar my-auto">
                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 text-slate-400 hover:text-white"
@@ -37,34 +74,56 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
 
-                <h3 className="text-xl font-black text-white mb-2">Import Sync Code</h3>
-                <p className="text-xs text-slate-400 mb-6">Paste the sync code from the other device (Mobile/Desktop).</p>
+                <h3 className="text-xl font-black text-white mb-2">Receive from Another Device</h3>
+                <p className="text-xs text-slate-400 mb-6">Open the source device, choose send, and enter this pairing code there.</p>
 
                 <div className="space-y-4">
-                    <textarea
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="Paste gravity:sync:... code here"
-                        className="w-full bg-dark-900 border border-dark-700 rounded-xl p-4 text-xs font-mono text-slate-200 focus:border-purple-500 outline-none h-24 resize-none"
-                    />
-
-                    {errorMsg && <p className="text-red-400 text-xs font-bold text-center">{errorMsg}</p>}
+                    <div className="w-full bg-dark-900 border border-dark-700 rounded-2xl p-5 text-center">
+                        <div className="text-[10px] uppercase tracking-[0.28em] font-black text-slate-500 mb-3">Pairing code</div>
+                        <div className="text-2xl font-mono tracking-[0.32em] text-white select-all">{pairCode || '----- -----'}</div>
+                    </div>
 
                     <button
-                        onClick={handleSync}
-                        disabled={!code || status === 'syncing'}
-                        className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${!code || status === 'syncing' ? 'bg-dark-700 text-slate-500' : 'bg-purple-600 text-white shadow-lg active:scale-95'}`}
+                        onClick={handleCopy}
+                        disabled={!pairCode}
+                        className="w-full py-3 bg-dark-700 hover:bg-dark-600 rounded-xl font-mono text-xs text-purple-300 transition-all active:scale-95"
                     >
-                        {status === 'syncing' ? (
-                            <div className="flex flex-col items-center">
-                                <span>Connecting...</span>
-                                <span className="text-[8px] opacity-70 normal-case mt-1">Keep Desktop Export screen OPEN</span>
-                            </div>
-                        ) : 'Start Sync'}
+                        Copy Code
                     </button>
 
+                    {status === 'preparing' && (
+                        <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
+                            Preparing secure session...
+                        </div>
+                    )}
+
+                    {status === 'waiting' && (
+                        <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
+                            Waiting for source device...
+                        </div>
+                    )}
+
+                    {status === 'importing' && (
+                        <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
+                            Receiving and importing encrypted wallet...
+                        </div>
+                    )}
+
+                    {status === 'done' && (
+                        <div className="w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                            <div className="font-black text-green-400 uppercase tracking-widest text-sm">Import Complete</div>
+                        </div>
+                    )}
+
+                    {status === 'error' && (
+                        <div className="w-full py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+                            <div className="font-black text-red-400 uppercase tracking-widest text-sm">Transfer Error</div>
+                            <div className="text-[11px] text-slate-400 mt-1">{errorMsg}</div>
+                        </div>
+                    )}
+
                     <div className="pt-2 text-center text-[10px] text-slate-500">
-                        Secure End-to-End Encrypted Transfer
+                        This device never exposes the private data in plain text.
                     </div>
                 </div>
             </div>

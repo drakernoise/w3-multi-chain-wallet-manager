@@ -16,6 +16,7 @@ const dec = new TextDecoder();
 
 let cachedKey: CryptoKey | null = null;
 let cachedSalt: Uint8Array | null = null;
+const MOBILE_SESSION_KEY = 'gravity_crypto_session_mobile';
 
 // Derived key from password string
 async function getKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
@@ -50,6 +51,15 @@ async function getKeyFromBytes(passwordBytes: Uint8Array, salt: Uint8Array): Pro
 // Persist the internal key for Passwordless auth (Google/Bio)
 async function storeInternalKey(key: string) {
   await storageService.setItem('device_auth_struct', key);
+}
+
+export async function ensureMobileInternalKey(): Promise<string> {
+  const existing = await getInternalKey();
+  if (existing) return existing;
+  const internalKey = Array.from(window.crypto.getRandomValues(new Uint8Array(32)))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  await storeInternalKey(internalKey);
+  return internalKey;
 }
 
 export async function getInternalKey(): Promise<string | null> {
@@ -116,7 +126,6 @@ export async function loadInternalKeyWithPin(pin: string): Promise<string | null
 
     return new TextDecoder().decode(decrypted);
   } catch (e) {
-    console.error("PIN Decryption failed", e);
     return null;
   }
 }
@@ -245,12 +254,32 @@ export async function unlockVault(password: string): Promise<Vault | null> {
   return null;
 }
 
+export async function unlockVaultWithCachedSession(): Promise<Vault | null> {
+  const base64 = await storageService.getItem('vaultData');
+  if (!base64 || !cachedKey || !cachedSalt) return null;
+
+  try {
+    const bundle = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const iv = bundle.slice(SALT_LEN, SALT_LEN + IV_LEN);
+    const ciphertext = bundle.slice(SALT_LEN + IV_LEN);
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: ALGO, iv },
+      cachedKey,
+      ciphertext
+    );
+    return JSON.parse(dec.decode(decrypted));
+  } catch (e) {
+    return null;
+  }
+}
+
 export function clearCryptoCache() {
   cachedKey = null;
   cachedSalt = null;
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
     chrome.storage.session.remove('crypto_session');
   }
+  storageService.removeItem(MOBILE_SESSION_KEY).catch(() => {});
 }
 
 async function persistSession() {
@@ -262,6 +291,11 @@ async function persistSession() {
     chrome.storage.session.set({
       crypto_session: { key: keyArr, salt: saltArr }
     });
+  } else {
+    const exported = await window.crypto.subtle.exportKey('raw', cachedKey);
+    const saltArr = Array.from(cachedSalt);
+    const keyArr = Array.from(new Uint8Array(exported));
+    await storageService.setItem(MOBILE_SESSION_KEY, JSON.stringify({ key: keyArr, salt: saltArr }));
   }
 }
 
@@ -294,6 +328,24 @@ export async function tryRestoreSession(): Promise<boolean> {
       });
     });
   }
+  try {
+    const raw = await storageService.getItem(MOBILE_SESSION_KEY);
+    if (raw) {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (parsed?.key && parsed?.salt) {
+        const importedKey = await window.crypto.subtle.importKey(
+          'raw',
+          new Uint8Array(parsed.key),
+          ALGO,
+          true,
+          ['encrypt', 'decrypt']
+        );
+        cachedKey = importedKey;
+        cachedSalt = new Uint8Array(parsed.salt);
+        return true;
+      }
+    }
+  } catch (e) { }
   return false;
 }
 

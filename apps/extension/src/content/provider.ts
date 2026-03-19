@@ -169,8 +169,11 @@ if (!(window as any)._gravityProvider) {
 
         /**
          * Handshake to verify extension is installed and ready
+         * Supports both (callback) and (appId, callback) for WhaleVault parity
          */
-        requestHandshake = (callback?: Function): Promise<ProviderResponse> | void => {
+        requestHandshake = (appIdOrCallback?: string | Function, callback?: Function): Promise<ProviderResponse> | void => {
+            const actualCallback = typeof appIdOrCallback === 'function' ? appIdOrCallback : callback;
+            
             const response: ProviderResponse = {
                 success: true,
                 message: 'Handshake successful',
@@ -179,12 +182,36 @@ if (!(window as any)._gravityProvider) {
                 rpc: this.current_rpc
             };
 
-            if (typeof callback === 'function') {
-                // Immediate callback response
-                setTimeout(() => callback(response), 0);
+            if (actualCallback) {
+                setTimeout(() => actualCallback(response), 0);
             } else {
                 return Promise.resolve(response);
             }
+        }
+
+        /**
+         * Decode a memo encrypted with a private key
+         */
+        decodeMemo = (
+            username: string,
+            memo: string,
+            key: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('decodeMemo', [username, memo, key], callback);
+        }
+
+        /**
+         * Encode a memo for a recipient
+         */
+        encodeMemo = (
+            username: string,
+            receiver: string,
+            memo: string,
+            key: string,
+            callback?: Function
+        ): Promise<any> | void => {
+            return this.send('encodeMemo', [username, receiver, memo, key], callback);
         }
 
         /**

@@ -1,5 +1,5 @@
 import { Chain } from '../types';
-import { PrivateKey as HivePrivateKey, cryptoUtils } from '@hiveio/dhive';
+import { PrivateKey as HivePrivateKey, cryptoUtils, Memo as HiveMemo } from '@hiveio/dhive';
 import { Client as SteemClient, PrivateKey as SteemPrivateKey } from 'dsteem';
 import { getActiveNode } from './nodeService';
 import { getChainConfig } from '../config/chainConfig';
@@ -1227,5 +1227,53 @@ export const signMessage = (
         }
     } catch (e: any) {
         return { success: false, error: e.message };
+    }
+};
+
+export const encodeMemo = async (chain: Chain, _username: string, receiver: string, memo: string, key: string): Promise<string> => {
+    try {
+        if (chain === Chain.HIVE || chain === Chain.STEEM) {
+            const privateKey = HivePrivateKey.fromString(key);
+            // In Hive/Sttem, if the memo doesn't start with #, it's not encrypted
+            if (!memo.startsWith('#')) memo = '#' + memo;
+            
+            // To encode, we need the receiver's memo key. 
+            // For simplicity in this provider, we assume the dApp might have provided it 
+            // OR we'anak fetch it. But standard WhaleVault expects the provider to handle it.
+            const receiverData = await fetchAccountData(chain, receiver);
+            if (!receiverData) throw new Error("Receiver account not found");
+            const receiverMemoKey = receiverData.memo_key;
+            
+            return HiveMemo.encode(privateKey, receiverMemoKey, memo);
+        } else if (chain === Chain.BLURT) {
+            const config = getChainConfig(Chain.BLURT);
+            blurt.config.set('address_prefix', config.addressPrefix);
+            
+            const receiverData = await fetchAccountData(chain, receiver);
+            if (!receiverData) throw new Error("Receiver account not found");
+            
+            return blurt.memo.encode(key, receiverData.memo_key, memo);
+        }
+        throw new Error("Chain not supported for memo encoding");
+    } catch (e: any) {
+        console.error("Encode memo error:", e);
+        throw e;
+    }
+};
+
+export const decodeMemo = async (chain: Chain, _username: string, encodedMemo: string, key: string): Promise<string> => {
+    try {
+        if (chain === Chain.HIVE || chain === Chain.STEEM) {
+            const privateKey = HivePrivateKey.fromString(key);
+            return HiveMemo.decode(privateKey, encodedMemo);
+        } else if (chain === Chain.BLURT) {
+            const config = getChainConfig(Chain.BLURT);
+            blurt.config.set('address_prefix', config.addressPrefix);
+            return blurt.memo.decode(key, encodedMemo);
+        }
+        throw new Error("Chain not supported for memo decoding");
+    } catch (e: any) {
+        console.error("Decode memo error:", e);
+        throw e;
     }
 };

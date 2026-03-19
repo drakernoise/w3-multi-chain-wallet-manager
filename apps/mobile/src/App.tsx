@@ -1,26 +1,121 @@
 import './polyfills/chrome'
-import { useState, useEffect } from 'react'
-import { Chain, WalletState, Account, Vault } from '@types'
+import { useState, useEffect, useRef } from 'react'
+import { Chain, WalletState, Account, Vault, SyncPayload } from '@types'
 import { LanguageProvider } from '@contexts/LanguageContext'
 import { LockScreen } from '@components/LockScreen'
 import { bridgeService, SignRequest, SignResponse } from '@services/bridgeService'
-import { broadcastTransfer, broadcastOperations } from '@services/chainService'
-import { getVault, saveVault, tryRestoreSession } from '@services/cryptoService'
+import { broadcastTransfer, broadcastOperations, broadcastVote, signMessage } from '@services/chainService'
+import { ensureMobileInternalKey, getVault, saveVault, tryRestoreSession, unlockVaultWithCachedSession } from '@services/cryptoService'
 import { mobileProvider, SignRequest as MobileSignRequest } from './services/mobileProvider'
 import { SignRequestModal } from './components/SignRequestModal'
 import { PermissionsManager } from './components/PermissionsManager'
 import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning'
 import 'gravity-shared/styles/global.css'
+import './App.css'
 
 // Shared Components
 import { WalletView } from '@components/WalletView'
 import { ChatView } from '@components/ChatView'
+import { BrowserView } from './components/BrowserView'
 import { TransferModal } from '@components/TransferModal'
 import { ReceiveModal } from '@components/ReceiveModal'
 import { HistoryModal } from '@components/HistoryModal'
 import { ImportModal } from '@components/ImportModal'
 import { ManageAccountModal } from '@components/ManageAccountModal'
 import { ManageWallets } from '@components/ManageWallets'
+
+const detectChainFromDomain = (domain?: string): Chain | null => {
+  const host = (domain || '').toLowerCase()
+  if (!host) return null
+
+  const hiveHosts = ['peakd.com', 'ecency.com', 'hive.blog', 'tribaldex.com', 'splinterlands.com']
+  if (hiveHosts.some((value) => host === value || host.endsWith(`.${value}`) || host.includes('hive'))) {
+    return Chain.HIVE
+  }
+
+  const blurtHosts = ['twiggy.lat', 'blurt.blog', 'beblurt.com', 'blurtwallet.com']
+  if (blurtHosts.some((value) => host === value || host.endsWith(`.${value}`) || host.includes('blurt'))) {
+    return Chain.BLURT
+  }
+
+  const steemHosts = ['steemit.com']
+  if (steemHosts.some((value) => host === value || host.endsWith(`.${value}`) || host.includes('steem'))) {
+    return Chain.STEEM
+  }
+
+  return null
+}
+
+const collectPossibleAccountNames = (params: any): string[] => {
+  const values = new Set<string>()
+  const pushValue = (value: unknown) => {
+    if (typeof value !== 'string') return
+    const normalized = value.trim().replace(/^@/, '')
+    if (!normalized) return
+    values.add(normalized)
+  }
+
+  if (params && typeof params === 'object') {
+    ;[
+      params.account,
+      params.username,
+      params.voter,
+      params.from,
+      params.author,
+      params.delegator,
+      params.account_name
+    ].forEach(pushValue)
+  }
+
+  const operations = params?.operations || params?.ops
+  const normalizedOps = Array.isArray(operations) ? operations : operations ? [operations] : []
+  normalizedOps.forEach((op: any) => {
+    const opData = Array.isArray(op) ? op[1] : (op?.data || op?.op || op?.operation_data || op)
+    if (!opData || typeof opData !== 'object') return
+    ;[
+      opData.account,
+      opData.username,
+      opData.voter,
+      opData.from,
+      opData.author,
+      opData.delegator,
+      opData.account_name
+    ].forEach(pushValue)
+  })
+
+  return Array.from(values)
+}
+
+const resolveAccountForRequest = (
+  accounts: Account[],
+  params: any,
+  domain?: string,
+  preferredAccountName?: string
+): Account | null => {
+  const domainChain = detectChainFromDomain(domain)
+  const candidates = [
+    preferredAccountName,
+    ...collectPossibleAccountNames(params)
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase())
+
+  for (const candidate of candidates) {
+    const exact = accounts.find((account) =>
+      account.name.toLowerCase() === candidate && (!domainChain || account.chain === domainChain)
+    )
+    if (exact) return exact
+  }
+
+  for (const candidate of candidates) {
+    const fallback = accounts.find((account) => account.name.toLowerCase() === candidate)
+    if (fallback) return fallback
+  }
+
+  return accounts.find((account) => account.chain === domainChain)
+    || accounts[0]
+    || null
+}
 
 function App() {
   return (
@@ -42,7 +137,7 @@ function MobileContent() {
   const [needsSave, setNeedsSave] = useState(false)
 
   // Navigation & View State
-  const [currentView, setCurrentView] = useState<'wallets' | 'bridge' | 'chat' | 'settings'>('wallets')
+  const [currentView, setCurrentView] = useState<'wallets' | 'bridge' | 'chat' | 'settings' | 'explorer'>('wallets')
   const [activeChain, setActiveChain] = useState<Chain>(Chain.HIVE)
 
   // Bridge State
@@ -51,6 +146,13 @@ function MobileContent() {
 
   // Mobile Provider State
   const [mobileSignRequest, setMobileSignRequest] = useState<MobileSignRequest | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  }
   const [showPermissions, setShowPermissions] = useState(false)
 
   const [activeModal, setActiveModal] = useState<'transfer' | 'receive' | 'history' | 'import' | 'manage' | null>(null)
@@ -61,6 +163,25 @@ function MobileContent() {
   const [showPinPrompt, setShowPinPrompt] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [pinValue, setPinValue] = useState('')
+  const accountsRef = useRef<Account[]>([])
+
+  const persistAccountsVault = async (accounts: Account[]) => {
+    const vault: Vault = { accounts, lastUpdated: Date.now() }
+    const hasSession = await tryRestoreSession()
+
+    if (hasSession) {
+      await saveVault('cached', vault)
+      return
+    }
+
+    const internalKey = await ensureMobileInternalKey()
+    await saveVault(internalKey, vault)
+    await tryRestoreSession()
+  }
+
+  useEffect(() => {
+    accountsRef.current = walletState.accounts
+  }, [walletState.accounts])
 
   useEffect(() => {
     // 1. Initialize Services
@@ -72,19 +193,48 @@ function MobileContent() {
     bridgeService.onSyncAccounts = (accounts) => {
       console.log('[Mobile] Sync accounts received:', accounts)
       setWalletState(prev => ({ ...prev, accounts, encryptedMaster: true }))
+      persistAccountsVault(accounts).catch(err =>
+        console.error('[Mobile] Immediate vault save after sync failed', err)
+      )
       setNeedsSave(true)
       setIsVerifying(false)
       setShowPinPrompt(false)
-      alert("Accounts imported from extension successfully!")
+      showToast("Accounts imported from extension successfully!")
     }
     bridgeService.init()
 
     mobileProvider.onSignRequest((req) => {
       console.log('[Mobile] Sign request received:', req)
-      if (mobileProvider.hasPermission(req.domain, req.operation)) {
-        handleMobileApprove(req.id, undefined)
+      const permission = mobileProvider.getPermission(req.domain)
+      const cachedAccount = resolveAccountForRequest(
+        accountsRef.current,
+        req.params,
+        req.domain,
+        permission?.defaultAccount
+      )
+
+      console.log('[GWDBG][mobile:auto-account]', JSON.stringify({
+        requestId: req.id,
+        domain: req.domain,
+        domainChain: detectChainFromDomain(req.domain),
+        requestedAccountNames: collectPossibleAccountNames(req.params),
+        preferredAccountName: permission?.defaultAccount || null,
+        resolvedAccount: cachedAccount ? { name: cachedAccount.name, chain: cachedAccount.chain } : null
+      }))
+      
+      if (req.preConfirmed && cachedAccount) {
+        console.log('[Mobile] Auto-approving pre-confirmed request for:', cachedAccount.name);
+        handleMobileApprove(req.id, req.rememberDuration, cachedAccount);
+      } else if (mobileProvider.hasPermission(req.domain, req.operation) && cachedAccount) {
+        console.log('[GWDBG][mobile:permission-auto-approve]', JSON.stringify({
+          requestId: req.id,
+          domain: req.domain,
+          operation: req.operation,
+          account: cachedAccount.name
+        }))
+        handleMobileApprove(req.id, undefined, cachedAccount);
       } else {
-        setMobileSignRequest(req)
+        setMobileSignRequest(req);
       }
     })
 
@@ -94,6 +244,21 @@ function MobileContent() {
         console.log('[Mobile] Checking for existing vault...');
         const vaultData = await getVault();
         if (vaultData) {
+          const restoredSession = await tryRestoreSession()
+          if (restoredSession) {
+            const restoredVault = await unlockVaultWithCachedSession()
+            if (restoredVault) {
+              console.log('[GWDBG][mobile:vault-auto-restored]', JSON.stringify({ accountCount: restoredVault.accounts.length }))
+              setWalletState(prev => ({
+                ...prev,
+                accounts: restoredVault.accounts,
+                encryptedMaster: true,
+              }));
+              setIsLocked(false);
+              setCurrentView(restoredVault.accounts.length > 0 ? 'wallets' : 'bridge');
+              return;
+            }
+          }
           console.log('[Mobile] Vault found, showing lock screen');
           setWalletState(prev => ({
             ...prev,
@@ -120,7 +285,7 @@ function MobileContent() {
   useEffect(() => {
     if (!isLocked && needsSave && walletState.encryptedMaster) {
       const vault: Vault = { accounts: walletState.accounts, lastUpdated: Date.now() };
-      saveVault('cached', vault)
+      persistAccountsVault(walletState.accounts)
         .then(() => setNeedsSave(false))
         .catch(err => console.error("Auto-save failed", err));
     }
@@ -147,7 +312,7 @@ function MobileContent() {
     const account = walletState.accounts.find(a => a.chain === activeRequest.chain && a.name === activeRequest.payload.username)
 
     if (!account || !account.activeKey) {
-      alert("Account not found or missing active key")
+      showToast("Account not found or missing active key")
       return
     }
 
@@ -173,7 +338,7 @@ function MobileContent() {
       setActiveRequest(null)
     } catch (e) {
       console.error("Signing failed", e)
-      alert("Signing failed: " + e)
+      showToast("Signing failed: " + e)
     }
   }
 
@@ -189,87 +354,336 @@ function MobileContent() {
   }
 
   // --- Mobile Provider Handlers ---
-  const handleMobileApprove = async (requestId: string, duration?: '1day' | '1week' | '1month') => {
-    const request = mobileSignRequest
+  const handleMobileApprove = async (requestId: string, duration?: '1day' | '1week' | '1month', autoAccount?: Account) => {
+    const request = autoAccount ? mobileProvider.getPendingRequest(requestId) : mobileSignRequest;
     if (!request) return
 
     if (duration) {
-      await mobileProvider.grantPermission(request.domain, [request.operation], duration)
-    }
-
-    // 1. Find suitable account
-    let account = walletState.accounts.find(a => a.name === request.params.username || a.name === request.params.from);
-    if (!account) account = walletState.accounts[0];
-
-    if (!account) {
-      alert("No accounts found. Please import an account first.");
-      mobileProvider.rejectRequest(requestId);
-      setMobileSignRequest(null);
-      return;
-    }
-
-    // 2. Identify required key type and get the key
-    const postingOps = ['vote', 'comment', 'post', 'custom_json'];
-    const needsPosting = postingOps.includes(request.operation);
-    const signingKey = needsPosting ? account.postingKey : account.activeKey;
-
-    if (!signingKey) {
-      alert(`Missing ${needsPosting ? 'Posting' : 'Active'} key for @${account.name}. Please update your account keys.`);
-      mobileProvider.rejectRequest(requestId);
-      setMobileSignRequest(null);
-      return;
+      await mobileProvider.grantPermission(request.domain, ['*'], duration, autoAccount?.name)
     }
 
     try {
       let result;
+      console.log('[Mobile] Approving request:', requestId, 'Op:', request.operation, 'Auto:', !!autoAccount);
 
-      // Use specialized broadcast for transfer if needed, or generic broadcastOperations
-      if (request.operation === 'transfer') {
+      // --- 1. Robust Parameter Parsing ---
+      let opData = { ...request.params };
+      // Some dApps pass a single 'params' string which is JSON (like PeakD sometimes)
+      if (opData.params && typeof opData.params === 'string') {
+        try {
+          const parsed = JSON.parse(opData.params);
+          opData = { ...opData, ...parsed };
+        } catch (e) { console.warn('[Mobile] Failed to parse params JSON', e); }
+      }
+
+      // --- 2. Robust Account Selection ---
+      let account: Account | null | undefined = autoAccount;
+      if (!account) {
+        account = resolveAccountForRequest(walletState.accounts, opData, request.domain);
+      }
+      
+      if (!account) {
+        // Fallback to active chain account
+        const domainChain = detectChainFromDomain(request.domain)
+        account = walletState.accounts.find((a) => a.chain === domainChain)
+          || walletState.accounts.find(a => a.chain === activeChain)
+          || walletState.accounts[0];
+      }
+
+      if (!account) {
+        console.error('[Mobile] No account found for request');
+        console.error('[GWDBG][mobile:account-missing]', JSON.stringify({ requestId, operation: request.operation, params: opData }));
+        showToast("Error: No account found. Please import your keys.");
+        mobileProvider.rejectRequest(requestId);
+        if (!autoAccount) setMobileSignRequest(null);
+        return;
+      }
+
+      // --- 3. Key Identification ---
+      const method = request.operation;
+      const postingOps = ['vote', 'comment', 'post', 'custom_json', 'requestVote', 'requestPost'];
+      const activeKeyOps = [
+        'witness_update',
+        'witness_set_properties',
+        'account_witness_vote',
+        'account_update',
+        'account_update2',
+        'transfer',
+        'transfer_to_vesting',
+        'withdraw_vesting',
+        'delegate_vesting_shares',
+        'account_create',
+        'account_create_with_delegation',
+        'transfer_to_savings',
+        'transfer_from_savings',
+        'escrow_transfer',
+        'escrow_release',
+        'escrow_dispute',
+        'escrow_approve',
+        'claim_reward_balance',
+        'delegate_rc',
+        'create_proposal',
+        'update_proposal_votes',
+        'remove_proposal',
+        'limit_order_create',
+        'limit_order_create2',
+        'limit_order_cancel',
+        'convert',
+        'collateralized_convert',
+        'fill_convert_request',
+        'cancel_transfer_from_savings',
+        'set_withdraw_vesting_route'
+      ];
+      let signBufferType: any = opData.type;
+      if (typeof signBufferType === 'string') {
+        try {
+          signBufferType = JSON.parse(signBufferType);
+        } catch {
+          // Keep original value when dApp sends a non-JSON type marker.
+        }
+      }
+
+      const isAuthSignBuffer =
+        (method === 'requestSignBuffer' || method === 'signBuffer' || method === 'sign_buffer') &&
+        typeof signBufferType === 'object' &&
+        (signBufferType?.auth === 'login' || signBufferType?.auth === 'posting');
+
+      const isPostingTypeSignBuffer =
+        (method === 'requestSignBuffer' || method === 'signBuffer' || method === 'sign_buffer') &&
+        typeof signBufferType === 'string' &&
+        signBufferType.toLowerCase() === 'posting';
+
+      let needsPosting =
+        postingOps.includes(request.operation) ||
+        postingOps.includes(opData.operation) ||
+        isAuthSignBuffer ||
+        isPostingTypeSignBuffer;
+      let signingKey = needsPosting ? (account.postingKey || account.activeKey) : account.activeKey;
+      console.log(
+        '[Mobile] Key selection:',
+        JSON.stringify({
+          requestId,
+          method,
+          needsPosting,
+          isAuthSignBuffer,
+          account: account.name,
+          hasPostingKey: !!account.postingKey,
+          hasActiveKey: !!account.activeKey
+        })
+      );
+      console.log('[GWDBG][mobile:key-selection]', JSON.stringify({
+        requestId,
+        method,
+        needsPosting,
+        isAuthSignBuffer,
+        isPostingTypeSignBuffer,
+        account: account.name,
+        chain: account.chain,
+        hasPostingKey: !!account.postingKey,
+        hasActiveKey: !!account.activeKey
+      }));
+
+      if (!signingKey) {
+        console.error(`[Mobile] Missing key for @${account.name}`);
+        console.error('[GWDBG][mobile:key-missing]', JSON.stringify({ requestId, account: account.name, needsPosting }));
+        showToast(`Missing ${needsPosting ? 'Posting' : 'Active'} key for @${account.name}.`);
+        mobileProvider.rejectRequest(requestId);
+        setMobileSignRequest(null);
+        return;
+      }
+
+      // --- 4. Operation Execution ---
+
+      if (method === 'transfer' || (method === 'broadcast' && opData.operation === 'transfer')) {
+        const transferData = method === 'broadcast' ? opData.params : opData;
         result = await broadcastTransfer(
           account.chain as Chain,
           account.name,
           signingKey,
-          request.params.to,
-          request.params.amount,
-          request.params.memo || '',
-          request.params.symbol || (account.chain === Chain.HIVE ? 'HIVE' : account.chain === Chain.STEEM ? 'STEEM' : 'BLURT')
+          transferData.to,
+          transferData.amount,
+          transferData.memo || '',
+          transferData.symbol || (account.chain === Chain.HIVE ? 'HIVE' : account.chain === Chain.STEEM ? 'STEEM' : 'BLURT')
         )
-      } else {
-        // Generic operation handling
-        // Convert request params to standard operation array [type, data]
-        const { domain, operation, callback, ...opData } = request.params;
+      } else if (method === 'requestVote' || method === 'vote') {
+        result = await broadcastVote(
+          account.chain as Chain,
+          account.name,
+          account.postingKey || account.activeKey || signingKey,
+          opData.author,
+          opData.permlink,
+          parseInt(opData.weight, 10) || 10000
+        )
+      } else if (method === 'requestPost' || method === 'post') {
+        let parentPermlink = opData.parent_perm || opData.parent_permlink;
+        const jsonMetadata = opData.json_metadata ?? opData.jsonMetadata;
 
-        // Specific normalization for some ops if needed
-        if (operation === 'vote') {
-          opData.weight = parseInt(opData.weight) || 10000;
+        if (!parentPermlink) {
+          try {
+            const metadata = typeof jsonMetadata === 'string' ? JSON.parse(jsonMetadata) : jsonMetadata;
+            if (metadata && Array.isArray(metadata.tags) && metadata.tags.length > 0) {
+              parentPermlink = metadata.tags[0];
+            }
+          } catch (e) { }
+          if (!parentPermlink) parentPermlink = 'general';
         }
 
-        const op = [operation, opData];
-        result = await broadcastOperations(
-          account.chain as Chain,
-          signingKey,
-          [op]
-        );
+        const op = ['comment', {
+          parent_author: opData.parent_author || '',
+          parent_permlink: parentPermlink || 'general',
+          author: account.name,
+          permlink: opData.permlink || '',
+          title: opData.title || '',
+          body: opData.body || '',
+          json_metadata: typeof jsonMetadata === 'string' ? jsonMetadata : JSON.stringify(jsonMetadata || {})
+        }];
+
+        console.log('[GWDBG][mobile:post-operation]', JSON.stringify({
+          requestId,
+          chain: account.chain,
+          account: account.name,
+          parentPermlink,
+          permlink: opData.permlink || ''
+        }));
+
+        result = await broadcastOperations(account.chain as Chain, account.postingKey || account.activeKey || signingKey, [op]);
+      } else if (method === 'requestSignBuffer' || method === 'signBuffer' || method === 'sign_buffer') {
+        console.log('[GWDBG][mobile:sign-buffer:start]', JSON.stringify({
+          requestId,
+          chain: account.chain,
+          account: account.name,
+          messageType: typeof (opData.message || opData.params),
+          hasType: typeof opData.type !== 'undefined'
+        }));
+        result = signMessage(account.chain as Chain, opData.message || opData.params, signingKey);
+      } else if (method === 'broadcast' || method === 'requestBroadcast') {
+        // Handle multiple operations
+        let ops = opData.operations || opData.ops;
+        if (typeof ops === 'string') {
+          try { ops = JSON.parse(ops); } catch (e) { }
+        }
+        if (!Array.isArray(ops)) ops = [ops];
+
+        // Deep normalization for each operation in the broadcast
+        const normalizedOps = ops.map((op: any) => {
+           if (Array.isArray(op)) return op;
+           if (op && typeof op === 'object') {
+             const type = op.type || op.operation || op.method;
+             const data = op.data || op.op || op.operation_data || (({ type: _t, operation: _o, method: _m, ...rest }) => rest)(op);
+             if (type) return [type, data];
+           }
+           return op;
+        });
+
+        const requestedKeyType = typeof opData.type === 'string' ? opData.type : '';
+        const requiresActiveKey = normalizedOps.some((op: any) => {
+          const opName = Array.isArray(op) ? op[0] : op?.type || op?.[0];
+          return activeKeyOps.includes(opName);
+        });
+        needsPosting = !requiresActiveKey;
+        signingKey = account.postingKey;
+        if (requestedKeyType === 'Active') signingKey = account.activeKey;
+        else if (requiresActiveKey) signingKey = account.activeKey;
+        if (!signingKey && account.activeKey) signingKey = account.activeKey;
+
+        console.log('[GWDBG][mobile:broadcast-key-selection]', JSON.stringify({
+          requestId,
+          chain: account.chain,
+          requestedKeyType,
+          requiresActiveKey,
+          selectedKeyIsActive: signingKey === account.activeKey,
+          operations: normalizedOps.map((op: any) => Array.isArray(op) ? op[0] : op?.type)
+        }));
+
+        if (!signingKey) {
+          console.error('[GWDBG][mobile:broadcast-key-missing]', JSON.stringify({ requestId, account: account.name, requestedKeyType, requiresActiveKey }));
+          showToast(`Missing ${requiresActiveKey ? 'Active' : 'Posting'} key for @${account.name}.`);
+          mobileProvider.rejectRequest(requestId);
+          setMobileSignRequest(null);
+          return;
+        }
+
+        result = await broadcastOperations(account.chain as Chain, signingKey, normalizedOps);
+      } else {
+        // Single operation fallback
+        // Clean opData of protocol fluff
+        const { domain: _d, operation: _o, callbackUrl: _c, id: _i, ...cleanOpData } = opData;
+        
+        // Final normalization for specific ops
+        let opName = method.startsWith('request') ? method.substring(7).toLowerCase() : method;
+        if (opName === 'vote') {
+           cleanOpData.voter = cleanOpData.voter || account.name;
+           cleanOpData.weight = parseInt(cleanOpData.weight) || 10000;
+        }
+
+        const op = [opName, cleanOpData];
+        console.log('[Mobile] Broadcasting single op:', op);
+        result = await broadcastOperations(account.chain as Chain, signingKey, [op]);
       }
 
       if (result?.success) {
-        const signature = result.txId || 'signed'
-        mobileProvider.approveRequest(requestId, signature)
+        const resultTxId = (result as any).txId;
+        console.log('[Mobile] Operation successful:', resultTxId || 'signed');
+        console.log('[GWDBG][mobile:operation-success]', JSON.stringify({
+          requestId,
+          method,
+          hasResult: !!(result as any).result,
+          hasPublicKey: !!(result as any).publicKey,
+          txId: resultTxId || null
+        }));
+        const finalResult =
+          method === 'requestSignBuffer' || method === 'signBuffer' || method === 'sign_buffer'
+            ? result
+            : (
+              result && typeof result === 'object'
+                ? {
+                    success: true,
+                    result: (result as any).opResult || (result as any).result || resultTxId || result,
+                    tx_id: resultTxId || (result as any).tx_id,
+                    broadcastPayload: (result as any).opResult || (result as any).result || resultTxId || result,
+                    message: (result as any).message || 'Operation successful'
+                  }
+                : { success: true, result: resultTxId || result }
+            );
+        console.log('[GWDBG][mobile:final-result-shape]', JSON.stringify({
+          requestId,
+          method,
+          finalResultType: typeof finalResult,
+          hasResultField: !!(finalResult as any)?.result,
+          hasPublicKeyField: !!(finalResult as any)?.publicKey
+        }));
+        mobileProvider.approveRequest(requestId, finalResult);
       } else {
-        alert("Operation failed: " + (result?.error || 'Unknown error'));
-        mobileProvider.rejectRequest(requestId)
+        console.error('[Mobile] Broadcast failed:', result?.error);
+        console.error('[GWDBG][mobile:operation-failed]', JSON.stringify({ requestId, method, error: result?.error || 'Unknown error' }));
+        showToast("Failed: " + (result?.error || 'Unknown error'));
+        mobileProvider.rejectRequest(requestId);
       }
     } catch (e: any) {
-      console.error('[Mobile] Operation failed:', e)
-      alert("Error: " + (e.message || String(e)));
-      mobileProvider.rejectRequest(requestId)
+      console.error('[Mobile] Fatal error in request handler:', e);
+      console.error('[GWDBG][mobile:operation-exception]', JSON.stringify({ requestId, error: e?.message || String(e) }));
+      showToast("Error: " + (e.message || String(e)));
+      mobileProvider.rejectRequest(requestId);
     }
-    setMobileSignRequest(null)
+    setMobileSignRequest(null);
   }
 
   const handleMobileReject = (requestId: string) => {
     mobileProvider.rejectRequest(requestId)
     setMobileSignRequest(null)
+  }
+
+  const handleDeviceSyncImport = async (payload: SyncPayload) => {
+    const mergedAccounts = [...walletState.accounts]
+    payload.accounts.forEach((account) => {
+      if (!mergedAccounts.find((candidate) => candidate.name === account.name && candidate.chain === account.chain)) {
+        mergedAccounts.push(account)
+      }
+    })
+
+    setWalletState(prev => ({ ...prev, accounts: mergedAccounts }))
+    await persistAccountsVault(mergedAccounts)
+    showToast('Wallet imported from another device')
   }
 
   const startScan = async () => {
@@ -278,7 +692,7 @@ function MobileContent() {
       const isAvailable = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
       if (!isAvailable.available) {
         console.log('[Scanner] ML Kit module not found. Installing...');
-        alert("Preparing scanner... (Downloading assets, please wait)");
+        showToast("Preparing scanner... (Downloading assets, please wait)");
         await BarcodeScanner.installGoogleBarcodeScannerModule();
       }
 
@@ -287,7 +701,7 @@ function MobileContent() {
       if (status.camera !== 'granted') {
         const req = await BarcodeScanner.requestPermissions();
         if (req.camera !== 'granted') {
-          alert("Camera permission is required to scan QR codes.");
+          showToast("Camera permission is required to scan QR codes.");
           return;
         }
       }
@@ -318,10 +732,10 @@ function MobileContent() {
             setShowPinPrompt(true);
           } catch (err) {
             console.error('[Scanner] Bridge connection failed', err);
-            alert("Connection failed: " + err);
+            showToast("Connection failed: " + err);
           }
         } else {
-          alert("Invalid QR Code: Not a Gravity Bridge session");
+          showToast("Invalid QR Code: Not a Gravity Bridge session");
         }
       });
 
@@ -335,7 +749,7 @@ function MobileContent() {
       setIsScanning(false);
       document.documentElement.classList.remove('barcode-scanner-active');
       document.body.classList.remove('barcode-scanner-active');
-      alert("Error opening scanner: " + e);
+      showToast("Error opening scanner: " + e);
     }
   }
 
@@ -343,17 +757,20 @@ function MobileContent() {
     if (!pinValue) return;
     setIsVerifying(true);
     try {
-      await bridgeService.validatePairing(pinValue);
+      await bridgeService.validatePairing(pinValue.trim());
       // We don't close showPinPrompt here, we wait for onSyncAccounts or an error timeout
       setTimeout(() => {
-        if (isVerifying) {
-          setIsVerifying(false);
-          alert("Pairing timeout: Please check if the extension is open and the PIN is correct.");
-        }
+        setIsVerifying((prev) => {
+          if (prev) {
+            showToast("Pairing timeout: Please check if the extension is open and the PIN is correct.");
+            return false;
+          }
+          return prev;
+        });
       }, 10000);
     } catch (e) {
       setIsVerifying(false);
-      alert("Error sending validation: " + e);
+      showToast("Error sending validation: " + e);
     }
   }
 
@@ -503,6 +920,15 @@ function MobileContent() {
             />
           </div>
         )}
+        {/* EXPLORER VIEW */}
+        {currentView === 'explorer' && (
+          <div className="h-full w-full">
+            <BrowserView
+              accounts={walletState.accounts}
+              onClose={() => setCurrentView('wallets')}
+            />
+          </div>
+        )}
         {/* SETTINGS VIEW */}
         {currentView === 'settings' && (
           <div className="h-full w-full p-4 overflow-y-auto">
@@ -512,6 +938,7 @@ function MobileContent() {
               setWalletState={setWalletState}
               onEdit={(acc) => { setSelectedAccount(acc); setActiveModal('manage'); }}
               onImport={() => setActiveModal('import')}
+              onSyncImport={handleDeviceSyncImport}
             />
           </div>
         )}
@@ -544,6 +971,15 @@ function MobileContent() {
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
           <span className={`text-[8px] font-black uppercase tracking-widest ${currentView === 'chat' ? 'border-b border-purple-400' : ''}`}>Chat</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentView('explorer')}
+          className={`flex flex-col items-center gap-1.5 transition-all outline-none bg-transparent border-none p-0 ${currentView === 'explorer' ? 'text-blue-400 opacity-100' : 'opacity-30'}`}
+          style={{ backgroundColor: 'transparent' }}
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+          <span className={`text-[8px] font-black uppercase tracking-widest ${currentView === 'explorer' ? 'border-b border-blue-400' : ''}`}>Explorer</span>
         </button>
 
         <button
@@ -608,12 +1044,12 @@ function MobileContent() {
                 symbol
               );
               if (result.success) {
-                alert("Transfer Sent! TX: " + result.txId?.substring(0, 8));
+                showToast("Transfer Sent! TX: " + result.txId?.substring(0, 8));
               } else {
-                alert("Failed: " + result.error);
+                showToast("Failed: " + result.error);
               }
             } catch (e) {
-              alert("Error: " + e);
+              showToast("Error: " + e);
             }
             setActiveModal(null);
           }}
@@ -699,6 +1135,16 @@ function MobileContent() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. In-App Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-12 left-0 right-0 z-[200] flex justify-center px-4 animate-slideDown pointer-events-none">
+          <div className="bg-purple-900/95 border border-purple-500/50 backdrop-blur-md text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3">
+            <svg className="w-5 h-5 shrink-0 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span className="text-xs font-black tracking-wide uppercase">{toastMessage}</span>
           </div>
         </div>
       )}

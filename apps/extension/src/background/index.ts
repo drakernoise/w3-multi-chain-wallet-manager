@@ -1,5 +1,5 @@
 import './polyfill';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote } from '@services/chainService';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, encodeMemo, decodeMemo } from '@services/chainService';
 import { getChainConfig, isChainSupported } from '@config/chainConfig';
 import { getActiveNode, benchmarkNodes } from '@services/nodeService';
 import { Chain } from 'gravity-shared/types';
@@ -185,7 +185,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         }
 
         // Twiggy/General Fix: Some dApps pass domain as params[0]
-        const methodsWithDomainFix = ['requestVote', 'vote', 'requestPost', 'post', 'requestBroadcast', 'broadcast', 'requestSignBuffer', 'signBuffer'];
+        const methodsWithDomainFix = ['requestVote', 'vote', 'requestPost', 'post', 'requestBroadcast', 'broadcast', 'requestSignBuffer', 'signBuffer', 'decodeMemo', 'encodeMemo'];
         if (methodsWithDomainFix.includes(request.method as string) && Array.isArray(request.params)) {
             const params = request.params;
             const first = params[0];
@@ -511,6 +511,8 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const isDelegation = method === 'requestDelegation' || method === 'delegation';
         const isPost = method === 'requestPost' || method === 'post';
         const isWitnessVote = method === 'requestWitnessVote' || method === 'witnessVote';
+        const isDecodeMemo = method === 'decodeMemo';
+        const isEncodeMemo = method === 'encodeMemo';
 
         let response: any;
 
@@ -717,6 +719,37 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             const approve = request.params[2] === true || request.params[2] === "true" || request.params[2] === 1;
             if (!account.activeKey) return { success: false, error: 'Active key required for witness voting' };
             response = await broadcastWitnessVote(account.chain, account.name, account.activeKey, witness, approve);
+
+        } else if (isDecodeMemo) {
+            const memo = request.params[1];
+            const type = request.params[2];
+            let keyStr = "";
+            if (type === 'Posting') keyStr = account.postingKey || "";
+            else if (type === 'Active') keyStr = account.activeKey || "";
+            else if (type === 'Memo') keyStr = account.memoKey || "";
+            if (!keyStr) return { success: false, error: 'Key required for decoding memo' };
+            try {
+                const decoded = await decodeMemo(account.chain, account.name, memo, keyStr);
+                response = { success: true, result: decoded };
+            } catch (e: any) {
+                response = { success: false, error: e.message };
+            }
+
+        } else if (isEncodeMemo) {
+            const receiver = request.params[1];
+            const memo = request.params[2];
+            const type = request.params[3];
+            let keyStr = "";
+            if (type === 'Posting') keyStr = account.postingKey || "";
+            else if (type === 'Active') keyStr = account.activeKey || "";
+            else if (type === 'Memo') keyStr = account.memoKey || "";
+            if (!keyStr) return { success: false, error: 'Key required for encoding memo' };
+            try {
+                const encoded = await encodeMemo(account.chain, account.name, receiver, memo, keyStr);
+                response = { success: true, result: encoded };
+            } catch (e: any) {
+                response = { success: false, error: e.message };
+            }
 
         } else {
             return { success: false, error: 'Unsupported operation' };

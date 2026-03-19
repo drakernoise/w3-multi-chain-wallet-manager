@@ -5,8 +5,9 @@ const config: CapacitorConfig = {
   appName: 'Gravity Wallet',
   webDir: 'dist',
   server: {
-    androidScheme: 'https',
-    iosScheme: 'https'
+    androidScheme: 'http',
+    iosScheme: 'https',
+    cleartext: true
   },
   plugins: {
     App: {

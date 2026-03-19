@@ -6,7 +6,6 @@ import { BiometricSetupModal } from './BiometricSetupModal';
 import { SyncExportModal } from './SyncExportModal';
 import { SyncImportModal } from './SyncImportModal';
 import { SyncPayload } from '../types';
-import { storageService } from '../services/storageService';
 
 interface ManageWalletsProps {
   accounts: Account[];
@@ -14,53 +13,23 @@ interface ManageWalletsProps {
   setWalletState: React.Dispatch<React.SetStateAction<WalletState>>;
   onEdit: (account: Account) => void;
   onImport: () => void;
+  onSyncImport: (payload: SyncPayload) => Promise<void>;
 }
 
-export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletState, setWalletState, onEdit, onImport }) => {
+export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletState, setWalletState, onEdit, onImport, onSyncImport }) => {
   const { t } = useTranslation();
   const [showTOTP, setShowTOTP] = useState(false);
   const [showBio, setShowBio] = useState(false);
   const [showSyncExport, setShowSyncExport] = useState(false);
   const [showSyncImport, setShowSyncImport] = useState(false);
-
-  const handleSyncImport = async (payload: SyncPayload) => {
-    // Merge Accounts
-    const mergedAccounts = [...walletState.accounts];
-    let added = 0;
-    payload.accounts.forEach(acc => {
-      if (!mergedAccounts.find(a => a.name === acc.name && a.chain === acc.chain)) {
-        mergedAccounts.push(acc);
-        added++;
-      }
-    });
-
-    const newConfig = { ...walletState };
-    if (payload.settings) {
-      if (payload.settings.useGoogleAuth !== undefined) newConfig.useGoogleAuth = payload.settings.useGoogleAuth;
-      if (payload.settings.useBiometrics !== undefined) newConfig.useBiometrics = payload.settings.useBiometrics;
-      if (payload.settings.useDeviceAuth !== undefined) newConfig.useDeviceAuth = payload.settings.useDeviceAuth;
-      if (payload.settings.useTOTP !== undefined) newConfig.useTOTP = payload.settings.useTOTP;
-    }
-
-    setWalletState({ ...newConfig, accounts: mergedAccounts });
-
-    // Save Chat Identity
-    if (payload.chatIdentity) {
-      await storageService.setItem('gravity_chat_key', payload.chatIdentity.privateKey);
-      await storageService.setItem('gravity_chat_pub', payload.chatIdentity.publicKey);
-      localStorage.setItem('gravity_chat_username', payload.chatIdentity.username);
-      localStorage.setItem('gravity_chat_registration', JSON.stringify({
-        id: payload.chatIdentity.id,
-        username: payload.chatIdentity.username,
-        timestamp: payload.timestamp
-      }));
-    }
-
-    alert(`Sync Successful! Added ${added} new accounts.`);
+  const chainCounts = {
+    hive: accounts.filter((account) => account.chain === Chain.HIVE).length,
+    blurt: accounts.filter((account) => account.chain === Chain.BLURT).length,
+    steem: accounts.filter((account) => account.chain === Chain.STEEM).length
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col h-full overflow-y-auto custom-scrollbar p-4 space-y-4">
       <div className="flex justify-between items-center p-4 border-b border-dark-700">
         <h2 className="text-lg font-bold">{t('settings.accounts_title')}</h2>
         <button
@@ -71,41 +40,50 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
-        {accounts.length === 0 ? (
-          <div className="text-center text-slate-500 py-10">
-            <p>{t('settings.no_accounts')}</p>
-          </div>
-        ) : (
-          accounts.map((acc, idx) => (
-            <div key={`${acc.chain}-${acc.name}-${idx}`} className="bg-dark-800 border border-dark-700 rounded-lg p-3 flex justify-between items-center group hover:border-dark-600">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-8 rounded-full ${acc.chain === Chain.HIVE ? 'bg-hive' :
-                  acc.chain === Chain.STEEM ? 'bg-steem' : 'bg-blurt'
-                  }`} />
-                <div>
-                  <h3 className="font-bold text-sm text-slate-200">@{acc.name}</h3>
-                  <div className="flex gap-2 text-[10px] text-slate-500 uppercase tracking-wider">
-                    <span>{acc.chain}</span>
-                    {acc.activeKey && <span className="text-green-500">• Active</span>}
-                    {acc.postingKey && <span className="text-blue-500">• Posting</span>}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => onEdit(acc)}
-                className="p-2 hover:bg-dark-700 rounded-lg text-slate-500 hover:text-white transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-              </button>
+      <div className="space-y-4">
+        <section className="bg-dark-800 border border-dark-700 rounded-2xl p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-white">Wallet Overview</h3>
+              <p className="text-[11px] text-slate-500 mt-1">Use this screen for security settings and device transfer. Manage individual accounts from the wallet view.</p>
             </div>
-          ))
-        )}
-      </div>
+            <div className="text-right">
+              <div className="text-2xl font-black text-white">{accounts.length}</div>
+              <div className="text-[10px] uppercase tracking-widest text-slate-500">Accounts</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mt-4">
+            <div className="bg-dark-900/70 border border-dark-700 rounded-xl p-3">
+              <div className="text-[10px] uppercase tracking-widest text-slate-500">Hive</div>
+              <div className="text-lg font-black text-white mt-1">{chainCounts.hive}</div>
+            </div>
+            <div className="bg-dark-900/70 border border-dark-700 rounded-xl p-3">
+              <div className="text-[10px] uppercase tracking-widest text-slate-500">Blurt</div>
+              <div className="text-lg font-black text-white mt-1">{chainCounts.blurt}</div>
+            </div>
+            <div className="bg-dark-900/70 border border-dark-700 rounded-xl p-3">
+              <div className="text-[10px] uppercase tracking-widest text-slate-500">Steem</div>
+              <div className="text-lg font-black text-white mt-1">{chainCounts.steem}</div>
+            </div>
+          </div>
+          {accounts.length > 0 ? (
+            <button
+              onClick={() => onEdit(accounts[0])}
+              className="mt-4 w-full bg-dark-900 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center justify-between transition-all"
+            >
+              <span className="text-sm font-bold">Open account manager</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
+          ) : (
+            <div className="mt-4 text-center text-slate-500 py-4 text-sm">
+              {t('settings.no_accounts')}
+            </div>
+          )}
+        </section>
 
-      <div className="p-4 pt-2 border-t border-dark-700 mt-auto space-y-3">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Cross-Device Sync</h3>
+        <div className="pt-2 border-t border-dark-700 space-y-3">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Pair Another Device</h3>
+        <p className="text-[10px] text-slate-500 -mt-1 mb-2">Use one device to show a pairing code and the other to send the encrypted wallet.</p>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setShowSyncExport(true)}
@@ -114,7 +92,7 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
             <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             </div>
-            <span className="font-bold text-xs">Export</span>
+            <span className="font-bold text-xs">Send Wallet</span>
           </button>
           <button
             onClick={() => setShowSyncImport(true)}
@@ -123,7 +101,7 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
             <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             </div>
-            <span className="font-bold text-xs">Import</span>
+            <span className="font-bold text-xs">Show Pair Code</span>
           </button>
         </div>
 
@@ -176,6 +154,7 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
             {walletState.useBiometrics ? 'Enabled' : 'Off'}
           </div>
         </button>
+        </div>
       </div>
 
       {showTOTP && (
@@ -207,7 +186,7 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
       {showSyncImport && (
         <SyncImportModal
           onClose={() => setShowSyncImport(false)}
-          onImport={handleSyncImport}
+          onImport={onSyncImport}
         />
       )}
     </div>

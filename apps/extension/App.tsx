@@ -17,6 +17,7 @@ import { SignRequest } from '@components/SignRequest';
 import { HelpView } from '@components/HelpView';
 import { ChatView } from '@components/ChatView';
 import { BridgeModal } from '@components/BridgeModal';
+import { SyncPayload } from '@types';
 // NotificationToast is now handled by NotificationProvider
 
 
@@ -31,12 +32,15 @@ import {
   clearCryptoCache,
   tryRestoreSession,
   enablePasswordless,
-  unlockVault
+  unlockVault,
+  loadInternalKeyWithPin,
+  hasPinProtectedKey
 } from '@services/cryptoService';
 import { benchmarkNodes } from '@services/nodeService';
 import { bridgeService } from '@services/bridgeService';
 import { LanguageProvider, useTranslation } from '@contexts/LanguageContext';
 import { NotificationProvider, useNotification } from '@contexts/NotificationContext';
+import { storageService } from '@services/storageService';
 
 declare const chrome: any;
 
@@ -92,8 +96,13 @@ function AppContent() {
 
   useEffect(() => {
     const handleOpenBridge = () => setShowBridge(true);
+    const handleOpenPair = () => setShowBridge(true);
     window.addEventListener('open-bridge', handleOpenBridge);
-    return () => window.removeEventListener('open-bridge', handleOpenBridge);
+    window.addEventListener('open-pair', handleOpenPair);
+    return () => {
+      window.removeEventListener('open-bridge', handleOpenBridge);
+      window.removeEventListener('open-pair', handleOpenPair);
+    };
   }, []);
 
   // 1. Global Chat Listeners for Toasts
@@ -116,20 +125,29 @@ function AppContent() {
   // 1.5. Bridge PIN Validation Listener
   useEffect(() => {
     bridgeService.onValidatePIN = async (pin) => {
-      console.log("[Bridge] PIN validation request received:", pin);
       try {
-        const vault = await unlockVault(pin);
+        // Step 1: Try direct unlock (Password mode)
+        let vault = await unlockVault(pin);
+
+        // Step 2: Try PIN-protected internal key resolution (for PIN mode)
+        if (!vault && pin && pin.length === 6) {
+          const hasPin = await hasPinProtectedKey();
+          if (hasPin) {
+            const internalKey = await loadInternalKeyWithPin(pin);
+            if (internalKey) {
+              vault = await unlockVault(internalKey);
+            }
+          }
+        }
+
         if (vault) {
-          console.log("[Bridge] PIN valid! Syncing", vault.accounts.length, "accounts...");
           bridgeService.syncAccounts(vault.accounts);
           showNotification("Mobile device paired and synced!", "success");
         } else {
-          console.error("[Bridge] Invalid PIN: Vault decryption failed");
-          showNotification("Pairing failed: Invalid PIN", "error");
+          showNotification("Pairing failed: Invalid PIN or Password", "error");
         }
       } catch (e) {
-        console.error("[Bridge] Critical error during PIN validation:", e);
-        showNotification("Pairing failed: Error validating PIN", "error");
+        showNotification("Pairing failed: Error validating credentials", "error");
       }
     };
   }, [showNotification]);
@@ -333,6 +351,58 @@ function AppContent() {
     } catch (e) {
       console.error("Import Save Failed:", e);
       showNotification('Failed to save account. Please try again.', 'error');
+    }
+  };
+
+  const handleDeviceSyncImport = async (payload: SyncPayload) => {
+    const mergedAccounts = [...walletState.accounts];
+    let added = 0;
+
+    payload.accounts.forEach((account) => {
+      if (!mergedAccounts.find((candidate) => candidate.name === account.name && candidate.chain === account.chain)) {
+        mergedAccounts.push(account);
+        added += 1;
+      }
+    });
+
+    const nextState: WalletState = {
+      ...walletState,
+      accounts: mergedAccounts,
+      useGoogleAuth: payload.settings?.useGoogleAuth ?? walletState.useGoogleAuth,
+      useBiometrics: payload.settings?.useBiometrics ?? walletState.useBiometrics,
+      useDeviceAuth: payload.settings?.useDeviceAuth ?? walletState.useDeviceAuth,
+      useTOTP: payload.settings?.useTOTP ?? walletState.useTOTP,
+      encryptedMaster: walletState.encryptedMaster || mergedAccounts.length > 0
+    };
+
+    if (payload.chatIdentity) {
+      await storageService.setItem('gravity_chat_key', payload.chatIdentity.privateKey);
+      await storageService.setItem('gravity_chat_pub', payload.chatIdentity.publicKey);
+      localStorage.setItem('gravity_chat_username', payload.chatIdentity.username);
+      localStorage.setItem('gravity_chat_registration', JSON.stringify({
+        id: payload.chatIdentity.id,
+        username: payload.chatIdentity.username,
+        timestamp: payload.timestamp
+      }));
+    }
+
+    setWalletState(nextState);
+
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+      chrome.storage.session.set({ session_accounts: mergedAccounts });
+    }
+
+    try {
+      if (!walletState.encryptedMaster) {
+        await enablePasswordless(mergedAccounts);
+      } else {
+        await saveVault('cached', { accounts: mergedAccounts, lastUpdated: Date.now() });
+      }
+      showNotification(`Transfer complete. Added ${added} account${added === 1 ? '' : 's'}.`, 'success');
+    } catch (error) {
+      console.error('Device transfer save failed:', error);
+      showNotification('The wallet was received but could not be persisted safely.', 'error');
+      throw error;
     }
   };
 
@@ -634,6 +704,7 @@ function AppContent() {
               setWalletState={setWalletState}
               onEdit={(acc: Account) => setManagingAccount(acc)}
               onImport={() => setShowImport(true)}
+              onSyncImport={handleDeviceSyncImport}
             />
           )}
 

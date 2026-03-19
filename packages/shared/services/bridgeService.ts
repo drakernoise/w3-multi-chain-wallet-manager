@@ -35,31 +35,50 @@ class BridgeService {
     public onSignRequest: ((request: SignRequest) => void) | null = null;
     public onSyncAccounts: ((accounts: any[]) => void) | null = null;
     public onValidatePIN: ((pin: string) => void) | null = null;
+    public onLog: ((msg: string) => void) | null = null;
+
+    private logs: string[] = [];
+
+    private addLog(msg: string) {
+        const timestamp = new Date().toLocaleTimeString();
+        const formattedLog = `[${timestamp}] ${msg}`;
+        this.logs.push(formattedLog);
+        this.onLog?.(formattedLog);
+        console.log(`[BridgeService] ${msg}`);
+    }
+
+    public getLogs() {
+        return this.logs;
+    }
 
     public async init() {
         if (this.socket?.connected) return;
 
-        console.log('[Bridge] Initializing socket connection to:', this.serverUrl);
+        this.addLog(`Initializing connection to ${this.serverUrl}`);
         this.socket = io(this.serverUrl, {
-            transports: ['polling', 'websocket'], // Try polling first for better compatibility
+            transports: ['polling', 'websocket'],
             autoConnect: true,
             reconnectionAttempts: 5,
             timeout: 10000
         });
 
         this.socket.on('connect', () => {
-            console.log('[Bridge] Socket connected! ID:', this.socket?.id);
-            if (this.onStatusChange) this.onStatusChange('connected');
+            this.addLog('Socket connected successfully');
+            this.onStatusChange?.('connected');
         });
 
         this.socket.on('connect_error', (err) => {
-            console.error('[Bridge] Socket connection error:', err.message);
-            if (this.onStatusChange) this.onStatusChange('error: ' + err.message);
+            this.addLog(`Socket connection error: ${err.message}`);
+            this.onStatusChange?.('error');
         });
 
         this.socket.on('disconnect', (reason) => {
-            console.log('[Bridge] Socket disconnected. Reason:', reason);
-            if (this.onStatusChange) this.onStatusChange('disconnected');
+            this.addLog(`Socket disconnected: ${reason}`);
+            this.onStatusChange?.('disconnected');
+        });
+
+        this.socket.on('bridge_signer_ready', () => {
+            this.addLog('Received bridge_signer_ready (Signer appeared)');
         });
 
         this.socket.on('bridge_request', async (data: { encrypted: string }) => {
@@ -89,7 +108,8 @@ class BridgeService {
             try {
                 const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
                 const { pin } = JSON.parse(decrypted);
-                if (this.onValidatePIN) this.onValidatePIN(pin);
+                this.addLog('Decrypted PIN request from mobile');
+                if (this.onValidatePIN) await this.onValidatePIN(pin);
             } catch (e) {
                 console.error("Bridge PIN validation failed", e);
             }
@@ -98,7 +118,6 @@ class BridgeService {
 
     // --- MOBILE SIDE (SIGNER) ---
     public async connectToExtension(qrData: string) {
-        // qrData format: "gravity:bridge:<sessionId>:<extensionPublicKey>"
         const parts = qrData.split(':');
         if (parts[0] !== 'gravity' || parts[1] !== 'bridge') return;
 
@@ -107,16 +126,15 @@ class BridgeService {
 
         if (!this.socket) await this.init();
 
-        // 1. Generate my keys
         this.myKeyPair = await generateEncryptionKeys();
         const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
 
-        // 2. Derive shared secret
         const extPubKey = await importKeyFromBase64(extPubKeyB64, 'public');
         this.sharedKey = await deriveSharedSecret(this.myKeyPair.privateKey, extPubKey);
 
-        // 3. Join bridge room and announce myself
+        this.addLog(`Joining bridge room: ${this.sessionId} with publicKey`);
         this.socket?.emit('bridge_join', { sessionId: this.sessionId, publicKey: myPubB64 });
+        this.addLog('Sent bridge_join event');
     }
 
     public async sendResponse(response: SignResponse) {
@@ -130,8 +148,13 @@ class BridgeService {
         if (!this.socket) await this.init();
 
         this.sessionId = Math.random().toString(36).substring(2, 12);
+        this.addLog(`Created new bridge session: ${this.sessionId}`);
+        
         this.myKeyPair = await generateEncryptionKeys();
         const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
+
+        this.addLog(`Extension joining bridge room: ${this.sessionId}`);
+        this.socket?.emit('bridge_join', { sessionId: this.sessionId, publicKey: myPubB64 }); // Sending publicKey here so server relays it later
 
         return `gravity:bridge:${this.sessionId}:${myPubB64}`;
     }
@@ -142,6 +165,7 @@ class BridgeService {
                 if (this.myKeyPair) {
                     const signerPubKey = await importKeyFromBase64(data.publicKey, 'public');
                     this.sharedKey = await deriveSharedSecret(this.myKeyPair.privateKey, signerPubKey);
+                    this.addLog('Shared key derived with signer');
                     resolve();
                 }
             });
@@ -166,12 +190,15 @@ class BridgeService {
         if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
         const encrypted = await encryptMessage(JSON.stringify(accounts), this.sharedKey);
         this.socket.emit('bridge_sync_accounts', { sessionId: this.sessionId, encrypted });
+        this.addLog(`Sent bridge_sync_accounts with ${accounts.length} accounts`);
+        this.onStatusChange?.('paired');
     }
 
     public async validatePairing(pin: string) {
         if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
         const encrypted = await encryptMessage(JSON.stringify({ pin }), this.sharedKey);
         this.socket.emit('bridge_validate_pin', { sessionId: this.sessionId, encrypted });
+        this.addLog('Sent bridge_validate_pin to extension');
     }
 }
 

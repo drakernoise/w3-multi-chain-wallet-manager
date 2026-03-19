@@ -10,16 +10,22 @@ interface BridgeModalProps {
 export const BridgeModal: React.FC<BridgeModalProps> = ({ onClose, onSync }) => {
     const [qrData, setQrData] = useState<string | null>(null);
     const [status, setStatus] = useState<'generating' | 'waiting' | 'connected'>('generating');
+    const [serverStatus, setServerStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
 
     useEffect(() => {
+        bridgeService.onStatusChange = (s) => {
+            if (s === 'connected') setServerStatus('connected');
+            else if (s === 'error') setServerStatus('error');
+            else if (s === 'paired') setStatus('connected');
+            else setServerStatus('connecting');
+        };
         const initBridge = async () => {
             const data = await bridgeService.createBridgeSession();
             setQrData(data);
             setStatus('waiting');
 
             await bridgeService.waitForSigner();
-            setStatus('connected');
-            if (onSync) onSync();
+            // Optional: setStatus('validating') if you want to show a message to the user
         };
         initBridge();
     }, []);
@@ -32,7 +38,21 @@ export const BridgeModal: React.FC<BridgeModalProps> = ({ onClose, onSync }) => 
                 </button>
 
                 <div className="text-center mb-8">
-                    <h2 className="text-xl font-black text-white mb-2 tracking-tight">Gravity Bridge</h2>
+                    <div className="flex justify-center mb-2">
+                        <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors ${
+                            serverStatus === 'connected' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 
+                            serverStatus === 'error' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 
+                            'bg-slate-500/10 text-slate-500 border border-slate-500/20'
+                        }`}>
+                            <div className={`w-1 h-1 rounded-full ${
+                                serverStatus === 'connected' ? 'bg-green-500 animate-pulse' : 
+                                serverStatus === 'error' ? 'bg-red-500' : 
+                                'bg-slate-500 animate-pulse'
+                            }`} />
+                            {serverStatus === 'connected' ? 'Server Linked' : serverStatus === 'error' ? 'Link Error' : 'Linking...'}
+                        </div>
+                    </div>
+                    <h2 className="text-xl font-black text-white mb-2 tracking-tight">Pair Phone</h2>
                     <p className="text-xs text-slate-500 font-medium">Pair your mobile device for remote signing</p>
                 </div>
 

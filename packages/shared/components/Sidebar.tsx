@@ -72,11 +72,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <NavIcon
           active={false}
           onClick={() => {
-            const event = new CustomEvent('open-bridge');
+            const event = new CustomEvent('open-pair');
             window.dispatchEvent(event);
           }}
           icon={<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m-3 3l3 3m6-3l3 3M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />}
-          label="Bridge Mobile"
+          label={t('sidebar.pair') || "Pair Mobile"}
         />
         <div className="h-px w-8 bg-dark-600 my-1 shrink-0" />
         <NavIcon
@@ -121,6 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 const NavIcon: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string; raw?: boolean }> = ({ active, onClick, icon, label, raw }) => (
   <button
     onClick={onClick}
+    title={label}
     className={`group relative flex items-center justify-center w-10 h-10 rounded-lg transition-all ${active ? 'bg-dark-700 text-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.2)] scale-105 border border-dark-600' : 'text-slate-500 hover:bg-dark-700 hover:text-slate-300'}`}
   >
     {raw ? icon : (

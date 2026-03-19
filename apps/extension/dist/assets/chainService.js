@@ -89517,5 +89517,43 @@ const signMessage = (chain, message, keyStr, _useLegacySigner = false) => {
     return { success: false, error: e.message };
   }
 };
+const encodeMemo = async (chain, _username, receiver, memo, key) => {
+  try {
+    if (chain === Chain.HIVE || chain === Chain.STEEM) {
+      const privateKey = indexBrowserExports$1.PrivateKey.fromString(key);
+      if (!memo.startsWith("#")) memo = "#" + memo;
+      const receiverData = await fetchAccountData(chain, receiver);
+      if (!receiverData) throw new Error("Receiver account not found");
+      const receiverMemoKey = receiverData.memo_key;
+      return indexBrowserExports$1.Memo.encode(privateKey, receiverMemoKey, memo);
+    } else if (chain === Chain.BLURT) {
+      const config = getChainConfig(Chain.BLURT);
+      libExports.config.set("address_prefix", config.addressPrefix);
+      const receiverData = await fetchAccountData(chain, receiver);
+      if (!receiverData) throw new Error("Receiver account not found");
+      return libExports.memo.encode(key, receiverData.memo_key, memo);
+    }
+    throw new Error("Chain not supported for memo encoding");
+  } catch (e) {
+    console.error("Encode memo error:", e);
+    throw e;
+  }
+};
+const decodeMemo = async (chain, _username, encodedMemo, key) => {
+  try {
+    if (chain === Chain.HIVE || chain === Chain.STEEM) {
+      const privateKey = indexBrowserExports$1.PrivateKey.fromString(key);
+      return indexBrowserExports$1.Memo.decode(privateKey, encodedMemo);
+    } else if (chain === Chain.BLURT) {
+      const config = getChainConfig(Chain.BLURT);
+      libExports.config.set("address_prefix", config.addressPrefix);
+      return libExports.memo.decode(key, encodedMemo);
+    }
+    throw new Error("Chain not supported for memo decoding");
+  } catch (e) {
+    console.error("Decode memo error:", e);
+    throw e;
+  }
+};
 
-export { getAccountAuthorities as A, fetchBalances as B, Chain as C, detectWeb3Context as D, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, global as m, checkAccountExists as n, broadcastSavingsDeposit as o, broadcastSavingsWithdraw as p, fetchAccountData as q, requireCryptoBrowserify as r, signMessage as s, broadcastRCDelegate as t, broadcastRCUndelegate as u, broadcastBulkTransfer as v, indexBrowserExports$1 as w, indexBrowserExports as x, validateAccountKeys as y, fetchAccountHistory as z };
+export { validateAccountKeys as A, fetchAccountHistory as B, Chain as C, getAccountAuthorities as D, fetchBalances as E, detectWeb3Context as F, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, indexBrowserExports$1 as y, indexBrowserExports as z };

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
-import { syncService } from '../services/syncService';
-import { Account } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Account, SyncPayload } from '../types';
+import { deviceTransferService } from '../services/deviceTransferService';
+import { storageService } from '../services/storageService';
 
 interface SyncExportModalProps {
     accounts: Account[];
@@ -9,59 +9,104 @@ interface SyncExportModalProps {
     onClose: () => void;
 }
 
+type ExportStatus = 'idle' | 'connecting' | 'paired' | 'sending' | 'sent' | 'error';
+
 export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, walletConfig, onClose }) => {
-    const [qrData, setQrData] = useState<string | null>(null);
-    const [status, setStatus] = useState<'initializing' | 'ready' | 'synced' | 'error'>('initializing');
-    const [copied, setCopied] = useState(false);
+    const [pairCode, setPairCode] = useState('');
+    const [status, setStatus] = useState<ExportStatus>('idle');
     const [errorMsg, setErrorMsg] = useState('');
-    const [socketConnected, setSocketConnected] = useState(false);
 
     useEffect(() => {
-        let mounted = true;
-
-        const start = async () => {
-            try {
-                const { qrData } = await syncService.startExportSession(
-                    accounts,
-                    walletConfig,
-                    () => { if (mounted) setStatus('synced'); }
-                );
-                if (mounted) {
-                    setQrData(qrData);
-                    setStatus('ready');
-                }
-            } catch (e: any) {
-                console.error("Sync Export Error:", e);
-                if (mounted) {
-                    setStatus('error');
-                    setErrorMsg(e.message || String(e));
-                }
+        deviceTransferService.onStatusChange((nextStatus, detail) => {
+            if (nextStatus === 'connecting' || nextStatus === 'waiting') setStatus('connecting');
+            if (nextStatus === 'paired') setStatus('paired');
+            if (nextStatus === 'transferred') setStatus('sent');
+            if (nextStatus === 'error') {
+                setStatus('error');
+                setErrorMsg(detail || 'Transfer failed');
             }
-        };
-        start();
-
-        const interval = setInterval(() => {
-            setSocketConnected(syncService.isConnected());
-        }, 1000);
+        });
 
         return () => {
-            mounted = false;
-            syncService.disconnect();
-            clearInterval(interval);
-        }
+            deviceTransferService.onStatusChange(null);
+            deviceTransferService.disconnect();
+        };
     }, []);
 
-    const handleCopy = () => {
-        if (qrData) {
-            navigator.clipboard.writeText(qrData);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+    const payloadSummary = useMemo(() => {
+        return {
+            accountCount: accounts.length,
+            chatIdentity: !!localStorage.getItem('gravity_chat_registration'),
+            settingsCount: [
+                walletConfig?.useGoogleAuth,
+                walletConfig?.useBiometrics,
+                walletConfig?.useDeviceAuth,
+                walletConfig?.useTOTP
+            ].filter((value) => typeof value !== 'undefined').length
+        };
+    }, [accounts, walletConfig]);
+
+    const buildPayload = async (): Promise<SyncPayload> => {
+        const payload: SyncPayload = {
+            timestamp: Date.now(),
+            accounts,
+            settings: {
+                useGoogleAuth: walletConfig?.useGoogleAuth,
+                useBiometrics: walletConfig?.useBiometrics,
+                useDeviceAuth: walletConfig?.useDeviceAuth,
+                useTOTP: walletConfig?.useTOTP
+            }
+        };
+
+        const registrationRaw = localStorage.getItem('gravity_chat_registration');
+        const privateKey = await storageService.getItem('gravity_chat_key');
+        const publicKey = await storageService.getItem('gravity_chat_pub');
+
+        if (registrationRaw && privateKey && publicKey) {
+            try {
+                const registration = JSON.parse(registrationRaw);
+                if (registration?.username && registration?.id) {
+                    payload.chatIdentity = {
+                        username: registration.username,
+                        id: registration.id,
+                        privateKey,
+                        publicKey
+                    };
+                }
+            } catch (e) {}
         }
-    }
+
+        return payload;
+    };
+
+    const handleConnect = async () => {
+        setErrorMsg('');
+        setStatus('connecting');
+        try {
+            await deviceTransferService.connectToSession(pairCode);
+        } catch (e: any) {
+            setStatus('error');
+            setErrorMsg(e?.message || 'Unable to pair with target device');
+        }
+    };
+
+    const handleSend = async () => {
+        setErrorMsg('');
+        setStatus('sending');
+        try {
+            const payload = await buildPayload();
+            await deviceTransferService.sendPayload(payload);
+        } catch (e: any) {
+            setStatus('error');
+            setErrorMsg(e?.message || 'Unable to send encrypted wallet');
+        }
+    };
+
+    const normalizedCode = deviceTransferService.normalizeCode(pairCode);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-            <div className="bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn overflow-y-auto">
+            <div className="bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar my-auto">
                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 text-slate-400 hover:text-white"
@@ -69,62 +114,79 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
 
-                <h3 className="text-xl font-black text-white mb-2">Sync to Mobile</h3>
-                <p className="text-xs text-slate-400 mb-6">Scan with your mobile app to transfer your accounts.</p>
+                <h3 className="text-xl font-black text-white mb-2">Send to Another Device</h3>
+                <p className="text-xs text-slate-400 mb-6">Enter the pairing code shown on the destination device. Nothing is sent until you confirm it here.</p>
 
-                <div className="flex flex-col items-center justify-center space-y-6">
-                    {status === 'initializing' && (
-                        <div className="w-48 h-48 flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+                <div className="space-y-4">
+                    <input
+                        value={pairCode}
+                        onChange={(event) => setPairCode(event.target.value.toUpperCase())}
+                        placeholder="ABCDE-FGHIJ"
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        className="w-full bg-dark-900 border border-dark-700 rounded-xl p-4 text-center text-lg tracking-[0.35em] font-mono text-slate-100 focus:border-purple-500 outline-none uppercase"
+                    />
+
+                    <div className="bg-dark-900/70 border border-dark-700 rounded-2xl p-4 space-y-2">
+                        <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Accounts</span>
+                            <span className="font-bold text-white">{payloadSummary.accountCount}</span>
                         </div>
-                    )}
-
-                    {status === 'ready' && qrData && (
-                        <div className="bg-white p-4 rounded-xl flex flex-col items-center">
-                            <QRCodeSVG value={qrData} size={192} level="M" />
-                            <div className={`text-[10px] font-bold mt-2 flex items-center gap-1 ${socketConnected ? 'text-green-600' : 'text-orange-500'}`}>
-                                <div className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`} />
-                                {socketConnected ? 'Server Connected' : 'Connecting to Server...'}
-                            </div>
+                        <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Settings</span>
+                            <span className="font-bold text-white">{payloadSummary.settingsCount ? 'Included' : 'Basic only'}</span>
                         </div>
-                    )}
-
-                    {status === 'synced' && (
-                        <div className="w-48 h-48 flex flex-col items-center justify-center text-green-400">
-                            <svg className="w-20 h-20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <p className="font-bold">Sync Complete!</p>
+                        <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Chat identity</span>
+                            <span className="font-bold text-white">{payloadSummary.chatIdentity ? 'Included' : 'Not found'}</span>
                         </div>
-                    )}
-
-                    {status === 'error' && (
-                        <div className="text-red-400 font-bold text-center">
-                            <p>Connection Error.</p>
-                            <p className="text-[10px] font-mono mt-2 bg-black/20 p-2 rounded max-w-[250px] break-words">{errorMsg}</p>
-                        </div>
-                    )}
-                </div>
-
-                {status === 'ready' && (
-                    <div className="mt-6">
-                        <div className="text-[10px] text-center text-slate-500 mb-2 uppercase font-bold tracking-widest">Or copy code manually</div>
-                        <button
-                            onClick={handleCopy}
-                            className="w-full py-3 bg-dark-700 hover:bg-dark-600 rounded-xl font-mono text-xs text-purple-300 transition-all active:scale-95 flex items-center justify-center gap-2"
-                        >
-                            {copied ? (
-                                <>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                    Copied!
-                                </>
-                            ) : (
-                                <>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-                                    Copy Sync Code
-                                </>
-                            )}
-                        </button>
                     </div>
-                )}
+
+                    {errorMsg && <p className="text-red-400 text-xs font-bold text-center">{errorMsg}</p>}
+
+                    {status === 'idle' || status === 'error' ? (
+                        <button
+                            onClick={handleConnect}
+                            disabled={normalizedCode.length !== 10}
+                            className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${normalizedCode.length !== 10 ? 'bg-dark-700 text-slate-500' : 'bg-purple-600 text-white shadow-lg active:scale-95'}`}
+                        >
+                            Pair Devices
+                        </button>
+                    ) : null}
+
+                    {status === 'connecting' && (
+                        <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
+                            Waiting for secure handshake...
+                        </div>
+                    )}
+
+                    {status === 'paired' && (
+                        <button
+                            onClick={handleSend}
+                            className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all bg-blue-600 text-white shadow-lg active:scale-95"
+                        >
+                            Approve and Send
+                        </button>
+                    )}
+
+                    {status === 'sending' && (
+                        <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
+                            Encrypting and sending wallet...
+                        </div>
+                    )}
+
+                    {status === 'sent' && (
+                        <div className="w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                            <div className="font-black text-green-400 uppercase tracking-widest text-sm">Transfer Complete</div>
+                            <div className="text-[11px] text-slate-400 mt-1">The destination device can import the wallet now.</div>
+                        </div>
+                    )}
+
+                    <div className="pt-2 text-center text-[10px] text-slate-500">
+                        End-to-end encrypted manual transfer
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -1,0 +1,1184 @@
+
+// Deploy Trigger: Force Update for Render
+const express = require('express');
+const http = require('http');
+const { Server } = require("socket.io");
+const cors = require('cors');
+const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const webpush = require('web-push');
+
+// VAPID Keys (Generated via CLI or Environment)
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY || 'BNXKcYc9Skxc1DN5d5LoSrm--iYct9aMr6SzoimkM0ZhKURE3cZp6MCHh03D7DYJ-j07QwZze0-peLPmne_VZcQ';
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || 'kqF_kPNPKYnCdseLHAzy30ZY_6Qhqcnu_lYFPSt_-8w';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'gravity-admin-2024';
+
+webpush.setVapidDetails('mailto:drakernoise2013@gmail.com', publicVapidKey, privateVapidKey);
+
+const STORAGE_DIR = process.env.DB_PATH || __dirname;
+const DB_PATH = path.join(STORAGE_DIR, 'chat_db.json');
+
+const app = express();
+app.use(cors());
+
+// Health check for cloud deployment services (like Render/Railway)
+app.get('/', (req, res) => res.send('Gravity Chat Server is Online'));
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok', timestamp: new Date() }));
+
+// Admin endpoint to reset database (protected by secret)
+app.post('/admin/reset', (req, res) => {
+    const secret = req.query.secret || req.headers['x-admin-secret'];
+    if (secret !== ADMIN_SECRET) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Reset all data
+    users = {};
+    usernames = {};
+    rooms = {
+        'global-lobby': {
+            id: 'global-lobby',
+            name: 'Global Lobby',
+            desc: 'Official Gravity Community',
+            type: 'public',
+            owner: 'system',
+            admins: [],
+            members: [],
+            bans: [],
+            mutes: [],
+            messages: []
+        }
+    };
+
+    // Save clean state
+    saveData();
+
+    console.log('[RESET] Database reset by admin');
+    res.json({ success: true, message: 'Database reset successfully' });
+});
+
+// Admin endpoint to delete a specific user
+// Admin endpoint to delete specific user(s)
+app.post('/admin/delete_user', (req, res) => {
+    const secret = req.query.secret || req.headers['x-admin-secret'];
+    const targetUsernames = req.query.username; // Can be "user1,user2,user3"
+
+    if (secret !== ADMIN_SECRET) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!targetUsernames) {
+        return res.status(400).json({ error: 'Missing username parameter' });
+    }
+
+    const namesToDelete = targetUsernames.split(',').map(n => n.trim()).filter(n => n.length > 0);
+    const deletedParams = [];
+    const notFound = [];
+
+    namesToDelete.forEach(rawName => {
+        const cleanName = rawName.toLowerCase();
+        const idToDelete = usernames[cleanName];
+
+        if (!idToDelete) {
+            notFound.push(rawName);
+            return;
+        }
+
+        // DEEP CLEANUP Logic
+        Object.keys(rooms).forEach(roomId => {
+            const room = rooms[roomId];
+            if (!room) return;
+
+            // Remove from members
+            if (room.members) room.members = room.members.filter(m => m !== idToDelete);
+
+            // Remove from admins
+            if (room.admins) room.admins = room.admins.filter(a => a !== idToDelete);
+
+            // If owner, delete room (except global-lobby)
+            if (room.owner === idToDelete && roomId !== 'global-lobby') {
+                console.log(`Deleting orphan room ${roomId} owned by ${rawName}`);
+                delete rooms[roomId];
+                io.emit('room_removed', roomId);
+            }
+        });
+
+        delete users[idToDelete];
+        delete usernames[cleanName];
+        deletedParams.push(rawName);
+        console.log(`[DELETE] Admin deleted user: ${rawName}`);
+    });
+
+    saveData();
+
+    res.json({
+        success: true,
+        deleted: deletedParams,
+        notFound: notFound,
+        message: `Deleted ${deletedParams.length} users. ${notFound.length} not found.`
+    });
+});
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
+// --- Gravity Chat State ---
+let users = {};
+let usernames = {};
+let rooms = {
+    'global-lobby': {
+        id: 'global-lobby',
+        name: 'Global Lobby',
+        desc: 'Official Gravity Community',
+        type: 'public',
+        owner: 'system',
+        admins: [],
+        members: [],
+        bans: [],
+        mutes: [],
+        messages: []
+    }
+};
+
+function loadData() {
+    try {
+        if (fs.existsSync(DB_PATH)) {
+            const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+            users = data.users || {};
+            usernames = data.usernames || {};
+
+            // --- INTEGRITY CHECK: Cleanup orphans ---
+            let cleaned = false;
+            for (const [name, id] of Object.entries(usernames)) {
+                if (!users[id]) {
+                    delete usernames[name];
+                    cleaned = true;
+                }
+            }
+            if (cleaned) {
+                console.log("[CHECK] Server Integrity Check: Orphaned usernames removed.");
+                // saveData() is called later if needed, or explicitly here if changes need to be persisted immediately.
+                // For now, we'll let the next saveData() call handle it, or if a user registers.
+            }
+
+            // Merge rooms with default global-lobby
+            rooms = { ...rooms, ...(data.rooms || {}) };
+            console.log('Loaded chat data from disk.');
+        }
+    } catch (err) {
+        console.error('Failed to load data:', err);
+    }
+}
+
+function saveData() {
+    try {
+        const data = { users, usernames, rooms };
+        fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+    } catch (err) {
+        console.error('Failed to save data:', err);
+    }
+}
+
+loadData();
+
+const connectedSockets = {}; // socketId -> userId
+const authChallenges = {}; // socketId -> { challenge, timestamp }
+const registrationRateLimit = {}; // IP -> timestamp
+const lastMessageTime = {}; // userId -> timestamp
+const lastSearchTime = {}; // userId -> timestamp
+const userMessageHistory = {}; // userId -> [{ content: string, timestamp: number }]
+
+// Anti-Spam config
+const RATE_LIMIT_TOKENS = 5; // Max 5 messages in 10 seconds
+const RATE_LIMIT_WINDOW = 10000; // 10 seconds
+const DUPLICATE_WINDOW = 30000; // 30 seconds for duplicate check
+const MAX_MESSAGE_LENGTH = 1000;
+
+// Helper: Check for spam and bots
+function isSpamming(userId, content) {
+    const now = Date.now();
+
+    if (!userMessageHistory[userId]) {
+        userMessageHistory[userId] = [];
+    }
+
+    // Clean up old history
+    userMessageHistory[userId] = userMessageHistory[userId].filter(m => (now - m.timestamp) < DUPLICATE_WINDOW);
+
+    const history = userMessageHistory[userId];
+
+    // 1. Rate Limiting (Token Bucket)
+    const recentMessages = history.filter(m => (now - m.timestamp) < RATE_LIMIT_WINDOW);
+    if (recentMessages.length >= RATE_LIMIT_TOKENS) {
+        return "Rate limit exceeded. Too many messages.";
+    }
+
+    // 2. Duplicate Message Detection
+    const isDuplicate = history.some(m => m.content === content && (now - m.timestamp) < DUPLICATE_WINDOW);
+    if (isDuplicate) {
+        return "Duplicate message detected. Please don't spam.";
+    }
+
+    // 3. Max Length
+    if (content.length > MAX_MESSAGE_LENGTH) {
+        return "Message too long.";
+    }
+
+    // Record this message
+    userMessageHistory[userId].push({ content, timestamp: now });
+    return null;
+}
+
+// Helper: Verify ECDSA signature
+function verifySignature(publicKeyHex, challenge, signatureHex) {
+    try {
+        const publicKeyBuffer = Buffer.from(publicKeyHex, 'hex');
+        const signatureBuffer = Buffer.from(signatureHex, 'hex');
+
+        // Import the public key as ECDSA (P-256)
+        const publicKey = crypto.createPublicKey({
+            key: publicKeyBuffer,
+            format: 'der',
+            type: 'spki'
+        });
+
+        // Verify using ECDSA with SHA-256
+        const isValid = crypto.verify(
+            'sha256',
+            Buffer.from(challenge, 'utf8'),
+            {
+                key: publicKey,
+                dsaEncoding: 'ieee-p1363' // Web Crypto uses IEEE P1363 format
+            },
+            signatureBuffer
+        );
+
+        return isValid;
+    } catch (err) {
+        console.error('Signature verification error:', err);
+        return false;
+    }
+}
+
+
+// Helper: Generate random challenge for authentication
+function generateChallenge() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    // --- 0. Challenge-Response Authentication (Optional Enhanced Security) ---
+    socket.on('request_challenge', (data) => {
+        const { userId, username, encryptionPublicKey } = data;
+        let user;
+
+        if (userId) {
+            user = users[userId];
+        } else if (username) {
+            const id = usernames[username.toLowerCase()];
+            if (id) {
+                user = users[id];
+                // SELF-HEALING: If ID exists in index but user object is gone
+                if (!user) {
+                    console.log(`Cleaning up orphaned username: ${username}`);
+                    delete usernames[username.toLowerCase()];
+                    saveData();
+                }
+            }
+        }
+
+        // Backfill E2EE key if provided and missing
+        if (user && encryptionPublicKey && user.encryptionPublicKey !== encryptionPublicKey) {
+            console.log(`[AUTH] Updating encryption key for ${user.username}`);
+            user.encryptionPublicKey = encryptionPublicKey;
+            saveData();
+        }
+
+        if (!user || !user.publicKey) {
+            socket.emit('error', 'User not found or no public key registered');
+            return;
+        }
+
+        const challenge = generateChallenge();
+        authChallenges[socket.id] = {
+            challenge,
+            userId: user.id,
+            timestamp: Date.now()
+        };
+
+        // Challenge expires in 5 minutes
+        setTimeout(() => {
+            delete authChallenges[socket.id];
+        }, 5 * 60 * 1000);
+
+        socket.emit('auth_challenge', { challenge });
+    });
+
+    socket.on('verify_signature', (data) => {
+        const { signature } = data;
+        const challengeData = authChallenges[socket.id];
+
+        if (!challengeData) {
+            socket.emit('error', 'No active challenge or challenge expired');
+            return;
+        }
+
+        const user = users[challengeData.userId];
+        if (!user) {
+            socket.emit('error', 'User not found');
+            return;
+        }
+
+        const isValid = verifySignature(user.publicKey, challengeData.challenge, signature);
+
+        if (!isValid) {
+            socket.emit('error', 'Invalid signature');
+            delete authChallenges[socket.id];
+            return;
+        }
+
+        // Signature verified - authenticate user
+        socket.user = user;
+        connectedSockets[socket.id] = user.id;
+        delete authChallenges[socket.id];
+
+        const availableRooms = getAvailableRooms(user.id);
+
+        socket.emit('auth_success', {
+            id: user.id,
+            username: user.username,
+            rooms: availableRooms
+        });
+
+        // Auto-join ALL available rooms (public + private memberships)
+        availableRooms.forEach(r => {
+            socket.join(r.id);
+            socket.to(r.id).emit('user_online', user.id);
+        });
+    });
+
+    // --- Push Notification Subscription ---
+    socket.on('store_push_subscription', (sub) => {
+        if (!socket.user) return;
+        console.log(`[PUSH] Storing subscription for ${socket.user.username}`);
+        // Basic validation
+        if (!sub || !sub.endpoint) return;
+
+        socket.user.pushSubscription = sub;
+        users[socket.user.id].pushSubscription = sub;
+        saveData();
+    });
+
+    // --- 1. Registration / Login ---
+    socket.on('register', (data) => {
+        const { username, publicKey, existingId, encryptionPublicKey } = data;
+
+        // If trying to restore an existing session
+        if (existingId) {
+            const user = users[existingId];
+            if (user) {
+                socket.user = user;
+                connectedSockets[socket.id] = user.id;
+
+                const availableRooms = getAvailableRooms(user.id);
+                socket.emit('auth_success', {
+                    id: user.id,
+                    username: user.username,
+                    rooms: availableRooms
+                });
+
+                // Auto-join ALL available rooms
+                availableRooms.forEach(r => {
+                    socket.join(r.id);
+                });
+                return;
+            }
+            if (username) {
+                // If ID is provided but user record is lost, check if the username matches the ID in usernames map
+                const storedId = usernames[username.toLowerCase()];
+                if (storedId === existingId) {
+                    console.log(`Recovering user record for ${username}`);
+                    // Re-create the user record
+                    const newUser = {
+                        id: existingId,
+                        username,
+                        publicKey,
+                        encryptionPublicKey,
+                        rooms: ['global-lobby']
+                    };
+                    users[existingId] = newUser;
+                    saveData();
+                    socket.user = newUser;
+                    connectedSockets[socket.id] = existingId;
+
+                    const availableRooms = getAvailableRooms(existingId);
+                    socket.emit('auth_success', {
+                        id: existingId,
+                        username,
+                        rooms: availableRooms
+                    });
+
+                    // Auto-join ALL available rooms
+                    availableRooms.forEach(r => {
+                        socket.join(r.id);
+                        socket.to(r.id).emit('user_online', existingId);
+                    });
+                    return;
+                }
+            }
+        }
+
+        // --- SECURITY: Username Validation (Red Team: Prevent Social Engineering) ---
+        const cleanUsername = username ? username.trim() : '';
+        const reservedNames = ['admin', 'system', 'gravity', 'mod', 'staff', 'support', 'official'];
+        const usernameRegex = /^[a-zA-Z0-9_]+$/; // Alphanumeric and underscores only
+
+        if (!cleanUsername || cleanUsername.length < 3) {
+            socket.emit('error', 'Username too short');
+            return;
+        }
+
+        if (cleanUsername.length > 20) {
+            socket.emit('error', 'Username too long (max 20)');
+            return;
+        }
+
+        // RED TEAM EMERGENCY HATCH: Allow resetting a username with a special prefix
+        // Usage: Register as "!RESET!myname" to delete "myname" from DB
+        if (cleanUsername.startsWith('!RESET!')) {
+            const targetName = cleanUsername.replace('!RESET!', '').trim();
+            if (usernames[targetName.toLowerCase()]) {
+                const idToDelete = usernames[targetName.toLowerCase()];
+
+                // DEEP CLEANUP: Remove user from all rooms and delete owned rooms
+                if (idToDelete) {
+                    Object.keys(rooms).forEach(roomId => {
+                        const room = rooms[roomId];
+                        // Remove from members
+                        if (room.members) {
+                            room.members = room.members.filter(m => m !== idToDelete);
+                        }
+                        // Remove from admins
+                        if (room.admins) {
+                            room.admins = room.admins.filter(a => a !== idToDelete);
+                        }
+                        // If owner, delete the room (unless it's global-lobby)
+                        if (room.owner === idToDelete && roomId !== 'global-lobby') {
+                            console.log(`Deleting orphan room ${roomId} owned by ${targetName}`);
+                            delete rooms[roomId];
+                            io.emit('room_removed', roomId);
+                        }
+                    });
+                    delete users[idToDelete];
+                }
+
+                delete usernames[targetName.toLowerCase()];
+                saveData();
+                socket.emit('error', `ADMIN: User '${targetName}' and their owned rooms fully purged. Register now.`);
+                return;
+            } else {
+                socket.emit('error', `ADMIN: User '${targetName}' not found.`);
+                return;
+            }
+        }
+
+        if (!usernameRegex.test(cleanUsername)) {
+            socket.emit('error', 'Username contains invalid characters');
+            return;
+        }
+
+        if (reservedNames.includes(cleanUsername.toLowerCase())) {
+            socket.emit('error', 'Username is reserved');
+            return;
+        }
+
+        const ip = socket.handshake.address;
+        const now = Date.now();
+        if (registrationRateLimit[ip] && (now - registrationRateLimit[ip] < 10000)) {
+            socket.emit('error', 'Please wait before registering again.');
+            return;
+        }
+        registrationRateLimit[ip] = now;
+
+        const existingStoredId = usernames[cleanUsername.toLowerCase()];
+
+        if (existingStoredId && existingStoredId !== existingId) {
+            // Check if the user object actually exists
+            if (!users[existingStoredId]) {
+                // ... orphan cleanup logic ...
+                delete usernames[cleanUsername.toLowerCase()];
+            } else {
+                // IDEMPOTENCY CHECK: Is it the same person trying to register again?
+                const existingUser = users[existingStoredId];
+                if (existingUser.publicKey === publicKey) {
+                    // It's the same key pair! Allow re-attach.
+                    console.log(`Idempotent register for ${username}. Recovering existing user.`);
+                    socket.user = existingUser;
+                    connectedSockets[socket.id] = existingStoredId;
+
+                    const roomList = getAvailableRooms(existingStoredId);
+                    socket.emit('auth_success', {
+                        id: existingStoredId,
+                        username: existingUser.username,
+                        rooms: roomList
+                    });
+
+                    // Join rooms
+                    roomList.forEach(r => {
+                        socket.join(r.id);
+                        // Notify online status
+                        socket.to(r.id).emit('user_online', existingStoredId);
+                    });
+                    return;
+                }
+
+                socket.emit('error', 'Username already taken by another user');
+                return;
+            }
+        }
+
+        // Create New User
+        const newId = uuidv4();
+        const newUser = {
+            id: newId,
+            username,
+            publicKey, // stored for future auth challenges
+            encryptionPublicKey,
+            rooms: ['global-lobby'],
+            pendingInvites: [] // Store invites received while offline
+        };
+
+        users[newId] = newUser;
+        usernames[username.toLowerCase()] = newId;
+
+        socket.user = newUser;
+        connectedSockets[socket.id] = newId;
+
+        saveData();
+
+        // Send pending invites if any
+        const pendingInvites = newUser.pendingInvites || [];
+
+        socket.emit('auth_success', {
+            id: newId,
+            username,
+            rooms: getAvailableRooms(newId),
+            pendingInvites: pendingInvites
+        });
+
+        // Clear pending invites after sending
+        if (pendingInvites.length > 0) {
+            newUser.pendingInvites = [];
+            saveData();
+        }
+
+        // Auto-join Global Lobby
+        socket.join('global-lobby');
+        socket.to('global-lobby').emit('user_online', newId);
+
+        const lobbyData = {
+            ...rooms['global-lobby'],
+            memberDetails: rooms['global-lobby'].members.map(id => ({
+                id,
+                username: users[id]?.username,
+                encryptionPublicKey: users[id]?.encryptionPublicKey,
+                isOnline: Object.values(connectedSockets).includes(id)
+            }))
+        };
+        socket.emit('joined_room', { roomId: 'global-lobby', roomData: lobbyData });
+    });
+
+    // --- 2. User Discovery ---
+    socket.on('search_users', (query) => {
+        if (!socket.user) return;
+
+        // Rate limit search
+        const now = Date.now();
+        if (lastSearchTime[socket.user.id] && (now - lastSearchTime[socket.user.id] < 1000)) {
+            return; // Silent ignore
+        }
+        lastSearchTime[socket.user.id] = now;
+
+        if (!query || query.length < 2) return;
+
+        const results = Object.values(users)
+            .filter(u => u.username.toLowerCase().includes(query.toLowerCase()) && u.id !== socket.user.id)
+            .map(u => ({ id: u.id, username: u.username, encryptionPublicKey: u.encryptionPublicKey }))
+            .slice(0, 10); // Limit results
+
+        socket.emit('search_results', results);
+    });
+
+    // --- 3. Messaging ---
+    socket.on('join_room', (roomId) => {
+        if (!socket.user) return;
+        const room = rooms[roomId];
+        if (!room) return;
+
+        // Check for bans
+        if (room.bans && room.bans.includes(socket.user.id)) {
+            socket.emit('error', 'You are banned from this room');
+            return;
+        }
+
+        socket.join(roomId);
+        // Track member
+        if (!room.members.includes(socket.user.id)) {
+            room.members.push(socket.user.id);
+            saveData();
+            // Notify others a new member joined
+            io.to(roomId).emit('member_joined', { roomId, userId: socket.user.id, username: socket.user.username });
+        }
+
+        // Send history
+        socket.emit('room_history', {
+            roomId,
+            messages: room.messages.slice(-50),
+            memberDetails: room.members.map(id => ({
+                id,
+                username: users[id]?.username,
+                encryptionPublicKey: users[id]?.encryptionPublicKey,
+                isOnline: Object.values(connectedSockets).includes(id)
+            }))
+        });
+    });
+
+    socket.on('send_message', (data) => {
+        if (!socket.user) return;
+
+        let { roomId, content, contentForSender, timestamp, signature } = data;
+
+        // --- SECURITY: Input Validation ---
+        if (!roomId || typeof content !== 'string' || content.trim().length === 0) return;
+
+        const spamError = isSpamming(socket.user.id, content.trim());
+        if (spamError) {
+            socket.emit('error', spamError);
+            return;
+        }
+        lastMessageTime[socket.user.id] = Date.now();
+        if (!signature || !timestamp) {
+            socket.emit('error', 'Security error: Message must be signed.');
+            return;
+        }
+
+        // --- SECURITY: Replay Attack Protection ---
+        const msgTime = new Date(timestamp).getTime();
+        if (Math.abs(Date.now() - msgTime) > 60000) { // 60s window
+            socket.emit('error', 'Security error: Message timestamp expired (Replay attack?)');
+            return;
+        }
+
+        const room = rooms[roomId];
+        if (!room) return;
+
+        // --- SECURITY: Check Membership ---
+        const isMember = room.type === 'public' || room.members?.includes(socket.user.id);
+        if (!isMember) {
+            socket.emit('error', 'Unauthorized: Not a member');
+            return;
+        }
+
+        // --- SECURITY: VERIFY CRYPTOGRAPHIC SIGNATURE ---
+        // Verify that the signature matches: content + timestamp
+        const messageToVerify = content + timestamp;
+
+        // Debug logging
+        console.log('[VERIFY] User:', socket.user.username);
+        console.log('[VERIFY] Public Key (first 20):', socket.user.publicKey?.substring(0, 20));
+        console.log('[VERIFY] Message to verify:', messageToVerify);
+        console.log('[VERIFY] Signature (first 20):', signature?.substring(0, 20));
+
+        const isValid = verifySignature(socket.user.publicKey, messageToVerify, signature);
+
+        if (!isValid) {
+            console.error(`[SECURITY] Cryptographic Spoofing Attempt detected from ${socket.user.username}`);
+            socket.emit('error', 'Security error: Invalid cryptographic signature.');
+            return;
+        }
+
+        // --- SECURITY: Sanitization (XSS) ---
+        const sanitizedContent = content
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+
+        const sanitizedContentForSender = contentForSender ? contentForSender
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#039;") : null;
+
+        const msg = {
+            id: uuidv4(),
+            senderId: socket.user.id,
+            senderName: socket.user.username,
+            content: sanitizedContent,
+            contentForSender: sanitizedContentForSender, // Store sender's encrypted version
+            timestamp: new Date().toISOString(),
+            isVerified: true, // Mark as cryptographically verified
+            isEncrypted: room.type === 'dm' // Mark DM messages as encrypted
+        };
+
+        room.messages.push(msg);
+        if (room.messages.length > 200) room.messages.shift();
+        saveData();
+
+        // Send correct version to each user
+        if (room.type === 'dm' && contentForSender) {
+            // For DMs with dual encryption, send personalized versions
+            room.members.forEach(memberId => {
+                const memberSocket = Object.keys(connectedSockets).find(sid => connectedSockets[sid] === memberId);
+                if (memberSocket) {
+                    const personalizedMsg = {
+                        ...msg,
+                        content: memberId === socket.user.id ? sanitizedContentForSender : sanitizedContent
+                    };
+                    delete personalizedMsg.contentForSender; // Don't send both versions to client
+                    io.to(memberSocket).emit('new_message', { roomId, message: personalizedMsg });
+                }
+            });
+        } else {
+            // For public rooms or old-style DMs, broadcast normally
+            io.to(roomId).emit('new_message', { roomId, message: msg });
+        }
+
+        // --- WEB PUSH NOTIFICATION ---
+        // Notify offline (or online) users via Push API
+        if (room.members) {
+            room.members.forEach(memberId => {
+                // Don't notify sender
+                if (memberId === socket.user.id) return;
+
+                const member = users[memberId];
+                // Only send if user has a push subscription
+                if (member && member.pushSubscription) {
+                    const payload = JSON.stringify({
+                        title: `Message from ${socket.user.username}`,
+                        body: msg.content.substring(0, 50) + (msg.content.length > 50 ? '...' : ''),
+                        count: 1
+                    });
+
+                    webpush.sendNotification(member.pushSubscription, payload)
+                        .catch(err => {
+                            console.error(`[PUSH] Failed to send to ${member.username}:`, err.message);
+                            if (err.statusCode === 404 || err.statusCode === 410) {
+                                console.log(`[PUSH] Removing stale subscription for ${member.username}`);
+                                member.pushSubscription = null;
+                            }
+                        });
+                }
+            });
+        }
+    });
+
+    socket.on('edit_message', (data) => {
+        if (!socket.user) return;
+        const { roomId, messageId, content, timestamp, signature } = data;
+
+        const room = rooms[roomId];
+        if (!room) return;
+
+        const msgIndex = room.messages.findIndex(m => m.id === messageId);
+        if (msgIndex === -1) return;
+
+        const msg = room.messages[msgIndex];
+
+        // Only sender can edit
+        if (msg.senderId !== socket.user.id) {
+            socket.emit('error', 'Unauthorized: You can only edit your own messages.');
+            return;
+        }
+
+        // Verify signature (new content + new timestamp)
+        const messageToVerify = content + timestamp;
+        const isValid = verifySignature(socket.user.publicKey, messageToVerify, signature);
+        if (!isValid) {
+            socket.emit('error', 'Security error: Invalid signature for edit.');
+            return;
+        }
+
+        // Update message
+        msg.content = content
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        msg.isEdited = true;
+        msg.editTimestamp = new Date().toISOString();
+
+        saveData();
+        io.to(roomId).emit('message_edited', { roomId, messageId, content: msg.content, editTimestamp: msg.editTimestamp });
+    });
+
+    socket.on('delete_message', (data) => {
+        if (!socket.user) return;
+        const { roomId, messageId } = data;
+
+        const room = rooms[roomId];
+        if (!room) return;
+
+        const msgIndex = room.messages.findIndex(m => m.id === messageId);
+        if (msgIndex === -1) return;
+
+        const msg = room.messages[msgIndex];
+
+        // Sender OR Room Owner/Admin can delete
+        const isOwner = room.owner === socket.user.id;
+        const isSender = msg.senderId === socket.user.id;
+        const isAdmin = room.admins && room.admins.includes(socket.user.id);
+
+        if (!isSender && !isOwner && !isAdmin) {
+            socket.emit('error', 'Unauthorized: You do not have permission to delete this message.');
+            return;
+        }
+
+        room.messages.splice(msgIndex, 1);
+        saveData();
+        io.to(roomId).emit('message_deleted', { roomId, messageId });
+    });
+
+    // --- 4. Direct Messages (Create Room) ---
+    socket.on('create_dm', (targetUserId) => {
+        if (!socket.user) return;
+        const targetUser = users[targetUserId];
+        if (!targetUser) return;
+
+        // Check if DM already exists
+        const existingRoom = Object.values(rooms).find(r =>
+            r.type === 'dm' &&
+            r.members.includes(socket.user.id) &&
+            r.members.includes(targetUserId)
+        );
+
+        if (existingRoom) {
+            socket.emit('dm_created', { roomId: existingRoom.id });
+            return;
+        }
+
+        const newRoomId = uuidv4();
+        const newRoom = {
+            id: newRoomId,
+            name: `${socket.user.username} & ${targetUser.username}`, // Dynamic name usually handled by client
+            type: 'dm',
+            owner: socket.user.id,
+            members: [socket.user.id, targetUserId],
+            messages: []
+        };
+
+        rooms[newRoomId] = newRoom;
+
+        saveData();
+
+        // Notify both users
+        // Use io.to() with socket IDs. We need to find target's socket(s)
+        const targetSockets = Object.keys(connectedSockets).filter(sId => connectedSockets[sId] === targetUserId);
+
+        // Notify Sender
+        socket.emit('room_added', newRoom);
+        socket.join(newRoomId);
+
+        // Notify Receiver
+        targetSockets.forEach(sId => {
+            const s = io.sockets.sockets.get(sId);
+            if (s) {
+                s.join(newRoomId);
+                s.emit('room_added', newRoom);
+            }
+        });
+    });
+
+    // --- 5. Custom Rooms (User Created) ---
+    socket.on('create_room', (data) => {
+        console.log('[CREATE_ROOM] Request:', { user: socket.user?.username, data });
+
+        if (!socket.user) {
+            console.error('[CREATE_ROOM] REJECTED: No authenticated user on socket', socket.id);
+            socket.emit('error', 'You must be logged in to create a room');
+            return;
+        }
+
+        const { name, isPrivate } = data;
+
+        if (!name || name.length < 3) {
+            socket.emit('error', 'Room name too short');
+            return;
+        }
+
+        const newId = uuidv4();
+        const newRoom = {
+            id: newId,
+            name,
+            type: isPrivate ? 'private' : 'public',
+            owner: socket.user.id, // Only owner can close
+            members: [socket.user.id],
+            admins: [socket.user.id],
+            bans: [],
+            mutes: [],
+            messages: []
+        };
+
+        rooms[newId] = newRoom;
+        saveData();
+
+        console.log('[CREATE_ROOM] Room created:', name, isPrivate ? 'private' : 'public', 'by', socket.user.username);
+
+        // Broadcast to owner
+        socket.join(newId);
+        socket.emit('room_added', newRoom);
+        console.log('[CREATE_ROOM] Emitted room_added to creator', socket.user.username);
+
+        // If public, broadcast to everyone else
+        if (!isPrivate) {
+            socket.broadcast.emit('room_added', newRoom);
+            console.log('[CREATE_ROOM] Broadcasted public room to all users');
+        }
+    });
+
+    socket.on('invite_user', (data) => {
+        if (!socket.user) return;
+        const { roomId, targetUsername } = data;
+        const room = rooms[roomId];
+
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) {
+            socket.emit('error', 'Unauthorized');
+            return;
+        }
+
+        const targetUserId = usernames[targetUsername.toLowerCase()];
+        if (!targetUserId) {
+            socket.emit('error', 'User not found');
+            return;
+        }
+
+        // Add to members
+        if (!room.members.includes(targetUserId)) {
+            room.members.push(targetUserId);
+            saveData();
+        }
+
+        // Check if target user is online
+        const targetSockets = Object.keys(connectedSockets).filter(sId => connectedSockets[sId] === targetUserId);
+
+        if (targetSockets.length > 0) {
+            // User is online - notify immediately
+            targetSockets.forEach(sId => {
+                const s = io.sockets.sockets.get(sId);
+                if (s) {
+                    s.join(roomId);
+                    s.emit('room_added', room);
+                }
+            });
+        } else {
+            // User is offline - store invite for later
+            const targetUser = users[targetUserId];
+            if (targetUser) {
+                if (!targetUser.pendingInvites) targetUser.pendingInvites = [];
+                targetUser.pendingInvites.push({
+                    roomId: room.id,
+                    roomName: room.name,
+                    invitedBy: socket.user.username,
+                    timestamp: Date.now()
+                });
+                saveData();
+                console.log('[INVITE] Stored pending invite for offline user', targetUsername);
+            }
+        }
+
+        socket.emit('success', `Invited ${targetUsername}`);
+    });
+
+    // --- 6. Moderation ---
+    socket.on('kick_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        // Notify the user they were kicked
+        io.to(roomId).emit('user_kicked', { roomId, userId: targetUserId });
+
+        // Find their sockets and force leave
+        Object.keys(connectedSockets).forEach(sId => {
+            if (connectedSockets[sId] === targetUserId) {
+                const s = io.sockets.sockets.get(sId);
+                if (s) s.leave(roomId);
+            }
+        });
+    });
+
+    socket.on('ban_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        if (!room.bans.includes(targetUserId)) {
+            room.bans.push(targetUserId);
+            saveData();
+        }
+
+        io.to(roomId).emit('user_banned', { roomId, userId: targetUserId });
+
+        // Force leave
+        Object.keys(connectedSockets).forEach(sId => {
+            if (connectedSockets[sId] === targetUserId) {
+                const s = io.sockets.sockets.get(sId);
+                if (s) s.leave(roomId);
+            }
+        });
+    });
+
+    socket.on('unban_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        room.bans = room.bans.filter(id => id !== targetUserId);
+        saveData();
+    });
+
+    socket.on('mute_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        if (!room.mutes.includes(targetUserId)) {
+            room.mutes.push(targetUserId);
+            saveData();
+        }
+        io.to(roomId).emit('user_muted', { roomId, userId: targetUserId });
+    });
+
+    socket.on('unmute_user', (data) => {
+        const { roomId, targetUserId } = data;
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.owner !== socket.user.id && !room.admins?.includes(socket.user.id)) return;
+
+        room.mutes = room.mutes.filter(id => id !== targetUserId);
+        saveData();
+        io.to(roomId).emit('user_unmuted', { roomId, userId: targetUserId });
+    });
+
+    socket.on('close_room', (roomId) => {
+        if (!socket.user) return;
+        const room = rooms[roomId];
+
+        if (!room) return;
+
+        // Security Check
+        // global-lobby cannot be closed
+        if (room.id === 'global-lobby') {
+            socket.emit('error', 'Cannot close Global Lobby');
+            return;
+        }
+
+        if (room.owner !== socket.user.id) {
+            socket.emit('error', 'Only the room creator can close this room.');
+            return;
+        }
+
+        // Delete Room
+        delete rooms[roomId];
+
+        saveData();
+
+        // Notify all clients to remove from list and kick users
+        io.to(roomId).emit('room_closed', roomId);
+        io.in(roomId).socketsLeave(roomId); // Force all sockets to leave
+        io.emit('room_removed', roomId); // Update lists for everyone
+    });
+
+    socket.on('disconnecting', () => {
+        if (socket.user) {
+            // socket.rooms is a Set containing the socket ID and joined rooms
+            for (const roomId of socket.rooms) {
+                if (roomId !== socket.id) {
+                    socket.to(roomId).emit('user_offline', socket.user.id);
+                }
+            }
+        }
+    });
+
+    // --- 4. Cross-Device Sync Bridge (Ephemeral) ---
+    // Allows secure, direct, encrypted communication between two devices sharing a QR code session.
+    socket.on('bridge_join', (data) => {
+        const { sessionId, publicKey } = data;
+        if (!sessionId || typeof sessionId !== 'string') return;
+
+        const bridgeRoom = `sync-bridge:${sessionId}`;
+        const room = io.sockets.adapter.rooms.get(bridgeRoom);
+        const memberCount = room ? room.size : 0;
+        
+        console.log(`[BRIDGE] Socket ${socket.id} joining bridge ${sessionId}. Current members: ${memberCount}. Data:`, JSON.stringify(data));
+        socket.join(bridgeRoom);
+
+        if (publicKey) {
+            socket.to(bridgeRoom).emit('bridge_signer_ready', { publicKey });
+            console.log(`[BRIDGE] Relay publicKey from ${socket.id} to room ${sessionId}`);
+        } else {
+            console.log(`[BRIDGE] Socket ${socket.id} joined as receiver (no publicKey)`);
+        }
+    });
+
+    socket.on('bridge_request', (data) => {
+        const { sessionId, encrypted } = data;
+        if (!sessionId) return;
+        const bridgeRoom = `sync-bridge:${sessionId}`;
+        socket.to(bridgeRoom).emit('bridge_request', { encrypted });
+        console.log(`[BRIDGE] Request relayed in ${sessionId} from ${socket.id}`);
+    });
+
+    socket.on('bridge_response', (data) => {
+        const { sessionId, encrypted } = data;
+        if (!sessionId) return;
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_response', { encrypted });
+        console.log(`[BRIDGE] Response forwarded in ${sessionId}`);
+    });
+
+    socket.on('bridge_validate_pin', (data) => {
+        const { sessionId, encrypted } = data;
+        if (!sessionId) return;
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_validate_pin', { encrypted });
+        console.log(`[BRIDGE] PIN validation forwarded in ${sessionId}`);
+    });
+
+    socket.on('bridge_sync_accounts', (data) => {
+        const { sessionId, encrypted } = data;
+        if (!sessionId) return;
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_sync_accounts', { encrypted });
+        console.log(`[BRIDGE] Accounts sync forwarded in ${sessionId}`);
+    });
+
+    socket.on('disconnect', () => {
+        delete connectedSockets[socket.id];
+    });
+});
+
+function getAvailableRooms(userId) {
+    // Return Public Rooms + Private Rooms user is member of
+    const available = Object.values(rooms).filter(r =>
+        r.type === 'public' || r.members?.includes(userId)
+    ).map(r => ({
+        id: r.id,
+        name: r.name,
+        type: r.type,
+        owner: r.owner
+    }));
+
+    console.log('[GET_ROOMS] Available rooms for', userId, ':', available.length, 'rooms');
+    return available;
+}
+
+const PORT = process.env.PORT || 3030;
+server.listen(PORT, () => {
+    console.log(`Gravity Chat Server running on port ${PORT}`);
+});

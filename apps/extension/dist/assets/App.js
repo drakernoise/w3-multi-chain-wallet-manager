@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { m as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, n as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, o as broadcastSavingsDeposit, p as broadcastSavingsWithdraw, q as fetchAccountData, t as broadcastRCDelegate, u as broadcastRCUndelegate, v as broadcastBulkTransfer, w as indexBrowserExports, x as indexBrowserExports$1, y as validateAccountKeys, z as fetchAccountHistory, A as getAccountAuthorities, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, B as fetchBalances, D as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as indexBrowserExports, z as indexBrowserExports$1, A as validateAccountKeys, B as fetchAccountHistory, D as getAccountAuthorities, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, E as fetchBalances, F as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -811,6 +811,7 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 let cachedKey = null;
 let cachedSalt = null;
+const MOBILE_SESSION_KEY = "gravity_crypto_session_mobile";
 async function getKey(password, salt) {
   const encPassword = enc.encode(password);
   return getKeyFromBytes(encPassword, salt);
@@ -891,7 +892,6 @@ async function loadInternalKeyWithPin(pin) {
     );
     return new TextDecoder().decode(decrypted);
   } catch (e) {
-    console.error("PIN Decryption failed", e);
     return null;
   }
 }
@@ -1000,6 +1000,8 @@ function clearCryptoCache() {
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
     chrome.storage.session.remove("crypto_session");
   }
+  storageService.removeItem(MOBILE_SESSION_KEY).catch(() => {
+  });
 }
 async function persistSession() {
   if (!cachedKey || !cachedSalt) return;
@@ -1010,6 +1012,11 @@ async function persistSession() {
     chrome.storage.session.set({
       crypto_session: { key: keyArr, salt: saltArr }
     });
+  } else {
+    const exported = await window.crypto.subtle.exportKey("raw", cachedKey);
+    const saltArr = Array.from(cachedSalt);
+    const keyArr = Array.from(new Uint8Array(exported));
+    await storageService.setItem(MOBILE_SESSION_KEY, JSON.stringify({ key: keyArr, salt: saltArr }));
   }
 }
 async function tryRestoreSession() {
@@ -1038,6 +1045,25 @@ async function tryRestoreSession() {
         }
       });
     });
+  }
+  try {
+    const raw = await storageService.getItem(MOBILE_SESSION_KEY);
+    if (raw) {
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (parsed?.key && parsed?.salt) {
+        const importedKey = await window.crypto.subtle.importKey(
+          "raw",
+          new Uint8Array(parsed.key),
+          ALGO,
+          true,
+          ["encrypt", "decrypt"]
+        );
+        cachedKey = importedKey;
+        cachedSalt = new Uint8Array(parsed.salt);
+        return true;
+      }
+    }
+  } catch (e) {
   }
   return false;
 }
@@ -5743,6 +5769,7 @@ const translations = {
     "sidebar.bulk": "Bulk Transfers",
     "sidebar.multisig": "MultiSig",
     "sidebar.manage": "Settings",
+    "sidebar.pair": "Pair Phone",
     "sidebar.lock": "Lock Wallet",
     "sidebar.pin": "Detach Window",
     "sidebar.dock": "Dock Window",
@@ -6203,6 +6230,7 @@ const translations = {
     "sidebar.bulk": "Transf. Masiva",
     "sidebar.multisig": "Multi-firma",
     "sidebar.manage": "Configuración",
+    "sidebar.pair": "Emparejar teléfono",
     "sidebar.lock": "Bloquear",
     "sidebar.pin": "Desanclar Ventana",
     "sidebar.dock": "Anclar Ventana",
@@ -6660,6 +6688,7 @@ const translations = {
     "sidebar.bulk": "Envoi Massif",
     "sidebar.multisig": "MultiSig",
     "sidebar.manage": "Paramètres",
+    "sidebar.pair": "Associer telephone",
     "sidebar.lock": "Verrouiller",
     "sidebar.pin": "Détacher Fenêtre",
     "sidebar.dock": "Ancrer Fenêtre",
@@ -7086,6 +7115,7 @@ const translations = {
     "sidebar.bulk": "Massenüberweisung",
     "sidebar.multisig": "MultiSig",
     "sidebar.manage": "Einstellungen",
+    "sidebar.pair": "Telefon koppeln",
     "sidebar.lock": "Sperren",
     "sidebar.pin": "Fenster lösen",
     "sidebar.dock": "Fenster andocken",
@@ -7512,6 +7542,7 @@ const translations = {
     "sidebar.bulk": "Trasferimento Multiplo",
     "sidebar.multisig": "MultiSig",
     "sidebar.manage": "Impostazioni",
+    "sidebar.pair": "Abbina telefono",
     "sidebar.lock": "Blocca",
     "sidebar.pin": "Stacca Finestra",
     "sidebar.dock": "Ancora Finestra",
@@ -8531,11 +8562,11 @@ const Sidebar = ({
         {
           active: false,
           onClick: () => {
-            const event = new CustomEvent("open-bridge");
+            const event = new CustomEvent("open-pair");
             window.dispatchEvent(event);
           },
           icon: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 4v1m-3 3l3 3m6-3l3 3M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" }),
-          label: "Bridge Mobile"
+          label: t("sidebar.pair") || "Pair Mobile"
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "h-px w-8 bg-dark-600 my-1 shrink-0" }),
@@ -8585,6 +8616,7 @@ const NavIcon = ({ active, onClick, icon, label, raw }) => /* @__PURE__ */ jsxRu
   "button",
   {
     onClick,
+    title: label,
     className: `group relative flex items-center justify-center w-10 h-10 rounded-lg transition-all ${active ? "bg-dark-700 text-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.2)] scale-105 border border-dark-600" : "text-slate-500 hover:bg-dark-700 hover:text-slate-300"}`,
     children: [
       raw ? icon : /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: icon }),
@@ -8845,953 +8877,243 @@ const BiometricSetupModal = ({ accounts, setWalletState, onClose, onComplete }) 
   ] }) });
 };
 
-var __defProp = Object.defineProperty;
-var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __propIsEnum = Object.prototype.propertyIsEnumerable;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues = (a, b) => {
-  for (var prop in b || (b = {}))
-    if (__hasOwnProp.call(b, prop))
-      __defNormalProp(a, prop, b[prop]);
-  if (__getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(b)) {
-      if (__propIsEnum.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    }
-  return a;
-};
-var __objRest = (source, exclude) => {
-  var target = {};
-  for (var prop in source)
-    if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
-      target[prop] = source[prop];
-  if (source != null && __getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(source)) {
-      if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
-        target[prop] = source[prop];
-    }
-  return target;
-};
-
-// src/third-party/qrcodegen/index.ts
-/**
- * @license QR Code generator library (TypeScript)
- * Copyright (c) Project Nayuki.
- * SPDX-License-Identifier: MIT
- */
-var qrcodegen;
-((qrcodegen2) => {
-  const _QrCode = class {
-    constructor(version, errorCorrectionLevel, dataCodewords, msk) {
-      this.version = version;
-      this.errorCorrectionLevel = errorCorrectionLevel;
-      this.modules = [];
-      this.isFunction = [];
-      if (version < _QrCode.MIN_VERSION || version > _QrCode.MAX_VERSION)
-        throw new RangeError("Version value out of range");
-      if (msk < -1 || msk > 7)
-        throw new RangeError("Mask value out of range");
-      this.size = version * 4 + 17;
-      let row = [];
-      for (let i = 0; i < this.size; i++)
-        row.push(false);
-      for (let i = 0; i < this.size; i++) {
-        this.modules.push(row.slice());
-        this.isFunction.push(row.slice());
-      }
-      this.drawFunctionPatterns();
-      const allCodewords = this.addEccAndInterleave(dataCodewords);
-      this.drawCodewords(allCodewords);
-      if (msk == -1) {
-        let minPenalty = 1e9;
-        for (let i = 0; i < 8; i++) {
-          this.applyMask(i);
-          this.drawFormatBits(i);
-          const penalty = this.getPenaltyScore();
-          if (penalty < minPenalty) {
-            msk = i;
-            minPenalty = penalty;
-          }
-          this.applyMask(i);
-        }
-      }
-      assert(0 <= msk && msk <= 7);
-      this.mask = msk;
-      this.applyMask(msk);
-      this.drawFormatBits(msk);
-      this.isFunction = [];
-    }
-    static encodeText(text, ecl) {
-      const segs = qrcodegen2.QrSegment.makeSegments(text);
-      return _QrCode.encodeSegments(segs, ecl);
-    }
-    static encodeBinary(data, ecl) {
-      const seg = qrcodegen2.QrSegment.makeBytes(data);
-      return _QrCode.encodeSegments([seg], ecl);
-    }
-    static encodeSegments(segs, ecl, minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true) {
-      if (!(_QrCode.MIN_VERSION <= minVersion && minVersion <= maxVersion && maxVersion <= _QrCode.MAX_VERSION) || mask < -1 || mask > 7)
-        throw new RangeError("Invalid value");
-      let version;
-      let dataUsedBits;
-      for (version = minVersion; ; version++) {
-        const dataCapacityBits2 = _QrCode.getNumDataCodewords(version, ecl) * 8;
-        const usedBits = QrSegment.getTotalBits(segs, version);
-        if (usedBits <= dataCapacityBits2) {
-          dataUsedBits = usedBits;
-          break;
-        }
-        if (version >= maxVersion)
-          throw new RangeError("Data too long");
-      }
-      for (const newEcl of [_QrCode.Ecc.MEDIUM, _QrCode.Ecc.QUARTILE, _QrCode.Ecc.HIGH]) {
-        if (boostEcl && dataUsedBits <= _QrCode.getNumDataCodewords(version, newEcl) * 8)
-          ecl = newEcl;
-      }
-      let bb = [];
-      for (const seg of segs) {
-        appendBits(seg.mode.modeBits, 4, bb);
-        appendBits(seg.numChars, seg.mode.numCharCountBits(version), bb);
-        for (const b of seg.getData())
-          bb.push(b);
-      }
-      assert(bb.length == dataUsedBits);
-      const dataCapacityBits = _QrCode.getNumDataCodewords(version, ecl) * 8;
-      assert(bb.length <= dataCapacityBits);
-      appendBits(0, Math.min(4, dataCapacityBits - bb.length), bb);
-      appendBits(0, (8 - bb.length % 8) % 8, bb);
-      assert(bb.length % 8 == 0);
-      for (let padByte = 236; bb.length < dataCapacityBits; padByte ^= 236 ^ 17)
-        appendBits(padByte, 8, bb);
-      let dataCodewords = [];
-      while (dataCodewords.length * 8 < bb.length)
-        dataCodewords.push(0);
-      bb.forEach((b, i) => dataCodewords[i >>> 3] |= b << 7 - (i & 7));
-      return new _QrCode(version, ecl, dataCodewords, mask);
-    }
-    getModule(x, y) {
-      return 0 <= x && x < this.size && 0 <= y && y < this.size && this.modules[y][x];
-    }
-    getModules() {
-      return this.modules;
-    }
-    drawFunctionPatterns() {
-      for (let i = 0; i < this.size; i++) {
-        this.setFunctionModule(6, i, i % 2 == 0);
-        this.setFunctionModule(i, 6, i % 2 == 0);
-      }
-      this.drawFinderPattern(3, 3);
-      this.drawFinderPattern(this.size - 4, 3);
-      this.drawFinderPattern(3, this.size - 4);
-      const alignPatPos = this.getAlignmentPatternPositions();
-      const numAlign = alignPatPos.length;
-      for (let i = 0; i < numAlign; i++) {
-        for (let j = 0; j < numAlign; j++) {
-          if (!(i == 0 && j == 0 || i == 0 && j == numAlign - 1 || i == numAlign - 1 && j == 0))
-            this.drawAlignmentPattern(alignPatPos[i], alignPatPos[j]);
-        }
-      }
-      this.drawFormatBits(0);
-      this.drawVersion();
-    }
-    drawFormatBits(mask) {
-      const data = this.errorCorrectionLevel.formatBits << 3 | mask;
-      let rem = data;
-      for (let i = 0; i < 10; i++)
-        rem = rem << 1 ^ (rem >>> 9) * 1335;
-      const bits = (data << 10 | rem) ^ 21522;
-      assert(bits >>> 15 == 0);
-      for (let i = 0; i <= 5; i++)
-        this.setFunctionModule(8, i, getBit(bits, i));
-      this.setFunctionModule(8, 7, getBit(bits, 6));
-      this.setFunctionModule(8, 8, getBit(bits, 7));
-      this.setFunctionModule(7, 8, getBit(bits, 8));
-      for (let i = 9; i < 15; i++)
-        this.setFunctionModule(14 - i, 8, getBit(bits, i));
-      for (let i = 0; i < 8; i++)
-        this.setFunctionModule(this.size - 1 - i, 8, getBit(bits, i));
-      for (let i = 8; i < 15; i++)
-        this.setFunctionModule(8, this.size - 15 + i, getBit(bits, i));
-      this.setFunctionModule(8, this.size - 8, true);
-    }
-    drawVersion() {
-      if (this.version < 7)
-        return;
-      let rem = this.version;
-      for (let i = 0; i < 12; i++)
-        rem = rem << 1 ^ (rem >>> 11) * 7973;
-      const bits = this.version << 12 | rem;
-      assert(bits >>> 18 == 0);
-      for (let i = 0; i < 18; i++) {
-        const color = getBit(bits, i);
-        const a = this.size - 11 + i % 3;
-        const b = Math.floor(i / 3);
-        this.setFunctionModule(a, b, color);
-        this.setFunctionModule(b, a, color);
-      }
-    }
-    drawFinderPattern(x, y) {
-      for (let dy = -4; dy <= 4; dy++) {
-        for (let dx = -4; dx <= 4; dx++) {
-          const dist = Math.max(Math.abs(dx), Math.abs(dy));
-          const xx = x + dx;
-          const yy = y + dy;
-          if (0 <= xx && xx < this.size && 0 <= yy && yy < this.size)
-            this.setFunctionModule(xx, yy, dist != 2 && dist != 4);
-        }
-      }
-    }
-    drawAlignmentPattern(x, y) {
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++)
-          this.setFunctionModule(x + dx, y + dy, Math.max(Math.abs(dx), Math.abs(dy)) != 1);
-      }
-    }
-    setFunctionModule(x, y, isDark) {
-      this.modules[y][x] = isDark;
-      this.isFunction[y][x] = true;
-    }
-    addEccAndInterleave(data) {
-      const ver = this.version;
-      const ecl = this.errorCorrectionLevel;
-      if (data.length != _QrCode.getNumDataCodewords(ver, ecl))
-        throw new RangeError("Invalid argument");
-      const numBlocks = _QrCode.NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
-      const blockEccLen = _QrCode.ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver];
-      const rawCodewords = Math.floor(_QrCode.getNumRawDataModules(ver) / 8);
-      const numShortBlocks = numBlocks - rawCodewords % numBlocks;
-      const shortBlockLen = Math.floor(rawCodewords / numBlocks);
-      let blocks = [];
-      const rsDiv = _QrCode.reedSolomonComputeDivisor(blockEccLen);
-      for (let i = 0, k = 0; i < numBlocks; i++) {
-        let dat = data.slice(k, k + shortBlockLen - blockEccLen + (i < numShortBlocks ? 0 : 1));
-        k += dat.length;
-        const ecc = _QrCode.reedSolomonComputeRemainder(dat, rsDiv);
-        if (i < numShortBlocks)
-          dat.push(0);
-        blocks.push(dat.concat(ecc));
-      }
-      let result = [];
-      for (let i = 0; i < blocks[0].length; i++) {
-        blocks.forEach((block, j) => {
-          if (i != shortBlockLen - blockEccLen || j >= numShortBlocks)
-            result.push(block[i]);
-        });
-      }
-      assert(result.length == rawCodewords);
-      return result;
-    }
-    drawCodewords(data) {
-      if (data.length != Math.floor(_QrCode.getNumRawDataModules(this.version) / 8))
-        throw new RangeError("Invalid argument");
-      let i = 0;
-      for (let right = this.size - 1; right >= 1; right -= 2) {
-        if (right == 6)
-          right = 5;
-        for (let vert = 0; vert < this.size; vert++) {
-          for (let j = 0; j < 2; j++) {
-            const x = right - j;
-            const upward = (right + 1 & 2) == 0;
-            const y = upward ? this.size - 1 - vert : vert;
-            if (!this.isFunction[y][x] && i < data.length * 8) {
-              this.modules[y][x] = getBit(data[i >>> 3], 7 - (i & 7));
-              i++;
-            }
-          }
-        }
-      }
-      assert(i == data.length * 8);
-    }
-    applyMask(mask) {
-      if (mask < 0 || mask > 7)
-        throw new RangeError("Mask value out of range");
-      for (let y = 0; y < this.size; y++) {
-        for (let x = 0; x < this.size; x++) {
-          let invert;
-          switch (mask) {
-            case 0:
-              invert = (x + y) % 2 == 0;
-              break;
-            case 1:
-              invert = y % 2 == 0;
-              break;
-            case 2:
-              invert = x % 3 == 0;
-              break;
-            case 3:
-              invert = (x + y) % 3 == 0;
-              break;
-            case 4:
-              invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 == 0;
-              break;
-            case 5:
-              invert = x * y % 2 + x * y % 3 == 0;
-              break;
-            case 6:
-              invert = (x * y % 2 + x * y % 3) % 2 == 0;
-              break;
-            case 7:
-              invert = ((x + y) % 2 + x * y % 3) % 2 == 0;
-              break;
-            default:
-              throw new Error("Unreachable");
-          }
-          if (!this.isFunction[y][x] && invert)
-            this.modules[y][x] = !this.modules[y][x];
-        }
-      }
-    }
-    getPenaltyScore() {
-      let result = 0;
-      for (let y = 0; y < this.size; y++) {
-        let runColor = false;
-        let runX = 0;
-        let runHistory = [0, 0, 0, 0, 0, 0, 0];
-        for (let x = 0; x < this.size; x++) {
-          if (this.modules[y][x] == runColor) {
-            runX++;
-            if (runX == 5)
-              result += _QrCode.PENALTY_N1;
-            else if (runX > 5)
-              result++;
-          } else {
-            this.finderPenaltyAddHistory(runX, runHistory);
-            if (!runColor)
-              result += this.finderPenaltyCountPatterns(runHistory) * _QrCode.PENALTY_N3;
-            runColor = this.modules[y][x];
-            runX = 1;
-          }
-        }
-        result += this.finderPenaltyTerminateAndCount(runColor, runX, runHistory) * _QrCode.PENALTY_N3;
-      }
-      for (let x = 0; x < this.size; x++) {
-        let runColor = false;
-        let runY = 0;
-        let runHistory = [0, 0, 0, 0, 0, 0, 0];
-        for (let y = 0; y < this.size; y++) {
-          if (this.modules[y][x] == runColor) {
-            runY++;
-            if (runY == 5)
-              result += _QrCode.PENALTY_N1;
-            else if (runY > 5)
-              result++;
-          } else {
-            this.finderPenaltyAddHistory(runY, runHistory);
-            if (!runColor)
-              result += this.finderPenaltyCountPatterns(runHistory) * _QrCode.PENALTY_N3;
-            runColor = this.modules[y][x];
-            runY = 1;
-          }
-        }
-        result += this.finderPenaltyTerminateAndCount(runColor, runY, runHistory) * _QrCode.PENALTY_N3;
-      }
-      for (let y = 0; y < this.size - 1; y++) {
-        for (let x = 0; x < this.size - 1; x++) {
-          const color = this.modules[y][x];
-          if (color == this.modules[y][x + 1] && color == this.modules[y + 1][x] && color == this.modules[y + 1][x + 1])
-            result += _QrCode.PENALTY_N2;
-        }
-      }
-      let dark = 0;
-      for (const row of this.modules)
-        dark = row.reduce((sum, color) => sum + (color ? 1 : 0), dark);
-      const total = this.size * this.size;
-      const k = Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1;
-      assert(0 <= k && k <= 9);
-      result += k * _QrCode.PENALTY_N4;
-      assert(0 <= result && result <= 2568888);
-      return result;
-    }
-    getAlignmentPatternPositions() {
-      if (this.version == 1)
-        return [];
-      else {
-        const numAlign = Math.floor(this.version / 7) + 2;
-        const step = this.version == 32 ? 26 : Math.ceil((this.version * 4 + 4) / (numAlign * 2 - 2)) * 2;
-        let result = [6];
-        for (let pos = this.size - 7; result.length < numAlign; pos -= step)
-          result.splice(1, 0, pos);
-        return result;
-      }
-    }
-    static getNumRawDataModules(ver) {
-      if (ver < _QrCode.MIN_VERSION || ver > _QrCode.MAX_VERSION)
-        throw new RangeError("Version number out of range");
-      let result = (16 * ver + 128) * ver + 64;
-      if (ver >= 2) {
-        const numAlign = Math.floor(ver / 7) + 2;
-        result -= (25 * numAlign - 10) * numAlign - 55;
-        if (ver >= 7)
-          result -= 36;
-      }
-      assert(208 <= result && result <= 29648);
-      return result;
-    }
-    static getNumDataCodewords(ver, ecl) {
-      return Math.floor(_QrCode.getNumRawDataModules(ver) / 8) - _QrCode.ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver] * _QrCode.NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
-    }
-    static reedSolomonComputeDivisor(degree) {
-      if (degree < 1 || degree > 255)
-        throw new RangeError("Degree out of range");
-      let result = [];
-      for (let i = 0; i < degree - 1; i++)
-        result.push(0);
-      result.push(1);
-      let root = 1;
-      for (let i = 0; i < degree; i++) {
-        for (let j = 0; j < result.length; j++) {
-          result[j] = _QrCode.reedSolomonMultiply(result[j], root);
-          if (j + 1 < result.length)
-            result[j] ^= result[j + 1];
-        }
-        root = _QrCode.reedSolomonMultiply(root, 2);
-      }
-      return result;
-    }
-    static reedSolomonComputeRemainder(data, divisor) {
-      let result = divisor.map((_) => 0);
-      for (const b of data) {
-        const factor = b ^ result.shift();
-        result.push(0);
-        divisor.forEach((coef, i) => result[i] ^= _QrCode.reedSolomonMultiply(coef, factor));
-      }
-      return result;
-    }
-    static reedSolomonMultiply(x, y) {
-      if (x >>> 8 != 0 || y >>> 8 != 0)
-        throw new RangeError("Byte out of range");
-      let z = 0;
-      for (let i = 7; i >= 0; i--) {
-        z = z << 1 ^ (z >>> 7) * 285;
-        z ^= (y >>> i & 1) * x;
-      }
-      assert(z >>> 8 == 0);
-      return z;
-    }
-    finderPenaltyCountPatterns(runHistory) {
-      const n = runHistory[1];
-      assert(n <= this.size * 3);
-      const core = n > 0 && runHistory[2] == n && runHistory[3] == n * 3 && runHistory[4] == n && runHistory[5] == n;
-      return (core && runHistory[0] >= n * 4 && runHistory[6] >= n ? 1 : 0) + (core && runHistory[6] >= n * 4 && runHistory[0] >= n ? 1 : 0);
-    }
-    finderPenaltyTerminateAndCount(currentRunColor, currentRunLength, runHistory) {
-      if (currentRunColor) {
-        this.finderPenaltyAddHistory(currentRunLength, runHistory);
-        currentRunLength = 0;
-      }
-      currentRunLength += this.size;
-      this.finderPenaltyAddHistory(currentRunLength, runHistory);
-      return this.finderPenaltyCountPatterns(runHistory);
-    }
-    finderPenaltyAddHistory(currentRunLength, runHistory) {
-      if (runHistory[0] == 0)
-        currentRunLength += this.size;
-      runHistory.pop();
-      runHistory.unshift(currentRunLength);
-    }
-  };
-  let QrCode = _QrCode;
-  QrCode.MIN_VERSION = 1;
-  QrCode.MAX_VERSION = 40;
-  QrCode.PENALTY_N1 = 3;
-  QrCode.PENALTY_N2 = 3;
-  QrCode.PENALTY_N3 = 40;
-  QrCode.PENALTY_N4 = 10;
-  QrCode.ECC_CODEWORDS_PER_BLOCK = [
-    [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
-    [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
-    [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
-    [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
-  ];
-  QrCode.NUM_ERROR_CORRECTION_BLOCKS = [
-    [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
-    [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
-    [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
-    [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81]
-  ];
-  qrcodegen2.QrCode = QrCode;
-  function appendBits(val, len, bb) {
-    if (len < 0 || len > 31 || val >>> len != 0)
-      throw new RangeError("Value out of range");
-    for (let i = len - 1; i >= 0; i--)
-      bb.push(val >>> i & 1);
-  }
-  function getBit(x, i) {
-    return (x >>> i & 1) != 0;
-  }
-  function assert(cond) {
-    if (!cond)
-      throw new Error("Assertion error");
-  }
-  const _QrSegment = class {
-    constructor(mode, numChars, bitData) {
-      this.mode = mode;
-      this.numChars = numChars;
-      this.bitData = bitData;
-      if (numChars < 0)
-        throw new RangeError("Invalid argument");
-      this.bitData = bitData.slice();
-    }
-    static makeBytes(data) {
-      let bb = [];
-      for (const b of data)
-        appendBits(b, 8, bb);
-      return new _QrSegment(_QrSegment.Mode.BYTE, data.length, bb);
-    }
-    static makeNumeric(digits) {
-      if (!_QrSegment.isNumeric(digits))
-        throw new RangeError("String contains non-numeric characters");
-      let bb = [];
-      for (let i = 0; i < digits.length; ) {
-        const n = Math.min(digits.length - i, 3);
-        appendBits(parseInt(digits.substr(i, n), 10), n * 3 + 1, bb);
-        i += n;
-      }
-      return new _QrSegment(_QrSegment.Mode.NUMERIC, digits.length, bb);
-    }
-    static makeAlphanumeric(text) {
-      if (!_QrSegment.isAlphanumeric(text))
-        throw new RangeError("String contains unencodable characters in alphanumeric mode");
-      let bb = [];
-      let i;
-      for (i = 0; i + 2 <= text.length; i += 2) {
-        let temp = _QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)) * 45;
-        temp += _QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i + 1));
-        appendBits(temp, 11, bb);
-      }
-      if (i < text.length)
-        appendBits(_QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)), 6, bb);
-      return new _QrSegment(_QrSegment.Mode.ALPHANUMERIC, text.length, bb);
-    }
-    static makeSegments(text) {
-      if (text == "")
-        return [];
-      else if (_QrSegment.isNumeric(text))
-        return [_QrSegment.makeNumeric(text)];
-      else if (_QrSegment.isAlphanumeric(text))
-        return [_QrSegment.makeAlphanumeric(text)];
-      else
-        return [_QrSegment.makeBytes(_QrSegment.toUtf8ByteArray(text))];
-    }
-    static makeEci(assignVal) {
-      let bb = [];
-      if (assignVal < 0)
-        throw new RangeError("ECI assignment value out of range");
-      else if (assignVal < 1 << 7)
-        appendBits(assignVal, 8, bb);
-      else if (assignVal < 1 << 14) {
-        appendBits(2, 2, bb);
-        appendBits(assignVal, 14, bb);
-      } else if (assignVal < 1e6) {
-        appendBits(6, 3, bb);
-        appendBits(assignVal, 21, bb);
-      } else
-        throw new RangeError("ECI assignment value out of range");
-      return new _QrSegment(_QrSegment.Mode.ECI, 0, bb);
-    }
-    static isNumeric(text) {
-      return _QrSegment.NUMERIC_REGEX.test(text);
-    }
-    static isAlphanumeric(text) {
-      return _QrSegment.ALPHANUMERIC_REGEX.test(text);
-    }
-    getData() {
-      return this.bitData.slice();
-    }
-    static getTotalBits(segs, version) {
-      let result = 0;
-      for (const seg of segs) {
-        const ccbits = seg.mode.numCharCountBits(version);
-        if (seg.numChars >= 1 << ccbits)
-          return Infinity;
-        result += 4 + ccbits + seg.bitData.length;
-      }
-      return result;
-    }
-    static toUtf8ByteArray(str) {
-      str = encodeURI(str);
-      let result = [];
-      for (let i = 0; i < str.length; i++) {
-        if (str.charAt(i) != "%")
-          result.push(str.charCodeAt(i));
-        else {
-          result.push(parseInt(str.substr(i + 1, 2), 16));
-          i += 2;
-        }
-      }
-      return result;
-    }
-  };
-  let QrSegment = _QrSegment;
-  QrSegment.NUMERIC_REGEX = /^[0-9]*$/;
-  QrSegment.ALPHANUMERIC_REGEX = /^[A-Z0-9 $%*+.\/:-]*$/;
-  QrSegment.ALPHANUMERIC_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
-  qrcodegen2.QrSegment = QrSegment;
-})(qrcodegen || (qrcodegen = {}));
-((qrcodegen2) => {
-  ((QrCode2) => {
-    const _Ecc = class {
-      constructor(ordinal, formatBits) {
-        this.ordinal = ordinal;
-        this.formatBits = formatBits;
-      }
-    };
-    let Ecc = _Ecc;
-    Ecc.LOW = new _Ecc(0, 1);
-    Ecc.MEDIUM = new _Ecc(1, 0);
-    Ecc.QUARTILE = new _Ecc(2, 3);
-    Ecc.HIGH = new _Ecc(3, 2);
-    QrCode2.Ecc = Ecc;
-  })(qrcodegen2.QrCode || (qrcodegen2.QrCode = {}));
-})(qrcodegen || (qrcodegen = {}));
-((qrcodegen2) => {
-  ((QrSegment2) => {
-    const _Mode = class {
-      constructor(modeBits, numBitsCharCount) {
-        this.modeBits = modeBits;
-        this.numBitsCharCount = numBitsCharCount;
-      }
-      numCharCountBits(ver) {
-        return this.numBitsCharCount[Math.floor((ver + 7) / 17)];
-      }
-    };
-    let Mode = _Mode;
-    Mode.NUMERIC = new _Mode(1, [10, 12, 14]);
-    Mode.ALPHANUMERIC = new _Mode(2, [9, 11, 13]);
-    Mode.BYTE = new _Mode(4, [8, 16, 16]);
-    Mode.KANJI = new _Mode(8, [8, 10, 12]);
-    Mode.ECI = new _Mode(7, [0, 0, 0]);
-    QrSegment2.Mode = Mode;
-  })(qrcodegen2.QrSegment || (qrcodegen2.QrSegment = {}));
-})(qrcodegen || (qrcodegen = {}));
-var qrcodegen_default = qrcodegen;
-
-// src/index.tsx
-/**
- * @license qrcode.react
- * Copyright (c) Paul O'Shannessy
- * SPDX-License-Identifier: ISC
- */
-var ERROR_LEVEL_MAP = {
-  L: qrcodegen_default.QrCode.Ecc.LOW,
-  M: qrcodegen_default.QrCode.Ecc.MEDIUM,
-  Q: qrcodegen_default.QrCode.Ecc.QUARTILE,
-  H: qrcodegen_default.QrCode.Ecc.HIGH
-};
-var DEFAULT_SIZE = 128;
-var DEFAULT_LEVEL = "L";
-var DEFAULT_BGCOLOR = "#FFFFFF";
-var DEFAULT_FGCOLOR = "#000000";
-var DEFAULT_INCLUDEMARGIN = false;
-var MARGIN_SIZE = 4;
-var DEFAULT_IMG_SCALE = 0.1;
-function generatePath(modules, margin = 0) {
-  const ops = [];
-  modules.forEach(function(row, y) {
-    let start = null;
-    row.forEach(function(cell, x) {
-      if (!cell && start !== null) {
-        ops.push(`M${start + margin} ${y + margin}h${x - start}v1H${start + margin}z`);
-        start = null;
-        return;
-      }
-      if (x === row.length - 1) {
-        if (!cell) {
-          return;
-        }
-        if (start === null) {
-          ops.push(`M${x + margin},${y + margin} h1v1H${x + margin}z`);
-        } else {
-          ops.push(`M${start + margin},${y + margin} h${x + 1 - start}v1H${start + margin}z`);
-        }
-        return;
-      }
-      if (cell && start === null) {
-        start = x;
-      }
-    });
-  });
-  return ops.join("");
-}
-function excavateModules(modules, excavation) {
-  return modules.slice().map((row, y) => {
-    if (y < excavation.y || y >= excavation.y + excavation.h) {
-      return row;
-    }
-    return row.map((cell, x) => {
-      if (x < excavation.x || x >= excavation.x + excavation.w) {
-        return cell;
-      }
-      return false;
-    });
-  });
-}
-function getImageSettings(cells, size, includeMargin, imageSettings) {
-  if (imageSettings == null) {
-    return null;
-  }
-  const margin = includeMargin ? MARGIN_SIZE : 0;
-  const numCells = cells.length + margin * 2;
-  const defaultSize = Math.floor(size * DEFAULT_IMG_SCALE);
-  const scale = numCells / size;
-  const w = (imageSettings.width || defaultSize) * scale;
-  const h = (imageSettings.height || defaultSize) * scale;
-  const x = imageSettings.x == null ? cells.length / 2 - w / 2 : imageSettings.x * scale;
-  const y = imageSettings.y == null ? cells.length / 2 - h / 2 : imageSettings.y * scale;
-  let excavation = null;
-  if (imageSettings.excavate) {
-    let floorX = Math.floor(x);
-    let floorY = Math.floor(y);
-    let ceilW = Math.ceil(w + x - floorX);
-    let ceilH = Math.ceil(h + y - floorY);
-    excavation = { x: floorX, y: floorY, w: ceilW, h: ceilH };
-  }
-  return { x, y, h, w, excavation };
-}
-(function() {
-  try {
-    new Path2D().addPath(new Path2D());
-  } catch (e) {
-    return false;
-  }
-  return true;
-})();
-function QRCodeSVG(props) {
-  const _a = props, {
-    value,
-    size = DEFAULT_SIZE,
-    level = DEFAULT_LEVEL,
-    bgColor = DEFAULT_BGCOLOR,
-    fgColor = DEFAULT_FGCOLOR,
-    includeMargin = DEFAULT_INCLUDEMARGIN,
-    imageSettings
-  } = _a, otherProps = __objRest(_a, [
-    "value",
-    "size",
-    "level",
-    "bgColor",
-    "fgColor",
-    "includeMargin",
-    "imageSettings"
-  ]);
-  let cells = qrcodegen_default.QrCode.encodeText(value, ERROR_LEVEL_MAP[level]).getModules();
-  const margin = includeMargin ? MARGIN_SIZE : 0;
-  const numCells = cells.length + margin * 2;
-  const calculatedImageSettings = getImageSettings(cells, size, includeMargin, imageSettings);
-  let image = null;
-  if (imageSettings != null && calculatedImageSettings != null) {
-    if (calculatedImageSettings.excavation != null) {
-      cells = excavateModules(cells, calculatedImageSettings.excavation);
-    }
-    image = /* @__PURE__ */ React.createElement("image", {
-      xlinkHref: imageSettings.src,
-      height: calculatedImageSettings.h,
-      width: calculatedImageSettings.w,
-      x: calculatedImageSettings.x + margin,
-      y: calculatedImageSettings.y + margin,
-      preserveAspectRatio: "none"
-    });
-  }
-  const fgPath = generatePath(cells, margin);
-  return /* @__PURE__ */ React.createElement("svg", __spreadValues({
-    height: size,
-    width: size,
-    viewBox: `0 0 ${numCells} ${numCells}`
-  }, otherProps), /* @__PURE__ */ React.createElement("path", {
-    fill: bgColor,
-    d: `M0,0 h${numCells}v${numCells}H0z`,
-    shapeRendering: "crispEdges"
-  }), /* @__PURE__ */ React.createElement("path", {
-    fill: fgColor,
-    d: fgPath,
-    shapeRendering: "crispEdges"
-  }), image);
-}
-
-class SyncService {
+const BRIDGE_SERVER_URL = "http://136.243.80.162:3030";
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH = 10;
+class DeviceTransferService {
   constructor() {
     this.socket = null;
-    this.serverUrl = "https://gravity-chat-serve.onrender.com";
+    this.sessionId = null;
+    this.sharedKey = null;
+    this.myKeyPair = null;
+    this.incomingPayloadResolver = null;
+    this.statusListener = null;
   }
-  // EXPORT FLOW (Sender)
-  async startExportSession(accounts, settings, onSuccess) {
-    const syncId = Math.random().toString(36).substring(2, 15);
-    const sessionKeyRaw = await window.crypto.subtle.generateKey(
-      { name: "AES-GCM", length: 256 },
-      true,
-      ["encrypt", "decrypt"]
-    );
-    const sessionKey = await exportKeyToBase64(sessionKeyRaw);
-    const payload = {
-      timestamp: Date.now(),
-      accounts,
-      settings: {
-        useGoogleAuth: settings?.useGoogleAuth,
-        useBiometrics: settings?.useBiometrics,
-        useDeviceAuth: settings?.useDeviceAuth,
-        useTOTP: settings?.useTOTP
-      }
-    };
-    const user = chatService.getCurrentUser();
-    const privat = await storageService.getItem("gravity_chat_key");
-    const publick = await storageService.getItem("gravity_chat_pub");
-    if (user && privat && publick) {
-      payload.chatIdentity = {
-        username: user.username,
-        id: user.id,
-        privateKey: privat,
-        publicKey: publick
-      };
+  onStatusChange(callback) {
+    this.statusListener = callback;
+  }
+  emitStatus(status, detail) {
+    this.statusListener?.(status, detail);
+  }
+  createSessionCode() {
+    const bytes = window.crypto.getRandomValues(new Uint8Array(CODE_LENGTH));
+    let result = "";
+    for (let index = 0; index < CODE_LENGTH; index += 1) {
+      result += CODE_ALPHABET[bytes[index] % CODE_ALPHABET.length];
     }
-    this.connect();
-    const onConnect = () => {
-      console.log("[SyncService] Export: Joining room", syncId);
-      this.socket?.emit("bridge_join", { sessionId: syncId });
-    };
-    if (this.socket?.connected) {
-      onConnect();
-    } else {
-      this.socket?.on("connect", onConnect);
-    }
-    const encryptedData = await this.encryptPayload(payload, sessionKeyRaw);
-    this.socket?.on("bridge_request", (_msg) => {
-      console.log("Sync peer detected. Sending payload...");
-      this.socket?.emit("bridge_response", { sessionId: syncId, encrypted: encryptedData });
-      if (onSuccess) onSuccess();
-      setTimeout(() => this.disconnect(), 5e3);
+    return result;
+  }
+  formatCode(code) {
+    const normalized = this.normalizeCode(code);
+    return normalized.replace(/(.{5})/g, "$1-").replace(/-$/, "");
+  }
+  normalizeCode(code) {
+    return String(code || "").toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, CODE_LENGTH);
+  }
+  ensureSocket() {
+    if (this.socket) return;
+    this.socket = lookup(BRIDGE_SERVER_URL, {
+      transports: ["polling", "websocket"],
+      autoConnect: true,
+      reconnectionAttempts: 5,
+      timeout: 1e4
     });
-    const qrData = `gravity:sync:${syncId}:${sessionKey}`;
-    return { syncId, sessionKey, qrData };
+    this.socket.on("connect", () => {
+      this.emitStatus(this.sharedKey ? "paired" : "connecting");
+    });
+    this.socket.on("connect_error", (err) => {
+      this.emitStatus("error", err.message || "Connection error");
+    });
+    this.socket.on("disconnect", (reason) => {
+      if (reason !== "io client disconnect") {
+        this.emitStatus("error", `Disconnected: ${reason}`);
+      }
+    });
+    this.socket.on("bridge_signer_ready", async (data) => {
+      if (!this.myKeyPair || !data?.publicKey) return;
+      try {
+        const remotePublicKey = await importKeyFromBase64(data.publicKey, "public");
+        this.sharedKey = await deriveSharedSecret(this.myKeyPair.privateKey, remotePublicKey);
+        this.emitStatus("paired");
+      } catch (error) {
+        this.emitStatus("error", error?.message || "Handshake failed");
+      }
+    });
+    this.socket.on("bridge_sync_accounts", async (data) => {
+      if (!this.sharedKey || !data?.encrypted) return;
+      try {
+        const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
+        const payload = JSON.parse(decrypted);
+        this.emitStatus("transferred");
+        this.incomingPayloadResolver?.(payload);
+        this.incomingPayloadResolver = null;
+      } catch (error) {
+        this.emitStatus("error", error?.message || "Import failed");
+      }
+    });
   }
-  // IMPORT FLOW (Receiver)
-  async startImportSession(qrCodeOrText) {
-    const parts = qrCodeOrText.trim().split(":");
-    if (parts[0] !== "gravity" || parts[1] !== "sync" || !parts[2] || !parts[3]) {
-      throw new Error("Invalid Sync Code Format");
-    }
-    const syncId = parts[2];
-    const keyB64 = parts[3];
-    const key = await this.importAesKey(keyB64);
-    this.connect();
+  async startReceiveSession() {
+    this.disconnect();
+    this.ensureSocket();
+    this.sessionId = this.createSessionCode();
+    this.myKeyPair = await generateEncryptionKeys();
+    this.sharedKey = null;
+    const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
+    this.emitStatus("waiting");
+    this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
+    return { code: this.formatCode(this.sessionId) };
+  }
+  async waitForIncomingPayload(timeoutMs = 5 * 60 * 1e3) {
     return new Promise((resolve, reject) => {
-      const onConnect = () => {
-        console.log("[SyncService] Import: Joining room", syncId);
-        this.socket?.emit("bridge_join", { sessionId: syncId });
-        setTimeout(() => {
-          console.log("[SyncService] Import: Sending bridge_request");
-          this.socket?.emit("bridge_request", { sessionId: syncId, encrypted: "HELO" });
-        }, 1500);
+      const timeoutId = window.setTimeout(() => {
+        this.incomingPayloadResolver = null;
+        reject(new Error("Transfer timed out"));
+      }, timeoutMs);
+      this.incomingPayloadResolver = (payload) => {
+        clearTimeout(timeoutId);
+        resolve(payload);
       };
-      if (this.socket?.connected) {
-        onConnect();
-      } else {
-        this.socket?.on("connect", onConnect);
-      }
-      this.socket?.on("bridge_response", async (msg) => {
-        console.log("[SyncService] Import: Received response!");
-        try {
-          const decrypted = await this.decryptPayload(msg.encrypted, key);
-          this.disconnect();
-          resolve(decrypted);
-        } catch (e) {
-          console.error("Sync decryption failed", e);
-          reject("Decryption Failed: Invalid Key or Data");
-        }
-      });
-      setTimeout(() => {
-        this.disconnect();
-        reject("Sync Timeout: No connection from peer.");
-      }, 6e4);
     });
   }
-  // UTILS
-  connect() {
-    if (this.socket) this.disconnect();
-    this.socket = lookup(this.serverUrl, { transports: ["websocket"] });
-    this.socket.on("connect", () => console.log("[SyncService] Socket Connected:", this.socket?.id));
-    this.socket.on("connect_error", (err) => console.error("[SyncService] Socket Connection Error:", err));
-    this.socket.on("disconnect", (reason) => console.log("[SyncService] Socket Disconnected:", reason));
+  async connectToSession(rawCode, timeoutMs = 3e4) {
+    const code = this.normalizeCode(rawCode);
+    if (code.length !== CODE_LENGTH) {
+      throw new Error("Invalid transfer code");
+    }
+    this.disconnect();
+    this.ensureSocket();
+    this.sessionId = code;
+    this.myKeyPair = await generateEncryptionKeys();
+    this.sharedKey = null;
+    const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
+    this.emitStatus("connecting");
+    const pairedPromise = new Promise((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        reject(new Error("Target device did not respond in time"));
+      }, timeoutMs);
+      const previousListener = this.statusListener;
+      this.statusListener = (status, detail) => {
+        previousListener?.(status, detail);
+        if (status === "paired") {
+          clearTimeout(timeoutId);
+          this.statusListener = previousListener;
+          resolve();
+        } else if (status === "error") {
+          clearTimeout(timeoutId);
+          this.statusListener = previousListener;
+          reject(new Error(detail || "Pairing failed"));
+        }
+      };
+    });
+    this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
+    await pairedPromise;
+  }
+  async sendPayload(payload) {
+    if (!this.socket || !this.sharedKey || !this.sessionId) {
+      throw new Error("Transfer session not ready");
+    }
+    const encrypted = await encryptMessage(JSON.stringify(payload), this.sharedKey);
+    this.socket.emit("bridge_sync_accounts", { sessionId: this.sessionId, encrypted });
+    this.emitStatus("transferred");
   }
   disconnect() {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
-  }
-  isConnected() {
-    return this.socket?.connected || false;
-  }
-  async importAesKey(b64) {
-    const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    return window.crypto.subtle.importKey("raw", raw, "AES-GCM", true, ["encrypt", "decrypt"]);
-  }
-  async encryptPayload(payload, key) {
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    const enc = new TextEncoder().encode(JSON.stringify(payload));
-    const encrypted = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc);
-    const bundle = new Uint8Array(iv.length + encrypted.byteLength);
-    bundle.set(iv, 0);
-    bundle.set(new Uint8Array(encrypted), 12);
-    return btoa(String.fromCharCode(...bundle));
-  }
-  async decryptPayload(b64, key) {
-    const data = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    const iv = data.slice(0, 12);
-    const ciphertext = data.slice(12);
-    const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-    return JSON.parse(new TextDecoder().decode(decrypted));
+    this.sessionId = null;
+    this.sharedKey = null;
+    this.myKeyPair = null;
+    this.incomingPayloadResolver = null;
+    this.emitStatus("idle");
   }
 }
-const syncService = new SyncService();
+const deviceTransferService = new DeviceTransferService();
 
 const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
-  const [qrData, setQrData] = reactExports.useState(null);
-  const [status, setStatus] = reactExports.useState("initializing");
-  const [copied, setCopied] = reactExports.useState(false);
+  const [pairCode, setPairCode] = reactExports.useState("");
+  const [status, setStatus] = reactExports.useState("idle");
   const [errorMsg, setErrorMsg] = reactExports.useState("");
-  const [socketConnected, setSocketConnected] = reactExports.useState(false);
   reactExports.useEffect(() => {
-    let mounted = true;
-    const start = async () => {
-      try {
-        const { qrData: qrData2 } = await syncService.startExportSession(
-          accounts,
-          walletConfig,
-          () => {
-            if (mounted) setStatus("synced");
-          }
-        );
-        if (mounted) {
-          setQrData(qrData2);
-          setStatus("ready");
-        }
-      } catch (e) {
-        console.error("Sync Export Error:", e);
-        if (mounted) {
-          setStatus("error");
-          setErrorMsg(e.message || String(e));
-        }
+    deviceTransferService.onStatusChange((nextStatus, detail) => {
+      if (nextStatus === "connecting" || nextStatus === "waiting") setStatus("connecting");
+      if (nextStatus === "paired") setStatus("paired");
+      if (nextStatus === "transferred") setStatus("sent");
+      if (nextStatus === "error") {
+        setStatus("error");
+        setErrorMsg(detail || "Transfer failed");
       }
-    };
-    start();
-    const interval = setInterval(() => {
-      setSocketConnected(syncService.isConnected());
-    }, 1e3);
+    });
     return () => {
-      mounted = false;
-      syncService.disconnect();
-      clearInterval(interval);
+      deviceTransferService.onStatusChange(null);
+      deviceTransferService.disconnect();
     };
   }, []);
-  const handleCopy = () => {
-    if (qrData) {
-      navigator.clipboard.writeText(qrData);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2e3);
+  const payloadSummary = reactExports.useMemo(() => {
+    return {
+      accountCount: accounts.length,
+      chatIdentity: !!localStorage.getItem("gravity_chat_registration"),
+      settingsCount: [
+        walletConfig?.useGoogleAuth,
+        walletConfig?.useBiometrics,
+        walletConfig?.useDeviceAuth,
+        walletConfig?.useTOTP
+      ].filter((value) => typeof value !== "undefined").length
+    };
+  }, [accounts, walletConfig]);
+  const buildPayload = async () => {
+    const payload = {
+      timestamp: Date.now(),
+      accounts,
+      settings: {
+        useGoogleAuth: walletConfig?.useGoogleAuth,
+        useBiometrics: walletConfig?.useBiometrics,
+        useDeviceAuth: walletConfig?.useDeviceAuth,
+        useTOTP: walletConfig?.useTOTP
+      }
+    };
+    const registrationRaw = localStorage.getItem("gravity_chat_registration");
+    const privateKey = await storageService.getItem("gravity_chat_key");
+    const publicKey = await storageService.getItem("gravity_chat_pub");
+    if (registrationRaw && privateKey && publicKey) {
+      try {
+        const registration = JSON.parse(registrationRaw);
+        if (registration?.username && registration?.id) {
+          payload.chatIdentity = {
+            username: registration.username,
+            id: registration.id,
+            privateKey,
+            publicKey
+          };
+        }
+      } catch (e) {
+      }
+    }
+    return payload;
+  };
+  const handleConnect = async () => {
+    setErrorMsg("");
+    setStatus("connecting");
+    try {
+      await deviceTransferService.connectToSession(pairCode);
+    } catch (e) {
+      setStatus("error");
+      setErrorMsg(e?.message || "Unable to pair with target device");
     }
   };
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative", children: [
+  const handleSend = async () => {
+    setErrorMsg("");
+    setStatus("sending");
+    try {
+      const payload = await buildPayload();
+      await deviceTransferService.sendPayload(payload);
+    } catch (e) {
+      setStatus("error");
+      setErrorMsg(e?.message || "Unable to send encrypted wallet");
+    }
+  };
+  const normalizedCode = deviceTransferService.normalizeCode(pairCode);
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn overflow-y-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar my-auto", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       "button",
       {
@@ -9800,64 +9122,112 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
         children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
       }
     ),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: "Sync to Mobile" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: "Scan with your mobile app to transfer your accounts." }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center justify-center space-y-6", children: [
-      status === "initializing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-48 h-48 flex items-center justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500" }) }),
-      status === "ready" && qrData && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white p-4 rounded-xl flex flex-col items-center", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(QRCodeSVG, { value: qrData, size: 192, level: "M" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `text-[10px] font-bold mt-2 flex items-center gap-1 ${socketConnected ? "text-green-600" : "text-orange-500"}`, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-2 h-2 rounded-full ${socketConnected ? "bg-green-500" : "bg-orange-500 animate-pulse"}` }),
-          socketConnected ? "Server Connected" : "Connecting to Server..."
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: "Send to Another Device" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: "Enter the pairing code shown on the destination device. Nothing is sent until you confirm it here." }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "input",
+        {
+          value: pairCode,
+          onChange: (event) => setPairCode(event.target.value.toUpperCase()),
+          placeholder: "ABCDE-FGHIJ",
+          autoCapitalize: "characters",
+          autoCorrect: "off",
+          spellCheck: false,
+          className: "w-full bg-dark-900 border border-dark-700 rounded-xl p-4 text-center text-lg tracking-[0.35em] font-mono text-slate-100 focus:border-purple-500 outline-none uppercase"
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900/70 border border-dark-700 rounded-2xl p-4 space-y-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between text-xs", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Accounts" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: payloadSummary.accountCount })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between text-xs", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Settings" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: payloadSummary.settingsCount ? "Included" : "Basic only" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between text-xs", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Chat identity" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: payloadSummary.chatIdentity ? "Included" : "Not found" })
         ] })
       ] }),
-      status === "synced" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-48 h-48 flex flex-col items-center justify-center text-green-400", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-20 h-20 mb-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-bold", children: "Sync Complete!" })
-      ] }),
-      status === "error" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-red-400 font-bold text-center", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Connection Error." }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] font-mono mt-2 bg-black/20 p-2 rounded max-w-[250px] break-words", children: errorMsg })
-      ] })
-    ] }),
-    status === "ready" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-6", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-center text-slate-500 mb-2 uppercase font-bold tracking-widest", children: "Or copy code manually" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
+      errorMsg && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-400 text-xs font-bold text-center", children: errorMsg }),
+      status === "idle" || status === "error" ? /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
-          onClick: handleCopy,
-          className: "w-full py-3 bg-dark-700 hover:bg-dark-600 rounded-xl font-mono text-xs text-purple-300 transition-all active:scale-95 flex items-center justify-center gap-2",
-          children: copied ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }) }),
-            "Copied!"
-          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" }) }),
-            "Copy Sync Code"
-          ] })
+          onClick: handleConnect,
+          disabled: normalizedCode.length !== 10,
+          className: `w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${normalizedCode.length !== 10 ? "bg-dark-700 text-slate-500" : "bg-purple-600 text-white shadow-lg active:scale-95"}`,
+          children: "Pair Devices"
         }
-      )
+      ) : null,
+      status === "connecting" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Waiting for secure handshake..." }),
+      status === "paired" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: handleSend,
+          className: "w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all bg-blue-600 text-white shadow-lg active:scale-95",
+          children: "Approve and Send"
+        }
+      ),
+      status === "sending" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Encrypting and sending wallet..." }),
+      status === "sent" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: "Transfer Complete" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 mt-1", children: "The destination device can import the wallet now." })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: "End-to-end encrypted manual transfer" })
     ] })
   ] }) });
 };
 
 const SyncImportModal = ({ onClose, onImport }) => {
-  const [code, setCode] = reactExports.useState("");
-  const [status, setStatus] = reactExports.useState("idle");
+  const [pairCode, setPairCode] = reactExports.useState("");
+  const [status, setStatus] = reactExports.useState("preparing");
   const [errorMsg, setErrorMsg] = reactExports.useState("");
-  const handleSync = async () => {
-    if (!code) return;
-    setStatus("syncing");
-    setErrorMsg("");
-    try {
-      const payload = await syncService.startImportSession(code);
-      await onImport(payload);
-      onClose();
-    } catch (e) {
-      setStatus("error");
-      setErrorMsg(e.message || "Sync Failed");
-    }
+  reactExports.useEffect(() => {
+    let mounted = true;
+    deviceTransferService.onStatusChange((nextStatus, detail) => {
+      if (!mounted) return;
+      if (nextStatus === "waiting") setStatus("waiting");
+      if (nextStatus === "paired") setStatus("waiting");
+      if (nextStatus === "error") {
+        setStatus("error");
+        setErrorMsg(detail || "Transfer failed");
+      }
+    });
+    const prepare = async () => {
+      try {
+        const { code } = await deviceTransferService.startReceiveSession();
+        if (!mounted) return;
+        setPairCode(code);
+        setStatus("waiting");
+        const payload = await deviceTransferService.waitForIncomingPayload();
+        if (!mounted) return;
+        setStatus("importing");
+        await onImport(payload);
+        if (!mounted) return;
+        setStatus("done");
+        setTimeout(() => {
+          if (mounted) onClose();
+        }, 900);
+      } catch (e) {
+        if (!mounted) return;
+        setStatus("error");
+        setErrorMsg(e?.message || "Unable to receive data");
+      }
+    };
+    prepare();
+    return () => {
+      mounted = false;
+      deviceTransferService.onStatusChange(null);
+      deviceTransferService.disconnect();
+    };
+  }, [onClose, onImport]);
+  const handleCopy = async () => {
+    if (!pairCode) return;
+    await navigator.clipboard.writeText(pairCode);
   };
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn overflow-y-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar my-auto", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       "button",
       {
@@ -9866,72 +9236,47 @@ const SyncImportModal = ({ onClose, onImport }) => {
         children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
       }
     ),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: "Import Sync Code" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: "Paste the sync code from the other device (Mobile/Desktop)." }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: "Receive from Another Device" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: "Open the source device, choose send, and enter this pairing code there." }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "textarea",
-        {
-          value: code,
-          onChange: (e) => setCode(e.target.value),
-          placeholder: "Paste gravity:sync:... code here",
-          className: "w-full bg-dark-900 border border-dark-700 rounded-xl p-4 text-xs font-mono text-slate-200 focus:border-purple-500 outline-none h-24 resize-none"
-        }
-      ),
-      errorMsg && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-400 text-xs font-bold text-center", children: errorMsg }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full bg-dark-900 border border-dark-700 rounded-2xl p-5 text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] uppercase tracking-[0.28em] font-black text-slate-500 mb-3", children: "Pairing code" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-2xl font-mono tracking-[0.32em] text-white select-all", children: pairCode || "----- -----" })
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
-          onClick: handleSync,
-          disabled: !code || status === "syncing",
-          className: `w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${!code || status === "syncing" ? "bg-dark-700 text-slate-500" : "bg-purple-600 text-white shadow-lg active:scale-95"}`,
-          children: status === "syncing" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Connecting..." }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[8px] opacity-70 normal-case mt-1", children: "Keep Desktop Export screen OPEN" })
-          ] }) : "Start Sync"
+          onClick: handleCopy,
+          disabled: !pairCode,
+          className: "w-full py-3 bg-dark-700 hover:bg-dark-600 rounded-xl font-mono text-xs text-purple-300 transition-all active:scale-95",
+          children: "Copy Code"
         }
       ),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: "Secure End-to-End Encrypted Transfer" })
+      status === "preparing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Preparing secure session..." }),
+      status === "waiting" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Waiting for source device..." }),
+      status === "importing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Receiving and importing encrypted wallet..." }),
+      status === "done" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: "Import Complete" }) }),
+      status === "error" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-red-400 uppercase tracking-widest text-sm", children: "Transfer Error" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 mt-1", children: errorMsg })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: "This device never exposes the private data in plain text." })
     ] })
   ] }) });
 };
 
-const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport }) => {
+const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport, onSyncImport }) => {
   const { t } = useTranslation();
   const [showTOTP, setShowTOTP] = reactExports.useState(false);
   const [showBio, setShowBio] = reactExports.useState(false);
   const [showSyncExport, setShowSyncExport] = reactExports.useState(false);
   const [showSyncImport, setShowSyncImport] = reactExports.useState(false);
-  const handleSyncImport = async (payload) => {
-    const mergedAccounts = [...walletState.accounts];
-    let added = 0;
-    payload.accounts.forEach((acc) => {
-      if (!mergedAccounts.find((a) => a.name === acc.name && a.chain === acc.chain)) {
-        mergedAccounts.push(acc);
-        added++;
-      }
-    });
-    const newConfig = { ...walletState };
-    if (payload.settings) {
-      if (payload.settings.useGoogleAuth !== void 0) newConfig.useGoogleAuth = payload.settings.useGoogleAuth;
-      if (payload.settings.useBiometrics !== void 0) newConfig.useBiometrics = payload.settings.useBiometrics;
-      if (payload.settings.useDeviceAuth !== void 0) newConfig.useDeviceAuth = payload.settings.useDeviceAuth;
-      if (payload.settings.useTOTP !== void 0) newConfig.useTOTP = payload.settings.useTOTP;
-    }
-    setWalletState({ ...newConfig, accounts: mergedAccounts });
-    if (payload.chatIdentity) {
-      await storageService.setItem("gravity_chat_key", payload.chatIdentity.privateKey);
-      await storageService.setItem("gravity_chat_pub", payload.chatIdentity.publicKey);
-      localStorage.setItem("gravity_chat_username", payload.chatIdentity.username);
-      localStorage.setItem("gravity_chat_registration", JSON.stringify({
-        id: payload.chatIdentity.id,
-        username: payload.chatIdentity.username,
-        timestamp: payload.timestamp
-      }));
-    }
-    alert(`Sync Successful! Added ${added} new accounts.`);
+  const chainCounts = {
+    hive: accounts.filter((account) => account.chain === Chain.HIVE).length,
+    blurt: accounts.filter((account) => account.chain === Chain.BLURT).length,
+    steem: accounts.filter((account) => account.chain === Chain.STEEM).length
   };
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full space-y-4", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full overflow-y-auto custom-scrollbar p-4 space-y-4", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center p-4 border-b border-dark-700", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-lg font-bold", children: t("settings.accounts_title") }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -9943,102 +9288,118 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
         }
       )
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3", children: accounts.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-center text-slate-500 py-10", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: t("settings.no_accounts") }) }) : accounts.map((acc, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-lg p-3 flex justify-between items-center group hover:border-dark-600", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-2 h-8 rounded-full ${acc.chain === Chain.HIVE ? "bg-hive" : acc.chain === Chain.STEEM ? "bg-steem" : "bg-blurt"}` }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("h3", { className: "font-bold text-sm text-slate-200", children: [
-            "@",
-            acc.name
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start justify-between gap-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-white", children: "Wallet Overview" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-500 mt-1", children: "Use this screen for security settings and device transfer. Manage individual accounts from the wallet view." })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 text-[10px] text-slate-500 uppercase tracking-wider", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: acc.chain }),
-            acc.activeKey && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-500", children: "• Active" }),
-            acc.postingKey && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-500", children: "• Posting" })
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-right", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-2xl font-black text-white", children: accounts.length }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] uppercase tracking-widest text-slate-500", children: "Accounts" })
           ] })
-        ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-3 mt-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900/70 border border-dark-700 rounded-xl p-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] uppercase tracking-widest text-slate-500", children: "Hive" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-lg font-black text-white mt-1", children: chainCounts.hive })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900/70 border border-dark-700 rounded-xl p-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] uppercase tracking-widest text-slate-500", children: "Blurt" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-lg font-black text-white mt-1", children: chainCounts.blurt })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900/70 border border-dark-700 rounded-xl p-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] uppercase tracking-widest text-slate-500", children: "Steem" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-lg font-black text-white mt-1", children: chainCounts.steem })
+          ] })
+        ] }),
+        accounts.length > 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => onEdit(accounts[0]),
+            className: "mt-4 w-full bg-dark-900 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center justify-between transition-all",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-bold", children: "Open account manager" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 5l7 7-7 7" }) })
+            ]
+          }
+        ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-4 text-center text-slate-500 py-4 text-sm", children: t("settings.no_accounts") })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "button",
-        {
-          onClick: () => onEdit(acc),
-          className: "p-2 hover:bg-dark-700 rounded-lg text-slate-500 hover:text-white transition-colors",
-          children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" }) })
-        }
-      )
-    ] }, `${acc.chain}-${acc.name}-${idx}`)) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 pt-2 border-t border-dark-700 mt-auto space-y-3", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: "Cross-Device Sync" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 border-t border-dark-700 space-y-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: "Pair Another Device" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 -mt-1 mb-2", children: "Use one device to show a pairing code and the other to send the encrypted wallet." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              onClick: () => setShowSyncExport(true),
+              className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" }) }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: "Send Wallet" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              onClick: () => setShowSyncImport(true),
+              className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }) }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: "Show Pair Code" })
+              ]
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1 mt-4", children: "Security" }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
           "button",
           {
-            onClick: () => setShowSyncExport(true),
-            className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
+            onClick: () => setShowTOTP(true),
+            className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
             children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" }) }) }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: "Export" })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Authenticator App (2FA)" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Enable Aegis, Google Auth, or Authy" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useTOTP ? "bg-green-500/20 text-green-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useTOTP ? "Enabled" : "Off" })
             ]
           }
         ),
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
           "button",
           {
-            onClick: () => setShowSyncImport(true),
-            className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
+            onClick: () => setWalletState((prev) => ({ ...prev, useDeviceAuth: !prev.useDeviceAuth })),
+            className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
             children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }) }) }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: "Import" })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" }) }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Device Auth" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Persistent secure device key" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useDeviceAuth ? "bg-blue-500/20 text-blue-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useDeviceAuth ? "Enabled" : "Off" })
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => setShowBio(true),
+            className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:bg-rose-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147l.156-.471m-1.284 8.761a20.003 20.003 0 007.544 6.799" }) }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Fingerprint / FaceID" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Fast biometric unlock" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useBiometrics ? "bg-green-500/20 text-green-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useBiometrics ? "Enabled" : "Off" })
             ]
           }
         )
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1 mt-4", children: "Security" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "button",
-        {
-          onClick: () => setShowTOTP(true),
-          className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" }) }) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Authenticator App (2FA)" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Enable Aegis, Google Auth, or Authy" })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useTOTP ? "bg-green-500/20 text-green-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useTOTP ? "Enabled" : "Off" })
-          ]
-        }
-      ),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "button",
-        {
-          onClick: () => setWalletState((prev) => ({ ...prev, useDeviceAuth: !prev.useDeviceAuth })),
-          className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" }) }) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Device Auth" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Persistent secure device key" })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useDeviceAuth ? "bg-blue-500/20 text-blue-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useDeviceAuth ? "Enabled" : "Off" })
-          ]
-        }
-      ),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "button",
-        {
-          onClick: () => setShowBio(true),
-          className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all text-left group",
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:bg-rose-500/20 transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.2-2.85.577-4.147l.156-.471m-1.284 8.761a20.003 20.003 0 007.544 6.799" }) }) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm", children: "Fingerprint / FaceID" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500", children: "Fast biometric unlock" })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-2 py-0.5 rounded text-[8px] font-black uppercase ${walletState.useBiometrics ? "bg-green-500/20 text-green-500" : "bg-slate-700 text-slate-400"}`, children: walletState.useBiometrics ? "Enabled" : "Off" })
-          ]
-        }
-      )
+      ] })
     ] }),
     showTOTP && /* @__PURE__ */ jsxRuntimeExports.jsx(
       TOTPSetupModal,
@@ -10070,7 +9431,7 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
       SyncImportModal,
       {
         onClose: () => setShowSyncImport(false),
-        onImport: handleSyncImport
+        onImport: onSyncImport
       }
     )
   ] });
@@ -14690,6 +14051,770 @@ const ChatView = ({ onClose }) => {
   ] });
 };
 
+var __defProp = Object.defineProperty;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __objRest = (source, exclude) => {
+  var target = {};
+  for (var prop in source)
+    if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+      target[prop] = source[prop];
+  if (source != null && __getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(source)) {
+      if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+        target[prop] = source[prop];
+    }
+  return target;
+};
+
+// src/third-party/qrcodegen/index.ts
+/**
+ * @license QR Code generator library (TypeScript)
+ * Copyright (c) Project Nayuki.
+ * SPDX-License-Identifier: MIT
+ */
+var qrcodegen;
+((qrcodegen2) => {
+  const _QrCode = class {
+    constructor(version, errorCorrectionLevel, dataCodewords, msk) {
+      this.version = version;
+      this.errorCorrectionLevel = errorCorrectionLevel;
+      this.modules = [];
+      this.isFunction = [];
+      if (version < _QrCode.MIN_VERSION || version > _QrCode.MAX_VERSION)
+        throw new RangeError("Version value out of range");
+      if (msk < -1 || msk > 7)
+        throw new RangeError("Mask value out of range");
+      this.size = version * 4 + 17;
+      let row = [];
+      for (let i = 0; i < this.size; i++)
+        row.push(false);
+      for (let i = 0; i < this.size; i++) {
+        this.modules.push(row.slice());
+        this.isFunction.push(row.slice());
+      }
+      this.drawFunctionPatterns();
+      const allCodewords = this.addEccAndInterleave(dataCodewords);
+      this.drawCodewords(allCodewords);
+      if (msk == -1) {
+        let minPenalty = 1e9;
+        for (let i = 0; i < 8; i++) {
+          this.applyMask(i);
+          this.drawFormatBits(i);
+          const penalty = this.getPenaltyScore();
+          if (penalty < minPenalty) {
+            msk = i;
+            minPenalty = penalty;
+          }
+          this.applyMask(i);
+        }
+      }
+      assert(0 <= msk && msk <= 7);
+      this.mask = msk;
+      this.applyMask(msk);
+      this.drawFormatBits(msk);
+      this.isFunction = [];
+    }
+    static encodeText(text, ecl) {
+      const segs = qrcodegen2.QrSegment.makeSegments(text);
+      return _QrCode.encodeSegments(segs, ecl);
+    }
+    static encodeBinary(data, ecl) {
+      const seg = qrcodegen2.QrSegment.makeBytes(data);
+      return _QrCode.encodeSegments([seg], ecl);
+    }
+    static encodeSegments(segs, ecl, minVersion = 1, maxVersion = 40, mask = -1, boostEcl = true) {
+      if (!(_QrCode.MIN_VERSION <= minVersion && minVersion <= maxVersion && maxVersion <= _QrCode.MAX_VERSION) || mask < -1 || mask > 7)
+        throw new RangeError("Invalid value");
+      let version;
+      let dataUsedBits;
+      for (version = minVersion; ; version++) {
+        const dataCapacityBits2 = _QrCode.getNumDataCodewords(version, ecl) * 8;
+        const usedBits = QrSegment.getTotalBits(segs, version);
+        if (usedBits <= dataCapacityBits2) {
+          dataUsedBits = usedBits;
+          break;
+        }
+        if (version >= maxVersion)
+          throw new RangeError("Data too long");
+      }
+      for (const newEcl of [_QrCode.Ecc.MEDIUM, _QrCode.Ecc.QUARTILE, _QrCode.Ecc.HIGH]) {
+        if (boostEcl && dataUsedBits <= _QrCode.getNumDataCodewords(version, newEcl) * 8)
+          ecl = newEcl;
+      }
+      let bb = [];
+      for (const seg of segs) {
+        appendBits(seg.mode.modeBits, 4, bb);
+        appendBits(seg.numChars, seg.mode.numCharCountBits(version), bb);
+        for (const b of seg.getData())
+          bb.push(b);
+      }
+      assert(bb.length == dataUsedBits);
+      const dataCapacityBits = _QrCode.getNumDataCodewords(version, ecl) * 8;
+      assert(bb.length <= dataCapacityBits);
+      appendBits(0, Math.min(4, dataCapacityBits - bb.length), bb);
+      appendBits(0, (8 - bb.length % 8) % 8, bb);
+      assert(bb.length % 8 == 0);
+      for (let padByte = 236; bb.length < dataCapacityBits; padByte ^= 236 ^ 17)
+        appendBits(padByte, 8, bb);
+      let dataCodewords = [];
+      while (dataCodewords.length * 8 < bb.length)
+        dataCodewords.push(0);
+      bb.forEach((b, i) => dataCodewords[i >>> 3] |= b << 7 - (i & 7));
+      return new _QrCode(version, ecl, dataCodewords, mask);
+    }
+    getModule(x, y) {
+      return 0 <= x && x < this.size && 0 <= y && y < this.size && this.modules[y][x];
+    }
+    getModules() {
+      return this.modules;
+    }
+    drawFunctionPatterns() {
+      for (let i = 0; i < this.size; i++) {
+        this.setFunctionModule(6, i, i % 2 == 0);
+        this.setFunctionModule(i, 6, i % 2 == 0);
+      }
+      this.drawFinderPattern(3, 3);
+      this.drawFinderPattern(this.size - 4, 3);
+      this.drawFinderPattern(3, this.size - 4);
+      const alignPatPos = this.getAlignmentPatternPositions();
+      const numAlign = alignPatPos.length;
+      for (let i = 0; i < numAlign; i++) {
+        for (let j = 0; j < numAlign; j++) {
+          if (!(i == 0 && j == 0 || i == 0 && j == numAlign - 1 || i == numAlign - 1 && j == 0))
+            this.drawAlignmentPattern(alignPatPos[i], alignPatPos[j]);
+        }
+      }
+      this.drawFormatBits(0);
+      this.drawVersion();
+    }
+    drawFormatBits(mask) {
+      const data = this.errorCorrectionLevel.formatBits << 3 | mask;
+      let rem = data;
+      for (let i = 0; i < 10; i++)
+        rem = rem << 1 ^ (rem >>> 9) * 1335;
+      const bits = (data << 10 | rem) ^ 21522;
+      assert(bits >>> 15 == 0);
+      for (let i = 0; i <= 5; i++)
+        this.setFunctionModule(8, i, getBit(bits, i));
+      this.setFunctionModule(8, 7, getBit(bits, 6));
+      this.setFunctionModule(8, 8, getBit(bits, 7));
+      this.setFunctionModule(7, 8, getBit(bits, 8));
+      for (let i = 9; i < 15; i++)
+        this.setFunctionModule(14 - i, 8, getBit(bits, i));
+      for (let i = 0; i < 8; i++)
+        this.setFunctionModule(this.size - 1 - i, 8, getBit(bits, i));
+      for (let i = 8; i < 15; i++)
+        this.setFunctionModule(8, this.size - 15 + i, getBit(bits, i));
+      this.setFunctionModule(8, this.size - 8, true);
+    }
+    drawVersion() {
+      if (this.version < 7)
+        return;
+      let rem = this.version;
+      for (let i = 0; i < 12; i++)
+        rem = rem << 1 ^ (rem >>> 11) * 7973;
+      const bits = this.version << 12 | rem;
+      assert(bits >>> 18 == 0);
+      for (let i = 0; i < 18; i++) {
+        const color = getBit(bits, i);
+        const a = this.size - 11 + i % 3;
+        const b = Math.floor(i / 3);
+        this.setFunctionModule(a, b, color);
+        this.setFunctionModule(b, a, color);
+      }
+    }
+    drawFinderPattern(x, y) {
+      for (let dy = -4; dy <= 4; dy++) {
+        for (let dx = -4; dx <= 4; dx++) {
+          const dist = Math.max(Math.abs(dx), Math.abs(dy));
+          const xx = x + dx;
+          const yy = y + dy;
+          if (0 <= xx && xx < this.size && 0 <= yy && yy < this.size)
+            this.setFunctionModule(xx, yy, dist != 2 && dist != 4);
+        }
+      }
+    }
+    drawAlignmentPattern(x, y) {
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++)
+          this.setFunctionModule(x + dx, y + dy, Math.max(Math.abs(dx), Math.abs(dy)) != 1);
+      }
+    }
+    setFunctionModule(x, y, isDark) {
+      this.modules[y][x] = isDark;
+      this.isFunction[y][x] = true;
+    }
+    addEccAndInterleave(data) {
+      const ver = this.version;
+      const ecl = this.errorCorrectionLevel;
+      if (data.length != _QrCode.getNumDataCodewords(ver, ecl))
+        throw new RangeError("Invalid argument");
+      const numBlocks = _QrCode.NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
+      const blockEccLen = _QrCode.ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver];
+      const rawCodewords = Math.floor(_QrCode.getNumRawDataModules(ver) / 8);
+      const numShortBlocks = numBlocks - rawCodewords % numBlocks;
+      const shortBlockLen = Math.floor(rawCodewords / numBlocks);
+      let blocks = [];
+      const rsDiv = _QrCode.reedSolomonComputeDivisor(blockEccLen);
+      for (let i = 0, k = 0; i < numBlocks; i++) {
+        let dat = data.slice(k, k + shortBlockLen - blockEccLen + (i < numShortBlocks ? 0 : 1));
+        k += dat.length;
+        const ecc = _QrCode.reedSolomonComputeRemainder(dat, rsDiv);
+        if (i < numShortBlocks)
+          dat.push(0);
+        blocks.push(dat.concat(ecc));
+      }
+      let result = [];
+      for (let i = 0; i < blocks[0].length; i++) {
+        blocks.forEach((block, j) => {
+          if (i != shortBlockLen - blockEccLen || j >= numShortBlocks)
+            result.push(block[i]);
+        });
+      }
+      assert(result.length == rawCodewords);
+      return result;
+    }
+    drawCodewords(data) {
+      if (data.length != Math.floor(_QrCode.getNumRawDataModules(this.version) / 8))
+        throw new RangeError("Invalid argument");
+      let i = 0;
+      for (let right = this.size - 1; right >= 1; right -= 2) {
+        if (right == 6)
+          right = 5;
+        for (let vert = 0; vert < this.size; vert++) {
+          for (let j = 0; j < 2; j++) {
+            const x = right - j;
+            const upward = (right + 1 & 2) == 0;
+            const y = upward ? this.size - 1 - vert : vert;
+            if (!this.isFunction[y][x] && i < data.length * 8) {
+              this.modules[y][x] = getBit(data[i >>> 3], 7 - (i & 7));
+              i++;
+            }
+          }
+        }
+      }
+      assert(i == data.length * 8);
+    }
+    applyMask(mask) {
+      if (mask < 0 || mask > 7)
+        throw new RangeError("Mask value out of range");
+      for (let y = 0; y < this.size; y++) {
+        for (let x = 0; x < this.size; x++) {
+          let invert;
+          switch (mask) {
+            case 0:
+              invert = (x + y) % 2 == 0;
+              break;
+            case 1:
+              invert = y % 2 == 0;
+              break;
+            case 2:
+              invert = x % 3 == 0;
+              break;
+            case 3:
+              invert = (x + y) % 3 == 0;
+              break;
+            case 4:
+              invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 == 0;
+              break;
+            case 5:
+              invert = x * y % 2 + x * y % 3 == 0;
+              break;
+            case 6:
+              invert = (x * y % 2 + x * y % 3) % 2 == 0;
+              break;
+            case 7:
+              invert = ((x + y) % 2 + x * y % 3) % 2 == 0;
+              break;
+            default:
+              throw new Error("Unreachable");
+          }
+          if (!this.isFunction[y][x] && invert)
+            this.modules[y][x] = !this.modules[y][x];
+        }
+      }
+    }
+    getPenaltyScore() {
+      let result = 0;
+      for (let y = 0; y < this.size; y++) {
+        let runColor = false;
+        let runX = 0;
+        let runHistory = [0, 0, 0, 0, 0, 0, 0];
+        for (let x = 0; x < this.size; x++) {
+          if (this.modules[y][x] == runColor) {
+            runX++;
+            if (runX == 5)
+              result += _QrCode.PENALTY_N1;
+            else if (runX > 5)
+              result++;
+          } else {
+            this.finderPenaltyAddHistory(runX, runHistory);
+            if (!runColor)
+              result += this.finderPenaltyCountPatterns(runHistory) * _QrCode.PENALTY_N3;
+            runColor = this.modules[y][x];
+            runX = 1;
+          }
+        }
+        result += this.finderPenaltyTerminateAndCount(runColor, runX, runHistory) * _QrCode.PENALTY_N3;
+      }
+      for (let x = 0; x < this.size; x++) {
+        let runColor = false;
+        let runY = 0;
+        let runHistory = [0, 0, 0, 0, 0, 0, 0];
+        for (let y = 0; y < this.size; y++) {
+          if (this.modules[y][x] == runColor) {
+            runY++;
+            if (runY == 5)
+              result += _QrCode.PENALTY_N1;
+            else if (runY > 5)
+              result++;
+          } else {
+            this.finderPenaltyAddHistory(runY, runHistory);
+            if (!runColor)
+              result += this.finderPenaltyCountPatterns(runHistory) * _QrCode.PENALTY_N3;
+            runColor = this.modules[y][x];
+            runY = 1;
+          }
+        }
+        result += this.finderPenaltyTerminateAndCount(runColor, runY, runHistory) * _QrCode.PENALTY_N3;
+      }
+      for (let y = 0; y < this.size - 1; y++) {
+        for (let x = 0; x < this.size - 1; x++) {
+          const color = this.modules[y][x];
+          if (color == this.modules[y][x + 1] && color == this.modules[y + 1][x] && color == this.modules[y + 1][x + 1])
+            result += _QrCode.PENALTY_N2;
+        }
+      }
+      let dark = 0;
+      for (const row of this.modules)
+        dark = row.reduce((sum, color) => sum + (color ? 1 : 0), dark);
+      const total = this.size * this.size;
+      const k = Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1;
+      assert(0 <= k && k <= 9);
+      result += k * _QrCode.PENALTY_N4;
+      assert(0 <= result && result <= 2568888);
+      return result;
+    }
+    getAlignmentPatternPositions() {
+      if (this.version == 1)
+        return [];
+      else {
+        const numAlign = Math.floor(this.version / 7) + 2;
+        const step = this.version == 32 ? 26 : Math.ceil((this.version * 4 + 4) / (numAlign * 2 - 2)) * 2;
+        let result = [6];
+        for (let pos = this.size - 7; result.length < numAlign; pos -= step)
+          result.splice(1, 0, pos);
+        return result;
+      }
+    }
+    static getNumRawDataModules(ver) {
+      if (ver < _QrCode.MIN_VERSION || ver > _QrCode.MAX_VERSION)
+        throw new RangeError("Version number out of range");
+      let result = (16 * ver + 128) * ver + 64;
+      if (ver >= 2) {
+        const numAlign = Math.floor(ver / 7) + 2;
+        result -= (25 * numAlign - 10) * numAlign - 55;
+        if (ver >= 7)
+          result -= 36;
+      }
+      assert(208 <= result && result <= 29648);
+      return result;
+    }
+    static getNumDataCodewords(ver, ecl) {
+      return Math.floor(_QrCode.getNumRawDataModules(ver) / 8) - _QrCode.ECC_CODEWORDS_PER_BLOCK[ecl.ordinal][ver] * _QrCode.NUM_ERROR_CORRECTION_BLOCKS[ecl.ordinal][ver];
+    }
+    static reedSolomonComputeDivisor(degree) {
+      if (degree < 1 || degree > 255)
+        throw new RangeError("Degree out of range");
+      let result = [];
+      for (let i = 0; i < degree - 1; i++)
+        result.push(0);
+      result.push(1);
+      let root = 1;
+      for (let i = 0; i < degree; i++) {
+        for (let j = 0; j < result.length; j++) {
+          result[j] = _QrCode.reedSolomonMultiply(result[j], root);
+          if (j + 1 < result.length)
+            result[j] ^= result[j + 1];
+        }
+        root = _QrCode.reedSolomonMultiply(root, 2);
+      }
+      return result;
+    }
+    static reedSolomonComputeRemainder(data, divisor) {
+      let result = divisor.map((_) => 0);
+      for (const b of data) {
+        const factor = b ^ result.shift();
+        result.push(0);
+        divisor.forEach((coef, i) => result[i] ^= _QrCode.reedSolomonMultiply(coef, factor));
+      }
+      return result;
+    }
+    static reedSolomonMultiply(x, y) {
+      if (x >>> 8 != 0 || y >>> 8 != 0)
+        throw new RangeError("Byte out of range");
+      let z = 0;
+      for (let i = 7; i >= 0; i--) {
+        z = z << 1 ^ (z >>> 7) * 285;
+        z ^= (y >>> i & 1) * x;
+      }
+      assert(z >>> 8 == 0);
+      return z;
+    }
+    finderPenaltyCountPatterns(runHistory) {
+      const n = runHistory[1];
+      assert(n <= this.size * 3);
+      const core = n > 0 && runHistory[2] == n && runHistory[3] == n * 3 && runHistory[4] == n && runHistory[5] == n;
+      return (core && runHistory[0] >= n * 4 && runHistory[6] >= n ? 1 : 0) + (core && runHistory[6] >= n * 4 && runHistory[0] >= n ? 1 : 0);
+    }
+    finderPenaltyTerminateAndCount(currentRunColor, currentRunLength, runHistory) {
+      if (currentRunColor) {
+        this.finderPenaltyAddHistory(currentRunLength, runHistory);
+        currentRunLength = 0;
+      }
+      currentRunLength += this.size;
+      this.finderPenaltyAddHistory(currentRunLength, runHistory);
+      return this.finderPenaltyCountPatterns(runHistory);
+    }
+    finderPenaltyAddHistory(currentRunLength, runHistory) {
+      if (runHistory[0] == 0)
+        currentRunLength += this.size;
+      runHistory.pop();
+      runHistory.unshift(currentRunLength);
+    }
+  };
+  let QrCode = _QrCode;
+  QrCode.MIN_VERSION = 1;
+  QrCode.MAX_VERSION = 40;
+  QrCode.PENALTY_N1 = 3;
+  QrCode.PENALTY_N2 = 3;
+  QrCode.PENALTY_N3 = 40;
+  QrCode.PENALTY_N4 = 10;
+  QrCode.ECC_CODEWORDS_PER_BLOCK = [
+    [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+    [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
+  ];
+  QrCode.NUM_ERROR_CORRECTION_BLOCKS = [
+    [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+    [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+    [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+    [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81]
+  ];
+  qrcodegen2.QrCode = QrCode;
+  function appendBits(val, len, bb) {
+    if (len < 0 || len > 31 || val >>> len != 0)
+      throw new RangeError("Value out of range");
+    for (let i = len - 1; i >= 0; i--)
+      bb.push(val >>> i & 1);
+  }
+  function getBit(x, i) {
+    return (x >>> i & 1) != 0;
+  }
+  function assert(cond) {
+    if (!cond)
+      throw new Error("Assertion error");
+  }
+  const _QrSegment = class {
+    constructor(mode, numChars, bitData) {
+      this.mode = mode;
+      this.numChars = numChars;
+      this.bitData = bitData;
+      if (numChars < 0)
+        throw new RangeError("Invalid argument");
+      this.bitData = bitData.slice();
+    }
+    static makeBytes(data) {
+      let bb = [];
+      for (const b of data)
+        appendBits(b, 8, bb);
+      return new _QrSegment(_QrSegment.Mode.BYTE, data.length, bb);
+    }
+    static makeNumeric(digits) {
+      if (!_QrSegment.isNumeric(digits))
+        throw new RangeError("String contains non-numeric characters");
+      let bb = [];
+      for (let i = 0; i < digits.length; ) {
+        const n = Math.min(digits.length - i, 3);
+        appendBits(parseInt(digits.substr(i, n), 10), n * 3 + 1, bb);
+        i += n;
+      }
+      return new _QrSegment(_QrSegment.Mode.NUMERIC, digits.length, bb);
+    }
+    static makeAlphanumeric(text) {
+      if (!_QrSegment.isAlphanumeric(text))
+        throw new RangeError("String contains unencodable characters in alphanumeric mode");
+      let bb = [];
+      let i;
+      for (i = 0; i + 2 <= text.length; i += 2) {
+        let temp = _QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)) * 45;
+        temp += _QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i + 1));
+        appendBits(temp, 11, bb);
+      }
+      if (i < text.length)
+        appendBits(_QrSegment.ALPHANUMERIC_CHARSET.indexOf(text.charAt(i)), 6, bb);
+      return new _QrSegment(_QrSegment.Mode.ALPHANUMERIC, text.length, bb);
+    }
+    static makeSegments(text) {
+      if (text == "")
+        return [];
+      else if (_QrSegment.isNumeric(text))
+        return [_QrSegment.makeNumeric(text)];
+      else if (_QrSegment.isAlphanumeric(text))
+        return [_QrSegment.makeAlphanumeric(text)];
+      else
+        return [_QrSegment.makeBytes(_QrSegment.toUtf8ByteArray(text))];
+    }
+    static makeEci(assignVal) {
+      let bb = [];
+      if (assignVal < 0)
+        throw new RangeError("ECI assignment value out of range");
+      else if (assignVal < 1 << 7)
+        appendBits(assignVal, 8, bb);
+      else if (assignVal < 1 << 14) {
+        appendBits(2, 2, bb);
+        appendBits(assignVal, 14, bb);
+      } else if (assignVal < 1e6) {
+        appendBits(6, 3, bb);
+        appendBits(assignVal, 21, bb);
+      } else
+        throw new RangeError("ECI assignment value out of range");
+      return new _QrSegment(_QrSegment.Mode.ECI, 0, bb);
+    }
+    static isNumeric(text) {
+      return _QrSegment.NUMERIC_REGEX.test(text);
+    }
+    static isAlphanumeric(text) {
+      return _QrSegment.ALPHANUMERIC_REGEX.test(text);
+    }
+    getData() {
+      return this.bitData.slice();
+    }
+    static getTotalBits(segs, version) {
+      let result = 0;
+      for (const seg of segs) {
+        const ccbits = seg.mode.numCharCountBits(version);
+        if (seg.numChars >= 1 << ccbits)
+          return Infinity;
+        result += 4 + ccbits + seg.bitData.length;
+      }
+      return result;
+    }
+    static toUtf8ByteArray(str) {
+      str = encodeURI(str);
+      let result = [];
+      for (let i = 0; i < str.length; i++) {
+        if (str.charAt(i) != "%")
+          result.push(str.charCodeAt(i));
+        else {
+          result.push(parseInt(str.substr(i + 1, 2), 16));
+          i += 2;
+        }
+      }
+      return result;
+    }
+  };
+  let QrSegment = _QrSegment;
+  QrSegment.NUMERIC_REGEX = /^[0-9]*$/;
+  QrSegment.ALPHANUMERIC_REGEX = /^[A-Z0-9 $%*+.\/:-]*$/;
+  QrSegment.ALPHANUMERIC_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+  qrcodegen2.QrSegment = QrSegment;
+})(qrcodegen || (qrcodegen = {}));
+((qrcodegen2) => {
+  ((QrCode2) => {
+    const _Ecc = class {
+      constructor(ordinal, formatBits) {
+        this.ordinal = ordinal;
+        this.formatBits = formatBits;
+      }
+    };
+    let Ecc = _Ecc;
+    Ecc.LOW = new _Ecc(0, 1);
+    Ecc.MEDIUM = new _Ecc(1, 0);
+    Ecc.QUARTILE = new _Ecc(2, 3);
+    Ecc.HIGH = new _Ecc(3, 2);
+    QrCode2.Ecc = Ecc;
+  })(qrcodegen2.QrCode || (qrcodegen2.QrCode = {}));
+})(qrcodegen || (qrcodegen = {}));
+((qrcodegen2) => {
+  ((QrSegment2) => {
+    const _Mode = class {
+      constructor(modeBits, numBitsCharCount) {
+        this.modeBits = modeBits;
+        this.numBitsCharCount = numBitsCharCount;
+      }
+      numCharCountBits(ver) {
+        return this.numBitsCharCount[Math.floor((ver + 7) / 17)];
+      }
+    };
+    let Mode = _Mode;
+    Mode.NUMERIC = new _Mode(1, [10, 12, 14]);
+    Mode.ALPHANUMERIC = new _Mode(2, [9, 11, 13]);
+    Mode.BYTE = new _Mode(4, [8, 16, 16]);
+    Mode.KANJI = new _Mode(8, [8, 10, 12]);
+    Mode.ECI = new _Mode(7, [0, 0, 0]);
+    QrSegment2.Mode = Mode;
+  })(qrcodegen2.QrSegment || (qrcodegen2.QrSegment = {}));
+})(qrcodegen || (qrcodegen = {}));
+var qrcodegen_default = qrcodegen;
+
+// src/index.tsx
+/**
+ * @license qrcode.react
+ * Copyright (c) Paul O'Shannessy
+ * SPDX-License-Identifier: ISC
+ */
+var ERROR_LEVEL_MAP = {
+  L: qrcodegen_default.QrCode.Ecc.LOW,
+  M: qrcodegen_default.QrCode.Ecc.MEDIUM,
+  Q: qrcodegen_default.QrCode.Ecc.QUARTILE,
+  H: qrcodegen_default.QrCode.Ecc.HIGH
+};
+var DEFAULT_SIZE = 128;
+var DEFAULT_LEVEL = "L";
+var DEFAULT_BGCOLOR = "#FFFFFF";
+var DEFAULT_FGCOLOR = "#000000";
+var DEFAULT_INCLUDEMARGIN = false;
+var MARGIN_SIZE = 4;
+var DEFAULT_IMG_SCALE = 0.1;
+function generatePath(modules, margin = 0) {
+  const ops = [];
+  modules.forEach(function(row, y) {
+    let start = null;
+    row.forEach(function(cell, x) {
+      if (!cell && start !== null) {
+        ops.push(`M${start + margin} ${y + margin}h${x - start}v1H${start + margin}z`);
+        start = null;
+        return;
+      }
+      if (x === row.length - 1) {
+        if (!cell) {
+          return;
+        }
+        if (start === null) {
+          ops.push(`M${x + margin},${y + margin} h1v1H${x + margin}z`);
+        } else {
+          ops.push(`M${start + margin},${y + margin} h${x + 1 - start}v1H${start + margin}z`);
+        }
+        return;
+      }
+      if (cell && start === null) {
+        start = x;
+      }
+    });
+  });
+  return ops.join("");
+}
+function excavateModules(modules, excavation) {
+  return modules.slice().map((row, y) => {
+    if (y < excavation.y || y >= excavation.y + excavation.h) {
+      return row;
+    }
+    return row.map((cell, x) => {
+      if (x < excavation.x || x >= excavation.x + excavation.w) {
+        return cell;
+      }
+      return false;
+    });
+  });
+}
+function getImageSettings(cells, size, includeMargin, imageSettings) {
+  if (imageSettings == null) {
+    return null;
+  }
+  const margin = includeMargin ? MARGIN_SIZE : 0;
+  const numCells = cells.length + margin * 2;
+  const defaultSize = Math.floor(size * DEFAULT_IMG_SCALE);
+  const scale = numCells / size;
+  const w = (imageSettings.width || defaultSize) * scale;
+  const h = (imageSettings.height || defaultSize) * scale;
+  const x = imageSettings.x == null ? cells.length / 2 - w / 2 : imageSettings.x * scale;
+  const y = imageSettings.y == null ? cells.length / 2 - h / 2 : imageSettings.y * scale;
+  let excavation = null;
+  if (imageSettings.excavate) {
+    let floorX = Math.floor(x);
+    let floorY = Math.floor(y);
+    let ceilW = Math.ceil(w + x - floorX);
+    let ceilH = Math.ceil(h + y - floorY);
+    excavation = { x: floorX, y: floorY, w: ceilW, h: ceilH };
+  }
+  return { x, y, h, w, excavation };
+}
+(function() {
+  try {
+    new Path2D().addPath(new Path2D());
+  } catch (e) {
+    return false;
+  }
+  return true;
+})();
+function QRCodeSVG(props) {
+  const _a = props, {
+    value,
+    size = DEFAULT_SIZE,
+    level = DEFAULT_LEVEL,
+    bgColor = DEFAULT_BGCOLOR,
+    fgColor = DEFAULT_FGCOLOR,
+    includeMargin = DEFAULT_INCLUDEMARGIN,
+    imageSettings
+  } = _a, otherProps = __objRest(_a, [
+    "value",
+    "size",
+    "level",
+    "bgColor",
+    "fgColor",
+    "includeMargin",
+    "imageSettings"
+  ]);
+  let cells = qrcodegen_default.QrCode.encodeText(value, ERROR_LEVEL_MAP[level]).getModules();
+  const margin = includeMargin ? MARGIN_SIZE : 0;
+  const numCells = cells.length + margin * 2;
+  const calculatedImageSettings = getImageSettings(cells, size, includeMargin, imageSettings);
+  let image = null;
+  if (imageSettings != null && calculatedImageSettings != null) {
+    if (calculatedImageSettings.excavation != null) {
+      cells = excavateModules(cells, calculatedImageSettings.excavation);
+    }
+    image = /* @__PURE__ */ React.createElement("image", {
+      xlinkHref: imageSettings.src,
+      height: calculatedImageSettings.h,
+      width: calculatedImageSettings.w,
+      x: calculatedImageSettings.x + margin,
+      y: calculatedImageSettings.y + margin,
+      preserveAspectRatio: "none"
+    });
+  }
+  const fgPath = generatePath(cells, margin);
+  return /* @__PURE__ */ React.createElement("svg", __spreadValues({
+    height: size,
+    width: size,
+    viewBox: `0 0 ${numCells} ${numCells}`
+  }, otherProps), /* @__PURE__ */ React.createElement("path", {
+    fill: bgColor,
+    d: `M0,0 h${numCells}v${numCells}H0z`,
+    shapeRendering: "crispEdges"
+  }), /* @__PURE__ */ React.createElement("path", {
+    fill: fgColor,
+    d: fgPath,
+    shapeRendering: "crispEdges"
+  }), image);
+}
+
 class BridgeService {
   constructor() {
     this.socket = null;
@@ -14702,28 +14827,42 @@ class BridgeService {
     this.onSignRequest = null;
     this.onSyncAccounts = null;
     this.onValidatePIN = null;
+    this.onLog = null;
+    this.logs = [];
+  }
+  addLog(msg) {
+    const timestamp = (/* @__PURE__ */ new Date()).toLocaleTimeString();
+    const formattedLog = `[${timestamp}] ${msg}`;
+    this.logs.push(formattedLog);
+    this.onLog?.(formattedLog);
+    console.log(`[BridgeService] ${msg}`);
+  }
+  getLogs() {
+    return this.logs;
   }
   async init() {
     if (this.socket?.connected) return;
-    console.log("[Bridge] Initializing socket connection to:", this.serverUrl);
+    this.addLog(`Initializing connection to ${this.serverUrl}`);
     this.socket = lookup(this.serverUrl, {
       transports: ["polling", "websocket"],
-      // Try polling first for better compatibility
       autoConnect: true,
       reconnectionAttempts: 5,
       timeout: 1e4
     });
     this.socket.on("connect", () => {
-      console.log("[Bridge] Socket connected! ID:", this.socket?.id);
-      if (this.onStatusChange) this.onStatusChange("connected");
+      this.addLog("Socket connected successfully");
+      this.onStatusChange?.("connected");
     });
     this.socket.on("connect_error", (err) => {
-      console.error("[Bridge] Socket connection error:", err.message);
-      if (this.onStatusChange) this.onStatusChange("error: " + err.message);
+      this.addLog(`Socket connection error: ${err.message}`);
+      this.onStatusChange?.("error");
     });
     this.socket.on("disconnect", (reason) => {
-      console.log("[Bridge] Socket disconnected. Reason:", reason);
-      if (this.onStatusChange) this.onStatusChange("disconnected");
+      this.addLog(`Socket disconnected: ${reason}`);
+      this.onStatusChange?.("disconnected");
+    });
+    this.socket.on("bridge_signer_ready", () => {
+      this.addLog("Received bridge_signer_ready (Signer appeared)");
     });
     this.socket.on("bridge_request", async (data) => {
       if (!this.sharedKey) return;
@@ -14750,7 +14889,8 @@ class BridgeService {
       try {
         const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
         const { pin } = JSON.parse(decrypted);
-        if (this.onValidatePIN) this.onValidatePIN(pin);
+        this.addLog("Decrypted PIN request from mobile");
+        if (this.onValidatePIN) await this.onValidatePIN(pin);
       } catch (e) {
         console.error("Bridge PIN validation failed", e);
       }
@@ -14767,7 +14907,9 @@ class BridgeService {
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
     const extPubKey = await importKeyFromBase64(extPubKeyB64, "public");
     this.sharedKey = await deriveSharedSecret(this.myKeyPair.privateKey, extPubKey);
+    this.addLog(`Joining bridge room: ${this.sessionId} with publicKey`);
     this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
+    this.addLog("Sent bridge_join event");
   }
   async sendResponse(response) {
     if (!this.socket || !this.sharedKey || !this.sessionId) return;
@@ -14778,8 +14920,11 @@ class BridgeService {
   async createBridgeSession() {
     if (!this.socket) await this.init();
     this.sessionId = Math.random().toString(36).substring(2, 12);
+    this.addLog(`Created new bridge session: ${this.sessionId}`);
     this.myKeyPair = await generateEncryptionKeys();
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
+    this.addLog(`Extension joining bridge room: ${this.sessionId}`);
+    this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
     return `gravity:bridge:${this.sessionId}:${myPubB64}`;
   }
   async waitForSigner() {
@@ -14788,6 +14933,7 @@ class BridgeService {
         if (this.myKeyPair) {
           const signerPubKey = await importKeyFromBase64(data.publicKey, "public");
           this.sharedKey = await deriveSharedSecret(this.myKeyPair.privateKey, signerPubKey);
+          this.addLog("Shared key derived with signer");
           resolve();
         }
       });
@@ -14808,11 +14954,14 @@ class BridgeService {
     if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
     const encrypted = await encryptMessage(JSON.stringify(accounts), this.sharedKey);
     this.socket.emit("bridge_sync_accounts", { sessionId: this.sessionId, encrypted });
+    this.addLog(`Sent bridge_sync_accounts with ${accounts.length} accounts`);
+    this.onStatusChange?.("paired");
   }
   async validatePairing(pin) {
     if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
     const encrypted = await encryptMessage(JSON.stringify({ pin }), this.sharedKey);
     this.socket.emit("bridge_validate_pin", { sessionId: this.sessionId, encrypted });
+    this.addLog("Sent bridge_validate_pin to extension");
   }
 }
 const bridgeService = new BridgeService();
@@ -14820,21 +14969,30 @@ const bridgeService = new BridgeService();
 const BridgeModal = ({ onClose, onSync }) => {
   const [qrData, setQrData] = reactExports.useState(null);
   const [status, setStatus] = reactExports.useState("generating");
+  const [serverStatus, setServerStatus] = reactExports.useState("connecting");
   reactExports.useEffect(() => {
+    bridgeService.onStatusChange = (s) => {
+      if (s === "connected") setServerStatus("connected");
+      else if (s === "error") setServerStatus("error");
+      else if (s === "paired") setStatus("connected");
+      else setServerStatus("connecting");
+    };
     const initBridge = async () => {
       const data = await bridgeService.createBridgeSession();
       setQrData(data);
       setStatus("waiting");
       await bridgeService.waitForSigner();
-      setStatus("connected");
-      if (onSync) onSync();
     };
     initBridge();
   }, []);
   return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-dark-900/90 backdrop-blur-md animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-600 rounded-[32px] p-8 max-w-sm w-full shadow-2xl relative overflow-hidden", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "absolute top-4 right-4 text-slate-500 hover:text-white transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-center mb-8", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-black text-white mb-2 tracking-tight", children: "Gravity Bridge" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-center mb-2", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors ${serverStatus === "connected" ? "bg-green-500/10 text-green-500 border border-green-500/20" : serverStatus === "error" ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-500/20"}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-1 h-1 rounded-full ${serverStatus === "connected" ? "bg-green-500 animate-pulse" : serverStatus === "error" ? "bg-red-500" : "bg-slate-500 animate-pulse"}` }),
+        serverStatus === "connected" ? "Server Linked" : serverStatus === "error" ? "Link Error" : "Linking..."
+      ] }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-black text-white mb-2 tracking-tight", children: "Pair Phone" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 font-medium", children: "Pair your mobile device for remote signing" })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col items-center justify-center space-y-8", children: status === "connected" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center py-10 animate-bounceFast", children: [
@@ -14912,8 +15070,13 @@ function AppContent() {
   }, []);
   reactExports.useEffect(() => {
     const handleOpenBridge = () => setShowBridge(true);
+    const handleOpenPair = () => setShowBridge(true);
     window.addEventListener("open-bridge", handleOpenBridge);
-    return () => window.removeEventListener("open-bridge", handleOpenBridge);
+    window.addEventListener("open-pair", handleOpenPair);
+    return () => {
+      window.removeEventListener("open-bridge", handleOpenBridge);
+      window.removeEventListener("open-pair", handleOpenPair);
+    };
   }, []);
   reactExports.useEffect(() => {
     chatService.init();
@@ -14928,20 +15091,25 @@ function AppContent() {
   }, [showNotification]);
   reactExports.useEffect(() => {
     bridgeService.onValidatePIN = async (pin) => {
-      console.log("[Bridge] PIN validation request received:", pin);
       try {
-        const vault = await unlockVault(pin);
+        let vault = await unlockVault(pin);
+        if (!vault && pin && pin.length === 6) {
+          const hasPin = await hasPinProtectedKey();
+          if (hasPin) {
+            const internalKey = await loadInternalKeyWithPin(pin);
+            if (internalKey) {
+              vault = await unlockVault(internalKey);
+            }
+          }
+        }
         if (vault) {
-          console.log("[Bridge] PIN valid! Syncing", vault.accounts.length, "accounts...");
           bridgeService.syncAccounts(vault.accounts);
           showNotification("Mobile device paired and synced!", "success");
         } else {
-          console.error("[Bridge] Invalid PIN: Vault decryption failed");
-          showNotification("Pairing failed: Invalid PIN", "error");
+          showNotification("Pairing failed: Invalid PIN or Password", "error");
         }
       } catch (e) {
-        console.error("[Bridge] Critical error during PIN validation:", e);
-        showNotification("Pairing failed: Error validating PIN", "error");
+        showNotification("Pairing failed: Error validating credentials", "error");
       }
     };
   }, [showNotification]);
@@ -15111,6 +15279,51 @@ function AppContent() {
     } catch (e) {
       console.error("Import Save Failed:", e);
       showNotification("Failed to save account. Please try again.", "error");
+    }
+  };
+  const handleDeviceSyncImport = async (payload) => {
+    const mergedAccounts = [...walletState.accounts];
+    let added = 0;
+    payload.accounts.forEach((account) => {
+      if (!mergedAccounts.find((candidate) => candidate.name === account.name && candidate.chain === account.chain)) {
+        mergedAccounts.push(account);
+        added += 1;
+      }
+    });
+    const nextState = {
+      ...walletState,
+      accounts: mergedAccounts,
+      useGoogleAuth: payload.settings?.useGoogleAuth ?? walletState.useGoogleAuth,
+      useBiometrics: payload.settings?.useBiometrics ?? walletState.useBiometrics,
+      useDeviceAuth: payload.settings?.useDeviceAuth ?? walletState.useDeviceAuth,
+      useTOTP: payload.settings?.useTOTP ?? walletState.useTOTP,
+      encryptedMaster: walletState.encryptedMaster || mergedAccounts.length > 0
+    };
+    if (payload.chatIdentity) {
+      await storageService.setItem("gravity_chat_key", payload.chatIdentity.privateKey);
+      await storageService.setItem("gravity_chat_pub", payload.chatIdentity.publicKey);
+      localStorage.setItem("gravity_chat_username", payload.chatIdentity.username);
+      localStorage.setItem("gravity_chat_registration", JSON.stringify({
+        id: payload.chatIdentity.id,
+        username: payload.chatIdentity.username,
+        timestamp: payload.timestamp
+      }));
+    }
+    setWalletState(nextState);
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
+      chrome.storage.session.set({ session_accounts: mergedAccounts });
+    }
+    try {
+      if (!walletState.encryptedMaster) {
+        await enablePasswordless(mergedAccounts);
+      } else {
+        await saveVault("cached", { accounts: mergedAccounts, lastUpdated: Date.now() });
+      }
+      showNotification(`Transfer complete. Added ${added} account${added === 1 ? "" : "s"}.`, "success");
+    } catch (error) {
+      console.error("Device transfer save failed:", error);
+      showNotification("The wallet was received but could not be persisted safely.", "error");
+      throw error;
     }
   };
   const handleUpdateAccount = (updatedAccount) => {
@@ -15380,7 +15593,8 @@ function AppContent() {
             walletState,
             setWalletState,
             onEdit: (acc) => setManagingAccount(acc),
-            onImport: () => setShowImport(true)
+            onImport: () => setShowImport(true),
+            onSyncImport: handleDeviceSyncImport
           }
         ),
         currentView === ViewState.BULK && /* @__PURE__ */ jsxRuntimeExports.jsx(

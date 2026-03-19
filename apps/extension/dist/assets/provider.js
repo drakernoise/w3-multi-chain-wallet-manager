@@ -151,8 +151,10 @@ if (!window._gravityProvider) {
     // ==================== API Methods ====================
     /**
      * Handshake to verify extension is installed and ready
+     * Supports both (callback) and (appId, callback) for WhaleVault parity
      */
-    requestHandshake = (callback) => {
+    requestHandshake = (appIdOrCallback, callback) => {
+      const actualCallback = typeof appIdOrCallback === "function" ? appIdOrCallback : callback;
       const response = {
         success: true,
         message: "Handshake successful",
@@ -160,11 +162,23 @@ if (!window._gravityProvider) {
         name: this.name,
         rpc: this.current_rpc
       };
-      if (typeof callback === "function") {
-        setTimeout(() => callback(response), 0);
+      if (actualCallback) {
+        setTimeout(() => actualCallback(response), 0);
       } else {
         return Promise.resolve(response);
       }
+    };
+    /**
+     * Decode a memo encrypted with a private key
+     */
+    decodeMemo = (username, memo, key, callback) => {
+      return this.send("decodeMemo", [username, memo, key], callback);
+    };
+    /**
+     * Encode a memo for a recipient
+     */
+    encodeMemo = (username, receiver, memo, key, callback) => {
+      return this.send("encodeMemo", [username, receiver, memo, key], callback);
     };
     /**
      * Request a transfer transaction
