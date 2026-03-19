@@ -5813,6 +5813,41 @@ const translations = {
     "settings.change_password": "Change Access Password",
     "settings.biometrics": "Use Biometrics",
     "settings.reset": "Reset Wallet",
+    "pair.section_title": "Pair Another Device",
+    "pair.section_subtitle": "On the new device, generate a receive code. On the current device, enter that code and approve the encrypted transfer.",
+    "pair.send_cta": "Send To New Device",
+    "pair.receive_cta": "Get Receive Code",
+    "pair.step_badge_send": "Step 2 of 2",
+    "pair.step_badge_receive": "Step 1 of 2",
+    "pair.send_title": "Send to Another Device",
+    "pair.send_subtitle": "Enter the receive code shown on the destination device. Nothing is sent until you confirm it here.",
+    "pair.receive_title": "Receive on This Device",
+    "pair.receive_subtitle": "On your current device, keep this code visible. On the device that already has the wallet, choose send and enter this code there.",
+    "pair.code_label": "Receive code",
+    "pair.copy_code": "Copy Code",
+    "pair.preparing": "Preparing secure session...",
+    "pair.waiting_source": "Waiting for source device...",
+    "pair.importing": "Receiving and importing encrypted wallet...",
+    "pair.receive_complete": "Import Complete",
+    "pair.receive_success_message": "Wallet received successfully. Imported {count} accounts.",
+    "pair.transfer_error": "Transfer Error",
+    "pair.receive_error": "Unable to receive data",
+    "pair.accounts_label": "Accounts",
+    "pair.settings_label": "Settings",
+    "pair.chat_identity_label": "Chat identity",
+    "pair.included": "Included",
+    "pair.basic_only": "Basic only",
+    "pair.not_found": "Not found",
+    "pair.pair_devices": "Pair Devices",
+    "pair.waiting_handshake": "Waiting for secure handshake...",
+    "pair.approve_and_send": "Approve and Send",
+    "pair.sending": "Encrypting and sending wallet...",
+    "pair.send_complete": "Transfer Complete",
+    "pair.send_complete_subtitle": "The destination device can import the wallet now.",
+    "pair.connect_error": "Unable to pair with target device",
+    "pair.send_error": "Unable to send encrypted wallet",
+    "pair.e2ee_notice": "This device never exposes the private data in plain text.",
+    "pair.e2ee_transfer": "End-to-end encrypted manual transfer",
     // MultiSig
     "multisig.title": "MultiSig Wallet",
     "multisig.initiator": "Initiator",
@@ -6273,6 +6308,41 @@ const translations = {
     "settings.change_password": "Cambiar Contraseña",
     "settings.biometrics": "Usar Biometría",
     "settings.reset": "Reiniciar Billetera",
+    "pair.section_title": "Emparejar Otro Equipo",
+    "pair.section_subtitle": "En el equipo nuevo, genera un código de recepción. En el equipo actual, introduce ese código y aprueba la transferencia cifrada.",
+    "pair.send_cta": "Enviar Al Equipo Nuevo",
+    "pair.receive_cta": "Obtener Código",
+    "pair.step_badge_send": "Paso 2 de 2",
+    "pair.step_badge_receive": "Paso 1 de 2",
+    "pair.send_title": "Enviar a Otro Equipo",
+    "pair.send_subtitle": "Introduce el código de recepción que muestra el equipo de destino. No se envía nada hasta que lo confirmes aquí.",
+    "pair.receive_title": "Recibir en Este Equipo",
+    "pair.receive_subtitle": "Mantén este código visible en este equipo. En el equipo que ya tiene la cartera, elige enviar e introduce allí este código.",
+    "pair.code_label": "Código de recepción",
+    "pair.copy_code": "Copiar Código",
+    "pair.preparing": "Preparando sesión segura...",
+    "pair.waiting_source": "Esperando al equipo origen...",
+    "pair.importing": "Recibiendo e importando cartera cifrada...",
+    "pair.receive_complete": "Importación Completa",
+    "pair.receive_success_message": "Cartera recibida correctamente. Se importaron {count} cuentas.",
+    "pair.transfer_error": "Error de Transferencia",
+    "pair.receive_error": "No se pudieron recibir los datos",
+    "pair.accounts_label": "Cuentas",
+    "pair.settings_label": "Ajustes",
+    "pair.chat_identity_label": "Identidad de chat",
+    "pair.included": "Incluido",
+    "pair.basic_only": "Sólo básico",
+    "pair.not_found": "No encontrado",
+    "pair.pair_devices": "Emparejar Equipos",
+    "pair.waiting_handshake": "Esperando handshake seguro...",
+    "pair.approve_and_send": "Aprobar y Enviar",
+    "pair.sending": "Cifrando y enviando cartera...",
+    "pair.send_complete": "Transferencia Completa",
+    "pair.send_complete_subtitle": "El equipo de destino ya puede importar la cartera.",
+    "pair.connect_error": "No se pudo emparejar con el equipo de destino",
+    "pair.send_error": "No se pudo enviar la cartera cifrada",
+    "pair.e2ee_notice": "Este equipo nunca expone los datos privados en texto plano.",
+    "pair.e2ee_transfer": "Transferencia manual cifrada de extremo a extremo",
     // MultiSig
     "multisig.title": "Billetera Multi-firma",
     "multisig.initiator": "Iniciador",
@@ -6745,6 +6815,41 @@ const translations = {
     "settings.change_password": "Changer Mot de Passe",
     "settings.biometrics": "Utiliser Biométrie",
     "settings.reset": "Réinitialiser Portefeuille",
+    "pair.section_title": "Associer un Autre Appareil",
+    "pair.section_subtitle": "Sur le nouvel appareil, générez un code de réception. Sur l'appareil actuel, saisissez ce code et approuvez le transfert chiffré.",
+    "pair.send_cta": "Envoyer Vers le Nouvel Appareil",
+    "pair.receive_cta": "Obtenir le Code",
+    "pair.step_badge_send": "Étape 2 sur 2",
+    "pair.step_badge_receive": "Étape 1 sur 2",
+    "pair.send_title": "Envoyer vers un Autre Appareil",
+    "pair.send_subtitle": "Saisissez le code de réception affiché sur l'appareil de destination. Rien n'est envoyé tant que vous ne confirmez pas ici.",
+    "pair.receive_title": "Recevoir sur Cet Appareil",
+    "pair.receive_subtitle": "Gardez ce code visible sur cet appareil. Sur l'appareil qui possède déjà le portefeuille, choisissez envoyer et saisissez ce code.",
+    "pair.code_label": "Code de réception",
+    "pair.copy_code": "Copier le Code",
+    "pair.preparing": "Préparation de la session sécurisée...",
+    "pair.waiting_source": "En attente de l'appareil source...",
+    "pair.importing": "Réception et importation du portefeuille chiffré...",
+    "pair.receive_complete": "Importation Terminée",
+    "pair.receive_success_message": "Portefeuille reçu avec succès. {count} comptes importés.",
+    "pair.transfer_error": "Erreur de Transfert",
+    "pair.receive_error": "Impossible de recevoir les données",
+    "pair.accounts_label": "Comptes",
+    "pair.settings_label": "Paramètres",
+    "pair.chat_identity_label": "Identité de chat",
+    "pair.included": "Inclus",
+    "pair.basic_only": "Basique seulement",
+    "pair.not_found": "Introuvable",
+    "pair.pair_devices": "Associer les Appareils",
+    "pair.waiting_handshake": "En attente du handshake sécurisé...",
+    "pair.approve_and_send": "Approuver et Envoyer",
+    "pair.sending": "Chiffrement et envoi du portefeuille...",
+    "pair.send_complete": "Transfert Terminé",
+    "pair.send_complete_subtitle": "L'appareil de destination peut maintenant importer le portefeuille.",
+    "pair.connect_error": "Impossible d'associer l'appareil cible",
+    "pair.send_error": "Impossible d'envoyer le portefeuille chiffré",
+    "pair.e2ee_notice": "Cet appareil n'expose jamais les données privées en clair.",
+    "pair.e2ee_transfer": "Transfert manuel chiffré de bout en bout",
     // MultiSig
     "multisig.title": "Portefeuille MultiSig",
     "multisig.initiator": "Initiateur",
@@ -7172,6 +7277,41 @@ const translations = {
     "settings.change_password": "Passwort ändern",
     "settings.biometrics": "Biometrie verwenden",
     "settings.reset": "Wallet zurücksetzen",
+    "pair.section_title": "Weiteres Gerät Koppeln",
+    "pair.section_subtitle": "Erzeuge auf dem neuen Gerät einen Empfangscode. Gib diesen Code auf dem aktuellen Gerät ein und bestätige die verschlüsselte Übertragung.",
+    "pair.send_cta": "An Neues Gerät Senden",
+    "pair.receive_cta": "Empfangscode Anzeigen",
+    "pair.step_badge_send": "Schritt 2 von 2",
+    "pair.step_badge_receive": "Schritt 1 von 2",
+    "pair.send_title": "An Anderes Gerät Senden",
+    "pair.send_subtitle": "Gib den Empfangscode ein, der auf dem Zielgerät angezeigt wird. Es wird nichts gesendet, bis du hier bestätigst.",
+    "pair.receive_title": "Auf Diesem Gerät Empfangen",
+    "pair.receive_subtitle": "Lass diesen Code auf diesem Gerät sichtbar. Wähle auf dem Gerät mit der vorhandenen Wallet Senden und gib dort diesen Code ein.",
+    "pair.code_label": "Empfangscode",
+    "pair.copy_code": "Code Kopieren",
+    "pair.preparing": "Sichere Sitzung wird vorbereitet...",
+    "pair.waiting_source": "Warte auf Quellgerät...",
+    "pair.importing": "Verschlüsselte Wallet wird empfangen und importiert...",
+    "pair.receive_complete": "Import Abgeschlossen",
+    "pair.receive_success_message": "Wallet erfolgreich empfangen. {count} Konten importiert.",
+    "pair.transfer_error": "Übertragungsfehler",
+    "pair.receive_error": "Daten konnten nicht empfangen werden",
+    "pair.accounts_label": "Konten",
+    "pair.settings_label": "Einstellungen",
+    "pair.chat_identity_label": "Chat-Identität",
+    "pair.included": "Enthalten",
+    "pair.basic_only": "Nur Basis",
+    "pair.not_found": "Nicht gefunden",
+    "pair.pair_devices": "Geräte Koppeln",
+    "pair.waiting_handshake": "Warte auf sicheren Handshake...",
+    "pair.approve_and_send": "Bestätigen und Senden",
+    "pair.sending": "Wallet wird verschlüsselt und gesendet...",
+    "pair.send_complete": "Übertragung Abgeschlossen",
+    "pair.send_complete_subtitle": "Das Zielgerät kann die Wallet jetzt importieren.",
+    "pair.connect_error": "Kopplung mit dem Zielgerät nicht möglich",
+    "pair.send_error": "Die verschlüsselte Wallet konnte nicht gesendet werden",
+    "pair.e2ee_notice": "Dieses Gerät legt private Daten niemals im Klartext offen.",
+    "pair.e2ee_transfer": "Ende-zu-Ende-verschlüsselte manuelle Übertragung",
     // MultiSig
     "multisig.title": "MultiSig Wallet",
     "multisig.initiator": "Initiator",
@@ -7599,6 +7739,41 @@ const translations = {
     "settings.change_password": "Cambia Password",
     "settings.biometrics": "Usa Biometria",
     "settings.reset": "Reimposta Wallet",
+    "pair.section_title": "Abbina un Altro Dispositivo",
+    "pair.section_subtitle": "Sul nuovo dispositivo genera un codice di ricezione. Sul dispositivo attuale inserisci quel codice e approva il trasferimento cifrato.",
+    "pair.send_cta": "Invia al Nuovo Dispositivo",
+    "pair.receive_cta": "Ottieni Codice",
+    "pair.step_badge_send": "Passo 2 di 2",
+    "pair.step_badge_receive": "Passo 1 di 2",
+    "pair.send_title": "Invia a un Altro Dispositivo",
+    "pair.send_subtitle": "Inserisci il codice di ricezione mostrato sul dispositivo di destinazione. Nulla viene inviato finché non confermi qui.",
+    "pair.receive_title": "Ricevi su Questo Dispositivo",
+    "pair.receive_subtitle": "Tieni visibile questo codice su questo dispositivo. Sul dispositivo che ha già il wallet, scegli invia e inserisci lì questo codice.",
+    "pair.code_label": "Codice di ricezione",
+    "pair.copy_code": "Copia Codice",
+    "pair.preparing": "Preparazione della sessione sicura...",
+    "pair.waiting_source": "In attesa del dispositivo sorgente...",
+    "pair.importing": "Ricezione e importazione del wallet cifrato...",
+    "pair.receive_complete": "Importazione Completata",
+    "pair.receive_success_message": "Wallet ricevuto correttamente. Importati {count} account.",
+    "pair.transfer_error": "Errore di Trasferimento",
+    "pair.receive_error": "Impossibile ricevere i dati",
+    "pair.accounts_label": "Account",
+    "pair.settings_label": "Impostazioni",
+    "pair.chat_identity_label": "Identità chat",
+    "pair.included": "Incluso",
+    "pair.basic_only": "Solo base",
+    "pair.not_found": "Non trovato",
+    "pair.pair_devices": "Abbina Dispositivi",
+    "pair.waiting_handshake": "In attesa dell'handshake sicuro...",
+    "pair.approve_and_send": "Approva e Invia",
+    "pair.sending": "Cifratura e invio del wallet...",
+    "pair.send_complete": "Trasferimento Completato",
+    "pair.send_complete_subtitle": "Il dispositivo di destinazione ora può importare il wallet.",
+    "pair.connect_error": "Impossibile abbinare il dispositivo di destinazione",
+    "pair.send_error": "Impossibile inviare il wallet cifrato",
+    "pair.e2ee_notice": "Questo dispositivo non espone mai i dati privati in chiaro.",
+    "pair.e2ee_transfer": "Trasferimento manuale cifrato end-to-end",
     // MultiSig
     "multisig.title": "Portafoglio MultiSig",
     "multisig.initiator": "Iniziatore",
@@ -9043,6 +9218,7 @@ class DeviceTransferService {
 const deviceTransferService = new DeviceTransferService();
 
 const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
+  const { t } = useTranslation();
   const [pairCode, setPairCode] = reactExports.useState("");
   const [status, setStatus] = reactExports.useState("idle");
   const [errorMsg, setErrorMsg] = reactExports.useState("");
@@ -9110,7 +9286,7 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
       await deviceTransferService.connectToSession(pairCode);
     } catch (e) {
       setStatus("error");
-      setErrorMsg(e?.message || "Unable to pair with target device");
+      setErrorMsg(e?.message || t("pair.connect_error"));
     }
   };
   const handleSend = async () => {
@@ -9121,7 +9297,7 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
       await deviceTransferService.sendPayload(payload);
     } catch (e) {
       setStatus("error");
-      setErrorMsg(e?.message || "Unable to send encrypted wallet");
+      setErrorMsg(e?.message || t("pair.send_error"));
     }
   };
   const normalizedCode = deviceTransferService.normalizeCode(pairCode);
@@ -9134,8 +9310,9 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
         children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
       }
     ),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: "Send to Another Device" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: "Enter the pairing code shown on the destination device. Nothing is sent until you confirm it here." }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mb-2 flex items-center gap-2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "px-2 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] font-black uppercase tracking-widest text-purple-400", children: t("pair.step_badge_send") }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: t("pair.send_title") }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: t("pair.send_subtitle") }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "input",
@@ -9151,16 +9328,16 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900/70 border border-dark-700 rounded-2xl p-4 space-y-2", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between text-xs", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Accounts" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: t("pair.accounts_label") }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: payloadSummary.accountCount })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between text-xs", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Settings" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: payloadSummary.settingsCount ? "Included" : "Basic only" })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: t("pair.settings_label") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: payloadSummary.settingsCount ? t("pair.included") : t("pair.basic_only") })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between text-xs", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Chat identity" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: payloadSummary.chatIdentity ? "Included" : "Not found" })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: t("pair.chat_identity_label") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: payloadSummary.chatIdentity ? t("pair.included") : t("pair.not_found") })
         ] })
       ] }),
       errorMsg && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-400 text-xs font-bold text-center", children: errorMsg }),
@@ -9170,29 +9347,30 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
           onClick: handleConnect,
           disabled: normalizedCode.length !== 10,
           className: `w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${normalizedCode.length !== 10 ? "bg-dark-700 text-slate-500" : "bg-purple-600 text-white shadow-lg active:scale-95"}`,
-          children: "Pair Devices"
+          children: t("pair.pair_devices")
         }
       ) : null,
-      status === "connecting" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Waiting for secure handshake..." }),
+      status === "connecting" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.waiting_handshake") }),
       status === "paired" && /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
           onClick: handleSend,
           className: "w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all bg-blue-600 text-white shadow-lg active:scale-95",
-          children: "Approve and Send"
+          children: t("pair.approve_and_send")
         }
       ),
-      status === "sending" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Encrypting and sending wallet..." }),
+      status === "sending" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.sending") }),
       status === "sent" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: "Transfer Complete" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 mt-1", children: "The destination device can import the wallet now." })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: t("pair.send_complete") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 mt-1", children: t("pair.send_complete_subtitle") })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: "End-to-end encrypted manual transfer" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: t("pair.e2ee_transfer") })
     ] })
   ] }) });
 };
 
 const SyncImportModal = ({ onClose, onImport }) => {
+  const { t } = useTranslation();
   const [pairCode, setPairCode] = reactExports.useState("");
   const [status, setStatus] = reactExports.useState("preparing");
   const [errorMsg, setErrorMsg] = reactExports.useState("");
@@ -9225,12 +9403,12 @@ const SyncImportModal = ({ onClose, onImport }) => {
         setStatus("importing");
         await onImportRef.current(payload);
         if (!mounted) return;
-        setSuccessMsg(`Wallet received successfully. Imported ${payload.accounts.length} account${payload.accounts.length === 1 ? "" : "s"}.`);
+        setSuccessMsg(t("pair.receive_success_message", { count: payload.accounts.length }));
         setStatus("done");
       } catch (e) {
         if (!mounted) return;
         setStatus("error");
-        setErrorMsg(e?.message || "Unable to receive data");
+        setErrorMsg(e?.message || t("pair.receive_error"));
       }
     };
     prepare();
@@ -9253,11 +9431,12 @@ const SyncImportModal = ({ onClose, onImport }) => {
         children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
       }
     ),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: "Receive from Another Device" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: "Open the source device, choose send, and enter this pairing code there." }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mb-2 flex items-center gap-2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] font-black uppercase tracking-widest text-green-400", children: t("pair.step_badge_receive") }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: t("pair.receive_title") }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: t("pair.receive_subtitle") }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full bg-dark-900 border border-dark-700 rounded-2xl p-5 text-center", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] uppercase tracking-[0.28em] font-black text-slate-500 mb-3", children: "Pairing code" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] uppercase tracking-[0.28em] font-black text-slate-500 mb-3", children: t("pair.code_label") }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-2xl font-mono tracking-[0.32em] text-white select-all", children: pairCode || "----- -----" })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -9266,27 +9445,27 @@ const SyncImportModal = ({ onClose, onImport }) => {
           onClick: handleCopy,
           disabled: !pairCode,
           className: "w-full py-3 bg-dark-700 hover:bg-dark-600 rounded-xl font-mono text-xs text-purple-300 transition-all active:scale-95",
-          children: "Copy Code"
+          children: t("pair.copy_code")
         }
       ),
-      status === "preparing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Preparing secure session..." }),
-      status === "waiting" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Waiting for source device..." }),
-      status === "importing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Receiving and importing encrypted wallet..." }),
+      status === "preparing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.preparing") }),
+      status === "waiting" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.waiting_source") }),
+      status === "importing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.importing") }),
       status === "done" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center px-4", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: "Import Complete" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: t("pair.receive_complete") }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-300 mt-2", children: successMsg })
       ] }),
       status === "error" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-red-400 uppercase tracking-widest text-sm", children: "Transfer Error" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-red-400 uppercase tracking-widest text-sm", children: t("pair.transfer_error") }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 mt-1", children: errorMsg })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: "This device never exposes the private data in plain text." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: t("pair.e2ee_notice") }),
       status === "done" && /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
           onClick: () => onCloseRef.current(),
           className: "w-full py-3 bg-green-500/15 hover:bg-green-500/25 border border-green-500/30 rounded-xl font-bold text-sm text-green-300 transition-all active:scale-95",
-          children: "Close"
+          children: t("common.close")
         }
       )
     ] })
@@ -9355,8 +9534,8 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
         ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-4 text-center text-slate-500 py-4 text-sm", children: t("settings.no_accounts") })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 border-t border-dark-700 space-y-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: "Pair Another Device" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 -mt-1 mb-2", children: "Use one device to show a pairing code and the other to send the encrypted wallet." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: t("pair.section_title") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 -mt-1 mb-2", children: t("pair.section_subtitle") }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "button",
@@ -9365,7 +9544,7 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
               className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
               children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" }) }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: "Send Wallet" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: t("pair.send_cta") })
               ]
             }
           ),
@@ -9376,7 +9555,7 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
               className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
               children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }) }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: "Show Pair Code" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: t("pair.receive_cta") })
               ]
             }
           )

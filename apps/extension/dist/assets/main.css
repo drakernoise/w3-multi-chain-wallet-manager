@@ -505,6 +505,9 @@ video {
 .pointer-events-auto {
   pointer-events: auto;
 }
+.visible {
+  visibility: visible;
+}
 .fixed {
   position: fixed;
 }
@@ -1444,6 +1447,9 @@ video {
 }
 .border-purple-500\/10 {
   border-color: rgb(168 85 247 / 0.1);
+}
+.border-purple-500\/20 {
+  border-color: rgb(168 85 247 / 0.2);
 }
 .border-purple-500\/30 {
   border-color: rgb(168 85 247 / 0.3);

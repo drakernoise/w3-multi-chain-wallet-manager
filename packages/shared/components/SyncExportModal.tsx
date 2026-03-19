@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Account, SyncPayload } from '../types';
 import { deviceTransferService } from '../services/deviceTransferService';
 import { storageService } from '../services/storageService';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface SyncExportModalProps {
     accounts: Account[];
@@ -12,6 +13,7 @@ interface SyncExportModalProps {
 type ExportStatus = 'idle' | 'connecting' | 'paired' | 'sending' | 'sent' | 'error';
 
 export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, walletConfig, onClose }) => {
+    const { t } = useTranslation();
     const [pairCode, setPairCode] = useState('');
     const [status, setStatus] = useState<ExportStatus>('idle');
     const [errorMsg, setErrorMsg] = useState('');
@@ -86,7 +88,7 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
             await deviceTransferService.connectToSession(pairCode);
         } catch (e: any) {
             setStatus('error');
-            setErrorMsg(e?.message || 'Unable to pair with target device');
+            setErrorMsg(e?.message || t('pair.connect_error'));
         }
     };
 
@@ -98,7 +100,7 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
             await deviceTransferService.sendPayload(payload);
         } catch (e: any) {
             setStatus('error');
-            setErrorMsg(e?.message || 'Unable to send encrypted wallet');
+            setErrorMsg(e?.message || t('pair.send_error'));
         }
     };
 
@@ -114,8 +116,11 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
 
-                <h3 className="text-xl font-black text-white mb-2">Send to Another Device</h3>
-                <p className="text-xs text-slate-400 mb-6">Enter the pairing code shown on the destination device. Nothing is sent until you confirm it here.</p>
+                <div className="mb-2 flex items-center gap-2">
+                    <span className="px-2 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-[10px] font-black uppercase tracking-widest text-purple-400">{t('pair.step_badge_send')}</span>
+                </div>
+                <h3 className="text-xl font-black text-white mb-2">{t('pair.send_title')}</h3>
+                <p className="text-xs text-slate-400 mb-6">{t('pair.send_subtitle')}</p>
 
                 <div className="space-y-4">
                     <input
@@ -130,16 +135,16 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
 
                     <div className="bg-dark-900/70 border border-dark-700 rounded-2xl p-4 space-y-2">
                         <div className="flex justify-between text-xs">
-                            <span className="text-slate-500">Accounts</span>
+                            <span className="text-slate-500">{t('pair.accounts_label')}</span>
                             <span className="font-bold text-white">{payloadSummary.accountCount}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                            <span className="text-slate-500">Settings</span>
-                            <span className="font-bold text-white">{payloadSummary.settingsCount ? 'Included' : 'Basic only'}</span>
+                            <span className="text-slate-500">{t('pair.settings_label')}</span>
+                            <span className="font-bold text-white">{payloadSummary.settingsCount ? t('pair.included') : t('pair.basic_only')}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                            <span className="text-slate-500">Chat identity</span>
-                            <span className="font-bold text-white">{payloadSummary.chatIdentity ? 'Included' : 'Not found'}</span>
+                            <span className="text-slate-500">{t('pair.chat_identity_label')}</span>
+                            <span className="font-bold text-white">{payloadSummary.chatIdentity ? t('pair.included') : t('pair.not_found')}</span>
                         </div>
                     </div>
 
@@ -151,13 +156,13 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
                             disabled={normalizedCode.length !== 10}
                             className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${normalizedCode.length !== 10 ? 'bg-dark-700 text-slate-500' : 'bg-purple-600 text-white shadow-lg active:scale-95'}`}
                         >
-                            Pair Devices
+                            {t('pair.pair_devices')}
                         </button>
                     ) : null}
 
                     {status === 'connecting' && (
                         <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
-                            Waiting for secure handshake...
+                            {t('pair.waiting_handshake')}
                         </div>
                     )}
 
@@ -166,25 +171,25 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
                             onClick={handleSend}
                             className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all bg-blue-600 text-white shadow-lg active:scale-95"
                         >
-                            Approve and Send
+                            {t('pair.approve_and_send')}
                         </button>
                     )}
 
                     {status === 'sending' && (
                         <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
-                            Encrypting and sending wallet...
+                            {t('pair.sending')}
                         </div>
                     )}
 
                     {status === 'sent' && (
                         <div className="w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
-                            <div className="font-black text-green-400 uppercase tracking-widest text-sm">Transfer Complete</div>
-                            <div className="text-[11px] text-slate-400 mt-1">The destination device can import the wallet now.</div>
+                            <div className="font-black text-green-400 uppercase tracking-widest text-sm">{t('pair.send_complete')}</div>
+                            <div className="text-[11px] text-slate-400 mt-1">{t('pair.send_complete_subtitle')}</div>
                         </div>
                     )}
 
                     <div className="pt-2 text-center text-[10px] text-slate-500">
-                        End-to-end encrypted manual transfer
+                        {t('pair.e2ee_transfer')}
                     </div>
                 </div>
             </div>
