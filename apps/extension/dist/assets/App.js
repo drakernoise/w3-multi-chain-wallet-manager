@@ -9196,6 +9196,7 @@ const SyncImportModal = ({ onClose, onImport }) => {
   const [pairCode, setPairCode] = reactExports.useState("");
   const [status, setStatus] = reactExports.useState("preparing");
   const [errorMsg, setErrorMsg] = reactExports.useState("");
+  const [successMsg, setSuccessMsg] = reactExports.useState("");
   reactExports.useEffect(() => {
     let mounted = true;
     deviceTransferService.onStatusChange((nextStatus, detail) => {
@@ -9218,10 +9219,8 @@ const SyncImportModal = ({ onClose, onImport }) => {
         setStatus("importing");
         await onImport(payload);
         if (!mounted) return;
+        setSuccessMsg(`Wallet received successfully. Imported ${payload.accounts.length} account${payload.accounts.length === 1 ? "" : "s"}.`);
         setStatus("done");
-        setTimeout(() => {
-          if (mounted) onClose();
-        }, 900);
       } catch (e) {
         if (!mounted) return;
         setStatus("error");
@@ -9267,12 +9266,23 @@ const SyncImportModal = ({ onClose, onImport }) => {
       status === "preparing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Preparing secure session..." }),
       status === "waiting" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Waiting for source device..." }),
       status === "importing" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: "Receiving and importing encrypted wallet..." }),
-      status === "done" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: "Import Complete" }) }),
+      status === "done" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center px-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: "Import Complete" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-300 mt-2", children: successMsg })
+      ] }),
       status === "error" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-red-400 uppercase tracking-widest text-sm", children: "Transfer Error" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 mt-1", children: errorMsg })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: "This device never exposes the private data in plain text." })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 text-center text-[10px] text-slate-500", children: "This device never exposes the private data in plain text." }),
+      status === "done" && /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: onClose,
+          className: "w-full py-3 bg-green-500/15 hover:bg-green-500/25 border border-green-500/30 rounded-xl font-bold text-sm text-green-300 transition-all active:scale-95",
+          children: "Close"
+        }
+      )
     ] })
   ] }) });
 };

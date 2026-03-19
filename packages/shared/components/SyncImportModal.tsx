@@ -13,6 +13,7 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
     const [pairCode, setPairCode] = useState('');
     const [status, setStatus] = useState<ImportStatus>('preparing');
     const [errorMsg, setErrorMsg] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
 
     useEffect(() => {
         let mounted = true;
@@ -39,10 +40,8 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
                 setStatus('importing');
                 await onImport(payload);
                 if (!mounted) return;
+                setSuccessMsg(`Wallet received successfully. Imported ${payload.accounts.length} account${payload.accounts.length === 1 ? '' : 's'}.`);
                 setStatus('done');
-                setTimeout(() => {
-                    if (mounted) onClose();
-                }, 900);
             } catch (e: any) {
                 if (!mounted) return;
                 setStatus('error');
@@ -110,8 +109,9 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
                     )}
 
                     {status === 'done' && (
-                        <div className="w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                        <div className="w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center px-4">
                             <div className="font-black text-green-400 uppercase tracking-widest text-sm">Import Complete</div>
+                            <div className="text-xs text-slate-300 mt-2">{successMsg}</div>
                         </div>
                     )}
 
@@ -125,6 +125,15 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
                     <div className="pt-2 text-center text-[10px] text-slate-500">
                         This device never exposes the private data in plain text.
                     </div>
+
+                    {status === 'done' && (
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 bg-green-500/15 hover:bg-green-500/25 border border-green-500/30 rounded-xl font-bold text-sm text-green-300 transition-all active:scale-95"
+                        >
+                            Close
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
