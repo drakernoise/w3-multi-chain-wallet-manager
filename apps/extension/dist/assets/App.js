@@ -8886,8 +8886,10 @@ class DeviceTransferService {
     this.sessionId = null;
     this.sharedKey = null;
     this.myKeyPair = null;
+    this.myPublicKeyB64 = null;
     this.incomingPayloadResolver = null;
     this.statusListener = null;
+    this.hasEchoedPublicKey = false;
   }
   onStatusChange(callback) {
     this.statusListener = callback;
@@ -8934,6 +8936,10 @@ class DeviceTransferService {
       try {
         const remotePublicKey = await importKeyFromBase64(data.publicKey, "public");
         this.sharedKey = await deriveSharedSecret(this.myKeyPair.privateKey, remotePublicKey);
+        if (!this.hasEchoedPublicKey && this.sessionId && this.myPublicKeyB64) {
+          this.hasEchoedPublicKey = true;
+          this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: this.myPublicKeyB64 });
+        }
         this.emitStatus("paired");
       } catch (error) {
         this.emitStatus("error", error?.message || "Handshake failed");
@@ -8958,7 +8964,9 @@ class DeviceTransferService {
     this.sessionId = this.createSessionCode();
     this.myKeyPair = await generateEncryptionKeys();
     this.sharedKey = null;
+    this.hasEchoedPublicKey = false;
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
+    this.myPublicKeyB64 = myPubB64;
     this.emitStatus("waiting");
     this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
     return { code: this.formatCode(this.sessionId) };
@@ -8985,7 +8993,9 @@ class DeviceTransferService {
     this.sessionId = code;
     this.myKeyPair = await generateEncryptionKeys();
     this.sharedKey = null;
+    this.hasEchoedPublicKey = false;
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
+    this.myPublicKeyB64 = myPubB64;
     this.emitStatus("connecting");
     const pairedPromise = new Promise((resolve, reject) => {
       const timeoutId = window.setTimeout(() => {
@@ -9024,6 +9034,8 @@ class DeviceTransferService {
     this.sessionId = null;
     this.sharedKey = null;
     this.myKeyPair = null;
+    this.myPublicKeyB64 = null;
+    this.hasEchoedPublicKey = false;
     this.incomingPayloadResolver = null;
     this.emitStatus("idle");
   }

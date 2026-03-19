@@ -20,8 +20,10 @@ class DeviceTransferService {
   private sessionId: string | null = null;
   private sharedKey: CryptoKey | null = null;
   private myKeyPair: CryptoKeyPair | null = null;
+  private myPublicKeyB64: string | null = null;
   private incomingPayloadResolver: ((payload: SyncPayload) => void) | null = null;
   private statusListener: ((status: TransferStatus, detail?: string) => void) | null = null;
+  private hasEchoedPublicKey = false;
 
   public onStatusChange(callback: ((status: TransferStatus, detail?: string) => void) | null) {
     this.statusListener = callback;
@@ -81,6 +83,10 @@ class DeviceTransferService {
       try {
         const remotePublicKey = await importKeyFromBase64(data.publicKey, 'public');
         this.sharedKey = await deriveSharedSecret(this.myKeyPair.privateKey, remotePublicKey);
+        if (!this.hasEchoedPublicKey && this.sessionId && this.myPublicKeyB64) {
+          this.hasEchoedPublicKey = true;
+          this.socket?.emit('bridge_join', { sessionId: this.sessionId, publicKey: this.myPublicKeyB64 });
+        }
         this.emitStatus('paired');
       } catch (error: any) {
         this.emitStatus('error', error?.message || 'Handshake failed');
@@ -107,8 +113,10 @@ class DeviceTransferService {
     this.sessionId = this.createSessionCode();
     this.myKeyPair = await generateEncryptionKeys();
     this.sharedKey = null;
+    this.hasEchoedPublicKey = false;
 
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
+    this.myPublicKeyB64 = myPubB64;
     this.emitStatus('waiting');
     this.socket?.emit('bridge_join', { sessionId: this.sessionId, publicKey: myPubB64 });
 
@@ -140,8 +148,10 @@ class DeviceTransferService {
     this.sessionId = code;
     this.myKeyPair = await generateEncryptionKeys();
     this.sharedKey = null;
+    this.hasEchoedPublicKey = false;
 
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
+    this.myPublicKeyB64 = myPubB64;
     this.emitStatus('connecting');
 
     const pairedPromise = new Promise<void>((resolve, reject) => {
@@ -186,6 +196,8 @@ class DeviceTransferService {
     this.sessionId = null;
     this.sharedKey = null;
     this.myKeyPair = null;
+    this.myPublicKeyB64 = null;
+    this.hasEchoedPublicKey = false;
     this.incomingPayloadResolver = null;
     this.emitStatus('idle');
   }
