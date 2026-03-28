@@ -45,6 +45,29 @@ interface SharedMultiSigPackage {
   proposal: SavedMultiSigProposal;
 }
 
+const normalizeSavedProposal = (proposal: Partial<SavedMultiSigProposal> | null | undefined): SavedMultiSigProposal | null => {
+  if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
+    return null;
+  }
+
+  return {
+    id: proposal.id || crypto.randomUUID(),
+    title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
+    chain: proposal.chain,
+    initiator: proposal.initiator,
+    threshold: Number(proposal.threshold) || 1,
+    signers: Array.isArray(proposal.signers) ? proposal.signers : [],
+    expiration: proposal.expiration || null,
+    operationType: proposal.operationType || 'custom',
+    operation: proposal.operation,
+    authoritySnapshot: proposal.authoritySnapshot || null,
+    unsignedTransaction: proposal.unsignedTransaction,
+    partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
+    lastBroadcastTxId: proposal.lastBroadcastTxId,
+    createdAt: proposal.createdAt || Date.now()
+  };
+};
+
 const chainTheme = {
   [Chain.HIVE]: 'bg-hive text-white shadow-lg',
   [Chain.STEEM]: 'bg-steem text-white shadow-lg',
@@ -94,7 +117,15 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         if (!raw || cancelled) return;
         const parsed = JSON.parse(raw) as SavedMultiSigProposal[];
         if (!cancelled && Array.isArray(parsed)) {
-          setSavedProposals(parsed);
+          const normalized = parsed
+            .map((proposal) => normalizeSavedProposal(proposal))
+            .filter((proposal): proposal is SavedMultiSigProposal => !!proposal);
+
+          setSavedProposals(normalized);
+
+          if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+            await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(normalized));
+          }
         }
       } catch (error) {
         console.warn('Failed to load saved multisig proposals:', error);
@@ -222,6 +253,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const activeAuthorityAccounts = authority?.accountAuths ?? [];
   const activeAuthorityKeys = authority?.keyAuths ?? [];
   const looksLikeMultisig = !!authority && (activeAuthorityAccounts.length > 0 || authority.threshold > 1);
+  const effectiveThreshold = authority?.threshold || request.threshold;
 
   const addSigner = (signerName?: string) => {
     const signer = (signerName ?? newSigner).trim().replace(/^@/, '');
@@ -238,7 +270,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     return JSON.stringify({
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: request.threshold,
+      threshold: effectiveThreshold,
       signers: request.signers,
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operation: (() => {
@@ -250,7 +282,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       })(),
       authoritySnapshot: authority
     }, null, 2);
-  }, [authority, expiresAt, request.initiator, request.operation, request.signers, request.threshold, selectedChain]);
+  }, [authority, effectiveThreshold, expiresAt, request.initiator, request.operation, request.signers, selectedChain]);
 
   const handleCopyDraft = async () => {
     await navigator.clipboard.writeText(proposalDraft);
@@ -282,7 +314,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || 'unknown'}`,
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: request.threshold,
+      threshold: effectiveThreshold,
       signers: request.signers,
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operationType: opType,
@@ -434,15 +466,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         throw new Error('Invalid proposal package');
       }
 
-      const normalizedProposal: SavedMultiSigProposal = {
-        ...proposal,
-        id: proposal.id || crypto.randomUUID(),
-        title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
-        signers: Array.isArray(proposal.signers) ? proposal.signers : [],
-        threshold: Number(proposal.threshold) || 1,
-        partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
-        createdAt: proposal.createdAt || Date.now()
-      };
+      const normalizedProposal = normalizeSavedProposal(proposal);
+
+      if (!normalizedProposal) {
+        throw new Error('Invalid proposal package');
+      }
 
       const proposals = [
         normalizedProposal,
@@ -512,11 +540,17 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                 <input
                   type="number"
                   min="1"
-                  max={Math.max(1, authority?.threshold || request.signers.length || 1)}
-                  value={request.threshold}
+                  max={Math.max(1, effectiveThreshold || request.signers.length || 1)}
+                  value={effectiveThreshold}
                   onChange={(e) => setRequest(prev => ({ ...prev, threshold: Math.max(1, Number(e.target.value) || 1) }))}
-                  className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                  disabled={!!authority}
+                  className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 disabled:text-slate-400 disabled:bg-dark-800 disabled:border-dark-700"
                 />
+                {authority && (
+                  <p className="mt-2 text-[10px] text-slate-500">
+                    Locked to on-chain threshold while authority is available.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.expiration')}</label>
@@ -754,8 +788,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                 ) : savedProposals.map((proposal) => (
                   <div key={proposal.id} className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3">
                     {(() => {
+                      const partialSignatures = Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [];
                       const progress = proposal.authoritySnapshot
-                        ? calculateThresholdProgress(proposal.authoritySnapshot, proposal.partialSignatures)
+                        ? calculateThresholdProgress(proposal.authoritySnapshot, partialSignatures)
                         : null;
                       const localSigner = findLocalSigner(proposal);
 
@@ -764,19 +799,24 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-white truncate">{proposal.title}</div>
                         <div className="text-[11px] text-slate-400 mt-1 break-words">
-                          {proposal.chain} • @{proposal.initiator} • threshold {proposal.threshold}
+                          {proposal.chain} • @{proposal.initiator} • draft threshold {proposal.threshold}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-1">
                           {new Date(proposal.createdAt).toLocaleString()}
                         </div>
                         {progress && (
                           <div className="mt-2 text-[10px] text-slate-400">
-                            Progress: <span className="font-bold text-white">{progress.currentWeight}</span> / {progress.threshold}
+                            Progress: <span className="font-bold text-white">{progress.currentWeight}</span> / {progress.threshold} on-chain
                           </div>
                         )}
-                        {proposal.partialSignatures.length > 0 && (
+                        {progress && proposal.threshold !== progress.threshold && (
+                          <div className="mt-1 text-[10px] text-amber-400 break-words">
+                            Saved draft threshold differs from current on-chain threshold. On-chain value wins.
+                          </div>
+                        )}
+                        {partialSignatures.length > 0 && (
                           <div className="mt-1 text-[10px] text-blue-400 break-words">
-                            Signed by {proposal.partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
+                            Signed by {partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
                           </div>
                         )}
                         {proposal.lastBroadcastTxId && (
@@ -809,14 +849,18 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                         <button
                           onClick={() => handlePartialSignProposal(proposal)}
                           disabled={!localSigner || proposalBusyId === proposal.id}
-                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
                         >
-                          {proposalBusyId === proposal.id ? '...' : localSigner ? `Sign @${localSigner.name}` : 'No local signer'}
+                          {proposalBusyId === proposal.id ? '...' : localSigner ? (
+                            <span className="block break-words normal-case tracking-normal font-bold">
+                              Sign @{localSigner.name}
+                            </span>
+                          ) : 'No signer'}
                         </button>
                         <button
                           onClick={() => handleBroadcastProposal(proposal)}
                           disabled={!progress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
-                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
                         >
                           Broadcast
                         </button>

@@ -11407,6 +11407,27 @@ const BulkTransfer = ({ chain, accounts, refreshBalance, onChangeChain, onAddAcc
 };
 
 const MULTISIG_STORAGE_KEY = "gravity_multisig_proposals";
+const normalizeSavedProposal = (proposal) => {
+  if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
+    return null;
+  }
+  return {
+    id: proposal.id || crypto.randomUUID(),
+    title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
+    chain: proposal.chain,
+    initiator: proposal.initiator,
+    threshold: Number(proposal.threshold) || 1,
+    signers: Array.isArray(proposal.signers) ? proposal.signers : [],
+    expiration: proposal.expiration || null,
+    operationType: proposal.operationType || "custom",
+    operation: proposal.operation,
+    authoritySnapshot: proposal.authoritySnapshot || null,
+    unsignedTransaction: proposal.unsignedTransaction,
+    partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
+    lastBroadcastTxId: proposal.lastBroadcastTxId,
+    createdAt: proposal.createdAt || Date.now()
+  };
+};
 const chainTheme = {
   [Chain.HIVE]: "bg-hive text-white shadow-lg",
   [Chain.STEEM]: "bg-steem text-white shadow-lg",
@@ -11450,7 +11471,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         if (!raw || cancelled) return;
         const parsed = JSON.parse(raw);
         if (!cancelled && Array.isArray(parsed)) {
-          setSavedProposals(parsed);
+          const normalized = parsed.map((proposal) => normalizeSavedProposal(proposal)).filter((proposal) => !!proposal);
+          setSavedProposals(normalized);
+          if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+            await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(normalized));
+          }
         }
       } catch (error) {
         console.warn("Failed to load saved multisig proposals:", error);
@@ -11563,6 +11588,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const activeAuthorityAccounts = authority?.accountAuths ?? [];
   const activeAuthorityKeys = authority?.keyAuths ?? [];
   const looksLikeMultisig = !!authority && (activeAuthorityAccounts.length > 0 || authority.threshold > 1);
+  const effectiveThreshold = authority?.threshold || request.threshold;
   const addSigner = (signerName) => {
     const signer = (signerName ?? newSigner).trim().replace(/^@/, "");
     if (!signer || request.signers.includes(signer)) return;
@@ -11576,7 +11602,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     return JSON.stringify({
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: request.threshold,
+      threshold: effectiveThreshold,
       signers: request.signers,
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operation: (() => {
@@ -11588,7 +11614,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       })(),
       authoritySnapshot: authority
     }, null, 2);
-  }, [authority, expiresAt, request.initiator, request.operation, request.signers, request.threshold, selectedChain]);
+  }, [authority, effectiveThreshold, expiresAt, request.initiator, request.operation, request.signers, selectedChain]);
   const handleCopyDraft = async () => {
     await navigator.clipboard.writeText(proposalDraft);
     setCopied(true);
@@ -11615,7 +11641,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || "unknown"}`,
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: request.threshold,
+      threshold: effectiveThreshold,
       signers: request.signers,
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operationType: opType,
@@ -11737,15 +11763,10 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
         throw new Error("Invalid proposal package");
       }
-      const normalizedProposal = {
-        ...proposal,
-        id: proposal.id || crypto.randomUUID(),
-        title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
-        signers: Array.isArray(proposal.signers) ? proposal.signers : [],
-        threshold: Number(proposal.threshold) || 1,
-        partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
-        createdAt: proposal.createdAt || Date.now()
-      };
+      const normalizedProposal = normalizeSavedProposal(proposal);
+      if (!normalizedProposal) {
+        throw new Error("Invalid proposal package");
+      }
       const proposals = [
         normalizedProposal,
         ...savedProposals.filter((candidate) => candidate.id !== normalizedProposal.id)
@@ -11810,12 +11831,14 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
               {
                 type: "number",
                 min: "1",
-                max: Math.max(1, authority?.threshold || request.signers.length || 1),
-                value: request.threshold,
+                max: Math.max(1, effectiveThreshold || request.signers.length || 1),
+                value: effectiveThreshold,
                 onChange: (e) => setRequest((prev) => ({ ...prev, threshold: Math.max(1, Number(e.target.value) || 1) })),
-                className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                disabled: !!authority,
+                className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 disabled:text-slate-400 disabled:bg-dark-800 disabled:border-dark-700"
               }
-            )
+            ),
+            authority && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-2 text-[10px] text-slate-500", children: "Locked to on-chain threshold while authority is available." })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.expiration") }),
@@ -12025,7 +12048,8 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
             )
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: savedProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No saved multisig proposals yet." }) : savedProposals.map((proposal) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-dark-700 bg-dark-800 px-3 py-3", children: (() => {
-            const progress = proposal.authoritySnapshot ? calculateThresholdProgress(proposal.authoritySnapshot, proposal.partialSignatures) : null;
+            const partialSignatures = Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [];
+            const progress = proposal.authoritySnapshot ? calculateThresholdProgress(proposal.authoritySnapshot, partialSignatures) : null;
             const localSigner = findLocalSigner(proposal);
             return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
@@ -12034,7 +12058,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   proposal.chain,
                   " • @",
                   proposal.initiator,
-                  " • threshold ",
+                  " • draft threshold ",
                   proposal.threshold
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: new Date(proposal.createdAt).toLocaleString() }),
@@ -12042,11 +12066,13 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   "Progress: ",
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: progress.currentWeight }),
                   " / ",
-                  progress.threshold
+                  progress.threshold,
+                  " on-chain"
                 ] }),
-                proposal.partialSignatures.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 text-[10px] text-blue-400 break-words", children: [
+                progress && proposal.threshold !== progress.threshold && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-1 text-[10px] text-amber-400 break-words", children: "Saved draft threshold differs from current on-chain threshold. On-chain value wins." }),
+                partialSignatures.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 text-[10px] text-blue-400 break-words", children: [
                   "Signed by ",
-                  proposal.partialSignatures.map((entry) => `@${entry.username}`).join(", ")
+                  partialSignatures.map((entry) => `@${entry.username}`).join(", ")
                 ] }),
                 proposal.lastBroadcastTxId && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 text-[10px] text-green-400 break-all", children: [
                   "Broadcasted: ",
@@ -12085,8 +12111,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   {
                     onClick: () => handlePartialSignProposal(proposal),
                     disabled: !localSigner || proposalBusyId === proposal.id,
-                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
-                    children: proposalBusyId === proposal.id ? "..." : localSigner ? `Sign @${localSigner.name}` : "No local signer"
+                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
+                    children: proposalBusyId === proposal.id ? "..." : localSigner ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
+                      "Sign @",
+                      localSigner.name
+                    ] }) : "No signer"
                   }
                 ),
                 /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -12094,7 +12123,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   {
                     onClick: () => handleBroadcastProposal(proposal),
                     disabled: !progress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId,
-                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
+                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
                     children: "Broadcast"
                   }
                 )
