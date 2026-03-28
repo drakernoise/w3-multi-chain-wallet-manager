@@ -446,7 +446,12 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
   const shareProposalToChatRecipients = async (proposal: SavedMultiSigProposal) => {
     const envelope = buildSyncEnvelope(proposal);
-    if (!envelope) return;
+    if (!envelope) {
+      const message = 'Auto-share unavailable: sign in to chat first.';
+      setTransportInfo(message);
+      showNotification(message, 'info');
+      return;
+    }
 
     const currentUser = envelope.sentBy.toLowerCase();
     const recipients = Array.from(
@@ -476,10 +481,13 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     if (sent.length > 0) {
       const message = `Auto-shared with ${sent.map((name) => `@${name}`).join(', ')}`;
       setTransportInfo(message);
+      showNotification(message, 'success');
     }
 
     if (failed.length > 0) {
-      showNotification(`Could not auto-share with ${failed.map((name) => `@${name}`).join(', ')}`, 'info');
+      const failureMessage = `Could not auto-share with ${failed.map((name) => `@${name}`).join(', ')}`;
+      setTransportInfo(failureMessage);
+      showNotification(failureMessage, 'info');
     }
   };
 
@@ -553,6 +561,19 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       setMemo('');
       setAmount('');
     }
+  };
+
+  const handleReuseProposal = (proposal: SavedMultiSigProposal) => {
+    setSaveLabel(`${proposal.title} copy`);
+    setTransportInfo(null);
+    setProposalBusyId(null);
+    handleLoadProposal({
+      ...proposal,
+      lastBroadcastTxId: undefined,
+      partialSignatures: [],
+      updatedAt: Date.now(),
+      expiration: null
+    });
   };
 
   const handleDeleteProposal = async (proposalId: string) => {
@@ -1134,59 +1155,70 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                           </div>
                         )}
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      {proposal.lastBroadcastTxId ? (
                         <button
-                          onClick={() => handleLoadProposal(proposal)}
-                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors"
+                          onClick={() => handleReuseProposal(proposal)}
+                          className="w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-blue-500 hover:text-white transition-colors"
                         >
-                          Load
+                          {t('multisig.reuse') || 'Reuse'}
                         </button>
-                        <button
-                          onClick={() => handleCopyProposalPackage(proposal)}
-                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors"
-                        >
-                          Copy
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProposal(proposal.id)}
-                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-2">
-                          {localSigners.length > 0 ? localSigners.map((signer) => (
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-3 gap-2">
                             <button
-                              key={`${proposal.id}:${signer.chain}:${signer.name}`}
-                              onClick={() => handlePartialSignProposal(proposal, signer)}
-                              disabled={proposalBusyId === proposal.id || signedNames.has(signer.name)}
-                              className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                              onClick={() => handleLoadProposal(proposal)}
+                              className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors"
                             >
-                              {proposalBusyId === proposal.id ? '...' : signedNames.has(signer.name) ? (
-                                <span className="block break-words normal-case tracking-normal font-bold">
-                                  Signed @{signer.name}
-                                </span>
-                              ) : (
-                                <span className="block break-words normal-case tracking-normal font-bold">
-                                  Sign @{signer.name}
-                                </span>
-                              )}
+                              Load
                             </button>
-                          )) : (
-                            <div className="col-span-2 min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-700 text-[10px] text-slate-500 text-center">
-                              No local signer
+                            <button
+                              onClick={() => handleCopyProposalPackage(proposal)}
+                              className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors"
+                            >
+                              Copy
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProposal(proposal.id)}
+                              className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              {localSigners.length > 0 ? localSigners.map((signer) => (
+                                <button
+                                  key={`${proposal.id}:${signer.chain}:${signer.name}`}
+                                  onClick={() => handlePartialSignProposal(proposal, signer)}
+                                  disabled={proposalBusyId === proposal.id || signedNames.has(signer.name)}
+                                  className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                                >
+                                  {proposalBusyId === proposal.id ? '...' : signedNames.has(signer.name) ? (
+                                    <span className="block break-words normal-case tracking-normal font-bold">
+                                      Signed @{signer.name}
+                                    </span>
+                                  ) : (
+                                    <span className="block break-words normal-case tracking-normal font-bold">
+                                      Sign @{signer.name}
+                                    </span>
+                                  )}
+                                </button>
+                              )) : (
+                                <div className="col-span-2 min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-700 text-[10px] text-slate-500 text-center">
+                                  No local signer
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleBroadcastProposal(proposal)}
-                          disabled={!coordinationProgress.canBroadcast || !onChainProgress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
-                          className="w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
-                        >
-                          Broadcast
-                        </button>
-                      </div>
+                            <button
+                              onClick={() => handleBroadcastProposal(proposal)}
+                              disabled={!coordinationProgress.canBroadcast || !onChainProgress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
+                              className="w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                            >
+                              Broadcast
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                       );
                     })()}

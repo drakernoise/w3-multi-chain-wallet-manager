@@ -5930,6 +5930,7 @@ const translations = {
     "multisig.you_label": "(YOU)",
     "multisig.how_it_works": '💡 **How it works:** This account is protected by Multiple Signatures. Each signer has a specific "Weight". Once the total weight reaches the "Threshold" of {threshold}, the transaction can be officially broadcasted to the blockchain.',
     "multisig.success_done": "Transaction Completed!",
+    "multisig.reuse": "Reuse",
     // Bulk
     "bulk.title": "Bulk Transfer",
     "bulk.recipients": "Recipients",
@@ -6425,6 +6426,7 @@ const translations = {
     "multisig.you_label": "(TÚ)",
     "multisig.how_it_works": '💡 **Cómo funciona:** Esta cuenta está protegida por Firmas Múltiples. Cada firmante tiene un "Peso" específico. Una vez que el peso total alcanza el "Umbral" de {threshold}, la transacción puede ser transmitida oficialmente a la blockchain.',
     "multisig.success_done": "¡Transacción Completada!",
+    "multisig.reuse": "Reutilizar",
     // Bulk
     "bulk.title": "Transferencia Masiva",
     "bulk.recipients": "Destinatarios",
@@ -11840,7 +11842,12 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   };
   const shareProposalToChatRecipients = async (proposal) => {
     const envelope = buildSyncEnvelope(proposal);
-    if (!envelope) return;
+    if (!envelope) {
+      const message = "Auto-share unavailable: sign in to chat first.";
+      setTransportInfo(message);
+      showNotification(message, "info");
+      return;
+    }
     const currentUser = envelope.sentBy.toLowerCase();
     const recipients = Array.from(
       new Set(
@@ -11863,9 +11870,12 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     if (sent.length > 0) {
       const message = `Auto-shared with ${sent.map((name) => `@${name}`).join(", ")}`;
       setTransportInfo(message);
+      showNotification(message, "success");
     }
     if (failed.length > 0) {
-      showNotification(`Could not auto-share with ${failed.map((name) => `@${name}`).join(", ")}`, "info");
+      const failureMessage = `Could not auto-share with ${failed.map((name) => `@${name}`).join(", ")}`;
+      setTransportInfo(failureMessage);
+      showNotification(failureMessage, "info");
     }
   };
   const handleSaveProposal = async () => {
@@ -11929,6 +11939,18 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       setMemo("");
       setAmount("");
     }
+  };
+  const handleReuseProposal = (proposal) => {
+    setSaveLabel(`${proposal.title} copy`);
+    setTransportInfo(null);
+    setProposalBusyId(null);
+    handleLoadProposal({
+      ...proposal,
+      lastBroadcastTxId: void 0,
+      partialSignatures: [],
+      updatedAt: Date.now(),
+      expiration: null
+    });
   };
   const handleDeleteProposal = async (proposalId) => {
     const proposals = savedProposals.filter((proposal) => proposal.id !== proposalId);
@@ -12422,58 +12444,67 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   proposal.lastBroadcastTxId
                 ] })
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-2", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "button",
-                  {
-                    onClick: () => handleLoadProposal(proposal),
-                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors",
-                    children: "Load"
-                  }
-                ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "button",
-                  {
-                    onClick: () => handleCopyProposalPackage(proposal),
-                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors",
-                    children: "Copy"
-                  }
-                ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "button",
-                  {
-                    onClick: () => handleDeleteProposal(proposal.id),
-                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors",
-                    children: "Delete"
-                  }
-                )
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: localSigners.length > 0 ? localSigners.map((signer) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "button",
-                  {
-                    onClick: () => handlePartialSignProposal(proposal, signer),
-                    disabled: proposalBusyId === proposal.id || signedNames.has(signer.name),
-                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
-                    children: proposalBusyId === proposal.id ? "..." : signedNames.has(signer.name) ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
-                      "Signed @",
-                      signer.name
-                    ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
-                      "Sign @",
-                      signer.name
-                    ] })
-                  },
-                  `${proposal.id}:${signer.chain}:${signer.name}`
-                )) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-2 min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-700 text-[10px] text-slate-500 text-center", children: "No local signer" }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
-                  "button",
-                  {
-                    onClick: () => handleBroadcastProposal(proposal),
-                    disabled: !coordinationProgress.canBroadcast || !onChainProgress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId,
-                    className: "w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
-                    children: "Broadcast"
-                  }
-                )
+              proposal.lastBroadcastTxId ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: () => handleReuseProposal(proposal),
+                  className: "w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-blue-500 hover:text-white transition-colors",
+                  children: t("multisig.reuse") || "Reuse"
+                }
+              ) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-2", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      onClick: () => handleLoadProposal(proposal),
+                      className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors",
+                      children: "Load"
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      onClick: () => handleCopyProposalPackage(proposal),
+                      className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors",
+                      children: "Copy"
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      onClick: () => handleDeleteProposal(proposal.id),
+                      className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors",
+                      children: "Delete"
+                    }
+                  )
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: localSigners.length > 0 ? localSigners.map((signer) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      onClick: () => handlePartialSignProposal(proposal, signer),
+                      disabled: proposalBusyId === proposal.id || signedNames.has(signer.name),
+                      className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
+                      children: proposalBusyId === proposal.id ? "..." : signedNames.has(signer.name) ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
+                        "Signed @",
+                        signer.name
+                      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
+                        "Sign @",
+                        signer.name
+                      ] })
+                    },
+                    `${proposal.id}:${signer.chain}:${signer.name}`
+                  )) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-2 min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-700 text-[10px] text-slate-500 text-center", children: "No local signer" }) }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      onClick: () => handleBroadcastProposal(proposal),
+                      disabled: !coordinationProgress.canBroadcast || !onChainProgress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId,
+                      className: "w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
+                      children: "Broadcast"
+                    }
+                  )
+                ] })
               ] })
             ] });
           })() }, proposal.id)) }),

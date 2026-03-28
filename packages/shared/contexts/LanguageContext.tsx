@@ -136,6 +136,7 @@ const translations: Record<Language, Record<string, string>> = {
         'multisig.you_label': '(YOU)',
         'multisig.how_it_works': '💡 **How it works:** This account is protected by Multiple Signatures. Each signer has a specific "Weight". Once the total weight reaches the "Threshold" of {threshold}, the transaction can be officially broadcasted to the blockchain.',
         'multisig.success_done': 'Transaction Completed!',
+        'multisig.reuse': 'Reuse',
         // Bulk
         'bulk.title': 'Bulk Transfer',
         'bulk.recipients': 'Recipients',
@@ -636,6 +637,7 @@ const translations: Record<Language, Record<string, string>> = {
         'multisig.you_label': '(TÚ)',
         'multisig.how_it_works': '💡 **Cómo funciona:** Esta cuenta está protegida por Firmas Múltiples. Cada firmante tiene un "Peso" específico. Una vez que el peso total alcanza el "Umbral" de {threshold}, la transacción puede ser transmitida oficialmente a la blockchain.',
         'multisig.success_done': '¡Transacción Completada!',
+        'multisig.reuse': 'Reutilizar',
         // Bulk
         'bulk.title': 'Transferencia Masiva',
         'bulk.recipients': 'Destinatarios',
