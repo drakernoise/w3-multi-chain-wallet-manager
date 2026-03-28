@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Chain, Account, MultiSigRequest } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
+import { useNotification } from '../contexts/NotificationContext';
 import {
   broadcastSignedTransaction,
   calculateThresholdProgress,
@@ -11,6 +12,7 @@ import {
   selectBroadcastSignatures,
   signTransactionEnvelope
 } from '../services/chainService';
+import { chatService, ChatMessage } from '../services/chatService';
 import { storageService } from '../services/storageService';
 
 interface MultiSigProps {
@@ -36,15 +38,31 @@ interface SavedMultiSigProposal {
   partialSignatures: PartialTransactionSignature[];
   lastBroadcastTxId?: string;
   createdAt: number;
+  updatedAt: number;
 }
 
 const MULTISIG_STORAGE_KEY = 'gravity_multisig_proposals';
+const MULTISIG_INCOMING_STORAGE_KEY = 'gravity_multisig_incoming_proposals';
 
 interface SharedMultiSigPackage {
   version: 1;
   kind: 'gravity-multisig-proposal';
   proposal: SavedMultiSigProposal;
 }
+
+interface MultiSigSyncEnvelope extends SharedMultiSigPackage {
+  transport: 'chat-dm';
+  sentAt: number;
+  sentBy: string;
+}
+
+interface IncomingMultiSigProposal {
+  proposal: SavedMultiSigProposal;
+  sentAt: number;
+  sentBy: string;
+}
+
+const MULTISIG_SYNC_KIND = 'gravity-multisig-proposal';
 
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
 
@@ -115,7 +133,8 @@ const normalizeSavedProposal = (proposal: Partial<SavedMultiSigProposal> | null 
     unsignedTransaction: proposal.unsignedTransaction,
     partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
     lastBroadcastTxId: proposal.lastBroadcastTxId,
-    createdAt: proposal.createdAt || Date.now()
+    createdAt: proposal.createdAt || Date.now(),
+    updatedAt: proposal.updatedAt || proposal.createdAt || Date.now()
   };
 };
 
@@ -127,6 +146,7 @@ const chainTheme = {
 
 export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
+  const { showNotification } = useNotification();
   const [selectedChain, setSelectedChain] = useState<Chain>(initialChain);
   const [newSigner, setNewSigner] = useState('');
   const [opType, setOpType] = useState<OpType>('transfer');
@@ -138,10 +158,12 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const [saveLabel, setSaveLabel] = useState('');
   const [importPayload, setImportPayload] = useState('');
   const [savedProposals, setSavedProposals] = useState<SavedMultiSigProposal[]>([]);
+  const [incomingProposals, setIncomingProposals] = useState<IncomingMultiSigProposal[]>([]);
   const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
   const [authorityLoading, setAuthorityLoading] = useState(false);
   const [authority, setAuthority] = useState<MultiSigAuthority | null>(null);
   const [authorityError, setAuthorityError] = useState<string | null>(null);
+  const [transportInfo, setTransportInfo] = useState<string | null>(null);
 
   const chainAccounts = useMemo(
     () => accounts.filter((account) => account.chain === selectedChain),
@@ -162,12 +184,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   useEffect(() => {
     let cancelled = false;
 
-    const loadSavedProposals = async () => {
+    const loadStoredData = async () => {
       try {
         const raw = await storageService.getItem(MULTISIG_STORAGE_KEY);
-        if (!raw || cancelled) return;
-        const parsed = JSON.parse(raw) as SavedMultiSigProposal[];
-        if (!cancelled && Array.isArray(parsed)) {
+        if (!cancelled && raw) {
+          const parsed = JSON.parse(raw) as SavedMultiSigProposal[];
           const normalized = parsed
             .map((proposal) => normalizeSavedProposal(proposal))
             .filter((proposal): proposal is SavedMultiSigProposal => !!proposal);
@@ -178,12 +199,34 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(normalized));
           }
         }
+
+        const rawIncoming = await storageService.getItem(MULTISIG_INCOMING_STORAGE_KEY);
+        if (!cancelled && rawIncoming) {
+          const parsedIncoming = JSON.parse(rawIncoming) as IncomingMultiSigProposal[];
+          const normalizedIncoming = parsedIncoming
+            .map((entry) => {
+              const normalizedProposal = normalizeSavedProposal(entry?.proposal);
+              if (!normalizedProposal) return null;
+              return {
+                proposal: normalizedProposal,
+                sentAt: entry?.sentAt || normalizedProposal.updatedAt || normalizedProposal.createdAt,
+                sentBy: entry?.sentBy || 'unknown'
+              };
+            })
+            .filter((entry): entry is IncomingMultiSigProposal => !!entry);
+
+          setIncomingProposals(normalizedIncoming);
+
+          if (JSON.stringify(parsedIncoming) !== JSON.stringify(normalizedIncoming)) {
+            await storageService.setItem(MULTISIG_INCOMING_STORAGE_KEY, JSON.stringify(normalizedIncoming));
+          }
+        }
       } catch (error) {
         console.warn('Failed to load saved multisig proposals:', error);
       }
     };
 
-    loadSavedProposals();
+    loadStoredData();
     return () => {
       cancelled = true;
     };
@@ -346,6 +389,100 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(proposals));
   };
 
+  const persistIncomingProposals = async (entries: IncomingMultiSigProposal[]) => {
+    setIncomingProposals(entries);
+    await storageService.setItem(MULTISIG_INCOMING_STORAGE_KEY, JSON.stringify(entries));
+  };
+
+  const mergeProposalIntoList = (incoming: SavedMultiSigProposal, current: SavedMultiSigProposal[]) => {
+    const existing = current.find((entry) => entry.id === incoming.id);
+    if (!existing) {
+      return [incoming, ...current].slice(0, 20);
+    }
+
+    const winner = (incoming.updatedAt || incoming.createdAt || 0) >= (existing.updatedAt || existing.createdAt || 0)
+      ? incoming
+      : existing;
+
+    return [
+      winner,
+      ...current.filter((entry) => entry.id !== incoming.id)
+    ].slice(0, 20);
+  };
+
+  const mergeIncomingProposal = (incoming: IncomingMultiSigProposal, current: IncomingMultiSigProposal[]) => {
+    const existing = current.find((entry) => entry.proposal.id === incoming.proposal.id);
+    if (!existing) {
+      return [incoming, ...current].slice(0, 20);
+    }
+
+    const winner = (incoming.proposal.updatedAt || incoming.sentAt || 0) >= (existing.proposal.updatedAt || existing.sentAt || 0)
+      ? incoming
+      : existing;
+
+    return [
+      winner,
+      ...current.filter((entry) => entry.proposal.id !== incoming.proposal.id)
+    ].slice(0, 20);
+  };
+
+  const buildSharedPackage = (proposal: SavedMultiSigProposal): SharedMultiSigPackage => ({
+    version: 1,
+    kind: MULTISIG_SYNC_KIND,
+    proposal
+  });
+
+  const buildSyncEnvelope = (proposal: SavedMultiSigProposal): MultiSigSyncEnvelope | null => {
+    const currentUser = chatService.getCurrentUser();
+    if (!currentUser?.username) return null;
+
+    return {
+      ...buildSharedPackage(proposal),
+      transport: 'chat-dm',
+      sentAt: Date.now(),
+      sentBy: currentUser.username
+    };
+  };
+
+  const shareProposalToChatRecipients = async (proposal: SavedMultiSigProposal) => {
+    const envelope = buildSyncEnvelope(proposal);
+    if (!envelope) return;
+
+    const currentUser = envelope.sentBy.toLowerCase();
+    const recipients = Array.from(
+      new Set(
+        [proposal.initiator, ...proposal.signers]
+          .map((name) => name.replace(/^@/, '').trim())
+          .filter(Boolean)
+      )
+    ).filter((name) => name.toLowerCase() !== currentUser);
+
+    if (recipients.length === 0) return;
+
+    const payload = JSON.stringify(envelope);
+    const sent: string[] = [];
+    const failed: string[] = [];
+
+    for (const recipient of recipients) {
+      try {
+        await chatService.sendDirectMessageToUsername(recipient, payload);
+        sent.push(recipient);
+      } catch (error) {
+        console.warn(`Failed to auto-share multisig proposal with @${recipient}:`, error);
+        failed.push(recipient);
+      }
+    }
+
+    if (sent.length > 0) {
+      const message = `Auto-shared with ${sent.map((name) => `@${name}`).join(', ')}`;
+      setTransportInfo(message);
+    }
+
+    if (failed.length > 0) {
+      showNotification(`Could not auto-share with ${failed.map((name) => `@${name}`).join(', ')}`, 'info');
+    }
+  };
+
   const handleSaveProposal = async () => {
     const coordinationThreshold = getCoordinationThreshold(request.signers);
     const normalizedExpiration = normalizeMultiSigExpiration(expiresAt);
@@ -375,11 +512,13 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       authoritySnapshot: authority,
       unsignedTransaction,
       partialSignatures: [],
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     };
 
     const proposals = [proposal, ...savedProposals].slice(0, 20);
     await persistSavedProposals(proposals);
+    await shareProposalToChatRecipients(proposal);
     setSaveLabel('');
   };
 
@@ -460,6 +599,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
       const nextProposal: SavedMultiSigProposal = {
         ...proposal,
+        updatedAt: Date.now(),
         partialSignatures: [
           ...proposal.partialSignatures.filter((entry) => entry.username !== signer.name),
           {
@@ -471,6 +611,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       };
 
       await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
+      await shareProposalToChatRecipients(nextProposal);
     } catch (error) {
       console.warn('Failed to partial-sign multisig proposal:', error);
     } finally {
@@ -498,22 +639,18 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
       const nextProposal: SavedMultiSigProposal = {
         ...proposal,
+        updatedAt: Date.now(),
         lastBroadcastTxId: result.txId
       };
 
       await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
+      await shareProposalToChatRecipients(nextProposal);
     } catch (error) {
       console.warn('Failed to broadcast multisig proposal:', error);
     } finally {
       setProposalBusyId(null);
     }
   };
-
-  const buildSharedPackage = (proposal: SavedMultiSigProposal): SharedMultiSigPackage => ({
-    version: 1,
-    kind: 'gravity-multisig-proposal',
-    proposal
-  });
 
   const handleCopyProposalPackage = async (proposal: SavedMultiSigProposal) => {
     await navigator.clipboard.writeText(JSON.stringify(buildSharedPackage(proposal), null, 2));
@@ -523,8 +660,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     if (!importPayload.trim()) return;
 
     try {
-      const parsed = JSON.parse(importPayload) as SharedMultiSigPackage | SavedMultiSigProposal;
-      const proposal = (parsed as SharedMultiSigPackage).kind === 'gravity-multisig-proposal'
+      const parsed = JSON.parse(importPayload) as SharedMultiSigPackage | MultiSigSyncEnvelope | SavedMultiSigProposal;
+      const proposal = (parsed as SharedMultiSigPackage).kind === MULTISIG_SYNC_KIND
         ? (parsed as SharedMultiSigPackage).proposal
         : parsed as SavedMultiSigProposal;
 
@@ -539,9 +676,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       }
 
       const proposals = [
-        normalizedProposal,
-        ...savedProposals.filter((candidate) => candidate.id !== normalizedProposal.id)
-      ].slice(0, 20);
+        ...mergeProposalIntoList(normalizedProposal, savedProposals)
+      ];
 
       await persistSavedProposals(proposals);
       setImportPayload('');
@@ -549,6 +685,60 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       console.warn('Failed to import multisig proposal package:', error);
     }
   };
+
+  const handleAcceptIncomingProposal = async (incoming: IncomingMultiSigProposal) => {
+    const mergedSaved = mergeProposalIntoList(incoming.proposal, savedProposals);
+    const nextIncoming = incomingProposals.filter((entry) => entry.proposal.id !== incoming.proposal.id);
+    await persistSavedProposals(mergedSaved);
+    await persistIncomingProposals(nextIncoming);
+    setTransportInfo(`Accepted update from @${incoming.sentBy}`);
+    showNotification(`Accepted multisig update from @${incoming.sentBy}`, 'success');
+  };
+
+  const handleRejectIncomingProposal = async (proposalId: string) => {
+    const nextIncoming = incomingProposals.filter((entry) => entry.proposal.id !== proposalId);
+    await persistIncomingProposals(nextIncoming);
+  };
+
+  useEffect(() => {
+    const incomingListener = async (_roomId: string, message: ChatMessage) => {
+      if (!message?.content) return;
+
+      try {
+        const parsed = JSON.parse(message.content) as MultiSigSyncEnvelope;
+        if (parsed?.kind !== MULTISIG_SYNC_KIND || !parsed?.proposal) return;
+
+        const normalizedProposal = normalizeSavedProposal(parsed.proposal);
+        if (!normalizedProposal) return;
+
+        const incomingEntry: IncomingMultiSigProposal = {
+          proposal: normalizedProposal,
+          sentAt: parsed.sentAt || normalizedProposal.updatedAt || Date.now(),
+          sentBy: parsed.sentBy || message.senderName || 'unknown'
+        };
+
+        const currentSaved = savedProposals.find((entry) => entry.id === normalizedProposal.id);
+        if (currentSaved && (currentSaved.updatedAt || currentSaved.createdAt || 0) >= (normalizedProposal.updatedAt || normalizedProposal.createdAt || 0)) {
+          return;
+        }
+
+        const mergedIncoming = mergeIncomingProposal(incomingEntry, incomingProposals);
+        const changed = JSON.stringify(mergedIncoming) !== JSON.stringify(incomingProposals);
+        if (!changed) return;
+
+        await persistIncomingProposals(mergedIncoming);
+        setTransportInfo(`Incoming update pending review from @${incomingEntry.sentBy}`);
+        showNotification(`Multisig update pending review from @${incomingEntry.sentBy}`, 'info');
+      } catch {
+        // Ignore non-multisig chat messages
+      }
+    };
+
+    chatService.addMessageListener(incomingListener);
+    return () => {
+      chatService.removeMessageListener(incomingListener);
+    };
+  }, [incomingProposals, savedProposals, showNotification]);
 
   return (
     <div className="h-full overflow-y-auto custom-scrollbar p-4">
@@ -820,10 +1010,63 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Incoming proposals</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Review DM-delivered proposal updates before they enter your local multisig tray.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {incomingProposals.length === 0 ? (
+                  <div className="text-xs text-slate-500 italic">No pending incoming multisig proposals.</div>
+                ) : incomingProposals.map((incoming) => (
+                  <div key={`incoming:${incoming.proposal.id}`} className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-3">
+                    <div className="space-y-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-white truncate">{incoming.proposal.title}</div>
+                        <div className="text-[11px] text-slate-400 mt-1 break-words">
+                          From @{incoming.sentBy} • {incoming.proposal.chain} • @{incoming.proposal.initiator}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1">
+                          {new Date(incoming.sentAt).toLocaleString()}
+                        </div>
+                        <div className="mt-2 text-[10px] text-slate-300">
+                          Coordination target: <span className="font-bold text-white">{getCoordinationThreshold(incoming.proposal.signers)}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handleAcceptIncomingProposal(incoming)}
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.1em] text-slate-200 hover:border-green-500 hover:text-white transition-colors"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => handleRejectIncomingProposal(incoming.proposal.id)}
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.1em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 border-t border-dark-700/80" />
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
                   <p className="text-xs text-slate-500 uppercase font-bold">Saved proposals</p>
                   <p className="text-[11px] text-slate-400 mt-1">
                     Keep local drafts here while we finish the signer notification and collection flow.
                   </p>
+                  {transportInfo && (
+                    <p className="text-[10px] text-blue-400 mt-2 break-words">
+                      {transportInfo}
+                    </p>
+                  )}
                 </div>
               </div>
 

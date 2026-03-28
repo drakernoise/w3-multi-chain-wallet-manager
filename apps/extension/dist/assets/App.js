@@ -1642,6 +1642,68 @@ class ChatService {
   unmuteUser(roomId, userId) {
     this.socket?.emit("unmute_user", { roomId, targetUserId: userId });
   }
+  async findUserByUsername(username, timeoutMs = 8e3) {
+    if (!this.socket?.connected) {
+      await this.init();
+    }
+    const normalized = username.trim().replace(/^@/, "").toLowerCase();
+    if (!normalized || !this.socket) return null;
+    return new Promise((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        this.socket?.off("search_results", handleResults);
+        reject(new Error(`Chat lookup timed out for @${normalized}`));
+      }, timeoutMs);
+      const handleResults = (results) => {
+        const match = (results || []).find((entry) => entry.username?.toLowerCase() === normalized) || null;
+        clearTimeout(timeoutId);
+        this.socket?.off("search_results", handleResults);
+        resolve(match);
+      };
+      this.socket?.on("search_results", handleResults);
+      this.socket?.emit("search_users", normalized);
+    });
+  }
+  async ensureDirectRoomByUsername(username, timeoutMs = 8e3) {
+    if (!this.socket?.connected) {
+      await this.init();
+    }
+    const normalized = username.trim().replace(/^@/, "").toLowerCase();
+    if (!normalized || !this.socket) throw new Error("Invalid DM target");
+    const existingRoom = this.rooms.find(
+      (room) => room.type === "dm" && (room.memberDetails?.some((member) => member.username?.toLowerCase() === normalized) || room.name?.toLowerCase().includes(normalized))
+    );
+    const targetUser = await this.findUserByUsername(normalized, timeoutMs);
+    if (!targetUser) throw new Error(`Chat user @${normalized} not found`);
+    if (existingRoom) {
+      if (!existingRoom.memberDetails?.length) {
+        this.joinRoom(existingRoom.id);
+      }
+      return { room: existingRoom, user: targetUser };
+    }
+    this.createDM(targetUser.id);
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const room = this.rooms.find(
+        (entry) => entry.type === "dm" && (entry.memberDetails?.some((member) => member.id === targetUser.id || member.username?.toLowerCase() === normalized) || entry.name?.toLowerCase().includes(normalized))
+      );
+      if (room) {
+        if (!room.memberDetails?.length) {
+          this.joinRoom(room.id);
+        }
+        return { room, user: targetUser };
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+    throw new Error(`DM room with @${normalized} not available yet`);
+  }
+  async sendDirectMessageToUsername(username, content) {
+    const { room, user } = await this.ensureDirectRoomByUsername(username);
+    if (!user.encryptionPublicKey) {
+      throw new Error(`Chat user @${user.username} has no encryption key`);
+    }
+    await this.sendDirectMessage(room.id, content, user.encryptionPublicKey);
+    return { roomId: room.id, userId: user.id };
+  }
   logout() {
     localStorage.removeItem("gravity_chat_id");
     localStorage.removeItem("gravity_chat_username");
@@ -11406,7 +11468,60 @@ const BulkTransfer = ({ chain, accounts, refreshBalance, onChangeChain, onAddAcc
   ] });
 };
 
+const NotificationToast = ({ message, type = "success", onClose }) => {
+  reactExports.useEffect(() => {
+    const timer = setTimeout(onClose, 3e3);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+  const bgColors = {
+    success: "bg-green-600/90 border-green-500/50",
+    error: "bg-red-600/90 border-red-500/50",
+    info: "bg-blue-600/90 border-blue-500/50"
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute top-20 left-0 right-0 z-[100] flex justify-center px-6 pointer-events-none", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `
+                ${bgColors[type]} 
+                text-white text-xs font-bold px-6 py-3 rounded-xl shadow-2xl border border-opacity-50
+                animate-bounce-in pointer-events-auto flex items-center gap-2 backdrop-blur-md
+                max-w-[85vw]
+            `, children: [
+    type === "success" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }) }),
+    type === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "break-all line-clamp-4 overflow-y-auto max-h-32 custom-scrollbar pr-1", children: message })
+  ] }) });
+};
+
+const NotificationContext = reactExports.createContext(void 0);
+const NotificationProvider = ({ children }) => {
+  const [notification, setNotification] = reactExports.useState(null);
+  const showNotification = reactExports.useCallback((message, type = "success") => {
+    setNotification({ message, type });
+  }, []);
+  const clearNotification = reactExports.useCallback(() => {
+    setNotification(null);
+  }, []);
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(NotificationContext.Provider, { value: { showNotification }, children: [
+    children,
+    notification && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      NotificationToast,
+      {
+        message: notification.message,
+        type: notification.type,
+        onClose: clearNotification
+      }
+    )
+  ] });
+};
+const useNotification = () => {
+  const context = reactExports.useContext(NotificationContext);
+  if (!context) {
+    throw new Error("useNotification must be used within a NotificationProvider");
+  }
+  return context;
+};
+
 const MULTISIG_STORAGE_KEY = "gravity_multisig_proposals";
+const MULTISIG_INCOMING_STORAGE_KEY = "gravity_multisig_incoming_proposals";
+const MULTISIG_SYNC_KIND = "gravity-multisig-proposal";
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
 const toLocalDateTimeInput = (date) => {
   const pad = (value) => String(value).padStart(2, "0");
@@ -11463,7 +11578,8 @@ const normalizeSavedProposal = (proposal) => {
     unsignedTransaction: proposal.unsignedTransaction,
     partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
     lastBroadcastTxId: proposal.lastBroadcastTxId,
-    createdAt: proposal.createdAt || Date.now()
+    createdAt: proposal.createdAt || Date.now(),
+    updatedAt: proposal.updatedAt || proposal.createdAt || Date.now()
   };
 };
 const chainTheme = {
@@ -11473,6 +11589,7 @@ const chainTheme = {
 };
 const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
+  const { showNotification } = useNotification();
   const [selectedChain, setSelectedChain] = reactExports.useState(initialChain);
   const [newSigner, setNewSigner] = reactExports.useState("");
   const [opType, setOpType] = reactExports.useState("transfer");
@@ -11484,10 +11601,12 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const [saveLabel, setSaveLabel] = reactExports.useState("");
   const [importPayload, setImportPayload] = reactExports.useState("");
   const [savedProposals, setSavedProposals] = reactExports.useState([]);
+  const [incomingProposals, setIncomingProposals] = reactExports.useState([]);
   const [proposalBusyId, setProposalBusyId] = reactExports.useState(null);
   const [authorityLoading, setAuthorityLoading] = reactExports.useState(false);
   const [authority, setAuthority] = reactExports.useState(null);
   const [authorityError, setAuthorityError] = reactExports.useState(null);
+  const [transportInfo, setTransportInfo] = reactExports.useState(null);
   const chainAccounts = reactExports.useMemo(
     () => accounts.filter((account) => account.chain === selectedChain),
     [accounts, selectedChain]
@@ -11503,23 +11622,39 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   }, [initialChain]);
   reactExports.useEffect(() => {
     let cancelled = false;
-    const loadSavedProposals = async () => {
+    const loadStoredData = async () => {
       try {
         const raw = await storageService.getItem(MULTISIG_STORAGE_KEY);
-        if (!raw || cancelled) return;
-        const parsed = JSON.parse(raw);
-        if (!cancelled && Array.isArray(parsed)) {
+        if (!cancelled && raw) {
+          const parsed = JSON.parse(raw);
           const normalized = parsed.map((proposal) => normalizeSavedProposal(proposal)).filter((proposal) => !!proposal);
           setSavedProposals(normalized);
           if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
             await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(normalized));
           }
         }
+        const rawIncoming = await storageService.getItem(MULTISIG_INCOMING_STORAGE_KEY);
+        if (!cancelled && rawIncoming) {
+          const parsedIncoming = JSON.parse(rawIncoming);
+          const normalizedIncoming = parsedIncoming.map((entry) => {
+            const normalizedProposal = normalizeSavedProposal(entry?.proposal);
+            if (!normalizedProposal) return null;
+            return {
+              proposal: normalizedProposal,
+              sentAt: entry?.sentAt || normalizedProposal.updatedAt || normalizedProposal.createdAt,
+              sentBy: entry?.sentBy || "unknown"
+            };
+          }).filter((entry) => !!entry);
+          setIncomingProposals(normalizedIncoming);
+          if (JSON.stringify(parsedIncoming) !== JSON.stringify(normalizedIncoming)) {
+            await storageService.setItem(MULTISIG_INCOMING_STORAGE_KEY, JSON.stringify(normalizedIncoming));
+          }
+        }
       } catch (error) {
         console.warn("Failed to load saved multisig proposals:", error);
       }
     };
-    loadSavedProposals();
+    loadStoredData();
     return () => {
       cancelled = true;
     };
@@ -11662,6 +11797,77 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     setSavedProposals(proposals);
     await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(proposals));
   };
+  const persistIncomingProposals = async (entries) => {
+    setIncomingProposals(entries);
+    await storageService.setItem(MULTISIG_INCOMING_STORAGE_KEY, JSON.stringify(entries));
+  };
+  const mergeProposalIntoList = (incoming, current) => {
+    const existing = current.find((entry) => entry.id === incoming.id);
+    if (!existing) {
+      return [incoming, ...current].slice(0, 20);
+    }
+    const winner = (incoming.updatedAt || incoming.createdAt || 0) >= (existing.updatedAt || existing.createdAt || 0) ? incoming : existing;
+    return [
+      winner,
+      ...current.filter((entry) => entry.id !== incoming.id)
+    ].slice(0, 20);
+  };
+  const mergeIncomingProposal = (incoming, current) => {
+    const existing = current.find((entry) => entry.proposal.id === incoming.proposal.id);
+    if (!existing) {
+      return [incoming, ...current].slice(0, 20);
+    }
+    const winner = (incoming.proposal.updatedAt || incoming.sentAt || 0) >= (existing.proposal.updatedAt || existing.sentAt || 0) ? incoming : existing;
+    return [
+      winner,
+      ...current.filter((entry) => entry.proposal.id !== incoming.proposal.id)
+    ].slice(0, 20);
+  };
+  const buildSharedPackage = (proposal) => ({
+    version: 1,
+    kind: MULTISIG_SYNC_KIND,
+    proposal
+  });
+  const buildSyncEnvelope = (proposal) => {
+    const currentUser = chatService.getCurrentUser();
+    if (!currentUser?.username) return null;
+    return {
+      ...buildSharedPackage(proposal),
+      transport: "chat-dm",
+      sentAt: Date.now(),
+      sentBy: currentUser.username
+    };
+  };
+  const shareProposalToChatRecipients = async (proposal) => {
+    const envelope = buildSyncEnvelope(proposal);
+    if (!envelope) return;
+    const currentUser = envelope.sentBy.toLowerCase();
+    const recipients = Array.from(
+      new Set(
+        [proposal.initiator, ...proposal.signers].map((name) => name.replace(/^@/, "").trim()).filter(Boolean)
+      )
+    ).filter((name) => name.toLowerCase() !== currentUser);
+    if (recipients.length === 0) return;
+    const payload = JSON.stringify(envelope);
+    const sent = [];
+    const failed = [];
+    for (const recipient of recipients) {
+      try {
+        await chatService.sendDirectMessageToUsername(recipient, payload);
+        sent.push(recipient);
+      } catch (error) {
+        console.warn(`Failed to auto-share multisig proposal with @${recipient}:`, error);
+        failed.push(recipient);
+      }
+    }
+    if (sent.length > 0) {
+      const message = `Auto-shared with ${sent.map((name) => `@${name}`).join(", ")}`;
+      setTransportInfo(message);
+    }
+    if (failed.length > 0) {
+      showNotification(`Could not auto-share with ${failed.map((name) => `@${name}`).join(", ")}`, "info");
+    }
+  };
   const handleSaveProposal = async () => {
     const coordinationThreshold = getCoordinationThreshold(request.signers);
     const normalizedExpiration = normalizeMultiSigExpiration(expiresAt);
@@ -11689,10 +11895,12 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       authoritySnapshot: authority,
       unsignedTransaction,
       partialSignatures: [],
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     };
     const proposals = [proposal, ...savedProposals].slice(0, 20);
     await persistSavedProposals(proposals);
+    await shareProposalToChatRecipients(proposal);
     setSaveLabel("");
   };
   const handleLoadProposal = (proposal) => {
@@ -11756,6 +11964,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       }
       const nextProposal = {
         ...proposal,
+        updatedAt: Date.now(),
         partialSignatures: [
           ...proposal.partialSignatures.filter((entry) => entry.username !== signer.name),
           {
@@ -11766,6 +11975,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         ]
       };
       await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
+      await shareProposalToChatRecipients(nextProposal);
     } catch (error) {
       console.warn("Failed to partial-sign multisig proposal:", error);
     } finally {
@@ -11788,20 +11998,17 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       if (!result.success) throw new Error(result.error || "Broadcast failed");
       const nextProposal = {
         ...proposal,
+        updatedAt: Date.now(),
         lastBroadcastTxId: result.txId
       };
       await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
+      await shareProposalToChatRecipients(nextProposal);
     } catch (error) {
       console.warn("Failed to broadcast multisig proposal:", error);
     } finally {
       setProposalBusyId(null);
     }
   };
-  const buildSharedPackage = (proposal) => ({
-    version: 1,
-    kind: "gravity-multisig-proposal",
-    proposal
-  });
   const handleCopyProposalPackage = async (proposal) => {
     await navigator.clipboard.writeText(JSON.stringify(buildSharedPackage(proposal), null, 2));
   };
@@ -11809,7 +12016,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     if (!importPayload.trim()) return;
     try {
       const parsed = JSON.parse(importPayload);
-      const proposal = parsed.kind === "gravity-multisig-proposal" ? parsed.proposal : parsed;
+      const proposal = parsed.kind === MULTISIG_SYNC_KIND ? parsed.proposal : parsed;
       if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
         throw new Error("Invalid proposal package");
       }
@@ -11818,15 +12025,57 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         throw new Error("Invalid proposal package");
       }
       const proposals = [
-        normalizedProposal,
-        ...savedProposals.filter((candidate) => candidate.id !== normalizedProposal.id)
-      ].slice(0, 20);
+        ...mergeProposalIntoList(normalizedProposal, savedProposals)
+      ];
       await persistSavedProposals(proposals);
       setImportPayload("");
     } catch (error) {
       console.warn("Failed to import multisig proposal package:", error);
     }
   };
+  const handleAcceptIncomingProposal = async (incoming) => {
+    const mergedSaved = mergeProposalIntoList(incoming.proposal, savedProposals);
+    const nextIncoming = incomingProposals.filter((entry) => entry.proposal.id !== incoming.proposal.id);
+    await persistSavedProposals(mergedSaved);
+    await persistIncomingProposals(nextIncoming);
+    setTransportInfo(`Accepted update from @${incoming.sentBy}`);
+    showNotification(`Accepted multisig update from @${incoming.sentBy}`, "success");
+  };
+  const handleRejectIncomingProposal = async (proposalId) => {
+    const nextIncoming = incomingProposals.filter((entry) => entry.proposal.id !== proposalId);
+    await persistIncomingProposals(nextIncoming);
+  };
+  reactExports.useEffect(() => {
+    const incomingListener = async (_roomId, message) => {
+      if (!message?.content) return;
+      try {
+        const parsed = JSON.parse(message.content);
+        if (parsed?.kind !== MULTISIG_SYNC_KIND || !parsed?.proposal) return;
+        const normalizedProposal = normalizeSavedProposal(parsed.proposal);
+        if (!normalizedProposal) return;
+        const incomingEntry = {
+          proposal: normalizedProposal,
+          sentAt: parsed.sentAt || normalizedProposal.updatedAt || Date.now(),
+          sentBy: parsed.sentBy || message.senderName || "unknown"
+        };
+        const currentSaved = savedProposals.find((entry) => entry.id === normalizedProposal.id);
+        if (currentSaved && (currentSaved.updatedAt || currentSaved.createdAt || 0) >= (normalizedProposal.updatedAt || normalizedProposal.createdAt || 0)) {
+          return;
+        }
+        const mergedIncoming = mergeIncomingProposal(incomingEntry, incomingProposals);
+        const changed = JSON.stringify(mergedIncoming) !== JSON.stringify(incomingProposals);
+        if (!changed) return;
+        await persistIncomingProposals(mergedIncoming);
+        setTransportInfo(`Incoming update pending review from @${incomingEntry.sentBy}`);
+        showNotification(`Multisig update pending review from @${incomingEntry.sentBy}`, "info");
+      } catch {
+      }
+    };
+    chatService.addMessageListener(incomingListener);
+    return () => {
+      chatService.removeMessageListener(incomingListener);
+    };
+  }, [incomingProposals, savedProposals, showNotification]);
   return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "h-full overflow-y-auto custom-scrollbar p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start justify-between gap-4", children: [
@@ -12068,8 +12317,50 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-between gap-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: "Incoming proposals" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Review DM-delivered proposal updates before they enter your local multisig tray." })
+          ] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: incomingProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No pending incoming multisig proposals." }) : incomingProposals.map((incoming) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-bold text-white truncate", children: incoming.proposal.title }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] text-slate-400 mt-1 break-words", children: [
+                "From @",
+                incoming.sentBy,
+                " • ",
+                incoming.proposal.chain,
+                " • @",
+                incoming.proposal.initiator
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: new Date(incoming.sentAt).toLocaleString() }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-2 text-[10px] text-slate-300", children: [
+                "Coordination target: ",
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: getCoordinationThreshold(incoming.proposal.signers) })
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: () => handleAcceptIncomingProposal(incoming),
+                  className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.1em] text-slate-200 hover:border-green-500 hover:text-white transition-colors",
+                  children: "Accept"
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: () => handleRejectIncomingProposal(incoming.proposal.id),
+                  className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.1em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors",
+                  children: "Reject"
+                }
+              )
+            ] })
+          ] }) }, `incoming:${incoming.proposal.id}`)) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 border-t border-dark-700/80" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-between gap-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: "Saved proposals" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Keep local drafts here while we finish the signer notification and collection flow." })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Keep local drafts here while we finish the signer notification and collection flow." }),
+            transportInfo && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-blue-400 mt-2 break-words", children: transportInfo })
           ] }) }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 items-stretch", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -13207,57 +13498,6 @@ const HistoryModal = ({ account, onClose }) => {
       item.memo && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 bg-dark-800 p-2.5 rounded-lg border border-dark-700/50 break-all font-medium leading-relaxed shadow-inner", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "opacity-75", children: item.memo }) })
     ] }, idx)) }) })
   ] }) });
-};
-
-const NotificationToast = ({ message, type = "success", onClose }) => {
-  reactExports.useEffect(() => {
-    const timer = setTimeout(onClose, 3e3);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-  const bgColors = {
-    success: "bg-green-600/90 border-green-500/50",
-    error: "bg-red-600/90 border-red-500/50",
-    info: "bg-blue-600/90 border-blue-500/50"
-  };
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute top-20 left-0 right-0 z-[100] flex justify-center px-6 pointer-events-none", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `
-                ${bgColors[type]} 
-                text-white text-xs font-bold px-6 py-3 rounded-xl shadow-2xl border border-opacity-50
-                animate-bounce-in pointer-events-auto flex items-center gap-2 backdrop-blur-md
-                max-w-[85vw]
-            `, children: [
-    type === "success" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }) }),
-    type === "error" && /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4 shrink-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "break-all line-clamp-4 overflow-y-auto max-h-32 custom-scrollbar pr-1", children: message })
-  ] }) });
-};
-
-const NotificationContext = reactExports.createContext(void 0);
-const NotificationProvider = ({ children }) => {
-  const [notification, setNotification] = reactExports.useState(null);
-  const showNotification = reactExports.useCallback((message, type = "success") => {
-    setNotification({ message, type });
-  }, []);
-  const clearNotification = reactExports.useCallback(() => {
-    setNotification(null);
-  }, []);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs(NotificationContext.Provider, { value: { showNotification }, children: [
-    children,
-    notification && /* @__PURE__ */ jsxRuntimeExports.jsx(
-      NotificationToast,
-      {
-        message: notification.message,
-        type: notification.type,
-        onClose: clearNotification
-      }
-    )
-  ] });
-};
-const useNotification = () => {
-  const context = reactExports.useContext(NotificationContext);
-  if (!context) {
-    throw new Error("useNotification must be used within a NotificationProvider");
-  }
-  return context;
 };
 
 const MultiSigProgress = ({

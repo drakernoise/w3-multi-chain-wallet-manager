@@ -657,6 +657,91 @@ class ChatService {
     public muteUser(roomId: string, userId: string) { this.socket?.emit('mute_user', { roomId, targetUserId: userId }); }
     public unmuteUser(roomId: string, userId: string) { this.socket?.emit('unmute_user', { roomId, targetUserId: userId }); }
 
+    public async findUserByUsername(username: string, timeoutMs: number = 8000): Promise<ChatUser | null> {
+        if (!this.socket?.connected) {
+            await this.init();
+        }
+
+        const normalized = username.trim().replace(/^@/, '').toLowerCase();
+        if (!normalized || !this.socket) return null;
+
+        return new Promise((resolve, reject) => {
+            const timeoutId = window.setTimeout(() => {
+                this.socket?.off('search_results', handleResults);
+                reject(new Error(`Chat lookup timed out for @${normalized}`));
+            }, timeoutMs);
+
+            const handleResults = (results: ChatUser[]) => {
+                const match = (results || []).find((entry) => entry.username?.toLowerCase() === normalized) || null;
+                clearTimeout(timeoutId);
+                this.socket?.off('search_results', handleResults);
+                resolve(match);
+            };
+
+            this.socket?.on('search_results', handleResults);
+            this.socket?.emit('search_users', normalized);
+        });
+    }
+
+    public async ensureDirectRoomByUsername(username: string, timeoutMs: number = 8000): Promise<{ room: ChatRoom; user: ChatUser }> {
+        if (!this.socket?.connected) {
+            await this.init();
+        }
+
+        const normalized = username.trim().replace(/^@/, '').toLowerCase();
+        if (!normalized || !this.socket) throw new Error('Invalid DM target');
+
+        const existingRoom = this.rooms.find((room) =>
+            room.type === 'dm' && (
+                room.memberDetails?.some((member) => member.username?.toLowerCase() === normalized) ||
+                room.name?.toLowerCase().includes(normalized)
+            )
+        );
+
+        const targetUser = await this.findUserByUsername(normalized, timeoutMs);
+        if (!targetUser) throw new Error(`Chat user @${normalized} not found`);
+
+        if (existingRoom) {
+            if (!existingRoom.memberDetails?.length) {
+                this.joinRoom(existingRoom.id);
+            }
+            return { room: existingRoom, user: targetUser };
+        }
+
+        this.createDM(targetUser.id);
+
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < timeoutMs) {
+            const room = this.rooms.find((entry) =>
+                entry.type === 'dm' && (
+                    entry.memberDetails?.some((member) => member.id === targetUser.id || member.username?.toLowerCase() === normalized) ||
+                    entry.name?.toLowerCase().includes(normalized)
+                )
+            );
+
+            if (room) {
+                if (!room.memberDetails?.length) {
+                    this.joinRoom(room.id);
+                }
+                return { room, user: targetUser };
+            }
+
+            await new Promise((resolve) => window.setTimeout(resolve, 250));
+        }
+
+        throw new Error(`DM room with @${normalized} not available yet`);
+    }
+
+    public async sendDirectMessageToUsername(username: string, content: string): Promise<{ roomId: string; userId: string }> {
+        const { room, user } = await this.ensureDirectRoomByUsername(username);
+        if (!user.encryptionPublicKey) {
+            throw new Error(`Chat user @${user.username} has no encryption key`);
+        }
+
+        await this.sendDirectMessage(room.id, content, user.encryptionPublicKey);
+        return { roomId: room.id, userId: user.id };
+    }
+
     public logout() {
         localStorage.removeItem('gravity_chat_id');
         localStorage.removeItem('gravity_chat_username');
