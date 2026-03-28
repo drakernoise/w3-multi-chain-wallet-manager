@@ -11584,6 +11584,20 @@ const normalizeSavedProposal = (proposal) => {
     updatedAt: proposal.updatedAt || proposal.createdAt || Date.now()
   };
 };
+const toTransportProposal = (proposal) => {
+  let compactOperation = proposal.operation;
+  try {
+    compactOperation = JSON.stringify(JSON.parse(proposal.operation));
+  } catch {
+    compactOperation = proposal.operation;
+  }
+  return {
+    ...proposal,
+    operation: compactOperation,
+    unsignedTransaction: void 0,
+    authoritySnapshot: proposal.authoritySnapshot || void 0
+  };
+};
 const chainTheme = {
   [Chain.HIVE]: "bg-hive text-white shadow-lg",
   [Chain.STEEM]: "bg-steem text-white shadow-lg",
@@ -11828,7 +11842,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const buildSharedPackage = (proposal) => ({
     version: 1,
     kind: MULTISIG_SYNC_KIND,
-    proposal
+    proposal: toTransportProposal(proposal)
   });
   const buildSyncEnvelope = (proposal) => {
     const currentUser = chatService.getCurrentUser();
@@ -11877,6 +11891,44 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       setTransportInfo(failureMessage);
       showNotification(failureMessage, "info");
     }
+  };
+  const ensureProposalArtifacts = async (proposal) => {
+    let nextProposal = proposal;
+    let changed = false;
+    if (!nextProposal.authoritySnapshot) {
+      const authoritySnapshot = await getAccountAuthorities(nextProposal.chain, nextProposal.initiator, "active");
+      nextProposal = {
+        ...nextProposal,
+        authoritySnapshot
+      };
+      changed = true;
+    }
+    if (!nextProposal.unsignedTransaction) {
+      let operationPayload;
+      try {
+        operationPayload = JSON.parse(nextProposal.operation);
+      } catch {
+        operationPayload = nextProposal.operation;
+      }
+      const normalizedExpiration = normalizeMultiSigExpiration(nextProposal.expiration);
+      const unsignedTransaction = await createUnsignedTransaction(
+        nextProposal.chain,
+        Array.isArray(operationPayload) ? [operationPayload] : operationPayload,
+        normalizedExpiration.isoValue
+      );
+      nextProposal = {
+        ...nextProposal,
+        expiration: normalizedExpiration.isoValue,
+        unsignedTransaction
+      };
+      changed = true;
+    }
+    if (changed) {
+      const persisted = savedProposals.map((entry) => entry.id === nextProposal.id ? { ...nextProposal, updatedAt: entry.updatedAt || Date.now() } : entry);
+      await persistSavedProposals(persisted);
+      return persisted.find((entry) => entry.id === nextProposal.id) || nextProposal;
+    }
+    return nextProposal;
   };
   const handleSaveProposal = async () => {
     const coordinationThreshold = getCoordinationThreshold(request.signers);
@@ -11972,12 +12024,13 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     });
   };
   const handlePartialSignProposal = async (proposal, signer) => {
-    if (!signer?.activeKey || !proposal.unsignedTransaction) return;
+    if (!signer?.activeKey) return;
     setProposalBusyId(proposal.id);
     try {
+      const readyProposal = await ensureProposalArtifacts(proposal);
       const signResult = await signTransactionEnvelope(
-        proposal.chain,
-        proposal.unsignedTransaction,
+        readyProposal.chain,
+        readyProposal.unsignedTransaction,
         signer.activeKey,
         signer.name
       );
@@ -11985,10 +12038,10 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         throw new Error(signResult.error || "Partial sign failed");
       }
       const nextProposal = {
-        ...proposal,
+        ...readyProposal,
         updatedAt: Date.now(),
         partialSignatures: [
-          ...proposal.partialSignatures.filter((entry) => entry.username !== signer.name),
+          ...readyProposal.partialSignatures.filter((entry) => entry.username !== signer.name),
           {
             username: signer.name,
             pubKey: signResult.publicKey,
@@ -12005,21 +12058,24 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     }
   };
   const handleBroadcastProposal = async (proposal) => {
-    if (!proposal.unsignedTransaction || !proposal.authoritySnapshot) return;
     setProposalBusyId(proposal.id);
     try {
-      const selectedSignatures = selectBroadcastSignatures(proposal.authoritySnapshot, proposal.partialSignatures);
+      const readyProposal = await ensureProposalArtifacts(proposal);
+      if (!readyProposal.authoritySnapshot || !readyProposal.unsignedTransaction) {
+        throw new Error("Proposal is missing authority or transaction data");
+      }
+      const selectedSignatures = selectBroadcastSignatures(readyProposal.authoritySnapshot, readyProposal.partialSignatures);
       if (selectedSignatures.length === 0) {
         throw new Error("No valid signatures available for broadcast");
       }
       const signedTransaction = {
-        ...proposal.unsignedTransaction,
+        ...readyProposal.unsignedTransaction,
         signatures: selectedSignatures.map((entry) => entry.signature)
       };
-      const result = await broadcastSignedTransaction(proposal.chain, signedTransaction);
+      const result = await broadcastSignedTransaction(readyProposal.chain, signedTransaction);
       if (!result.success) throw new Error(result.error || "Broadcast failed");
       const nextProposal = {
-        ...proposal,
+        ...readyProposal,
         updatedAt: Date.now(),
         lastBroadcastTxId: result.txId
       };
