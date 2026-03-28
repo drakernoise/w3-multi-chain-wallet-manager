@@ -8,6 +8,7 @@ import {
   getAccountAuthorities,
   MultiSigAuthority,
   PartialTransactionSignature,
+  selectBroadcastSignatures,
   signTransactionEnvelope
 } from '../services/chainService';
 import { storageService } from '../services/storageService';
@@ -44,6 +45,31 @@ interface SharedMultiSigPackage {
   kind: 'gravity-multisig-proposal';
   proposal: SavedMultiSigProposal;
 }
+
+const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
+
+const toLocalDateTimeInput = (date: Date): string => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const getDefaultMultiSigExpiration = (): string => toLocalDateTimeInput(
+  new Date(Date.now() + DIRECT_MULTISIG_EXPIRATION_MINUTES * 60 * 1000)
+);
+
+const normalizeMultiSigExpiration = (rawValue?: string | null): { localValue: string; isoValue: string } => {
+  const parsed = rawValue ? new Date(rawValue) : new Date();
+  const safeBase = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const now = Date.now();
+  const maxAllowed = now + DIRECT_MULTISIG_EXPIRATION_MINUTES * 60 * 1000;
+  const clampedTime = Math.min(Math.max(safeBase.getTime(), now + 60 * 1000), maxAllowed);
+  const clampedDate = new Date(clampedTime);
+
+  return {
+    localValue: toLocalDateTimeInput(clampedDate),
+    isoValue: clampedDate.toISOString()
+  };
+};
 
 const normalizeSavedProposal = (proposal: Partial<SavedMultiSigProposal> | null | undefined): SavedMultiSigProposal | null => {
   if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
@@ -82,7 +108,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
-  const [expiresAt, setExpiresAt] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16));
+  const [expiresAt, setExpiresAt] = useState(() => getDefaultMultiSigExpiration());
   const [copied, setCopied] = useState(false);
   const [saveLabel, setSaveLabel] = useState('');
   const [importPayload, setImportPayload] = useState('');
@@ -296,6 +322,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   };
 
   const handleSaveProposal = async () => {
+    const normalizedExpiration = normalizeMultiSigExpiration(expiresAt);
     let operationPayload: any;
     try {
       operationPayload = JSON.parse(request.operation);
@@ -306,7 +333,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     const unsignedTransaction = await createUnsignedTransaction(
       selectedChain,
       Array.isArray(operationPayload) ? [operationPayload] : operationPayload,
-      expiresAt ? new Date(expiresAt).toISOString() : undefined
+      normalizedExpiration.isoValue
     );
 
     const proposal: SavedMultiSigProposal = {
@@ -316,7 +343,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       initiator: request.initiator,
       threshold: effectiveThreshold,
       signers: request.signers,
-      expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
+      expiration: normalizedExpiration.isoValue,
       operationType: opType,
       operation: request.operation,
       authoritySnapshot: authority,
@@ -331,9 +358,10 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   };
 
   const handleLoadProposal = (proposal: SavedMultiSigProposal) => {
+    const normalizedExpiration = normalizeMultiSigExpiration(proposal.expiration);
     setSelectedChain(proposal.chain);
     setOpType(proposal.operationType);
-    setExpiresAt(proposal.expiration ? proposal.expiration.slice(0, 16) : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16));
+    setExpiresAt(normalizedExpiration.localValue);
     setRequest({
       initiator: proposal.initiator,
       signers: proposal.signers,
@@ -429,9 +457,14 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
     setProposalBusyId(proposal.id);
     try {
+      const selectedSignatures = selectBroadcastSignatures(proposal.authoritySnapshot, proposal.partialSignatures);
+      if (selectedSignatures.length === 0) {
+        throw new Error('No valid signatures available for broadcast');
+      }
+
       const signedTransaction = {
         ...proposal.unsignedTransaction,
-        signatures: proposal.partialSignatures.map((entry) => entry.signature)
+        signatures: selectedSignatures.map((entry) => entry.signature)
       };
 
       const result = await broadcastSignedTransaction(proposal.chain, signedTransaction);
@@ -567,6 +600,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   onChange={(e) => setExpiresAt(e.target.value)}
                   className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
                 />
+                <p className="mt-2 text-[10px] text-slate-500">
+                  Direct multisig transactions should stay within about {DIRECT_MULTISIG_EXPIRATION_MINUTES} minutes.
+                </p>
               </div>
             </div>
 

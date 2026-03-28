@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as calculateThresholdProgress, z as getAccountAuthorities, A as createUnsignedTransaction, B as signTransactionEnvelope, D as broadcastSignedTransaction, E as indexBrowserExports, F as indexBrowserExports$1, G as validateAccountKeys, H as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, I as fetchBalances, J as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as calculateThresholdProgress, z as getAccountAuthorities, A as createUnsignedTransaction, B as signTransactionEnvelope, D as selectBroadcastSignatures, E as broadcastSignedTransaction, F as indexBrowserExports, G as indexBrowserExports$1, H as validateAccountKeys, I as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, J as fetchBalances, K as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -11407,6 +11407,26 @@ const BulkTransfer = ({ chain, accounts, refreshBalance, onChangeChain, onAddAcc
 };
 
 const MULTISIG_STORAGE_KEY = "gravity_multisig_proposals";
+const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
+const toLocalDateTimeInput = (date) => {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+const getDefaultMultiSigExpiration = () => toLocalDateTimeInput(
+  new Date(Date.now() + DIRECT_MULTISIG_EXPIRATION_MINUTES * 60 * 1e3)
+);
+const normalizeMultiSigExpiration = (rawValue) => {
+  const parsed = rawValue ? new Date(rawValue) : /* @__PURE__ */ new Date();
+  const safeBase = Number.isNaN(parsed.getTime()) ? /* @__PURE__ */ new Date() : parsed;
+  const now = Date.now();
+  const maxAllowed = now + DIRECT_MULTISIG_EXPIRATION_MINUTES * 60 * 1e3;
+  const clampedTime = Math.min(Math.max(safeBase.getTime(), now + 60 * 1e3), maxAllowed);
+  const clampedDate = new Date(clampedTime);
+  return {
+    localValue: toLocalDateTimeInput(clampedDate),
+    isoValue: clampedDate.toISOString()
+  };
+};
 const normalizeSavedProposal = (proposal) => {
   if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
     return null;
@@ -11441,7 +11461,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const [to, setTo] = reactExports.useState("");
   const [amount, setAmount] = reactExports.useState("");
   const [memo, setMemo] = reactExports.useState("");
-  const [expiresAt, setExpiresAt] = reactExports.useState(() => new Date(Date.now() + 24 * 60 * 60 * 1e3).toISOString().slice(0, 16));
+  const [expiresAt, setExpiresAt] = reactExports.useState(() => getDefaultMultiSigExpiration());
   const [copied, setCopied] = reactExports.useState(false);
   const [saveLabel, setSaveLabel] = reactExports.useState("");
   const [importPayload, setImportPayload] = reactExports.useState("");
@@ -11625,6 +11645,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(proposals));
   };
   const handleSaveProposal = async () => {
+    const normalizedExpiration = normalizeMultiSigExpiration(expiresAt);
     let operationPayload;
     try {
       operationPayload = JSON.parse(request.operation);
@@ -11634,7 +11655,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     const unsignedTransaction = await createUnsignedTransaction(
       selectedChain,
       Array.isArray(operationPayload) ? [operationPayload] : operationPayload,
-      expiresAt ? new Date(expiresAt).toISOString() : void 0
+      normalizedExpiration.isoValue
     );
     const proposal = {
       id: crypto.randomUUID(),
@@ -11643,7 +11664,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       initiator: request.initiator,
       threshold: effectiveThreshold,
       signers: request.signers,
-      expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
+      expiration: normalizedExpiration.isoValue,
       operationType: opType,
       operation: request.operation,
       authoritySnapshot: authority,
@@ -11656,9 +11677,10 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     setSaveLabel("");
   };
   const handleLoadProposal = (proposal) => {
+    const normalizedExpiration = normalizeMultiSigExpiration(proposal.expiration);
     setSelectedChain(proposal.chain);
     setOpType(proposal.operationType);
-    setExpiresAt(proposal.expiration ? proposal.expiration.slice(0, 16) : new Date(Date.now() + 24 * 60 * 60 * 1e3).toISOString().slice(0, 16));
+    setExpiresAt(normalizedExpiration.localValue);
     setRequest({
       initiator: proposal.initiator,
       signers: proposal.signers,
@@ -11735,9 +11757,13 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     if (!proposal.unsignedTransaction || !proposal.authoritySnapshot) return;
     setProposalBusyId(proposal.id);
     try {
+      const selectedSignatures = selectBroadcastSignatures(proposal.authoritySnapshot, proposal.partialSignatures);
+      if (selectedSignatures.length === 0) {
+        throw new Error("No valid signatures available for broadcast");
+      }
       const signedTransaction = {
         ...proposal.unsignedTransaction,
-        signatures: proposal.partialSignatures.map((entry) => entry.signature)
+        signatures: selectedSignatures.map((entry) => entry.signature)
       };
       const result = await broadcastSignedTransaction(proposal.chain, signedTransaction);
       if (!result.success) throw new Error(result.error || "Broadcast failed");
@@ -11855,7 +11881,12 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                 onChange: (e) => setExpiresAt(e.target.value),
                 className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
               }
-            )
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "mt-2 text-[10px] text-slate-500", children: [
+              "Direct multisig transactions should stay within about ",
+              DIRECT_MULTISIG_EXPIRATION_MINUTES,
+              " minutes."
+            ] })
           ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3", children: [

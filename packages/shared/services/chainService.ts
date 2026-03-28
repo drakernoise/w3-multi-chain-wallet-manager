@@ -46,6 +46,12 @@ export interface PartialTransactionSignature {
     signature: string;
 }
 
+const getSignatureWeight = (auth: MultiSigAuthority, sig: PartialTransactionSignature): number => {
+    const accountWeight = auth.accountAuths.find((entry) => entry[0] === sig.username)?.[1] || 0;
+    const keyWeight = auth.keyAuths.find((entry) => entry[0] === sig.pubKey)?.[1] || 0;
+    return Math.max(accountWeight, keyWeight);
+};
+
 // --- HELPER: Parse JSON response with HTML error detection ---
 const parseJsonResponse = async (response: Response, nodeUrl: string): Promise<any> => {
     const text = await response.text();
@@ -235,6 +241,23 @@ const convertAssetSymbolRecursively = (value: any, fromSymbol: string, toSymbol:
     return value;
 };
 
+const normalizeBlockchainExpiration = (expiration?: string): string => {
+    if (!expiration) {
+        return new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5);
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(expiration)) {
+        return expiration;
+    }
+
+    const parsed = new Date(expiration);
+    if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString().slice(0, -5);
+    }
+
+    return expiration;
+};
+
 export const createUnsignedTransaction = async (
     chain: Chain,
     operations: any[],
@@ -247,7 +270,7 @@ export const createUnsignedTransaction = async (
     return {
         ref_block_num: props.head_block_number & 0xFFFF,
         ref_block_prefix: Buffer.from(props.head_block_id, 'hex').readUInt32LE(4),
-        expiration: expiration || new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5),
+        expiration: normalizeBlockchainExpiration(expiration),
         operations: cleanOperations,
         extensions: []
     };
@@ -321,6 +344,10 @@ export const broadcastSignedTransaction = async (
     signedTransaction: any
 ): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any; signatures?: string[]; transaction?: any; signedTx?: any }> => {
     try {
+        const normalizedTransaction = {
+            ...signedTransaction,
+            expiration: normalizeBlockchainExpiration(signedTransaction?.expiration)
+        };
         const nodeUrl = getActiveNode(chain);
         if (chain === Chain.HIVE) {
             const response = await fetch(nodeUrl, {
@@ -328,7 +355,7 @@ export const broadcastSignedTransaction = async (
                 body: JSON.stringify({
                     jsonrpc: '2.0',
                     method: 'condenser_api.broadcast_transaction_synchronous',
-                    params: [signedTransaction],
+                    params: [normalizedTransaction],
                     id: 1
                 }),
                 headers: {
@@ -344,22 +371,22 @@ export const broadcastSignedTransaction = async (
                 success: true,
                 txId: json.result?.id,
                 opResult: json.result,
-                signatures: signedTransaction.signatures,
-                transaction: signedTransaction,
-                signedTx: signedTransaction
+                signatures: normalizedTransaction.signatures,
+                transaction: normalizedTransaction,
+                signedTx: normalizedTransaction
             };
         }
 
         if (chain === Chain.STEEM) {
             const client = new SteemClient(nodeUrl);
-            const result = await client.broadcast.send(signedTransaction);
+            const result = await client.broadcast.send(normalizedTransaction);
             return {
                 success: true,
                 txId: result.id,
                 opResult: result,
-                signatures: signedTransaction.signatures,
-                transaction: signedTransaction,
-                signedTx: signedTransaction
+                signatures: normalizedTransaction.signatures,
+                transaction: normalizedTransaction,
+                signedTx: normalizedTransaction
             };
         }
 
@@ -369,7 +396,7 @@ export const broadcastSignedTransaction = async (
                 body: JSON.stringify({
                     jsonrpc: '2.0',
                     method: 'condenser_api.broadcast_transaction_synchronous',
-                    params: [signedTransaction],
+                    params: [normalizedTransaction],
                     id: 1
                 }),
                 headers: {
@@ -384,9 +411,9 @@ export const broadcastSignedTransaction = async (
                 success: true,
                 txId: json.result?.id,
                 opResult: json.result,
-                signatures: signedTransaction.signatures,
-                transaction: signedTransaction,
-                signedTx: signedTransaction
+                signatures: normalizedTransaction.signatures,
+                transaction: normalizedTransaction,
+                signedTx: normalizedTransaction
             };
         }
 
@@ -569,20 +596,17 @@ export const getAccountAuthorities = async (chain: Chain, username: string, type
 };
 
 export const calculateThresholdProgress = (auth: MultiSigAuthority, signatures: any[]): MultisigProgress => {
-    // signatures is an array of { pubKey, signature, weight? }
-    // For now, we assume the signatures provided correspond to the auth data provided
     let currentWeight = 0;
+    const seenSigners = new Set<string>();
 
-    // In a real multisig, we'd recover the pubkey from the signature and match it
-    // For the UI demonstration, we'll sum the weights of provided signatures
-    signatures.forEach(sig => {
-        // Find matching key weight
-        const keyMatch = auth.keyAuths.find(k => k[0] === sig.pubKey);
-        if (keyMatch) currentWeight += keyMatch[1];
+    (signatures || []).forEach(sig => {
+        if (!sig?.signature) return;
 
-        // Find matching account weight
-        const accMatch = auth.accountAuths.find(a => a[0] === sig.username);
-        if (accMatch) currentWeight += accMatch[1];
+        const signerId = sig.username || sig.pubKey || sig.signature;
+        if (seenSigners.has(signerId)) return;
+        seenSigners.add(signerId);
+
+        currentWeight += getSignatureWeight(auth, sig);
     });
 
     return {
@@ -590,6 +614,35 @@ export const calculateThresholdProgress = (auth: MultiSigAuthority, signatures: 
         threshold: auth.threshold,
         canBroadcast: currentWeight >= auth.threshold
     };
+};
+
+export const selectBroadcastSignatures = (
+    auth: MultiSigAuthority,
+    signatures: PartialTransactionSignature[]
+): PartialTransactionSignature[] => {
+    const remaining = [...(signatures || [])]
+        .filter((sig) => !!sig?.signature)
+        .sort((left, right) => getSignatureWeight(auth, right) - getSignatureWeight(auth, left));
+
+    const selected: PartialTransactionSignature[] = [];
+    const usedSigners = new Set<string>();
+    let currentWeight = 0;
+
+    for (const sig of remaining) {
+        const signerId = sig.username || sig.pubKey || sig.signature;
+        if (usedSigners.has(signerId)) continue;
+
+        const weight = getSignatureWeight(auth, sig);
+        if (weight <= 0) continue;
+
+        selected.push(sig);
+        usedSigners.add(signerId);
+        currentWeight += weight;
+
+        if (currentWeight >= auth.threshold) break;
+    }
+
+    return selected;
 };
 
 

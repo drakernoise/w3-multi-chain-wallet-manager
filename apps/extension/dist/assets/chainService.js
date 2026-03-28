@@ -88606,6 +88606,11 @@ function requireLib () {
 
 var libExports = requireLib();
 
+const getSignatureWeight = (auth, sig) => {
+  const accountWeight = auth.accountAuths.find((entry) => entry[0] === sig.username)?.[1] || 0;
+  const keyWeight = auth.keyAuths.find((entry) => entry[0] === sig.pubKey)?.[1] || 0;
+  return Math.max(accountWeight, keyWeight);
+};
 const parseJsonResponse = async (response, nodeUrl) => {
   const text = await response.text();
   if (text.trim().startsWith("<") || text.includes("<!DOCTYPE") || text.includes("<html")) {
@@ -88757,6 +88762,19 @@ const convertAssetSymbolRecursively = (value, fromSymbol, toSymbol) => {
   }
   return value;
 };
+const normalizeBlockchainExpiration = (expiration) => {
+  if (!expiration) {
+    return new Date(Date.now() + 60 * 1e3).toISOString().slice(0, -5);
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(expiration)) {
+    return expiration;
+  }
+  const parsed = new Date(expiration);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, -5);
+  }
+  return expiration;
+};
 const createUnsignedTransaction = async (chain, operations, expiration) => {
   const props = await fetchGlobalProps(chain);
   if (!props) throw new Error(`Could not fetch global properties for ${chain}`);
@@ -88764,7 +88782,7 @@ const createUnsignedTransaction = async (chain, operations, expiration) => {
   return {
     ref_block_num: props.head_block_number & 65535,
     ref_block_prefix: Buffer.from(props.head_block_id, "hex").readUInt32LE(4),
-    expiration: expiration || new Date(Date.now() + 60 * 1e3).toISOString().slice(0, -5),
+    expiration: normalizeBlockchainExpiration(expiration),
     operations: cleanOperations,
     extensions: []
   };
@@ -88825,6 +88843,10 @@ const signTransactionEnvelope = async (chain, transaction, key, username) => {
 };
 const broadcastSignedTransaction = async (chain, signedTransaction) => {
   try {
+    const normalizedTransaction = {
+      ...signedTransaction,
+      expiration: normalizeBlockchainExpiration(signedTransaction?.expiration)
+    };
     const nodeUrl = getActiveNode(chain);
     if (chain === Chain.HIVE) {
       const response = await fetch(nodeUrl, {
@@ -88832,7 +88854,7 @@ const broadcastSignedTransaction = async (chain, signedTransaction) => {
         body: JSON.stringify({
           jsonrpc: "2.0",
           method: "condenser_api.broadcast_transaction_synchronous",
-          params: [signedTransaction],
+          params: [normalizedTransaction],
           id: 1
         }),
         headers: {
@@ -88847,21 +88869,21 @@ const broadcastSignedTransaction = async (chain, signedTransaction) => {
         success: true,
         txId: json.result?.id,
         opResult: json.result,
-        signatures: signedTransaction.signatures,
-        transaction: signedTransaction,
-        signedTx: signedTransaction
+        signatures: normalizedTransaction.signatures,
+        transaction: normalizedTransaction,
+        signedTx: normalizedTransaction
       };
     }
     if (chain === Chain.STEEM) {
       const client = new indexBrowserExports.Client(nodeUrl);
-      const result = await client.broadcast.send(signedTransaction);
+      const result = await client.broadcast.send(normalizedTransaction);
       return {
         success: true,
         txId: result.id,
         opResult: result,
-        signatures: signedTransaction.signatures,
-        transaction: signedTransaction,
-        signedTx: signedTransaction
+        signatures: normalizedTransaction.signatures,
+        transaction: normalizedTransaction,
+        signedTx: normalizedTransaction
       };
     }
     if (chain === Chain.BLURT) {
@@ -88870,7 +88892,7 @@ const broadcastSignedTransaction = async (chain, signedTransaction) => {
         body: JSON.stringify({
           jsonrpc: "2.0",
           method: "condenser_api.broadcast_transaction_synchronous",
-          params: [signedTransaction],
+          params: [normalizedTransaction],
           id: 1
         }),
         headers: {
@@ -88884,9 +88906,9 @@ const broadcastSignedTransaction = async (chain, signedTransaction) => {
         success: true,
         txId: json.result?.id,
         opResult: json.result,
-        signatures: signedTransaction.signatures,
-        transaction: signedTransaction,
-        signedTx: signedTransaction
+        signatures: normalizedTransaction.signatures,
+        transaction: normalizedTransaction,
+        signedTx: normalizedTransaction
       };
     }
     throw new Error("Chain not supported");
@@ -89045,17 +89067,36 @@ const getAccountAuthorities = async (chain, username, type = "active") => {
 };
 const calculateThresholdProgress = (auth, signatures) => {
   let currentWeight = 0;
-  signatures.forEach((sig) => {
-    const keyMatch = auth.keyAuths.find((k) => k[0] === sig.pubKey);
-    if (keyMatch) currentWeight += keyMatch[1];
-    const accMatch = auth.accountAuths.find((a) => a[0] === sig.username);
-    if (accMatch) currentWeight += accMatch[1];
+  const seenSigners = /* @__PURE__ */ new Set();
+  (signatures || []).forEach((sig) => {
+    if (!sig?.signature) return;
+    const signerId = sig.username || sig.pubKey || sig.signature;
+    if (seenSigners.has(signerId)) return;
+    seenSigners.add(signerId);
+    currentWeight += getSignatureWeight(auth, sig);
   });
   return {
     currentWeight,
     threshold: auth.threshold,
     canBroadcast: currentWeight >= auth.threshold
   };
+};
+const selectBroadcastSignatures = (auth, signatures) => {
+  const remaining = [...signatures || []].filter((sig) => !!sig?.signature).sort((left, right) => getSignatureWeight(auth, right) - getSignatureWeight(auth, left));
+  const selected = [];
+  const usedSigners = /* @__PURE__ */ new Set();
+  let currentWeight = 0;
+  for (const sig of remaining) {
+    const signerId = sig.username || sig.pubKey || sig.signature;
+    if (usedSigners.has(signerId)) continue;
+    const weight = getSignatureWeight(auth, sig);
+    if (weight <= 0) continue;
+    selected.push(sig);
+    usedSigners.add(signerId);
+    currentWeight += weight;
+    if (currentWeight >= auth.threshold) break;
+  }
+  return selected;
 };
 const broadcastTransfer = async (chain, from, activeKey, to, amount, memo, tokenSymbol) => {
   const formattedAmount = parseFloat(amount).toFixed(3);
@@ -89743,4 +89784,4 @@ const decodeMemo = async (chain, _username, encodedMemo, key) => {
   }
 };
 
-export { createUnsignedTransaction as A, signTransactionEnvelope as B, Chain as C, broadcastSignedTransaction as D, indexBrowserExports$1 as E, indexBrowserExports as F, validateAccountKeys as G, fetchAccountHistory as H, fetchBalances as I, detectWeb3Context as J, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, calculateThresholdProgress as y, getAccountAuthorities as z };
+export { createUnsignedTransaction as A, signTransactionEnvelope as B, Chain as C, selectBroadcastSignatures as D, broadcastSignedTransaction as E, indexBrowserExports$1 as F, indexBrowserExports as G, validateAccountKeys as H, fetchAccountHistory as I, fetchBalances as J, detectWeb3Context as K, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, calculateThresholdProgress as y, getAccountAuthorities as z };
