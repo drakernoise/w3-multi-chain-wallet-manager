@@ -367,21 +367,28 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     await persistSavedProposals(proposals);
   };
 
-  const findLocalSigner = (proposal: SavedMultiSigProposal): Account | null => {
+  const getLocalSigners = (proposal: SavedMultiSigProposal): Account[] => {
     const allowedNames = new Set([
       ...proposal.signers,
       ...(proposal.authoritySnapshot?.accountAuths.map(([name]) => name) || [])
     ]);
+    const signedNames = new Set((proposal.partialSignatures || []).map((entry) => entry.username));
 
-    return accounts.find((account) =>
-      account.chain === proposal.chain &&
-      !!account.activeKey &&
-      allowedNames.has(account.name)
-    ) || null;
+    return accounts
+      .filter((account) =>
+        account.chain === proposal.chain &&
+        !!account.activeKey &&
+        allowedNames.has(account.name)
+      )
+      .sort((left, right) => {
+        const leftSigned = signedNames.has(left.name) ? 1 : 0;
+        const rightSigned = signedNames.has(right.name) ? 1 : 0;
+        if (leftSigned !== rightSigned) return leftSigned - rightSigned;
+        return left.name.localeCompare(right.name);
+      });
   };
 
-  const handlePartialSignProposal = async (proposal: SavedMultiSigProposal) => {
-    const signer = findLocalSigner(proposal);
+  const handlePartialSignProposal = async (proposal: SavedMultiSigProposal, signer: Account) => {
     if (!signer?.activeKey || !proposal.unsignedTransaction) return;
 
     setProposalBusyId(proposal.id);
@@ -792,7 +799,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                       const progress = proposal.authoritySnapshot
                         ? calculateThresholdProgress(proposal.authoritySnapshot, partialSignatures)
                         : null;
-                      const localSigner = findLocalSigner(proposal);
+                      const localSigners = getLocalSigners(proposal);
+                      const signedNames = new Set(partialSignatures.map((entry) => entry.username));
 
                       return (
                     <div className="space-y-3">
@@ -845,22 +853,35 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                           Delete
                         </button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => handlePartialSignProposal(proposal)}
-                          disabled={!localSigner || proposalBusyId === proposal.id}
-                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
-                        >
-                          {proposalBusyId === proposal.id ? '...' : localSigner ? (
-                            <span className="block break-words normal-case tracking-normal font-bold">
-                              Sign @{localSigner.name}
-                            </span>
-                          ) : 'No signer'}
-                        </button>
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          {localSigners.length > 0 ? localSigners.map((signer) => (
+                            <button
+                              key={`${proposal.id}:${signer.chain}:${signer.name}`}
+                              onClick={() => handlePartialSignProposal(proposal, signer)}
+                              disabled={proposalBusyId === proposal.id || signedNames.has(signer.name)}
+                              className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                            >
+                              {proposalBusyId === proposal.id ? '...' : signedNames.has(signer.name) ? (
+                                <span className="block break-words normal-case tracking-normal font-bold">
+                                  Signed @{signer.name}
+                                </span>
+                              ) : (
+                                <span className="block break-words normal-case tracking-normal font-bold">
+                                  Sign @{signer.name}
+                                </span>
+                              )}
+                            </button>
+                          )) : (
+                            <div className="col-span-2 min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-700 text-[10px] text-slate-500 text-center">
+                              No local signer
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={() => handleBroadcastProposal(proposal)}
                           disabled={!progress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
-                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                          className="w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
                         >
                           Broadcast
                         </button>

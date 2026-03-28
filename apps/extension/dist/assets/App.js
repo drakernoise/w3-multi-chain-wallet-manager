@@ -11685,17 +11685,22 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     const proposals = savedProposals.filter((proposal) => proposal.id !== proposalId);
     await persistSavedProposals(proposals);
   };
-  const findLocalSigner = (proposal) => {
+  const getLocalSigners = (proposal) => {
     const allowedNames = /* @__PURE__ */ new Set([
       ...proposal.signers,
       ...proposal.authoritySnapshot?.accountAuths.map(([name]) => name) || []
     ]);
-    return accounts.find(
+    const signedNames = new Set((proposal.partialSignatures || []).map((entry) => entry.username));
+    return accounts.filter(
       (account) => account.chain === proposal.chain && !!account.activeKey && allowedNames.has(account.name)
-    ) || null;
+    ).sort((left, right) => {
+      const leftSigned = signedNames.has(left.name) ? 1 : 0;
+      const rightSigned = signedNames.has(right.name) ? 1 : 0;
+      if (leftSigned !== rightSigned) return leftSigned - rightSigned;
+      return left.name.localeCompare(right.name);
+    });
   };
-  const handlePartialSignProposal = async (proposal) => {
-    const signer = findLocalSigner(proposal);
+  const handlePartialSignProposal = async (proposal, signer) => {
     if (!signer?.activeKey || !proposal.unsignedTransaction) return;
     setProposalBusyId(proposal.id);
     try {
@@ -12050,7 +12055,8 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: savedProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No saved multisig proposals yet." }) : savedProposals.map((proposal) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-dark-700 bg-dark-800 px-3 py-3", children: (() => {
             const partialSignatures = Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [];
             const progress = proposal.authoritySnapshot ? calculateThresholdProgress(proposal.authoritySnapshot, partialSignatures) : null;
-            const localSigner = findLocalSigner(proposal);
+            const localSigners = getLocalSigners(proposal);
+            const signedNames = new Set(partialSignatures.map((entry) => entry.username));
             return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-bold text-white truncate", children: proposal.title }),
@@ -12105,25 +12111,29 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   }
                 )
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: localSigners.length > 0 ? localSigners.map((signer) => /* @__PURE__ */ jsxRuntimeExports.jsx(
                   "button",
                   {
-                    onClick: () => handlePartialSignProposal(proposal),
-                    disabled: !localSigner || proposalBusyId === proposal.id,
+                    onClick: () => handlePartialSignProposal(proposal, signer),
+                    disabled: proposalBusyId === proposal.id || signedNames.has(signer.name),
                     className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
-                    children: proposalBusyId === proposal.id ? "..." : localSigner ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
+                    children: proposalBusyId === proposal.id ? "..." : signedNames.has(signer.name) ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
+                      "Signed @",
+                      signer.name
+                    ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
                       "Sign @",
-                      localSigner.name
-                    ] }) : "No signer"
-                  }
-                ),
+                      signer.name
+                    ] })
+                  },
+                  `${proposal.id}:${signer.chain}:${signer.name}`
+                )) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-2 min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-700 text-[10px] text-slate-500 text-center", children: "No local signer" }) }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx(
                   "button",
                   {
                     onClick: () => handleBroadcastProposal(proposal),
                     disabled: !progress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId,
-                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
+                    className: "w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
                     children: "Broadcast"
                   }
                 )
