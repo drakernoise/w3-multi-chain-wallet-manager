@@ -11427,6 +11427,10 @@ const normalizeMultiSigExpiration = (rawValue) => {
     isoValue: clampedDate.toISOString()
   };
 };
+const getCoordinationThreshold = (signers) => {
+  const unique = new Set((signers || []).map((name) => name.replace(/^@/, "").trim()).filter(Boolean));
+  return Math.max(1, unique.size);
+};
 const calculateCoordinationProgress = (proposal, partialSignatures) => {
   const signedNames = new Set(partialSignatures.map((entry) => entry.username));
   const eligibleNames = new Set((proposal.signers || []).map((name) => name.replace(/^@/, "")));
@@ -11434,7 +11438,7 @@ const calculateCoordinationProgress = (proposal, partialSignatures) => {
   eligibleNames.forEach((name) => {
     if (signedNames.has(name)) current += 1;
   });
-  const threshold = Math.max(1, proposal.threshold || 1);
+  const threshold = getCoordinationThreshold(proposal.signers || []);
   return {
     current,
     threshold,
@@ -11450,7 +11454,7 @@ const normalizeSavedProposal = (proposal) => {
     title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
     chain: proposal.chain,
     initiator: proposal.initiator,
-    threshold: Number(proposal.threshold) || 1,
+    threshold: getCoordinationThreshold(Array.isArray(proposal.signers) ? proposal.signers : []),
     signers: Array.isArray(proposal.signers) ? proposal.signers : [],
     expiration: proposal.expiration || null,
     operationType: proposal.operationType || "custom",
@@ -11632,10 +11636,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     setRequest((prev) => ({ ...prev, signers: prev.signers.filter((candidate) => candidate !== signer) }));
   };
   const proposalDraft = reactExports.useMemo(() => {
+    const coordinationThreshold = getCoordinationThreshold(request.signers);
     return JSON.stringify({
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: request.threshold,
+      threshold: coordinationThreshold,
       signers: request.signers,
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operation: (() => {
@@ -11647,7 +11652,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       })(),
       authoritySnapshot: authority
     }, null, 2);
-  }, [authority, expiresAt, request.initiator, request.operation, request.signers, request.threshold, selectedChain]);
+  }, [authority, expiresAt, request.initiator, request.operation, request.signers, selectedChain]);
   const handleCopyDraft = async () => {
     await navigator.clipboard.writeText(proposalDraft);
     setCopied(true);
@@ -11658,6 +11663,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(proposals));
   };
   const handleSaveProposal = async () => {
+    const coordinationThreshold = getCoordinationThreshold(request.signers);
     const normalizedExpiration = normalizeMultiSigExpiration(expiresAt);
     let operationPayload;
     try {
@@ -11675,7 +11681,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || "unknown"}`,
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: request.threshold,
+      threshold: coordinationThreshold,
       signers: request.signers,
       expiration: normalizedExpiration.isoValue,
       operationType: opType,
@@ -11697,7 +11703,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     setRequest({
       initiator: proposal.initiator,
       signers: proposal.signers,
-      threshold: proposal.threshold,
+      threshold: getCoordinationThreshold(proposal.signers),
       operation: proposal.operation
     });
     try {
@@ -11870,18 +11876,8 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.threshold") }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "input",
-              {
-                type: "number",
-                min: "1",
-                max: Math.max(1, request.signers.length || 1),
-                value: request.threshold,
-                onChange: (e) => setRequest((prev) => ({ ...prev, threshold: Math.max(1, Number(e.target.value) || 1) })),
-                className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-2 text-[10px] text-slate-500", children: "Coordination threshold for this draft. On-chain authority is shown separately below." })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white", children: getCoordinationThreshold(request.signers) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-2 text-[10px] text-slate-500", children: "Coordination requires all selected signers in this draft." })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.expiration") }),
@@ -12108,8 +12104,9 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   proposal.chain,
                   " • @",
                   proposal.initiator,
-                  " • draft threshold ",
-                  proposal.threshold
+                  " • ",
+                  getCoordinationThreshold(proposal.signers),
+                  " signers"
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: new Date(proposal.createdAt).toLocaleString() }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-2 text-[10px] text-slate-300", children: [

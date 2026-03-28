@@ -71,6 +71,11 @@ const normalizeMultiSigExpiration = (rawValue?: string | null): { localValue: st
   };
 };
 
+const getCoordinationThreshold = (signers: string[]): number => {
+  const unique = new Set((signers || []).map((name) => name.replace(/^@/, '').trim()).filter(Boolean));
+  return Math.max(1, unique.size);
+};
+
 const calculateCoordinationProgress = (
   proposal: SavedMultiSigProposal,
   partialSignatures: PartialTransactionSignature[]
@@ -83,7 +88,7 @@ const calculateCoordinationProgress = (
     if (signedNames.has(name)) current += 1;
   });
 
-  const threshold = Math.max(1, proposal.threshold || 1);
+  const threshold = getCoordinationThreshold(proposal.signers || []);
   return {
     current,
     threshold,
@@ -101,7 +106,7 @@ const normalizeSavedProposal = (proposal: Partial<SavedMultiSigProposal> | null 
     title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
     chain: proposal.chain,
     initiator: proposal.initiator,
-    threshold: Number(proposal.threshold) || 1,
+    threshold: getCoordinationThreshold(Array.isArray(proposal.signers) ? proposal.signers : []),
     signers: Array.isArray(proposal.signers) ? proposal.signers : [],
     expiration: proposal.expiration || null,
     operationType: proposal.operationType || 'custom',
@@ -312,10 +317,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   };
 
   const proposalDraft = useMemo(() => {
+    const coordinationThreshold = getCoordinationThreshold(request.signers);
     return JSON.stringify({
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: request.threshold,
+      threshold: coordinationThreshold,
       signers: request.signers,
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operation: (() => {
@@ -327,7 +333,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       })(),
       authoritySnapshot: authority
     }, null, 2);
-  }, [authority, expiresAt, request.initiator, request.operation, request.signers, request.threshold, selectedChain]);
+  }, [authority, expiresAt, request.initiator, request.operation, request.signers, selectedChain]);
 
   const handleCopyDraft = async () => {
     await navigator.clipboard.writeText(proposalDraft);
@@ -341,6 +347,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   };
 
   const handleSaveProposal = async () => {
+    const coordinationThreshold = getCoordinationThreshold(request.signers);
     const normalizedExpiration = normalizeMultiSigExpiration(expiresAt);
     let operationPayload: any;
     try {
@@ -360,7 +367,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || 'unknown'}`,
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: request.threshold,
+      threshold: coordinationThreshold,
       signers: request.signers,
       expiration: normalizedExpiration.isoValue,
       operationType: opType,
@@ -384,7 +391,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     setRequest({
       initiator: proposal.initiator,
       signers: proposal.signers,
-      threshold: proposal.threshold,
+      threshold: getCoordinationThreshold(proposal.signers),
       operation: proposal.operation
     });
 
@@ -596,16 +603,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.threshold')}</label>
-                <input
-                  type="number"
-                  min="1"
-                  max={Math.max(1, request.signers.length || 1)}
-                  value={request.threshold}
-                  onChange={(e) => setRequest(prev => ({ ...prev, threshold: Math.max(1, Number(e.target.value) || 1) }))}
-                  className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
-                />
+                <div className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white">
+                  {getCoordinationThreshold(request.signers)}
+                </div>
                 <p className="mt-2 text-[10px] text-slate-500">
-                  Coordination threshold for this draft. On-chain authority is shown separately below.
+                  Coordination requires all selected signers in this draft.
                 </p>
               </div>
               <div>
@@ -860,7 +862,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-white truncate">{proposal.title}</div>
                         <div className="text-[11px] text-slate-400 mt-1 break-words">
-                          {proposal.chain} • @{proposal.initiator} • draft threshold {proposal.threshold}
+                          {proposal.chain} • @{proposal.initiator} • {getCoordinationThreshold(proposal.signers)} signers
                         </div>
                         <div className="text-[10px] text-slate-500 mt-1">
                           {new Date(proposal.createdAt).toLocaleString()}
