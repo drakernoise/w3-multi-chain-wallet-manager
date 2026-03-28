@@ -6,6 +6,7 @@ export interface DAppPermission {
     expiresAt: number; // timestamp
     grantedAt: number;
     defaultAccount?: string;
+    defaultAccountChain?: string;
 }
 
 export interface SignRequest {
@@ -28,6 +29,22 @@ class MobileProviderService {
     constructor() {
         this.loadPermissions();
         this.setupDeepLinkListener();
+    }
+
+    private normalizeDomain(domain: string): string {
+        const rawValue = String(domain || '').trim();
+        if (!rawValue) return '';
+
+        try {
+            return new URL(rawValue).hostname.toLowerCase();
+        } catch (_error) {
+            return rawValue
+                .replace(/^[a-z]+:\/\//i, '')
+                .split('/')[0]
+                .split('?')[0]
+                .split('#')[0]
+                .toLowerCase();
+        }
     }
 
     private setupDeepLinkListener() {
@@ -128,7 +145,8 @@ class MobileProviderService {
         });
     }
 
-    public async grantPermission(domain: string, operations: string[], duration: '1day' | '1week' | '1month', defaultAccount?: string) {
+    public async grantPermission(domain: string, operations: string[], duration: '1day' | '1week' | '1month', defaultAccount?: string, defaultAccountChain?: string) {
+        const normalizedDomain = this.normalizeDomain(domain);
         const now = Date.now();
         const durations = {
             '1day': 24 * 60 * 60 * 1000,
@@ -136,23 +154,24 @@ class MobileProviderService {
             '1month': 30 * 24 * 60 * 60 * 1000
         };
 
-        const existing = this.permissions.get(domain);
+        const existing = this.permissions.get(normalizedDomain);
         const mergedOperations = Array.from(new Set([...(existing?.operations || []), ...operations]));
 
         const permission: DAppPermission = {
-            domain,
+            domain: normalizedDomain,
             operations: mergedOperations,
             expiresAt: now + durations[duration],
             grantedAt: existing?.grantedAt || now,
-            defaultAccount: defaultAccount || existing?.defaultAccount
+            defaultAccount: defaultAccount || existing?.defaultAccount,
+            defaultAccountChain: defaultAccountChain || existing?.defaultAccountChain
         };
 
-        this.permissions.set(domain, permission);
+        this.permissions.set(normalizedDomain, permission);
         await this.savePermissions();
     }
 
     public revokePermission(domain: string) {
-        this.permissions.delete(domain);
+        this.permissions.delete(this.normalizeDomain(domain));
         this.savePermissions();
     }
 
@@ -164,7 +183,7 @@ class MobileProviderService {
     }
 
     public getPermission(domain: string): DAppPermission | null {
-        const permission = this.permissions.get(domain);
+        const permission = this.permissions.get(this.normalizeDomain(domain));
         if (!permission) return null;
 
         // Check if expired

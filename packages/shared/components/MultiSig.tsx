@@ -1,37 +1,706 @@
-import React from 'react';
-import { Chain, Account } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Chain, Account, MultiSigRequest } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
+import { getAccountAuthorities, MultiSigAuthority } from '../services/chainService';
+import { storageService } from '../services/storageService';
 
 interface MultiSigProps {
   chain: Chain;
   accounts: Account[];
 }
 
-export const MultiSig: React.FC<MultiSigProps> = () => {
+type OpType = 'transfer' | 'delegate_vesting_shares' | 'transfer_to_vesting' | 'withdraw_vesting' | 'custom';
+
+interface SavedMultiSigProposal {
+  id: string;
+  title: string;
+  chain: Chain;
+  initiator: string;
+  threshold: number;
+  signers: string[];
+  expiration: string | null;
+  operationType: OpType;
+  operation: string;
+  createdAt: number;
+}
+
+const MULTISIG_STORAGE_KEY = 'gravity_multisig_proposals';
+
+interface SharedMultiSigPackage {
+  version: 1;
+  kind: 'gravity-multisig-proposal';
+  proposal: SavedMultiSigProposal;
+}
+
+const chainTheme = {
+  [Chain.HIVE]: 'bg-hive text-white shadow-lg',
+  [Chain.STEEM]: 'bg-steem text-white shadow-lg',
+  [Chain.BLURT]: 'bg-blurt text-white shadow-lg'
+};
+
+export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts }) => {
   const { t } = useTranslation();
+  const [selectedChain, setSelectedChain] = useState<Chain>(initialChain);
+  const [newSigner, setNewSigner] = useState('');
+  const [opType, setOpType] = useState<OpType>('transfer');
+  const [to, setTo] = useState('');
+  const [amount, setAmount] = useState('');
+  const [memo, setMemo] = useState('');
+  const [expiresAt, setExpiresAt] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16));
+  const [copied, setCopied] = useState(false);
+  const [saveLabel, setSaveLabel] = useState('');
+  const [importPayload, setImportPayload] = useState('');
+  const [savedProposals, setSavedProposals] = useState<SavedMultiSigProposal[]>([]);
+  const [authorityLoading, setAuthorityLoading] = useState(false);
+  const [authority, setAuthority] = useState<MultiSigAuthority | null>(null);
+  const [authorityError, setAuthorityError] = useState<string | null>(null);
+
+  const chainAccounts = useMemo(
+    () => accounts.filter((account) => account.chain === selectedChain),
+    [accounts, selectedChain]
+  );
+
+  const [request, setRequest] = useState<MultiSigRequest>({
+    initiator: chainAccounts[0]?.name || '',
+    signers: [],
+    threshold: 1,
+    operation: '{}'
+  });
+
+  useEffect(() => {
+    setSelectedChain(initialChain);
+  }, [initialChain]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSavedProposals = async () => {
+      try {
+        const raw = await storageService.getItem(MULTISIG_STORAGE_KEY);
+        if (!raw || cancelled) return;
+        const parsed = JSON.parse(raw) as SavedMultiSigProposal[];
+        if (!cancelled && Array.isArray(parsed)) {
+          setSavedProposals(parsed);
+        }
+      } catch (error) {
+        console.warn('Failed to load saved multisig proposals:', error);
+      }
+    };
+
+    loadSavedProposals();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const fallbackInitiator = chainAccounts[0]?.name || '';
+    setRequest(prev => ({
+      ...prev,
+      initiator: chainAccounts.some((account) => account.name === prev.initiator) ? prev.initiator : fallbackInitiator,
+      signers: prev.signers.filter((signer) => signer.trim().length > 0)
+    }));
+  }, [chainAccounts]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAuthority = async () => {
+      if (!request.initiator) {
+        setAuthority(null);
+        setAuthorityError(null);
+        return;
+      }
+
+      setAuthorityLoading(true);
+      setAuthorityError(null);
+
+      try {
+        const auth = await getAccountAuthorities(selectedChain, request.initiator, 'active');
+        if (cancelled) return;
+        setAuthority(auth);
+        if (auth?.threshold) {
+          setRequest(prev => ({
+            ...prev,
+            threshold: Math.max(1, Math.min(prev.threshold || auth.threshold, auth.threshold))
+          }));
+        }
+      } catch (error: any) {
+        if (cancelled) return;
+        setAuthority(null);
+        setAuthorityError(error?.message || 'Failed to inspect account authority.');
+      } finally {
+        if (!cancelled) setAuthorityLoading(false);
+      }
+    };
+
+    loadAuthority();
+    return () => {
+      cancelled = true;
+    };
+  }, [request.initiator, selectedChain]);
+
+  useEffect(() => {
+    const asset = selectedChain === Chain.HIVE ? 'HIVE' : selectedChain === Chain.STEEM ? 'STEEM' : 'BLURT';
+
+    const fmtAmount = (value: string) => `${parseFloat(value || '0').toFixed(3)} ${asset}`;
+    const fmtVests = (value: string) => `${parseFloat(value || '0').toFixed(6)} VESTS`;
+
+    if (opType === 'custom') return;
+
+    let operation: any = {};
+
+    switch (opType) {
+      case 'transfer':
+        operation = [
+          'transfer',
+          {
+            from: request.initiator,
+            to,
+            amount: fmtAmount(amount),
+            memo
+          }
+        ];
+        break;
+      case 'delegate_vesting_shares':
+        operation = [
+          'delegate_vesting_shares',
+          {
+            delegator: request.initiator,
+            delegatee: to,
+            vesting_shares: fmtVests(amount)
+          }
+        ];
+        break;
+      case 'transfer_to_vesting':
+        operation = [
+          'transfer_to_vesting',
+          {
+            from: request.initiator,
+            to: to || request.initiator,
+            amount: fmtAmount(amount)
+          }
+        ];
+        break;
+      case 'withdraw_vesting':
+        operation = [
+          'withdraw_vesting',
+          {
+            account: request.initiator,
+            vesting_shares: fmtVests(amount)
+          }
+        ];
+        break;
+    }
+
+    setRequest(prev => ({
+      ...prev,
+      operation: JSON.stringify(operation, null, 2)
+    }));
+  }, [amount, memo, opType, request.initiator, selectedChain, to]);
+
+  const availableSigners = useMemo(() => {
+    const local = chainAccounts.map(account => account.name);
+    const onChain = authority?.accountAuths.map(([name]) => name) || [];
+    return Array.from(new Set([...local, ...onChain])).filter(Boolean);
+  }, [authority?.accountAuths, chainAccounts]);
+
+  const activeAuthorityAccounts = authority?.accountAuths ?? [];
+  const activeAuthorityKeys = authority?.keyAuths ?? [];
+  const looksLikeMultisig = !!authority && (activeAuthorityAccounts.length > 0 || authority.threshold > 1);
+
+  const addSigner = (signerName?: string) => {
+    const signer = (signerName ?? newSigner).trim().replace(/^@/, '');
+    if (!signer || request.signers.includes(signer)) return;
+    setRequest(prev => ({ ...prev, signers: [...prev.signers, signer] }));
+    setNewSigner('');
+  };
+
+  const removeSigner = (signer: string) => {
+    setRequest(prev => ({ ...prev, signers: prev.signers.filter(candidate => candidate !== signer) }));
+  };
+
+  const proposalDraft = useMemo(() => {
+    return JSON.stringify({
+      chain: selectedChain,
+      initiator: request.initiator,
+      threshold: request.threshold,
+      signers: request.signers,
+      expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
+      operation: (() => {
+        try {
+          return JSON.parse(request.operation);
+        } catch {
+          return request.operation;
+        }
+      })(),
+      authoritySnapshot: authority
+    }, null, 2);
+  }, [authority, expiresAt, request.initiator, request.operation, request.signers, request.threshold, selectedChain]);
+
+  const handleCopyDraft = async () => {
+    await navigator.clipboard.writeText(proposalDraft);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+
+  const persistSavedProposals = async (proposals: SavedMultiSigProposal[]) => {
+    setSavedProposals(proposals);
+    await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(proposals));
+  };
+
+  const handleSaveProposal = async () => {
+    const proposal: SavedMultiSigProposal = {
+      id: crypto.randomUUID(),
+      title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || 'unknown'}`,
+      chain: selectedChain,
+      initiator: request.initiator,
+      threshold: request.threshold,
+      signers: request.signers,
+      expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
+      operationType: opType,
+      operation: request.operation,
+      createdAt: Date.now()
+    };
+
+    const proposals = [proposal, ...savedProposals].slice(0, 20);
+    await persistSavedProposals(proposals);
+    setSaveLabel('');
+  };
+
+  const handleLoadProposal = (proposal: SavedMultiSigProposal) => {
+    setSelectedChain(proposal.chain);
+    setOpType(proposal.operationType);
+    setExpiresAt(proposal.expiration ? proposal.expiration.slice(0, 16) : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16));
+    setRequest({
+      initiator: proposal.initiator,
+      signers: proposal.signers,
+      threshold: proposal.threshold,
+      operation: proposal.operation
+    });
+
+    try {
+      const parsed = JSON.parse(proposal.operation);
+      if (Array.isArray(parsed) && parsed.length === 2) {
+        const [, payload] = parsed;
+        setTo(payload.to || payload.delegatee || '');
+        setMemo(payload.memo || '');
+        setAmount(
+          typeof payload.amount === 'string'
+            ? payload.amount.split(' ')[0]
+            : typeof payload.vesting_shares === 'string'
+              ? payload.vesting_shares.split(' ')[0]
+              : '0'
+        );
+      }
+    } catch {
+      setTo('');
+      setMemo('');
+      setAmount('');
+    }
+  };
+
+  const handleDeleteProposal = async (proposalId: string) => {
+    const proposals = savedProposals.filter((proposal) => proposal.id !== proposalId);
+    await persistSavedProposals(proposals);
+  };
+
+  const buildSharedPackage = (proposal: SavedMultiSigProposal): SharedMultiSigPackage => ({
+    version: 1,
+    kind: 'gravity-multisig-proposal',
+    proposal
+  });
+
+  const handleCopyProposalPackage = async (proposal: SavedMultiSigProposal) => {
+    await navigator.clipboard.writeText(JSON.stringify(buildSharedPackage(proposal), null, 2));
+  };
+
+  const handleImportProposal = async () => {
+    if (!importPayload.trim()) return;
+
+    try {
+      const parsed = JSON.parse(importPayload) as SharedMultiSigPackage | SavedMultiSigProposal;
+      const proposal = (parsed as SharedMultiSigPackage).kind === 'gravity-multisig-proposal'
+        ? (parsed as SharedMultiSigPackage).proposal
+        : parsed as SavedMultiSigProposal;
+
+      if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
+        throw new Error('Invalid proposal package');
+      }
+
+      const normalizedProposal: SavedMultiSigProposal = {
+        ...proposal,
+        id: proposal.id || crypto.randomUUID(),
+        title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
+        signers: Array.isArray(proposal.signers) ? proposal.signers : [],
+        threshold: Number(proposal.threshold) || 1,
+        createdAt: proposal.createdAt || Date.now()
+      };
+
+      const proposals = [
+        normalizedProposal,
+        ...savedProposals.filter((candidate) => candidate.id !== normalizedProposal.id)
+      ].slice(0, 20);
+
+      await persistSavedProposals(proposals);
+      setImportPayload('');
+    } catch (error) {
+      console.warn('Failed to import multisig proposal package:', error);
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col items-center justify-center p-8 text-center">
-      <div className="relative w-64 h-64 mb-8 group">
-        <div className="absolute inset-0 bg-blue-500 blur-[80px] opacity-20 rounded-full group-hover:opacity-30 transition-opacity duration-700"></div>
-        <img
-          src="/construction_worker.png"
-          alt="Under Construction"
-          className="relative w-full h-full object-contain drop-shadow-2xl animate-float"
-        />
-      </div>
+    <div className="h-full overflow-y-auto custom-scrollbar p-4">
+      <div className="space-y-4">
+        <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black text-white tracking-tight">{t('multisig.title')}</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Build a multisig proposal draft and inspect the live account authority before coordinating signatures.
+              </p>
+            </div>
+            <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              Alpha
+            </div>
+          </div>
 
-      <h2 className="text-4xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent mb-4 tracking-tight">
-        {t('multisig.construction_title')}
-      </h2>
+          <div className="flex p-1 bg-dark-900 rounded-xl mt-5 border border-dark-700">
+            {[Chain.BLURT, Chain.HIVE, Chain.STEEM].map((chain) => (
+              <button
+                key={chain}
+                onClick={() => setSelectedChain(chain)}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedChain === chain ? chainTheme[chain] : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                {chain}
+              </button>
+            ))}
+          </div>
+        </div>
 
-      <p className="text-slate-400 max-w-sm text-lg leading-relaxed">
-        {t('multisig.construction_desc')}
-      </p>
+        <div className="grid grid-cols-1 gap-4">
+          <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4">
+            <div>
+              <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.initiator')}</label>
+              <select
+                value={request.initiator}
+                onChange={(e) => setRequest(prev => ({ ...prev, initiator: e.target.value }))}
+                className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              >
+                {chainAccounts.length === 0 && <option value="">No {selectedChain} accounts imported</option>}
+                {chainAccounts.map((account) => (
+                  <option key={`${account.chain}:${account.name}`} value={account.name}>
+                    @{account.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      <div className="mt-8 flex gap-3 opacity-75">
-        <span className="w-3 h-3 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-        <span className="w-3 h-3 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-        <span className="w-3 h-3 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.threshold')}</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={Math.max(1, authority?.threshold || request.signers.length || 1)}
+                  value={request.threshold}
+                  onChange={(e) => setRequest(prev => ({ ...prev, threshold: Math.max(1, Number(e.target.value) || 1) }))}
+                  className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.expiration')}</label>
+                <input
+                  type="datetime-local"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                  className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-bold">{t('multisig.authorities_title')}</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {authorityLoading
+                      ? 'Inspecting live active authority...'
+                      : looksLikeMultisig
+                        ? `On-chain threshold ${authority?.threshold}. Account auths and keys below are the real source of truth.`
+                        : 'This account does not currently expose a clear on-chain multisig active authority.'}
+                  </p>
+                </div>
+                {authority && (
+                  <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.18em] ${looksLikeMultisig ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                    {looksLikeMultisig ? 'Ready' : 'Single Signer'}
+                  </div>
+                )}
+              </div>
+
+              {authorityError && (
+                <div className="text-xs text-red-400 bg-red-500/5 border border-red-500/10 rounded-xl p-3">
+                  {authorityError}
+                </div>
+              )}
+
+              {authority && (
+                <div className="space-y-3">
+                  <div className="text-xs text-slate-300">
+                    Threshold: <span className="font-black text-white">{authority.threshold}</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {activeAuthorityAccounts.length > 0 ? activeAuthorityAccounts.map(([name, weight]) => (
+                      <div key={`acc:${name}`} className="flex items-center justify-between bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-xs">
+                        <span className="text-slate-200">@{name}</span>
+                        <span className="text-blue-400 font-black">+{weight}</span>
+                      </div>
+                    )) : (
+                      <div className="text-xs text-slate-500 italic">No account-based signers defined on-chain.</div>
+                    )}
+
+                    {activeAuthorityKeys.length > 0 && (
+                      <div className="pt-1 space-y-2">
+                        {activeAuthorityKeys.map(([key, weight]) => (
+                          <div key={`key:${key}`} className="flex items-center justify-between bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-[11px]">
+                            <span className="text-slate-400 font-mono truncate">{key.slice(0, 10)}...{key.slice(-8)}</span>
+                            <span className="text-purple-400 font-black">+{weight}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4">
+            <div>
+              <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.signers')}</label>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 mt-2">
+                <input
+                  value={newSigner}
+                  onChange={(e) => setNewSigner(e.target.value)}
+                  placeholder="username"
+                  className="min-w-0 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={() => addSigner()}
+                  className="px-3 sm:px-4 min-w-[64px] rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-black transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+              {availableSigners.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {availableSigners.map((signer) => (
+                    <button
+                      key={signer}
+                      onClick={() => addSigner(signer)}
+                      className="px-3 py-1.5 rounded-full bg-dark-900 border border-dark-700 text-xs text-slate-300 hover:border-blue-500 hover:text-white transition-colors"
+                    >
+                      @{signer}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
+              {request.signers.length === 0 ? (
+                <div className="text-xs text-slate-500 italic">No proposal signers selected yet.</div>
+              ) : request.signers.map((signer) => (
+                <span key={signer} className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
+                  @{signer}
+                  <button onClick={() => removeSigner(signer)} className="text-blue-200 hover:text-white transition-colors">
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.proposal')}</label>
+              <select
+                value={opType}
+                onChange={(e) => setOpType(e.target.value as OpType)}
+                className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              >
+                <option value="transfer">Transfer</option>
+                <option value="delegate_vesting_shares">Delegate Power</option>
+                <option value="transfer_to_vesting">Power Up</option>
+                <option value="withdraw_vesting">Power Down</option>
+                <option value="custom">Custom JSON</option>
+              </select>
+            </div>
+
+            {opType !== 'custom' && (
+              <div className="space-y-3 rounded-2xl border border-dark-700 bg-dark-900/60 p-4">
+                {opType !== 'withdraw_vesting' && (
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Target account</label>
+                    <input
+                      value={to}
+                      onChange={(e) => setTo(e.target.value)}
+                      placeholder={opType === 'transfer_to_vesting' ? `Default: @${request.initiator}` : 'username'}
+                      className="w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">
+                    {opType === 'delegate_vesting_shares' || opType === 'withdraw_vesting'
+                      ? 'Amount (VESTS)'
+                      : `Amount (${selectedChain})`}
+                  </label>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.000"
+                    className="w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {opType === 'transfer' && (
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Memo</label>
+                    <input
+                      value={memo}
+                      onChange={(e) => setMemo(e.target.value)}
+                      placeholder="Optional note"
+                      className="w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-slate-500 uppercase font-bold">Operation preview</label>
+                {opType !== 'custom' && <span className="text-[10px] text-blue-400">Generated</span>}
+              </div>
+              <textarea
+                className={`w-full bg-dark-950 border border-dark-600 rounded-2xl p-3 text-[11px] font-mono h-32 outline-none focus:border-blue-500 ${opType !== 'custom' ? 'text-slate-400' : 'text-white'}`}
+                value={request.operation}
+                onChange={(e) => opType === 'custom' && setRequest(prev => ({ ...prev, operation: e.target.value }))}
+                readOnly={opType !== 'custom'}
+              />
+            </div>
+
+            <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Proposal draft</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Export this JSON to coordinate signatures manually while we finish the full multisig transport flow.
+                  </p>
+                </div>
+                <button
+                  onClick={handleCopyDraft}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-[0.18em] transition-colors shrink-0"
+                >
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <pre className="mt-3 text-[10px] text-slate-300 whitespace-pre-wrap break-all bg-black/30 rounded-xl p-3 border border-dark-700 max-h-48 overflow-y-auto custom-scrollbar">
+                {proposalDraft}
+              </pre>
+            </div>
+
+            <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Saved proposals</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Keep local drafts here while we finish the signer notification and collection flow.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 items-stretch">
+                <input
+                  value={saveLabel}
+                  onChange={(e) => setSaveLabel(e.target.value)}
+                  placeholder="Proposal label"
+                  className="min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleSaveProposal}
+                  disabled={!request.initiator || !request.operation}
+                  className="px-4 shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {savedProposals.length === 0 ? (
+                  <div className="text-xs text-slate-500 italic">No saved multisig proposals yet.</div>
+                ) : savedProposals.map((proposal) => (
+                  <div key={proposal.id} className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3">
+                    <div className="space-y-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-white truncate">{proposal.title}</div>
+                        <div className="text-[11px] text-slate-400 mt-1 break-words">
+                          {proposal.chain} • @{proposal.initiator} • threshold {proposal.threshold}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1">
+                          {new Date(proposal.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => handleLoadProposal(proposal)}
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => handleCopyProposalPackage(proposal)}
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors"
+                        >
+                          Copy
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProposal(proposal.id)}
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 border-t border-dark-700/80 space-y-2">
+                <p className="text-[11px] text-slate-400">
+                  Paste a shared proposal package here to import it into this device.
+                </p>
+                <textarea
+                  value={importPayload}
+                  onChange={(e) => setImportPayload(e.target.value)}
+                  placeholder='{"kind":"gravity-multisig-proposal", ...}'
+                  className="w-full bg-dark-950 border border-dark-600 rounded-2xl p-3 text-[11px] font-mono h-24 outline-none focus:border-blue-500 text-slate-300"
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleImportProposal}
+                    disabled={!importPayload.trim()}
+                    className="px-4 py-2 rounded-xl bg-dark-900 border border-dark-600 disabled:text-slate-600 disabled:border-dark-700 text-slate-200 text-xs font-black uppercase tracking-[0.14em] hover:border-blue-500 hover:text-white transition-colors"
+                  >
+                    Import package
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

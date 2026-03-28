@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as indexBrowserExports, z as indexBrowserExports$1, A as validateAccountKeys, B as fetchAccountHistory, D as getAccountAuthorities, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, E as fetchBalances, F as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as getAccountAuthorities, z as indexBrowserExports, A as indexBrowserExports$1, B as validateAccountKeys, D as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, E as fetchBalances, F as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -10444,6 +10444,7 @@ const WalletView = ({
   chain,
   onChainChange,
   accounts,
+  isRefreshing = false,
   onManage,
   onSend,
   onReceive,
@@ -10452,6 +10453,7 @@ const WalletView = ({
   onAddAccount
 }) => {
   const { t } = useTranslation();
+  const [localRefreshing, setLocalRefreshing] = reactExports.useState(false);
   const [modalState, setModalState] = reactExports.useState({ type: null, account: null });
   const openModal = (type, account) => {
     setModalState({ type, account });
@@ -10459,16 +10461,27 @@ const WalletView = ({
   const closeModal = () => {
     setModalState({ type: null, account: null });
   };
+  const handleRefreshClick = async () => {
+    if (!onRefresh || localRefreshing || isRefreshing) return;
+    setLocalRefreshing(true);
+    try {
+      await Promise.resolve(onRefresh());
+    } finally {
+      setTimeout(() => setLocalRefreshing(false), 500);
+    }
+  };
+  const refreshing = isRefreshing || localRefreshing;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4 relative h-full overflow-y-auto p-4 custom-scrollbar", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-6", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-200 to-slate-400", children: t("wallet.network_label") }),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
-          onClick: onRefresh,
+          onClick: handleRefreshClick,
+          disabled: refreshing,
           className: "p-2 bg-dark-800 rounded-full hover:bg-dark-700 hover:text-blue-400 transition-colors border border-dark-700",
           title: t("wallet.refresh_tooltip"),
-          children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" }) })
+          children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: `w-4 h-4 ${refreshing ? "animate-spin" : ""}`, fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" }) })
         }
       )
     ] }),
@@ -11393,28 +11406,607 @@ const BulkTransfer = ({ chain, accounts, refreshBalance, onChangeChain, onAddAcc
   ] });
 };
 
-const MultiSig = () => {
+const MULTISIG_STORAGE_KEY = "gravity_multisig_proposals";
+const chainTheme = {
+  [Chain.HIVE]: "bg-hive text-white shadow-lg",
+  [Chain.STEEM]: "bg-steem text-white shadow-lg",
+  [Chain.BLURT]: "bg-blurt text-white shadow-lg"
+};
+const MultiSig = ({ chain: initialChain, accounts }) => {
   const { t } = useTranslation();
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col items-center justify-center p-8 text-center", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative w-64 h-64 mb-8 group", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 bg-blue-500 blur-[80px] opacity-20 rounded-full group-hover:opacity-30 transition-opacity duration-700" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "img",
-        {
-          src: "/construction_worker.png",
-          alt: "Under Construction",
-          className: "relative w-full h-full object-contain drop-shadow-2xl animate-float"
+  const [selectedChain, setSelectedChain] = reactExports.useState(initialChain);
+  const [newSigner, setNewSigner] = reactExports.useState("");
+  const [opType, setOpType] = reactExports.useState("transfer");
+  const [to, setTo] = reactExports.useState("");
+  const [amount, setAmount] = reactExports.useState("");
+  const [memo, setMemo] = reactExports.useState("");
+  const [expiresAt, setExpiresAt] = reactExports.useState(() => new Date(Date.now() + 24 * 60 * 60 * 1e3).toISOString().slice(0, 16));
+  const [copied, setCopied] = reactExports.useState(false);
+  const [saveLabel, setSaveLabel] = reactExports.useState("");
+  const [importPayload, setImportPayload] = reactExports.useState("");
+  const [savedProposals, setSavedProposals] = reactExports.useState([]);
+  const [authorityLoading, setAuthorityLoading] = reactExports.useState(false);
+  const [authority, setAuthority] = reactExports.useState(null);
+  const [authorityError, setAuthorityError] = reactExports.useState(null);
+  const chainAccounts = reactExports.useMemo(
+    () => accounts.filter((account) => account.chain === selectedChain),
+    [accounts, selectedChain]
+  );
+  const [request, setRequest] = reactExports.useState({
+    initiator: chainAccounts[0]?.name || "",
+    signers: [],
+    threshold: 1,
+    operation: "{}"
+  });
+  reactExports.useEffect(() => {
+    setSelectedChain(initialChain);
+  }, [initialChain]);
+  reactExports.useEffect(() => {
+    let cancelled = false;
+    const loadSavedProposals = async () => {
+      try {
+        const raw = await storageService.getItem(MULTISIG_STORAGE_KEY);
+        if (!raw || cancelled) return;
+        const parsed = JSON.parse(raw);
+        if (!cancelled && Array.isArray(parsed)) {
+          setSavedProposals(parsed);
         }
-      )
+      } catch (error) {
+        console.warn("Failed to load saved multisig proposals:", error);
+      }
+    };
+    loadSavedProposals();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  reactExports.useEffect(() => {
+    const fallbackInitiator = chainAccounts[0]?.name || "";
+    setRequest((prev) => ({
+      ...prev,
+      initiator: chainAccounts.some((account) => account.name === prev.initiator) ? prev.initiator : fallbackInitiator,
+      signers: prev.signers.filter((signer) => signer.trim().length > 0)
+    }));
+  }, [chainAccounts]);
+  reactExports.useEffect(() => {
+    let cancelled = false;
+    const loadAuthority = async () => {
+      if (!request.initiator) {
+        setAuthority(null);
+        setAuthorityError(null);
+        return;
+      }
+      setAuthorityLoading(true);
+      setAuthorityError(null);
+      try {
+        const auth = await getAccountAuthorities(selectedChain, request.initiator, "active");
+        if (cancelled) return;
+        setAuthority(auth);
+        if (auth?.threshold) {
+          setRequest((prev) => ({
+            ...prev,
+            threshold: Math.max(1, Math.min(prev.threshold || auth.threshold, auth.threshold))
+          }));
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setAuthority(null);
+        setAuthorityError(error?.message || "Failed to inspect account authority.");
+      } finally {
+        if (!cancelled) setAuthorityLoading(false);
+      }
+    };
+    loadAuthority();
+    return () => {
+      cancelled = true;
+    };
+  }, [request.initiator, selectedChain]);
+  reactExports.useEffect(() => {
+    const asset = selectedChain === Chain.HIVE ? "HIVE" : selectedChain === Chain.STEEM ? "STEEM" : "BLURT";
+    const fmtAmount = (value) => `${parseFloat(value || "0").toFixed(3)} ${asset}`;
+    const fmtVests = (value) => `${parseFloat(value || "0").toFixed(6)} VESTS`;
+    if (opType === "custom") return;
+    let operation = {};
+    switch (opType) {
+      case "transfer":
+        operation = [
+          "transfer",
+          {
+            from: request.initiator,
+            to,
+            amount: fmtAmount(amount),
+            memo
+          }
+        ];
+        break;
+      case "delegate_vesting_shares":
+        operation = [
+          "delegate_vesting_shares",
+          {
+            delegator: request.initiator,
+            delegatee: to,
+            vesting_shares: fmtVests(amount)
+          }
+        ];
+        break;
+      case "transfer_to_vesting":
+        operation = [
+          "transfer_to_vesting",
+          {
+            from: request.initiator,
+            to: to || request.initiator,
+            amount: fmtAmount(amount)
+          }
+        ];
+        break;
+      case "withdraw_vesting":
+        operation = [
+          "withdraw_vesting",
+          {
+            account: request.initiator,
+            vesting_shares: fmtVests(amount)
+          }
+        ];
+        break;
+    }
+    setRequest((prev) => ({
+      ...prev,
+      operation: JSON.stringify(operation, null, 2)
+    }));
+  }, [amount, memo, opType, request.initiator, selectedChain, to]);
+  const availableSigners = reactExports.useMemo(() => {
+    const local = chainAccounts.map((account) => account.name);
+    const onChain = authority?.accountAuths.map(([name]) => name) || [];
+    return Array.from(/* @__PURE__ */ new Set([...local, ...onChain])).filter(Boolean);
+  }, [authority?.accountAuths, chainAccounts]);
+  const activeAuthorityAccounts = authority?.accountAuths ?? [];
+  const activeAuthorityKeys = authority?.keyAuths ?? [];
+  const looksLikeMultisig = !!authority && (activeAuthorityAccounts.length > 0 || authority.threshold > 1);
+  const addSigner = (signerName) => {
+    const signer = (signerName ?? newSigner).trim().replace(/^@/, "");
+    if (!signer || request.signers.includes(signer)) return;
+    setRequest((prev) => ({ ...prev, signers: [...prev.signers, signer] }));
+    setNewSigner("");
+  };
+  const removeSigner = (signer) => {
+    setRequest((prev) => ({ ...prev, signers: prev.signers.filter((candidate) => candidate !== signer) }));
+  };
+  const proposalDraft = reactExports.useMemo(() => {
+    return JSON.stringify({
+      chain: selectedChain,
+      initiator: request.initiator,
+      threshold: request.threshold,
+      signers: request.signers,
+      expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
+      operation: (() => {
+        try {
+          return JSON.parse(request.operation);
+        } catch {
+          return request.operation;
+        }
+      })(),
+      authoritySnapshot: authority
+    }, null, 2);
+  }, [authority, expiresAt, request.initiator, request.operation, request.signers, request.threshold, selectedChain]);
+  const handleCopyDraft = async () => {
+    await navigator.clipboard.writeText(proposalDraft);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+  const persistSavedProposals = async (proposals) => {
+    setSavedProposals(proposals);
+    await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(proposals));
+  };
+  const handleSaveProposal = async () => {
+    const proposal = {
+      id: crypto.randomUUID(),
+      title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || "unknown"}`,
+      chain: selectedChain,
+      initiator: request.initiator,
+      threshold: request.threshold,
+      signers: request.signers,
+      expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
+      operationType: opType,
+      operation: request.operation,
+      createdAt: Date.now()
+    };
+    const proposals = [proposal, ...savedProposals].slice(0, 20);
+    await persistSavedProposals(proposals);
+    setSaveLabel("");
+  };
+  const handleLoadProposal = (proposal) => {
+    setSelectedChain(proposal.chain);
+    setOpType(proposal.operationType);
+    setExpiresAt(proposal.expiration ? proposal.expiration.slice(0, 16) : new Date(Date.now() + 24 * 60 * 60 * 1e3).toISOString().slice(0, 16));
+    setRequest({
+      initiator: proposal.initiator,
+      signers: proposal.signers,
+      threshold: proposal.threshold,
+      operation: proposal.operation
+    });
+    try {
+      const parsed = JSON.parse(proposal.operation);
+      if (Array.isArray(parsed) && parsed.length === 2) {
+        const [, payload] = parsed;
+        setTo(payload.to || payload.delegatee || "");
+        setMemo(payload.memo || "");
+        setAmount(
+          typeof payload.amount === "string" ? payload.amount.split(" ")[0] : typeof payload.vesting_shares === "string" ? payload.vesting_shares.split(" ")[0] : "0"
+        );
+      }
+    } catch {
+      setTo("");
+      setMemo("");
+      setAmount("");
+    }
+  };
+  const handleDeleteProposal = async (proposalId) => {
+    const proposals = savedProposals.filter((proposal) => proposal.id !== proposalId);
+    await persistSavedProposals(proposals);
+  };
+  const buildSharedPackage = (proposal) => ({
+    version: 1,
+    kind: "gravity-multisig-proposal",
+    proposal
+  });
+  const handleCopyProposalPackage = async (proposal) => {
+    await navigator.clipboard.writeText(JSON.stringify(buildSharedPackage(proposal), null, 2));
+  };
+  const handleImportProposal = async () => {
+    if (!importPayload.trim()) return;
+    try {
+      const parsed = JSON.parse(importPayload);
+      const proposal = parsed.kind === "gravity-multisig-proposal" ? parsed.proposal : parsed;
+      if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
+        throw new Error("Invalid proposal package");
+      }
+      const normalizedProposal = {
+        ...proposal,
+        id: proposal.id || crypto.randomUUID(),
+        title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
+        signers: Array.isArray(proposal.signers) ? proposal.signers : [],
+        threshold: Number(proposal.threshold) || 1,
+        createdAt: proposal.createdAt || Date.now()
+      };
+      const proposals = [
+        normalizedProposal,
+        ...savedProposals.filter((candidate) => candidate.id !== normalizedProposal.id)
+      ].slice(0, 20);
+      await persistSavedProposals(proposals);
+      setImportPayload("");
+    } catch (error) {
+      console.warn("Failed to import multisig proposal package:", error);
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "h-full overflow-y-auto custom-scrollbar p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start justify-between gap-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-black text-white tracking-tight", children: t("multisig.title") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 mt-1", children: "Build a multisig proposal draft and inspect the live account authority before coordinating signatures." })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20", children: "Alpha" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex p-1 bg-dark-900 rounded-xl mt-5 border border-dark-700", children: [Chain.BLURT, Chain.HIVE, Chain.STEEM].map((chain) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => setSelectedChain(chain),
+          className: `flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedChain === chain ? chainTheme[chain] : "text-slate-500 hover:text-slate-300"}`,
+          children: chain
+        },
+        chain
+      )) })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-4xl font-black bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent mb-4 tracking-tight", children: t("multisig.construction_title") }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-slate-400 max-w-sm text-lg leading-relaxed", children: t("multisig.construction_desc") }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-8 flex gap-3 opacity-75", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "w-3 h-3 rounded-full bg-blue-500 animate-bounce", style: { animationDelay: "0ms" } }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "w-3 h-3 rounded-full bg-indigo-500 animate-bounce", style: { animationDelay: "150ms" } }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "w-3 h-3 rounded-full bg-purple-500 animate-bounce", style: { animationDelay: "300ms" } })
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 gap-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.initiator") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "select",
+            {
+              value: request.initiator,
+              onChange: (e) => setRequest((prev) => ({ ...prev, initiator: e.target.value })),
+              className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500",
+              children: [
+                chainAccounts.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("option", { value: "", children: [
+                  "No ",
+                  selectedChain,
+                  " accounts imported"
+                ] }),
+                chainAccounts.map((account) => /* @__PURE__ */ jsxRuntimeExports.jsxs("option", { value: account.name, children: [
+                  "@",
+                  account.name
+                ] }, `${account.chain}:${account.name}`))
+              ]
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.threshold") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "number",
+                min: "1",
+                max: Math.max(1, authority?.threshold || request.signers.length || 1),
+                value: request.threshold,
+                onChange: (e) => setRequest((prev) => ({ ...prev, threshold: Math.max(1, Number(e.target.value) || 1) })),
+                className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.expiration") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "datetime-local",
+                value: expiresAt,
+                onChange: (e) => setExpiresAt(e.target.value),
+                className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              }
+            )
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.authorities_title") }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: authorityLoading ? "Inspecting live active authority..." : looksLikeMultisig ? `On-chain threshold ${authority?.threshold}. Account auths and keys below are the real source of truth.` : "This account does not currently expose a clear on-chain multisig active authority." })
+            ] }),
+            authority && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.18em] ${looksLikeMultisig ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`, children: looksLikeMultisig ? "Ready" : "Single Signer" })
+          ] }),
+          authorityError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-red-400 bg-red-500/5 border border-red-500/10 rounded-xl p-3", children: authorityError }),
+          authority && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs text-slate-300", children: [
+              "Threshold: ",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-black text-white", children: authority.threshold })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
+              activeAuthorityAccounts.length > 0 ? activeAuthorityAccounts.map(([name, weight]) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-xs", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200", children: [
+                  "@",
+                  name
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-blue-400 font-black", children: [
+                  "+",
+                  weight
+                ] })
+              ] }, `acc:${name}`)) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No account-based signers defined on-chain." }),
+              activeAuthorityKeys.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-1 space-y-2", children: activeAuthorityKeys.map(([key, weight]) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-[11px]", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-400 font-mono truncate", children: [
+                  key.slice(0, 10),
+                  "...",
+                  key.slice(-8)
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-purple-400 font-black", children: [
+                  "+",
+                  weight
+                ] })
+              ] }, `key:${key}`)) })
+            ] })
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.signers") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[minmax(0,1fr)_auto] gap-2 mt-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: newSigner,
+                onChange: (e) => setNewSigner(e.target.value),
+                placeholder: "username",
+                className: "min-w-0 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => addSigner(),
+                className: "px-3 sm:px-4 min-w-[64px] rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-black transition-colors",
+                children: "Add"
+              }
+            )
+          ] }),
+          availableSigners.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap gap-2 mt-3", children: availableSigners.map((signer) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              onClick: () => addSigner(signer),
+              className: "px-3 py-1.5 rounded-full bg-dark-900 border border-dark-700 text-xs text-slate-300 hover:border-blue-500 hover:text-white transition-colors",
+              children: [
+                "@",
+                signer
+              ]
+            },
+            signer
+          )) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap gap-2 min-h-[2.5rem]", children: request.signers.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No proposal signers selected yet." }) : request.signers.map((signer) => /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "inline-flex items-center gap-2 px-3 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs", children: [
+          "@",
+          signer,
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => removeSigner(signer), className: "text-blue-200 hover:text-white transition-colors", children: "×" })
+        ] }, signer)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.proposal") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "select",
+            {
+              value: opType,
+              onChange: (e) => setOpType(e.target.value),
+              className: "w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "transfer", children: "Transfer" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "delegate_vesting_shares", children: "Delegate Power" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "transfer_to_vesting", children: "Power Up" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "withdraw_vesting", children: "Power Down" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "custom", children: "Custom JSON" })
+              ]
+            }
+          )
+        ] }),
+        opType !== "custom" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3 rounded-2xl border border-dark-700 bg-dark-900/60 p-4", children: [
+          opType !== "withdraw_vesting" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-400 block mb-1", children: "Target account" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: to,
+                onChange: (e) => setTo(e.target.value),
+                placeholder: opType === "transfer_to_vesting" ? `Default: @${request.initiator}` : "username",
+                className: "w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-400 block mb-1", children: opType === "delegate_vesting_shares" || opType === "withdraw_vesting" ? "Amount (VESTS)" : `Amount (${selectedChain})` }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "number",
+                value: amount,
+                onChange: (e) => setAmount(e.target.value),
+                placeholder: "0.000",
+                className: "w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              }
+            )
+          ] }),
+          opType === "transfer" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-400 block mb-1", children: "Memo" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: memo,
+                onChange: (e) => setMemo(e.target.value),
+                placeholder: "Optional note",
+                className: "w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              }
+            )
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between mb-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: "Operation preview" }),
+            opType !== "custom" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-blue-400", children: "Generated" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "textarea",
+            {
+              className: `w-full bg-dark-950 border border-dark-600 rounded-2xl p-3 text-[11px] font-mono h-32 outline-none focus:border-blue-500 ${opType !== "custom" ? "text-slate-400" : "text-white"}`,
+              value: request.operation,
+              onChange: (e) => opType === "custom" && setRequest((prev) => ({ ...prev, operation: e.target.value })),
+              readOnly: opType !== "custom"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: "Proposal draft" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Export this JSON to coordinate signatures manually while we finish the full multisig transport flow." })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: handleCopyDraft,
+                className: "px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-[0.18em] transition-colors shrink-0",
+                children: copied ? "Copied" : "Copy"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "mt-3 text-[10px] text-slate-300 whitespace-pre-wrap break-all bg-black/30 rounded-xl p-3 border border-dark-700 max-h-48 overflow-y-auto custom-scrollbar", children: proposalDraft })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-between gap-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: "Saved proposals" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Keep local drafts here while we finish the signer notification and collection flow." })
+          ] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 items-stretch", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: saveLabel,
+                onChange: (e) => setSaveLabel(e.target.value),
+                placeholder: "Proposal label",
+                className: "min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: handleSaveProposal,
+                disabled: !request.initiator || !request.operation,
+                className: "px-4 shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors",
+                children: "Save"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: savedProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No saved multisig proposals yet." }) : savedProposals.map((proposal) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-dark-700 bg-dark-800 px-3 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-bold text-white truncate", children: proposal.title }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] text-slate-400 mt-1 break-words", children: [
+                proposal.chain,
+                " • @",
+                proposal.initiator,
+                " • threshold ",
+                proposal.threshold
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: new Date(proposal.createdAt).toLocaleString() })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-2", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: () => handleLoadProposal(proposal),
+                  className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors",
+                  children: "Load"
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: () => handleCopyProposalPackage(proposal),
+                  className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors",
+                  children: "Copy"
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: () => handleDeleteProposal(proposal.id),
+                  className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors",
+                  children: "Delete"
+                }
+              )
+            ] })
+          ] }) }, proposal.id)) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 border-t border-dark-700/80 space-y-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400", children: "Paste a shared proposal package here to import it into this device." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "textarea",
+              {
+                value: importPayload,
+                onChange: (e) => setImportPayload(e.target.value),
+                placeholder: '{"kind":"gravity-multisig-proposal", ...}',
+                className: "w-full bg-dark-950 border border-dark-600 rounded-2xl p-3 text-[11px] font-mono h-24 outline-none focus:border-blue-500 text-slate-300"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: handleImportProposal,
+                disabled: !importPayload.trim(),
+                className: "px-4 py-2 rounded-xl bg-dark-900 border border-dark-600 disabled:text-slate-600 disabled:border-dark-700 text-slate-200 text-xs font-black uppercase tracking-[0.14em] hover:border-blue-500 hover:text-white transition-colors",
+                children: "Import package"
+              }
+            ) })
+          ] })
+        ] })
+      ] })
     ] })
-  ] });
+  ] }) });
 };
 
 const validateUsername = (username) => {
@@ -12576,6 +13168,15 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       setLoading(false);
     });
   }, [requestId, t]);
+  const extractBroadcastOperations = (value) => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      if (Array.isArray(value.operations)) return value.operations;
+      if (value.tx && Array.isArray(value.tx.operations)) return value.tx.operations;
+      if (value.transaction && Array.isArray(value.transaction.operations)) return value.transaction.operations;
+    }
+    return value ? [value] : [];
+  };
   const [trustDomain, setTrustDomain] = reactExports.useState(false);
   reactExports.useEffect(() => {
     if (!request || !accounts.length) return;
@@ -12587,8 +13188,8 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         account = accounts.find((a) => a.name === username && a.chain === "HIVE");
       }
       if (!account) account = accounts.find((a) => a.name === username);
-      if (!account && Array.isArray(request.params) && Array.isArray(request.params[1])) {
-        const operations = request.params[1];
+      if (!account && Array.isArray(request.params)) {
+        const operations = extractBroadcastOperations(request.params[1]);
         const accountNames = accounts.map((a) => a.name.toLowerCase());
         for (const op of operations) {
           if (Array.isArray(op) && op.length >= 2 && typeof op[1] === "object") {
@@ -12652,8 +13253,8 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       if (!account) {
         account = accounts.find((a) => a.name === username);
       }
-      if (!account && Array.isArray(request.params) && Array.isArray(request.params[1])) {
-        const operations = request.params[1];
+      if (!account && Array.isArray(request.params)) {
+        const operations = extractBroadcastOperations(request.params[1]);
         const accountNames = accounts.map((a) => a.name.toLowerCase());
         for (const op of operations) {
           if (Array.isArray(op) && op.length >= 2 && typeof op[1] === "object") {
@@ -12732,9 +13333,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
         result = {
-          result: opResult,
+          result: response.txId || opResult,
+          txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
+          opResult,
           message: t("sign.success"),
           ...response
         };
@@ -12748,9 +13351,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
         result = {
-          result: opResult,
+          result: response.txId || opResult,
+          txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
+          opResult,
           message: t("sign.success"),
           ...response
         };
@@ -12765,9 +13370,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
         result = {
-          result: opResult,
+          result: response.txId || opResult,
+          txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
+          opResult,
           message: t("sign.success"),
           ...response
         };
@@ -12823,6 +13430,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       } else if (isBroadcast2) {
         let rawOperations = request.params[1];
         const keyType = request.params[2];
+        const originalEnvelope = request._gravityBroadcastEnvelope || (request._gravityOriginalParams && Array.isArray(request._gravityOriginalParams) ? request._gravityOriginalParams[1] : null);
+        if (rawOperations && typeof rawOperations === "object" && !Array.isArray(rawOperations)) {
+          console.log("[SignRequest Broadcast] Extracting operations from transaction envelope:", Object.keys(rawOperations));
+          rawOperations = rawOperations.operations || rawOperations.tx?.operations || rawOperations.transaction?.operations || rawOperations;
+        }
         let operations = (Array.isArray(rawOperations) ? rawOperations : [rawOperations]).map((op) => {
           if (Array.isArray(op)) return op;
           if (op && typeof op === "object") {
@@ -12832,6 +13444,8 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           }
           return op;
         });
+        const firstOperation = operations.find((op) => Array.isArray(op) || op && typeof op === "object");
+        const firstOperationName = Array.isArray(firstOperation) ? firstOperation[0] : firstOperation?.type || firstOperation?.operation || firstOperation?.method || null;
         const requiresActiveKey = operations.some((op) => {
           const opName = Array.isArray(op) ? op[0] : op.type || op[0];
           const activeKeyOps = [
@@ -12895,10 +13509,30 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         const response = await broadcastOperations(account.chain, key, operations);
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
-        result = {
-          result: opResult,
+        const isSplinterlands = /(^|\.)splinterlands\.com$/i.test(domain);
+        const envelopePayload = originalEnvelope && typeof originalEnvelope === "object" ? {
+          ...originalEnvelope,
+          operations: Array.isArray(originalEnvelope.operations) ? originalEnvelope.operations : operations
+        } : null;
+        const resultPayload = isSplinterlands ? {
+          ...envelopePayload || {},
+          ...opResult && typeof opResult === "object" ? opResult : {},
+          id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+          txId: response.txId,
           tx_id: response.txId,
+          operation: firstOperationName,
+          op: firstOperationName,
+          operations
+        } : response.txId || opResult;
+        result = {
+          result: resultPayload,
+          txId: response.txId,
+          tx_id: response.txId,
+          transaction: envelopePayload || void 0,
           broadcastPayload: opResult,
+          opResult,
+          operation: firstOperationName,
+          operations,
           message: t("sign.success"),
           ...response
         };
@@ -12913,9 +13547,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
         result = {
-          result: opResult,
+          result: response.txId || opResult,
+          txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
+          opResult,
           message: t("sign.success"),
           ...response
         };
@@ -12928,9 +13564,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
         result = {
-          result: opResult,
+          result: response.txId || opResult,
+          txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
+          opResult,
           message: t("sign.success"),
           ...response
         };
@@ -12946,9 +13584,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
         result = {
-          result: opResult,
+          result: response.txId || opResult,
+          txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
+          opResult,
           message: t("sign.success"),
           ...response
         };
@@ -12959,9 +13599,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
         result = {
-          result: opResult,
+          result: response.txId || opResult,
+          txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
+          opResult,
           message: t("sign.success"),
           ...response
         };
@@ -15177,6 +15819,15 @@ const BridgeModal = ({ onClose, onSync }) => {
   const [qrData, setQrData] = reactExports.useState(null);
   const [status, setStatus] = reactExports.useState("generating");
   const [serverStatus, setServerStatus] = reactExports.useState("connecting");
+  const [isCompact, setIsCompact] = reactExports.useState(false);
+  reactExports.useEffect(() => {
+    const updateCompact = () => {
+      setIsCompact(window.innerHeight < 720);
+    };
+    updateCompact();
+    window.addEventListener("resize", updateCompact);
+    return () => window.removeEventListener("resize", updateCompact);
+  }, []);
   reactExports.useEffect(() => {
     bridgeService.onStatusChange = (s) => {
       if (s === "connected") setServerStatus("connected");
@@ -15192,9 +15843,10 @@ const BridgeModal = ({ onClose, onSync }) => {
     };
     initBridge();
   }, []);
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-dark-900/90 backdrop-blur-md animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-600 rounded-[32px] p-8 max-w-sm w-full shadow-2xl relative overflow-hidden", children: [
+  const qrSize = isCompact ? 164 : 200;
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto p-3 sm:p-4 bg-dark-900/90 backdrop-blur-md animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `bg-dark-800 border border-dark-600 rounded-[28px] max-w-sm w-full shadow-2xl relative my-auto max-h-[calc(100vh-1.5rem)] flex flex-col ${isCompact ? "p-5" : "p-8"}`, children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "absolute top-4 right-4 text-slate-500 hover:text-white transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-center mb-8", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `text-center shrink-0 ${isCompact ? "mb-5" : "mb-8"}`, children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-center mb-2", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors ${serverStatus === "connected" ? "bg-green-500/10 text-green-500 border border-green-500/20" : serverStatus === "error" ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-slate-500/10 text-slate-500 border border-slate-500/20"}`, children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `w-1 h-1 rounded-full ${serverStatus === "connected" ? "bg-green-500 animate-pulse" : serverStatus === "error" ? "bg-red-500" : "bg-slate-500 animate-pulse"}` }),
         serverStatus === "connected" ? "Server Linked" : serverStatus === "error" ? "Link Error" : "Linking..."
@@ -15202,35 +15854,35 @@ const BridgeModal = ({ onClose, onSync }) => {
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-black text-white mb-2 tracking-tight", children: "Pair Phone" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 font-medium", children: "Pair your mobile device for remote signing" })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-col items-center justify-center space-y-8", children: status === "connected" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center py-10 animate-bounceFast", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar flex flex-col items-center ${isCompact ? "space-y-5" : "space-y-8"}`, children: status === "connected" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center py-6 animate-bounceFast w-full", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 mb-4 border border-green-500/30", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-10 h-10", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 3, d: "M5 13l4 4L19 7" }) }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: "Linked Successfully" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 mt-2", children: "You can now sign transactions on your phone." }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 mt-8 w-full", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 mt-2 text-center", children: "You can now sign transactions on your phone." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 mt-6 w-full", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onSync, className: "flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95", children: "Sync Accounts" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "px-4 py-3 bg-dark-700 hover:bg-dark-600 rounded-xl text-xs font-bold transition-all border border-dark-600", children: "Done" })
       ] })
     ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-4 bg-white rounded-3xl shadow-inner-xl animate-scaleIn", children: qrData ? /* @__PURE__ */ jsxRuntimeExports.jsx(QRCodeSVG, { value: qrData, size: 200, level: "H" }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-[200px] h-[200px] flex items-center justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" }) }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `${isCompact ? "p-3" : "p-4"} bg-white rounded-3xl shadow-inner-xl animate-scaleIn shrink-0`, children: qrData ? /* @__PURE__ */ jsxRuntimeExports.jsx(QRCodeSVG, { value: qrData, size: qrSize, level: "H" }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { width: qrSize, height: qrSize }, className: "flex items-center justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" }) }) }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full space-y-3", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3 bg-dark-900/50 p-3 rounded-2xl border border-dark-700/50", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-6 h-6 bg-purple-600 rounded-lg flex items-center justify-center text-[10px] font-black italic", children: "1" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-6 h-6 bg-purple-600 rounded-lg flex items-center justify-center text-[10px] font-black italic shrink-0", children: "1" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-slate-400 font-bold", children: "Open Gravity Mobile App" })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3 bg-dark-900/50 p-3 rounded-2xl border border-dark-700/50", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-6 h-6 bg-purple-600 rounded-lg flex items-center justify-center text-[10px] font-black italic", children: "2" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-6 h-6 bg-purple-600 rounded-lg flex items-center justify-center text-[10px] font-black italic shrink-0", children: "2" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-slate-400 font-bold", children: 'Tap "Pair" and Scan QR Code' })
         ] })
       ] }),
-      qrData && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full mt-4 p-3 bg-dark-900/80 rounded-2xl border border-dark-700/50 animate-fadeIn", children: [
+      qrData && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full p-3 bg-dark-900/80 rounded-2xl border border-dark-700/50 animate-fadeIn", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[9px] text-slate-500 uppercase font-black tracking-widest mb-2 opacity-70", children: "Manual Pairing String" }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("code", { className: "flex-1 text-[9px] text-purple-400 font-mono break-all line-clamp-2 select-all cursor-pointer bg-black/40 p-2 rounded-lg border border-purple-500/10", children: qrData }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("code", { className: "flex-1 text-[9px] text-purple-400 font-mono break-all line-clamp-3 select-all cursor-pointer bg-black/40 p-2 rounded-lg border border-purple-500/10", children: qrData }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
               onClick: () => navigator.clipboard.writeText(qrData),
-              className: "p-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-slate-400 transition-colors shrink-0 flex items-center justify-center border border-dark-600",
+              className: "p-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-slate-400 transition-colors shrink-0 flex items-center justify-center border border-dark-600 self-stretch",
               title: "Copy to clipboard",
               children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" }) })
             }
@@ -15238,7 +15890,7 @@ const BridgeModal = ({ onClose, onSync }) => {
         ] })
       ] })
     ] }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-8 pt-6 border-t border-dark-700 text-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[9px] text-slate-600 uppercase font-bold tracking-widest leading-relaxed", children: "End-to-End Encrypted Secure Connection" }) })
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `${isCompact ? "mt-4 pt-4" : "mt-8 pt-6"} border-t border-dark-700 text-center shrink-0`, children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[9px] text-slate-600 uppercase font-bold tracking-widest leading-relaxed", children: "End-to-End Encrypted Secure Connection" }) })
   ] }) });
 };
 
@@ -15417,6 +16069,7 @@ function AppContent() {
     }
   }, [walletState.accounts, isLocked, needsSave, walletState.encryptedMaster]);
   const fetchBalancesRef = reactExports.useRef();
+  const isRefreshingRef = reactExports.useRef(false);
   reactExports.useEffect(() => {
     fetchBalancesRef.current = fetchBalances$1;
   });
@@ -15429,7 +16082,8 @@ function AppContent() {
     }
   }, [isLocked, walletState.accounts.length > 0]);
   const fetchBalances$1 = async () => {
-    if (isLocked || walletState.accounts.length === 0) return;
+    if (isLocked || walletState.accounts.length === 0 || isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
     setIsRefreshing(true);
     try {
       const updatedAccounts = await Promise.all(walletState.accounts.map(async (acc) => {
@@ -15448,9 +16102,15 @@ function AppContent() {
     } catch (err) {
       console.warn("Poll balances failed:", err);
     } finally {
+      isRefreshingRef.current = false;
       setIsRefreshing(false);
     }
   };
+  reactExports.useEffect(() => {
+    if (currentView === ViewState.WALLET && !isLocked && walletState.accounts.length > 0) {
+      fetchBalances$1();
+    }
+  }, [currentView, activeChain, isLocked, walletState.accounts.length]);
   const handleUnlock = (decryptedAccounts) => {
     setWalletState((prev) => ({ ...prev, accounts: decryptedAccounts }));
     setIsLocked(false);
@@ -15587,15 +16247,22 @@ function AppContent() {
   const [isDetached, setIsDetached] = reactExports.useState(false);
   reactExports.useEffect(() => {
     const isDetachedMode = typeof window !== "undefined" && window.location.search.includes("detached=true");
-    const TARGET_WIDTH = 400;
-    const TARGET_HEIGHT = 600;
     const OUTER_WIDTH = 416;
     const OUTER_HEIGHT = 639;
     if (isDetachedMode) {
       setIsDetached(true);
-      document.body.style.width = `${TARGET_WIDTH}px`;
-      document.body.style.height = `${TARGET_HEIGHT}px`;
+      document.documentElement.style.width = "100%";
+      document.documentElement.style.height = "100%";
+      document.body.style.width = "100vw";
+      document.body.style.height = "100vh";
+      document.body.style.minHeight = "100vh";
       document.body.style.overflow = "hidden";
+      const root = document.getElementById("root");
+      if (root) {
+        root.style.width = "100%";
+        root.style.height = "100%";
+        root.style.minHeight = "100vh";
+      }
       let animationFrameId;
       const lockSize = () => {
         if (window.innerWidth <= 420 && window.innerHeight <= 650 && window.innerWidth >= 390) {
@@ -15688,7 +16355,7 @@ function AppContent() {
   }, []);
   if (!isDataLoaded) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: {
-      height: "600px",
+      height: isDetached ? "100vh" : "600px",
       width: "100%",
       background: "#050505",
       color: "#00ffff",
@@ -15785,6 +16452,7 @@ function AppContent() {
             chain: activeChain,
             onChainChange: setActiveChain,
             accounts: walletState.accounts.filter((a) => a.chain === activeChain),
+            isRefreshing,
             onManage: (acc) => setManagingAccount(acc),
             onSend: (acc) => setTransferAccount(acc),
             onReceive: (acc) => setReceiveAccount(acc),

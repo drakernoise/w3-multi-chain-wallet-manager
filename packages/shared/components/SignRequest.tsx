@@ -46,6 +46,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
         });
     }, [requestId, t]);
 
+    const extractBroadcastOperations = (value: any): any[] => {
+        if (Array.isArray(value)) return value;
+        if (value && typeof value === 'object') {
+            if (Array.isArray(value.operations)) return value.operations;
+            if (value.tx && Array.isArray(value.tx.operations)) return value.tx.operations;
+            if (value.transaction && Array.isArray(value.transaction.operations)) return value.transaction.operations;
+        }
+        return value ? [value] : [];
+    };
+
     const [trustDomain, setTrustDomain] = useState(false);
 
     useEffect(() => {
@@ -61,8 +71,8 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             if (!account) account = accounts.find(a => a.name === username);
 
             // Extract user from broadcast operations if not found
-            if (!account && Array.isArray(request.params) && Array.isArray(request.params[1])) {
-                const operations = request.params[1];
+            if (!account && Array.isArray(request.params)) {
+                const operations = extractBroadcastOperations(request.params[1]);
                 const accountNames = accounts.map(a => a.name.toLowerCase());
 
                 for (const op of operations) {
@@ -155,8 +165,8 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
             // 5. CRITICAL FIX: For broadcast operations, extract actual user from operation data
             // Twiggy sends author as params[0], but the real voter is inside the operation
-            if (!account && Array.isArray(request.params) && Array.isArray(request.params[1])) {
-                const operations = request.params[1];
+            if (!account && Array.isArray(request.params)) {
+                const operations = extractBroadcastOperations(request.params[1]);
                 const accountNames = accounts.map(a => a.name.toLowerCase());
 
                 for (const op of operations) {
@@ -254,9 +264,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
                 result = {
-                    result: opResult,
+                    result: response.txId || opResult,
+                    txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
+                    opResult,
                     message: t('sign.success'),
                     ...response
                 };
@@ -276,9 +288,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
                 result = {
-                    result: opResult,
+                    result: response.txId || opResult,
+                    txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
+                    opResult,
                     message: t('sign.success'),
                     ...response
                 };
@@ -299,9 +313,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
                 result = {
-                    result: opResult,
+                    result: response.txId || opResult,
+                    txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
+                    opResult,
                     message: t('sign.success'),
                     ...response
                 };
@@ -368,6 +384,18 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // Generic Broadcast
                 let rawOperations = request.params[1];
                 const keyType = request.params[2]; // 'Posting' or 'Active'
+                const originalEnvelope =
+                    request._gravityBroadcastEnvelope ||
+                    (request._gravityOriginalParams && Array.isArray(request._gravityOriginalParams) ? request._gravityOriginalParams[1] : null);
+
+                if (rawOperations && typeof rawOperations === 'object' && !Array.isArray(rawOperations)) {
+                    console.log('[SignRequest Broadcast] Extracting operations from transaction envelope:', Object.keys(rawOperations));
+                    rawOperations =
+                        rawOperations.operations ||
+                        rawOperations.tx?.operations ||
+                        rawOperations.transaction?.operations ||
+                        rawOperations;
+                }
 
                 // 1. ROBUST NORMALIZATION: Handle both array [name, data] and object { type, ... }
                 // Some dApps (like blurt.blog) send operations as objects inside requestBroadcast
@@ -380,6 +408,10 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     }
                     return op;
                 });
+                const firstOperation = operations.find((op: any) => Array.isArray(op) || (op && typeof op === 'object'));
+                const firstOperationName = Array.isArray(firstOperation)
+                    ? firstOperation[0]
+                    : firstOperation?.type || firstOperation?.operation || firstOperation?.method || null;
 
                 // Determine which operations require Active key
                 const requiresActiveKey = operations.some((op: any) => {
@@ -460,10 +492,36 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
+                const isSplinterlands = /(^|\.)splinterlands\.com$/i.test(domain);
+                const envelopePayload = originalEnvelope && typeof originalEnvelope === 'object'
+                    ? {
+                        ...originalEnvelope,
+                        operations: Array.isArray((originalEnvelope as any).operations) ? (originalEnvelope as any).operations : operations
+                    }
+                    : null;
+
+                const resultPayload = isSplinterlands
+                    ? {
+                        ...(envelopePayload || {}),
+                        ...(opResult && typeof opResult === 'object' ? opResult : {}),
+                        id: response.txId || (opResult && typeof opResult === 'object' ? (opResult as any).id : undefined),
+                        txId: response.txId,
+                        tx_id: response.txId,
+                        operation: firstOperationName,
+                        op: firstOperationName,
+                        operations
+                    }
+                    : (response.txId || opResult);
+
                 result = {
-                    result: opResult,
+                    result: resultPayload,
+                    txId: response.txId,
                     tx_id: response.txId,
+                    transaction: envelopePayload || undefined,
                     broadcastPayload: opResult,
+                    opResult,
+                    operation: firstOperationName,
+                    operations,
                     message: t('sign.success'),
                     ...response
                 };
@@ -481,9 +539,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
                 result = {
-                    result: opResult,
+                    result: response.txId || opResult,
+                    txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
+                    opResult,
                     message: t('sign.success'),
                     ...response
                 };
@@ -499,9 +559,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
                 result = {
-                    result: opResult,
+                    result: response.txId || opResult,
+                    txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
+                    opResult,
                     message: t('sign.success'),
                     ...response
                 };
@@ -520,9 +582,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
                 result = {
-                    result: opResult,
+                    result: response.txId || opResult,
+                    txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
+                    opResult,
                     message: t('sign.success'),
                     ...response
                 };
@@ -537,9 +601,11 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 // Compatibility mapping
                 const opResult = response.opResult || response.txId;
                 result = {
-                    result: opResult,
+                    result: response.txId || opResult,
+                    txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
+                    opResult,
                     message: t('sign.success'),
                     ...response
                 };

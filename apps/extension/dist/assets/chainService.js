@@ -88671,7 +88671,12 @@ const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
   if (broadcastResult.error) {
     throw new Error(broadcastResult.error.message || JSON.stringify(broadcastResult.error));
   }
-  return broadcastResult.result;
+  return {
+    ...broadcastResult.result,
+    signatures: signedTx.signatures,
+    signedTx,
+    transaction: signedTx
+  };
 };
 const globalPropsCache = /* @__PURE__ */ new Map();
 const GLOBAL_PROPS_CACHE_TTL = 3e3;
@@ -89130,7 +89135,12 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
     const data = err.data ? JSON.stringify(err.data) : "";
     throw new Error(`${msg} ${data}`);
   }
-  return broadcastResult.result;
+  return {
+    ...broadcastResult.result,
+    signatures: signedTx.signatures,
+    signedTx,
+    transaction: signedTx
+  };
 };
 const broadcastOperations = async (chain, activeKey, operations) => {
   const nodeUrl = getActiveNode(chain);
@@ -89194,7 +89204,14 @@ const broadcastOperations = async (chain, activeKey, operations) => {
       console.log("[BroadcastOps] Trying node:", node);
       const result = await tryBroadcast(node);
       console.log("[BroadcastOps] Success with node:", node);
-      return { success: true, txId: result.id, opResult: result };
+      return {
+        success: true,
+        txId: result.id,
+        opResult: result,
+        signatures: result.signatures,
+        transaction: result.transaction || result.signedTx,
+        signedTx: result.signedTx
+      };
     } catch (e) {
       const errMsg = e.message || String(e);
       console.warn("[BroadcastOps] Node failed:", node, errMsg);
@@ -89556,4 +89573,4 @@ const decodeMemo = async (chain, _username, encodedMemo, key) => {
   }
 };
 
-export { validateAccountKeys as A, fetchAccountHistory as B, Chain as C, getAccountAuthorities as D, fetchBalances as E, detectWeb3Context as F, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, indexBrowserExports$1 as y, indexBrowserExports as z };
+export { indexBrowserExports as A, validateAccountKeys as B, Chain as C, fetchAccountHistory as D, fetchBalances as E, detectWeb3Context as F, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, getAccountAuthorities as y, indexBrowserExports$1 as z };

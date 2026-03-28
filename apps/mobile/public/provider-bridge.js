@@ -82,7 +82,7 @@
     };
 
     const PERMISSION_KEY = 'gravity_mobile_site_permissions_v2';
-    const DESKTOP_MODE_KEY = 'gravity_mobile_desktop_hosts_v1';
+    const DESKTOP_MODE_KEY = 'gravity_mobile_desktop_hosts_v2';
 
     const loadStoredPermissions = () => {
         try {
@@ -125,7 +125,8 @@
         const existing = permissions[domain] || {};
         permissions[domain] = {
             domain,
-            account,
+            account: account.name,
+            accountChain: account.chain,
             expiresAt: Date.now() + (durations[duration] || durations['1day']),
             operations: ['*'],
             grantedAt: existing.grantedAt || Date.now()
@@ -143,7 +144,8 @@
         try {
             const raw = localStorage.getItem(DESKTOP_MODE_KEY);
             const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
+            if (!Array.isArray(parsed)) return [];
+            return parsed.filter((host) => typeof host === 'string' && host.trim());
         } catch (e) {
             return [];
         }
@@ -198,9 +200,121 @@
         document.documentElement.dataset.gravityDesktopMode = enabled ? 'true' : 'false';
     };
 
+    const collectPossibleAccountNames = (params) => {
+        const values = [];
+        const seen = new Set();
+        const pushValue = (value) => {
+            if (typeof value !== 'string') return;
+            const normalized = value.trim().replace(/^@/, '');
+            if (!normalized) return;
+            if (['hive', 'blurt', 'steem', 'posting', 'active'].includes(normalized.toLowerCase())) return;
+            if (seen.has(normalized.toLowerCase())) return;
+            seen.add(normalized.toLowerCase());
+            values.push(normalized);
+        };
+
+        if (params && typeof params === 'object') {
+            [
+                params.account,
+                params.user,
+                params.username,
+                params.voter,
+                params.from,
+                params.author,
+                params.delegator,
+                params.account_name
+            ].forEach(pushValue);
+
+            if (typeof params.type === 'string') {
+                try {
+                    const parsedType = JSON.parse(params.type);
+                    [parsedType?.account, parsedType?.user, parsedType?.username].forEach(pushValue);
+                } catch (e) {}
+            } else if (params.type && typeof params.type === 'object') {
+                [params.type.account, params.type.user, params.type.username].forEach(pushValue);
+            }
+
+            const messageValue = typeof params.message === 'string'
+                ? params.message.trim()
+                : typeof params.params === 'string'
+                    ? params.params.trim()
+                    : '';
+            const prefixedMessageMatch = messageValue.match(/^(?:blt|blurt|hive|stm|steem):([a-z0-9\-\.]+)$/i);
+            if (prefixedMessageMatch && prefixedMessageMatch[1]) {
+                pushValue(prefixedMessageMatch[1]);
+            }
+        }
+
+        const operations = params && (params.operations || params.ops);
+        const normalizedOps = Array.isArray(operations)
+            ? operations
+            : operations && typeof operations === 'object'
+                ? (operations.operations || operations.tx?.operations || operations.transaction?.operations || [operations])
+                : [];
+
+        normalizedOps.forEach((op) => {
+            const opData = Array.isArray(op) ? op[1] : (op?.data || op?.op || op?.operation_data || op);
+            if (!opData || typeof opData !== 'object') return;
+            [
+                opData.account,
+                opData.user,
+                opData.username,
+                opData.voter,
+                opData.from,
+                opData.author,
+                opData.delegator,
+                opData.account_name
+            ].forEach(pushValue);
+        });
+
+        return values;
+    };
+
+    const detectChainFromParams = (params) => {
+        const messageValue = typeof params?.message === 'string'
+            ? params.message.trim().toLowerCase()
+            : typeof params?.params === 'string'
+                ? params.params.trim().toLowerCase()
+                : null;
+
+        if (messageValue) {
+            if (messageValue.startsWith('blt:') || messageValue.startsWith('blurt:')) return 'BLURT';
+            if (messageValue.startsWith('hive:')) return 'HIVE';
+            if (messageValue.startsWith('stm:') || messageValue.startsWith('steem:')) return 'STEEM';
+        }
+
+        const genericUsername = typeof params?.username === 'string' ? params.username.trim().toLowerCase() : null;
+        if (genericUsername === 'blurt') return 'BLURT';
+        if (genericUsername === 'hive') return 'HIVE';
+        if (genericUsername === 'steem') return 'STEEM';
+
+        const hinted = params && (params.selectedAccountChain || params.requestChain || params.chain);
+        if (typeof hinted === 'string') {
+            const normalized = hinted.toUpperCase();
+            if (normalized === 'HIVE' || normalized === 'BLURT' || normalized === 'STEEM') return normalized;
+        }
+
+        if (typeof params?.type === 'string') {
+            try {
+                const parsedType = JSON.parse(params.type);
+                const nestedHint = typeof parsedType?.chain === 'string' ? parsedType.chain.toUpperCase() : null;
+                if (nestedHint === 'HIVE' || nestedHint === 'BLURT' || nestedHint === 'STEEM') return nestedHint;
+            } catch (e) {}
+        } else if (params?.type && typeof params.type === 'object') {
+            const nestedHint = typeof params.type.chain === 'string' ? params.type.chain.toUpperCase() : null;
+            if (nestedHint === 'HIVE' || nestedHint === 'BLURT' || nestedHint === 'STEEM') return nestedHint;
+        }
+
+        return null;
+    };
+
     const formatBridgeResult = (res) => {
         const nestedResult = res && res.result && typeof res.result === 'object' ? res.result : null;
+        const rootExtras = res && typeof res === 'object' ? res : {};
+        const nestedExtras = nestedResult && typeof nestedResult === 'object' ? nestedResult : {};
         return {
+            ...rootExtras,
+            ...nestedExtras,
             id: res && (res.id || res.request_id),
             success: !!(res && res.success),
             error: res && res.success ? null : ((res && res.error) || 'User rejected'),
@@ -208,7 +322,19 @@
                 ? nestedResult.result
                 : (res && (res.result || res.txId || null)),
             request_id: res && (res.id || res.request_id),
+            txId: (res && res.txId) || (nestedResult && nestedResult.txId) || null,
+            tx_id: (res && (res.tx_id || res.txId)) || (nestedResult && (nestedResult.tx_id || nestedResult.txId)) || null,
+            opResult: (res && res.opResult) || (nestedResult && nestedResult.opResult),
+            broadcastPayload: (res && res.broadcastPayload) || (nestedResult && nestedResult.broadcastPayload),
+            signatures: (res && res.signatures) || (nestedResult && nestedResult.signatures) || null,
+            signedTx: (res && res.signedTx) || (nestedResult && nestedResult.signedTx) || null,
+            transaction: (res && res.transaction) || (nestedResult && nestedResult.transaction) || null,
+            operation: (res && res.operation) || (nestedResult && nestedResult.operation) || null,
+            operations: (res && res.operations) || (nestedResult && nestedResult.operations) || null,
             publicKey: (res && res.publicKey) || (nestedResult && nestedResult.publicKey),
+            pubkey: (res && (res.pubkey || res.publicKey)) || (nestedResult && (nestedResult.pubkey || nestedResult.publicKey)),
+            signature: (res && (res.signature || res.result)) || (nestedResult && (nestedResult.signature || nestedResult.result)),
+            data: (res && res.data) || (nestedResult && nestedResult.data),
             message: (res && res.message) || (nestedResult && nestedResult.message)
         };
     };
@@ -299,7 +425,9 @@
                     method,
                     params: {
                         ...params,
-                        account: selectedAccount || params.username || params.account,
+                        account: (selectedAccount && selectedAccount.name) || params.username || params.account,
+                        username: (selectedAccount && selectedAccount.name) || params.username || params.account,
+                        selectedAccountChain: (selectedAccount && selectedAccount.chain) || params.selectedAccountChain,
                         rememberDuration: rememberDuration || params.rememberDuration
                     },
                     domain: window.location.hostname,
@@ -333,16 +461,21 @@
             // Non-silent methods require our in-page UI
             const silentMethods = ['requestHandshake', 'requestAddAccount'];
             const storedPermission = getStoredPermission(window.location.hostname, method);
+            const allAccounts = window.gravity_accounts || [];
+            const chainHint = detectChainFromParams(params);
+            const visibleAccounts = chainHint
+                ? (() => {
+                    const exact = allAccounts.filter((account) => String(account.chain).toUpperCase() === chainHint);
+                    return exact.length > 0 ? exact : allAccounts;
+                })()
+                : allAccounts;
             const storedAccount = storedPermission && storedPermission.account
-                ? (window.gravity_accounts || []).find((account) => account.name === storedPermission.account)
+                ? visibleAccounts.find((account) =>
+                    account.name === storedPermission.account &&
+                    (!storedPermission.accountChain || String(account.chain).toUpperCase() === String(storedPermission.accountChain).toUpperCase())
+                )
                 : null;
-            const explicitRequestedAccount = [
-                params && params.account,
-                params && params.username,
-                params && params.voter,
-                params && params.from,
-                params && params.author
-            ].find(Boolean);
+            const explicitRequestedAccount = collectPossibleAccountNames(params)[0] || null;
             const requestedAccountDiffers = !!(
                 storedAccount &&
                 explicitRequestedAccount &&
@@ -355,7 +488,7 @@
                         method,
                         account: storedAccount.name
                     });
-                    sendToNative(storedAccount.name);
+                    sendToNative(storedAccount);
                     return;
                 }
                 gwdbg('bridge:show-overlay', { id, method });
@@ -369,15 +502,16 @@
 
     // 2. The In-Page UI that replaces the native modal
     const showAuthOverlay = (method, params, onApprove, onReject) => {
-        const accounts = window.gravity_accounts || [];
+        const allAccounts = window.gravity_accounts || [];
+        const chainHint = detectChainFromParams(params);
+        const exactChainAccounts = chainHint
+            ? allAccounts.filter((account) => String(account.chain).toUpperCase() === chainHint)
+            : [];
+        const accounts = exactChainAccounts.length > 0 ? exactChainAccounts : allAccounts;
         const storedPermission = getStoredPermission(window.location.hostname, method);
         const preferredAccountNames = [
-            storedPermission && storedPermission.account,
-            params && params.account,
-            params && params.username,
-            params && params.voter,
-            params && params.from,
-            params && params.author
+            ...collectPossibleAccountNames(params),
+            ...(storedPermission && storedPermission.account ? [storedPermission.account] : [])
         ]
             .filter(Boolean)
             .map((value) => String(value).toLowerCase());
@@ -408,13 +542,16 @@
             pointerEvents: 'auto'
         });
         
+        const initialAccount = accounts.find((account) => preferredAccountNames.includes(account.name.toLowerCase())) || accounts[0];
+        const initialAccountKey = initialAccount ? `${initialAccount.chain}:${initialAccount.name}` : '';
+
         const accountItems = accounts.length > 0
             ? accounts.map((a, index) => `
                 <button
                     type="button"
-                    data-account="${a.name}"
-                    data-selected="${index === 0 ? 'true' : 'false'}"
-                    style="width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid ${index === 0 ? '#2563eb' : '#334155'}; background: ${index === 0 ? 'rgba(37,99,235,0.18)' : '#111827'}; color: white; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; font-weight: 700;"
+                    data-account-key="${a.chain}:${a.name}"
+                    data-selected="${initialAccountKey === `${a.chain}:${a.name}` ? 'true' : 'false'}"
+                    style="width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid ${initialAccountKey === `${a.chain}:${a.name}` ? '#2563eb' : '#334155'}; background: ${initialAccountKey === `${a.chain}:${a.name}` ? 'rgba(37,99,235,0.18)' : '#111827'}; color: white; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; font-weight: 700;"
                 >
                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@${a.name}</span>
                     <span style="flex-shrink: 0; font-size: 11px; color: #94a3b8;">${a.chain}</span>
@@ -471,8 +608,7 @@
         const durationWrapEl = card.querySelector('#grav-duration-wrap');
         const confirmButton = card.querySelector('#grav-confirm');
         const cancelButton = card.querySelector('#grav-cancel');
-        const initialAccount = accounts.find((account) => preferredAccountNames.includes(account.name.toLowerCase())) || accounts[0];
-        let selectedAccount = initialAccount ? initialAccount.name : '';
+        let selectedAccountKey = initialAccountKey;
         let selectedDuration = '1day';
         let isSubmitting = false;
 
@@ -504,7 +640,7 @@
         };
 
         const updateAccountPreview = () => {
-            const current = accounts.find((account) => account.name === selectedAccount);
+            const current = accounts.find((account) => `${account.chain}:${account.name}` === selectedAccountKey);
             toggleEl.textContent = current ? `@${current.name} · ${current.chain}` : 'Choose account';
             previewEl.textContent = current ? `Selected: @${current.name} on ${current.chain}` : '(No account selected)';
             previewEl.title = previewEl.textContent;
@@ -515,11 +651,11 @@
             listEl.style.display = listEl.style.display === 'none' ? 'flex' : 'none';
         });
 
-        card.querySelectorAll('[data-account]').forEach((button) => {
+        card.querySelectorAll('[data-account-key]').forEach((button) => {
             bindTap(button, () => {
-                selectedAccount = button.getAttribute('data-account') || '';
-                card.querySelectorAll('[data-account]').forEach((candidate) => {
-                    const isActive = candidate.getAttribute('data-account') === selectedAccount;
+                selectedAccountKey = button.getAttribute('data-account-key') || '';
+                card.querySelectorAll('[data-account-key]').forEach((candidate) => {
+                    const isActive = candidate.getAttribute('data-account-key') === selectedAccountKey;
                     candidate.style.borderColor = isActive ? '#2563eb' : '#334155';
                     candidate.style.background = isActive ? 'rgba(37,99,235,0.18)' : '#111827';
                 });
@@ -557,9 +693,14 @@
             isSubmitting = true;
             confirmButton.style.opacity = '0.72';
             confirmButton.textContent = '...';
-            const acc = selectedAccount;
+            const acc = accounts.find((account) => `${account.chain}:${account.name}` === selectedAccountKey) || null;
             const rememberDuration = rememberEl.checked ? selectedDuration : undefined;
-            gwdbg('overlay:confirm', { method, account: acc || null, rememberDuration: rememberDuration || null });
+            gwdbg('overlay:confirm', {
+                method,
+                account: acc ? acc.name : null,
+                chain: acc ? acc.chain : null,
+                rememberDuration: rememberDuration || null
+            });
             if (acc && rememberDuration) {
                 rememberPermission(window.location.hostname, method, acc, rememberDuration);
             }
@@ -610,7 +751,11 @@
 
     const detectChainFromHost = () => {
         const host = (window.location.hostname || '').toLowerCase();
-        if (host.includes('blurt')) return 'BLURT';
+        if (
+            host.includes('blurt') ||
+            host === 'twiggy.lat' ||
+            host.endsWith('.twiggy.lat')
+        ) return 'BLURT';
         if (host.includes('steem')) return 'STEEM';
         return 'HIVE';
     };
@@ -653,7 +798,8 @@
             })),
             requestBroadcast: () => requestNative('requestBroadcast', withChainHint({
                 username: params[0],
-                operations: params[1],
+                operations: Array.isArray(params[1]) ? params[1] : ((params[1] && params[1].operations) || (params[1] && params[1].tx && params[1].tx.operations) || (params[1] && params[1].transaction && params[1].transaction.operations) || params[1]),
+                transaction: (params[1] && typeof params[1] === 'object' && !Array.isArray(params[1])) ? params[1] : undefined,
                 type: params[2]
             })),
             requestSignBuffer: () => requestNative('requestSignBuffer', withChainHint({
@@ -834,61 +980,10 @@
                 transform: translate(-50%, 0);
                 opacity: 1;
             }
-            #gravity-browser-bar {
-                position: fixed;
-                top: max(env(safe-area-inset-top), 0px);
-                left: 0;
-                right: 0;
-                z-index: 2147483646;
-                background: rgba(2, 6, 23, 0.96);
-                color: white;
-                border-bottom: 1px solid rgba(96, 165, 250, 0.18);
-                box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);
-                padding: 10px 12px;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                pointer-events: auto;
-                isolation: isolate;
-            }
-            #gravity-browser-bar[data-open="true"] {
-                padding-bottom: 12px;
-            }
-            #gravity-browser-bar-shell {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            #gravity-browser-address {
-                min-width: 0;
-                flex: 1;
-                width: auto;
-                box-sizing: border-box;
-                border-radius: 14px;
-                border: 1px solid #334155;
-                background: #0f172a;
-                color: white;
-                padding: 11px 13px;
-                font: 600 13px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                pointer-events: auto;
-                touch-action: manipulation;
-                user-select: text;
-                -webkit-user-select: text;
-            }
-            #gravity-browser-bar button {
-                border: none;
-                border-radius: 12px;
-                width: 42px;
-                height: 42px;
-                padding: 0;
-                background: #1e293b;
-                color: white;
-                font: 900 17px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                flex-shrink: 0;
-            }
-            #gravity-browser-bar button[data-primary="true"] {
-                background: #2563eb;
-            }
-            #gravity-browser-bar button[data-active="true"] {
-                background: #0f766e;
+            #gravity-browser-bar,
+            #gravity-browser-spacer,
+            #gravity-browser-toggle {
+                display: none !important;
             }
             #gravity-launch-indicator {
                 position: fixed;
@@ -907,111 +1002,15 @@
     };
 
     const ensureBrowserChrome = () => {
-        if (document.getElementById('gravity-browser-bar')) return;
-
-        const bar = document.createElement('div');
-        bar.id = 'gravity-browser-bar';
-        bar.innerHTML = `
-            <div id="gravity-browser-bar-shell">
-                <input id="gravity-browser-address" type="text" value="" spellcheck="false" autocapitalize="none" autocomplete="off" />
-                <button type="button" data-action="desktop" aria-label="Desktop mode">PC</button>
-                <button type="button" data-action="go" data-primary="true" aria-label="Go">→</button>
-                <button type="button" data-action="reload" aria-label="Reload">↻</button>
-            </div>
-        `;
-
-        let isEditingAddress = false;
-        let pendingAddressValue = '';
-        const updateAddress = () => {
-            const input = bar.querySelector('#gravity-browser-address');
-            if (isEditingAddress) return;
-            input.value = window.location.href;
-        };
-        updateAddress();
-        window.addEventListener('hashchange', updateAddress);
-        window.addEventListener('popstate', updateAddress);
-        setInterval(updateAddress, 1200);
-
-        const input = bar.querySelector('#gravity-browser-address');
-        const desktopButton = bar.querySelector('[data-action="desktop"]');
-        const syncDesktopButton = () => {
-            if (!desktopButton) return;
-            const enabled = isDesktopModeEnabled();
-            desktopButton.setAttribute('data-active', enabled ? 'true' : 'false');
-            desktopButton.title = enabled ? 'Desktop mode on' : 'Desktop mode off';
-        };
-        syncDesktopButton();
-        input.addEventListener('focus', () => {
-            isEditingAddress = true;
-            pendingAddressValue = input.value || '';
-            setTimeout(() => {
-                try {
-                    input.select();
-                } catch (e) {}
-            }, 80);
-        });
-        input.addEventListener('input', () => {
-            pendingAddressValue = input.value || '';
-        });
-        input.addEventListener('blur', () => {
-            setTimeout(() => {
-                isEditingAddress = false;
-                updateAddress();
-            }, 180);
-        });
-        input.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                const goButton = bar.querySelector('[data-action="go"]');
-                if (goButton) goButton.click();
-            }
-        });
-
-        bar.addEventListener('click', (event) => {
-            const action = event.target && event.target.getAttribute ? event.target.getAttribute('data-action') : null;
-            if (!action) return;
-            if (action === 'reload') {
-                if (window.mobileApp && typeof window.mobileApp.postMessage === 'function') {
-                    window.mobileApp.postMessage({ detail: { type: 'gravity_reload_request' } });
-                } else {
-                    window.location.reload();
-                }
-                return;
-            }
-            if (action === 'desktop') {
-                const nextEnabled = !isDesktopModeEnabled();
-                setDesktopModeEnabled(nextEnabled);
-                applyDesktopMode();
-                syncDesktopButton();
-                showInAppToast(nextEnabled ? 'Desktop mode enabled' : 'Desktop mode disabled');
-                setTimeout(() => {
-                    if (window.mobileApp && typeof window.mobileApp.postMessage === 'function') {
-                        window.mobileApp.postMessage({ detail: { type: 'gravity_reload_request' } });
-                    } else {
-                        window.location.reload();
-                    }
-                }, 120);
-                return;
-            }
-            if (action === 'go') {
-                let nextUrl = (pendingAddressValue || input.value || '').trim();
-                if (!nextUrl) return;
-                if (!/^https?:\/\//i.test(nextUrl)) {
-                    nextUrl = nextUrl.includes('.') ? `https://${nextUrl}` : `https://www.google.com/search?q=${encodeURIComponent(nextUrl)}`;
-                }
-                isEditingAddress = false;
-                gwdbg('browser-chrome:navigate', { nextUrl });
-                if (window.mobileApp && typeof window.mobileApp.postMessage === 'function') {
-                    window.mobileApp.postMessage({ detail: { type: 'gravity_navigate_request', url: nextUrl } });
-                } else {
-                    window.location.href = nextUrl;
-                }
-            }
-        });
-
-        document.documentElement.style.scrollPaddingTop = '76px';
-        document.body.style.paddingTop = '64px';
-        document.body.appendChild(bar);
+        const existingBar = document.getElementById('gravity-browser-bar');
+        if (existingBar) existingBar.remove();
+        const existingSpacer = document.getElementById('gravity-browser-spacer');
+        if (existingSpacer) existingSpacer.remove();
+        const staleToggle = document.getElementById('gravity-browser-toggle');
+        if (staleToggle) staleToggle.remove();
+        document.documentElement.style.removeProperty('--gravity-browser-bar-offset');
+        document.documentElement.style.scrollPaddingTop = '';
+        document.body.style.paddingTop = '';
     };
 
     const ensureLaunchIndicator = () => {

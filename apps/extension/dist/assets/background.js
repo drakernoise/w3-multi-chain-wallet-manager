@@ -83,6 +83,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("[Gravity Background] onMessage received:", request.type, request.method || "");
   if (request.type === "gravity_request") {
     console.log("[Gravity Background] Received request:", request.method, "from:", sender.origin || sender.url);
+    const originalParams = Array.isArray(request.params) ? request.params.map((param) => param && typeof param === "object" ? { ...param } : param) : request.params;
     if (typeof request.method !== "string" || request.method.length > 64) {
       console.warn("Gravity: Rejected invalid method (length/type)", request.method);
       sendResponse({ success: false, error: "Invalid Request: Method name too long or invalid." });
@@ -102,8 +103,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const param = request.params[i];
         if (param && typeof param === "object" && !Array.isArray(param)) {
           const obj = param;
-          if (obj.operations && obj.url) {
-            const operations = Array.isArray(obj.operations) ? obj.operations : [obj.operations];
+          const envelopeOps = Array.isArray(obj.operations) ? obj.operations : Array.isArray(obj.tx?.operations) ? obj.tx.operations : Array.isArray(obj.transaction?.operations) ? obj.transaction.operations : null;
+          if (envelopeOps) {
+            if ((request.method === "requestBroadcast" || request.method === "broadcast") && i === 1) {
+              request._gravityBroadcastEnvelope = { ...obj };
+            }
+            const operations = envelopeOps;
             request.params[i] = operations;
             if (request.method === "requestSignBuffer" && i === 2 && Array.isArray(request.params[i])) {
               request.method = "requestBroadcast";
@@ -169,7 +174,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       } else {
         const chainHint = detectChainFromUrl(sender.url || sender.tab?.url);
         console.log("[Gravity Background] Chain hint:", chainHint, "Tab ID:", sender.tab?.id);
-        const normalizedRequest = { ...request };
+        const normalizedRequest = { ...request, _gravityOriginalParams: originalParams };
         const reqData = {
           data: normalizedRequest,
           tabId: sender.tab?.id,
@@ -209,9 +214,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const data = req.data;
         if (Array.isArray(data.params) && data.params[1] && typeof data.params[1] === "object" && !Array.isArray(data.params[1])) {
           const secondParam = data.params[1];
-          if (secondParam.operations && secondParam.url) {
-            console.log("[Background] Defensive fix: Converting {operations, url} in params[1]");
-            data.params[1] = Array.isArray(secondParam.operations) ? secondParam.operations : [secondParam.operations];
+          const envelopeOps = Array.isArray(secondParam.operations) ? secondParam.operations : Array.isArray(secondParam.tx?.operations) ? secondParam.tx.operations : Array.isArray(secondParam.transaction?.operations) ? secondParam.transaction.operations : null;
+          if (envelopeOps) {
+            console.log("[Background] Defensive fix: Converting broadcast envelope in params[1]");
+            data.params[1] = envelopeOps;
           }
         }
       }
@@ -578,8 +584,32 @@ async function tryAutoSign(request, sender) {
     if (!response.success) {
       return { success: false, error: response.error || "Operation failed" };
     }
-    const finalResult = response.opResult || response.txId || response.result || "success";
+    const opResult = response.opResult || response.result || response.txId || "success";
+    const finalResult = response.txId || response.result || opResult;
     const { success: _s, result: _r, publicKey: _pk, error: _e, ...restResponse } = response;
+    const broadcastOperationsList = isBroadcast && Array.isArray(request.params?.[1]) ? request.params[1] : null;
+    const broadcastEnvelope = isBroadcast && request._gravityBroadcastEnvelope && typeof request._gravityBroadcastEnvelope === "object" ? {
+      ...request._gravityBroadcastEnvelope,
+      operations: Array.isArray(request._gravityBroadcastEnvelope.operations) ? request._gravityBroadcastEnvelope.operations : broadcastOperationsList
+    } : null;
+    const firstBroadcastOperation = Array.isArray(broadcastOperationsList) ? broadcastOperationsList[0] : null;
+    const firstBroadcastOperationName = Array.isArray(firstBroadcastOperation) ? firstBroadcastOperation[0] : firstBroadcastOperation?.type || firstBroadcastOperation?.operation || firstBroadcastOperation?.method || null;
+    let splinterlandsHost = "";
+    try {
+      splinterlandsHost = new URL(url).hostname;
+    } catch (_e2) {
+    }
+    const isSplinterlands = /(^|\.)splinterlands\.com$/i.test(splinterlandsHost);
+    const broadcastResultPayload = isSplinterlands ? {
+      ...broadcastEnvelope || {},
+      ...opResult && typeof opResult === "object" ? opResult : {},
+      id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+      txId: response.txId,
+      tx_id: response.txId,
+      operation: firstBroadcastOperationName,
+      op: firstBroadcastOperationName,
+      operations: broadcastOperationsList
+    } : finalResult;
     const result = isSignBuffer ? {
       success: true,
       result: response.result,
@@ -598,9 +628,14 @@ async function tryAutoSign(request, sender) {
       ...restResponse
     } : {
       success: true,
-      result: finalResult,
+      result: broadcastResultPayload,
+      txId: response.txId,
       tx_id: response.txId,
-      broadcastPayload: finalResult,
+      transaction: broadcastEnvelope || void 0,
+      broadcastPayload: opResult,
+      opResult,
+      operation: firstBroadcastOperationName,
+      operations: broadcastOperationsList,
       message: "Signed successfully",
       ...restResponse
     };

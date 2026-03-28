@@ -123,7 +123,12 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
         throw new Error(broadcastResult.error.message || JSON.stringify(broadcastResult.error));
     }
 
-    return broadcastResult.result; // Returns { id: "txid", block_num: 123, ... }
+    return {
+        ...broadcastResult.result,
+        signatures: signedTx.signatures,
+        signedTx,
+        transaction: signedTx
+    }; // Returns broadcast result plus the signed transaction envelope
 };
 
 
@@ -714,14 +719,19 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
         throw new Error(`${msg} ${data}`);
     }
 
-    return broadcastResult.result;
+    return {
+        ...broadcastResult.result,
+        signatures: signedTx.signatures,
+        signedTx,
+        transaction: signedTx
+    };
 };
 
 export const broadcastOperations = async (
     chain: Chain,
     activeKey: string,
     operations: any[]
-): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
+): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any; signatures?: string[]; transaction?: any; signedTx?: any }> => {
     const nodeUrl = getActiveNode(chain);
     console.log('[BroadcastOps] Chain:', chain, 'NodeUrl:', nodeUrl, 'Operations:', operations);
 
@@ -796,7 +806,14 @@ export const broadcastOperations = async (
             console.log('[BroadcastOps] Trying node:', node);
             const result = await tryBroadcast(node);
             console.log('[BroadcastOps] Success with node:', node);
-            return { success: true, txId: result.id, opResult: result };
+            return {
+                success: true,
+                txId: result.id,
+                opResult: result,
+                signatures: result.signatures,
+                transaction: result.transaction || result.signedTx,
+                signedTx: result.signedTx
+            };
         } catch (e: any) {
             const errMsg = e.message || String(e);
             console.warn('[BroadcastOps] Node failed:', node, errMsg);

@@ -113,6 +113,9 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
     // 1. Request from Web Page (via Content Script)
     if (request.type === 'gravity_request') {
         console.log('[Gravity Background] Received request:', request.method, 'from:', sender.origin || sender.url);
+        const originalParams = Array.isArray(request.params)
+            ? request.params.map((param: any) => (param && typeof param === 'object' ? { ...param } : param))
+            : request.params;
 
         // Validation: Prevent giant strings or invalid types (Fuzzer protection)
         if (typeof request.method !== 'string' || request.method.length > 64) {
@@ -135,14 +138,25 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
             }
         }
 
-        // Case 2: params is array with {operations, url} object at ANY position
+        // Case 2: params is array with broadcast envelope object at ANY position
         if (Array.isArray(request.params)) {
             for (let i = 0; i < request.params.length; i++) {
                 const param = request.params[i];
                 if (param && typeof param === 'object' && !Array.isArray(param)) {
                     const obj = param as any;
-                    if (obj.operations && obj.url) {
-                        const operations = Array.isArray(obj.operations) ? obj.operations : [obj.operations];
+                    const envelopeOps = Array.isArray(obj.operations)
+                        ? obj.operations
+                        : Array.isArray(obj.tx?.operations)
+                            ? obj.tx.operations
+                            : Array.isArray(obj.transaction?.operations)
+                                ? obj.transaction.operations
+                                : null;
+
+                    if (envelopeOps) {
+                        if ((request.method === 'requestBroadcast' || request.method === 'broadcast') && i === 1) {
+                            request._gravityBroadcastEnvelope = { ...obj };
+                        }
+                        const operations = envelopeOps;
                         request.params[i] = operations;
 
                         // CRITICAL FIX: twiggy.lat calls requestSignBuffer with operations, convert to requestBroadcast
@@ -228,7 +242,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
                 console.log('[Gravity Background] Chain hint:', chainHint, 'Tab ID:', sender.tab?.id);
 
                 // ENSURE normalization happened before storing
-                const normalizedRequest = { ...request };
+                const normalizedRequest = { ...request, _gravityOriginalParams: originalParams };
 
                 // Store request consistently in Session Storage (Persists across SW sleep)
                 const reqData = {
@@ -276,14 +290,20 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
             if (req && req.data && req.data.params) {
                 const data = req.data;
 
-                // Check if params[1] is the problematic {operations, url} object
+                // Check if params[1] is a broadcast envelope object and normalize on read
                 if (Array.isArray(data.params) && data.params[1] &&
                     typeof data.params[1] === 'object' && !Array.isArray(data.params[1])) {
                     const secondParam = data.params[1] as any;
-                    if (secondParam.operations && secondParam.url) {
-                        console.log('[Background] Defensive fix: Converting {operations, url} in params[1]');
-                        data.params[1] = Array.isArray(secondParam.operations) ?
-                            secondParam.operations : [secondParam.operations];
+                    const envelopeOps = Array.isArray(secondParam.operations)
+                        ? secondParam.operations
+                        : Array.isArray(secondParam.tx?.operations)
+                            ? secondParam.tx.operations
+                            : Array.isArray(secondParam.transaction?.operations)
+                                ? secondParam.transaction.operations
+                                : null;
+                    if (envelopeOps) {
+                        console.log('[Background] Defensive fix: Converting broadcast envelope in params[1]');
+                        data.params[1] = envelopeOps;
                     }
                 }
             }
@@ -761,10 +781,43 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             return { success: false, error: response.error || 'Operation failed' };
         }
 
-        const finalResult = response.opResult || response.txId || response.result || 'success';
+        const opResult = response.opResult || response.result || response.txId || 'success';
+        const finalResult = response.txId || response.result || opResult;
 
         // Extract fields to avoid duplicating 'success' when spreading
         const { success: _s, result: _r, publicKey: _pk, error: _e, ...restResponse } = response;
+
+        const broadcastOperationsList = isBroadcast && Array.isArray(request.params?.[1]) ? request.params[1] : null;
+        const broadcastEnvelope = isBroadcast && request._gravityBroadcastEnvelope && typeof request._gravityBroadcastEnvelope === 'object'
+            ? {
+                ...request._gravityBroadcastEnvelope,
+                operations: Array.isArray(request._gravityBroadcastEnvelope.operations)
+                    ? request._gravityBroadcastEnvelope.operations
+                    : broadcastOperationsList
+            }
+            : null;
+        const firstBroadcastOperation = Array.isArray(broadcastOperationsList) ? broadcastOperationsList[0] : null;
+        const firstBroadcastOperationName = Array.isArray(firstBroadcastOperation)
+            ? firstBroadcastOperation[0]
+            : firstBroadcastOperation?.type || firstBroadcastOperation?.operation || firstBroadcastOperation?.method || null;
+
+        let splinterlandsHost = '';
+        try {
+            splinterlandsHost = new URL(url).hostname;
+        } catch (_e) { }
+        const isSplinterlands = /(^|\.)splinterlands\.com$/i.test(splinterlandsHost);
+        const broadcastResultPayload = isSplinterlands
+            ? {
+                ...(broadcastEnvelope || {}),
+                ...(opResult && typeof opResult === 'object' ? opResult : {}),
+                id: response.txId || (opResult && typeof opResult === 'object' ? (opResult as any).id : undefined),
+                txId: response.txId,
+                tx_id: response.txId,
+                operation: firstBroadcastOperationName,
+                op: firstBroadcastOperationName,
+                operations: broadcastOperationsList
+            }
+            : finalResult;
 
         const result = isSignBuffer
             ? {
@@ -784,9 +837,14 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             }
             : {
                 success: true,
-                result: finalResult,
+                result: broadcastResultPayload,
+                txId: response.txId,
                 tx_id: response.txId,
-                broadcastPayload: finalResult,
+                transaction: broadcastEnvelope || undefined,
+                broadcastPayload: opResult,
+                opResult,
+                operation: firstBroadcastOperationName,
+                operations: broadcastOperationsList,
                 message: 'Signed successfully',
                 ...restResponse
             };
@@ -916,4 +974,3 @@ self.addEventListener('notificationclick', (event: any) => {
         height: 620
     });
 });
-

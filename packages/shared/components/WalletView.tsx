@@ -9,6 +9,7 @@ interface WalletViewProps {
   chain: Chain;
   onChainChange: (chain: Chain) => void;
   accounts: Account[];
+  isRefreshing?: boolean;
   onManage?: (account: Account) => void;
   onSend?: (account: Account) => void;
   onReceive?: (account: Account) => void;
@@ -21,6 +22,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
   chain,
   onChainChange,
   accounts,
+  isRefreshing = false,
   onManage,
   onSend,
   onReceive,
@@ -29,6 +31,7 @@ export const WalletView: React.FC<WalletViewProps> = ({
   onAddAccount
 }) => {
   const { t } = useTranslation();
+  const [localRefreshing, setLocalRefreshing] = useState(false);
 
   // Modal state
   const [modalState, setModalState] = useState<{
@@ -44,6 +47,18 @@ export const WalletView: React.FC<WalletViewProps> = ({
     setModalState({ type: null, account: null });
   };
 
+  const handleRefreshClick = async () => {
+    if (!onRefresh || localRefreshing || isRefreshing) return;
+    setLocalRefreshing(true);
+    try {
+      await Promise.resolve(onRefresh());
+    } finally {
+      setTimeout(() => setLocalRefreshing(false), 500);
+    }
+  };
+
+  const refreshing = isRefreshing || localRefreshing;
+
   return (
     <div className="space-y-4 relative h-full overflow-y-auto p-4 custom-scrollbar">
       {/* Header with Network Refresh */}
@@ -52,11 +67,12 @@ export const WalletView: React.FC<WalletViewProps> = ({
           {t('wallet.network_label')}
         </h2>
         <button
-          onClick={onRefresh}
+          onClick={handleRefreshClick}
+          disabled={refreshing}
           className="p-2 bg-dark-800 rounded-full hover:bg-dark-700 hover:text-blue-400 transition-colors border border-dark-700"
           title={t('wallet.refresh_tooltip')}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          <svg className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </button>
       </div>
 

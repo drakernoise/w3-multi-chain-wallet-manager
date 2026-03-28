@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SignRequest } from '../services/mobileProvider';
 import { useTranslation } from 'gravity-shared/contexts/LanguageContext';
+import { Account, Chain } from '@types';
 
 interface SignRequestModalProps {
     request: SignRequest;
-    onApprove: (requestId: string, rememberDuration?: '1day' | '1week' | '1month') => void;
+    accounts: Account[];
+    suggestedAccount: Account | null;
+    suggestedChain: Chain | null;
+    onApprove: (requestId: string, rememberDuration?: '1day' | '1week' | '1month', selectedAccount?: Account) => void;
     onReject: (requestId: string) => void;
 }
 
-export const SignRequestModal: React.FC<SignRequestModalProps> = ({ request, onApprove, onReject }) => {
+export const SignRequestModal: React.FC<SignRequestModalProps> = ({ request, accounts, suggestedAccount, suggestedChain, onApprove, onReject }) => {
     const { t } = useTranslation();
     const [rememberPermission, setRememberPermission] = useState(false);
     const [duration, setDuration] = useState<'1day' | '1week' | '1month'>('1day');
-
     const getDomainDisplay = () => {
         try {
             return new URL(request.domain).hostname;
@@ -33,6 +36,27 @@ export const SignRequestModal: React.FC<SignRequestModalProps> = ({ request, onA
         };
         return operations[request.operation] || request.operation;
     };
+
+    const availableAccounts = useMemo(() => {
+        const exactChain = suggestedChain
+            ? accounts.filter((account) => account.chain === suggestedChain)
+            : [];
+        return exactChain.length > 0 ? exactChain : accounts;
+    }, [accounts, suggestedChain]);
+
+    const selectedAccount = useMemo(
+        () => {
+            if (suggestedAccount) {
+                const exactSuggested = availableAccounts.find(
+                    (account) => account.name === suggestedAccount.name && account.chain === suggestedAccount.chain
+                );
+                if (exactSuggested) return exactSuggested;
+            }
+
+            return availableAccounts[0] || null;
+        },
+        [availableAccounts, suggestedAccount]
+    );
 
     return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -58,6 +82,20 @@ export const SignRequestModal: React.FC<SignRequestModalProps> = ({ request, onA
                     <div className="bg-dark-900/50 rounded-lg p-4 border border-dark-700">
                         <div className="text-xs text-slate-400 mb-2">{t('mobile.operation') || 'Operation'}</div>
                         <div className="text-lg font-bold text-white">{getOperationDisplay()}</div>
+                    </div>
+
+                    <div className="bg-dark-900/50 rounded-lg p-4 border border-dark-700">
+                        <div className="text-xs text-slate-400 mb-3">{t('mobile.account') || 'Account'}</div>
+                        <div className="rounded-xl border border-dark-600 bg-dark-800 px-4 py-3">
+                            <div className="text-base font-semibold text-white">
+                                {selectedAccount ? `@${selectedAccount.name}` : (t('mobile.no_account_detected') || 'No account detected')}
+                            </div>
+                            {selectedAccount && (
+                                <div className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                                    {selectedAccount.chain}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Parameters */}
@@ -140,7 +178,7 @@ export const SignRequestModal: React.FC<SignRequestModalProps> = ({ request, onA
                         {t('common.reject') || 'Reject'}
                     </button>
                     <button
-                        onClick={() => onApprove(request.id, rememberPermission ? duration : undefined)}
+                        onClick={() => onApprove(request.id, rememberPermission ? duration : undefined, selectedAccount || undefined)}
                         className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors"
                     >
                         {t('common.approve') || 'Approve'}

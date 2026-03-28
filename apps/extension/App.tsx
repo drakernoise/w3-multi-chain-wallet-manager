@@ -268,6 +268,7 @@ function AppContent() {
 
   // 4. Poll Balances automatically (Safe closure pattern)
   const fetchBalancesRef = useRef<() => void>();
+  const isRefreshingRef = useRef(false);
   useEffect(() => {
     fetchBalancesRef.current = fetchBalances;
   });
@@ -282,7 +283,8 @@ function AppContent() {
   }, [isLocked, walletState.accounts.length > 0]);
 
   const fetchBalances = async () => {
-    if (isLocked || walletState.accounts.length === 0) return;
+    if (isLocked || walletState.accounts.length === 0 || isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
     setIsRefreshing(true);
 
     try {
@@ -303,9 +305,16 @@ function AppContent() {
     } catch (err) {
       console.warn("Poll balances failed:", err);
     } finally {
+      isRefreshingRef.current = false;
       setIsRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    if (currentView === ViewState.WALLET && !isLocked && walletState.accounts.length > 0) {
+      fetchBalances();
+    }
+  }, [currentView, activeChain, isLocked, walletState.accounts.length]);
 
   const handleUnlock = (decryptedAccounts: Account[]) => {
     setWalletState(prev => ({ ...prev, accounts: decryptedAccounts }));
@@ -470,16 +479,23 @@ function AppContent() {
 
   useEffect(() => {
     const isDetachedMode = typeof window !== 'undefined' && window.location.search.includes('detached=true');
-    const TARGET_WIDTH = 400;
-    const TARGET_HEIGHT = 600;
     const OUTER_WIDTH = 416;
     const OUTER_HEIGHT = 639;
 
     if (isDetachedMode) {
       setIsDetached(true);
-      document.body.style.width = `${TARGET_WIDTH}px`;
-      document.body.style.height = `${TARGET_HEIGHT}px`;
+      document.documentElement.style.width = '100%';
+      document.documentElement.style.height = '100%';
+      document.body.style.width = '100vw';
+      document.body.style.height = '100vh';
+      document.body.style.minHeight = '100vh';
       document.body.style.overflow = 'hidden';
+      const root = document.getElementById('root');
+      if (root) {
+        root.style.width = '100%';
+        root.style.height = '100%';
+        root.style.minHeight = '100vh';
+      }
 
       let animationFrameId: number;
       const lockSize = () => {
@@ -578,7 +594,7 @@ function AppContent() {
   if (!isDataLoaded) {
     return (
       <div style={{
-        height: '600px',
+        height: isDetached ? '100vh' : '600px',
         width: '100%',
         background: '#050505',
         color: '#00ffff',
@@ -688,6 +704,7 @@ function AppContent() {
               chain={activeChain}
               onChainChange={setActiveChain}
               accounts={walletState.accounts.filter(a => a.chain === activeChain)}
+              isRefreshing={isRefreshing}
               onManage={(acc: Account) => setManagingAccount(acc)}
               onSend={(acc: Account) => setTransferAccount(acc)}
               onReceive={(acc: Account) => setReceiveAccount(acc)}

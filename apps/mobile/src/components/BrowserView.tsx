@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InAppBrowser, ToolBarType, BackgroundColor } from '@capgo/inappbrowser';
 import { mobileProvider } from '../services/mobileProvider';
-import { Globe, ExternalLink, RotateCw, Plus, X } from 'lucide-react';
+import { Globe, ExternalLink, RotateCw, Plus, X, ArrowRight } from 'lucide-react';
 
 import { Account } from '@types';
 
@@ -12,6 +12,7 @@ interface BrowserViewProps {
 
 export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = [] }) => {
     const STORAGE_KEY = 'gravity_mobile_explorer_sites_v1';
+    const BRIDGE_VERSION = 'bridge-2026-03-21-1';
     const DEFAULT_SITE_ORDER = [
         'https://hive-engine.com',
         'https://beblurt.com',
@@ -24,8 +25,11 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
         'https://splinterlands.com'
     ];
     const [inputUrl, setInputUrl] = useState('');
+    const [showUrlModal, setShowUrlModal] = useState(false);
     const [launchingTarget, setLaunchingTarget] = useState<string | null>(null);
     const injectionScriptRef = useRef<string>('');
+    const initialTargetRef = useRef<string | null>(null);
+    const peakdResetAttemptedRef = useRef(false);
     const defaultDApps = useMemo(() => ([
         { name: 'Hive Engine', url: 'https://hive-engine.com', chain: 'Hive' },
         { name: 'BeBlurt', url: 'https://beblurt.com', chain: 'Blurt' },
@@ -142,16 +146,18 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
             console.log('[GWDBG][browser:open]', JSON.stringify({ targetUrl, accountCount: accounts.length }));
             setInputUrl(targetUrl);
             setLaunchingTarget(targetUrl);
+            initialTargetRef.current = targetUrl;
+            peakdResetAttemptedRef.current = false;
             
-            const scriptUrl = window.location.origin + '/provider-bridge.js';
-            const response = await fetch(scriptUrl);
+            const scriptUrl = `${window.location.origin}/provider-bridge.js?v=${encodeURIComponent(BRIDGE_VERSION)}`;
+            const response = await fetch(scriptUrl, { cache: 'no-store' });
             let injectionScript = await response.text();
             
             // Inject account info
             const accountsJson = JSON.stringify(accounts.map(a => ({ name: a.name, chain: a.chain })));
-            injectionScript = `window.gravity_accounts = ${accountsJson}; \n` + injectionScript;
+            injectionScript = `window.gravity_accounts = ${accountsJson}; window.__gravityBridgeVersion = ${JSON.stringify(BRIDGE_VERSION)}; console.log('[GWDBG][bridge-version]', window.__gravityBridgeVersion); \n` + injectionScript;
             injectionScriptRef.current = injectionScript;
-            console.log('[GWDBG][browser:inject-script]', JSON.stringify({ scriptUrl, accountNames: accounts.map(a => a.name) }));
+            console.log('[GWDBG][browser:inject-script]', JSON.stringify({ scriptUrl, bridgeVersion: BRIDGE_VERSION, accountNames: accounts.map(a => a.name) }));
 
             await InAppBrowser.removeAllListeners();
 
@@ -167,6 +173,49 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
                     setInputUrl(nextUrl);
                 }
                 console.log('[GWDBG][browser:url-change]', JSON.stringify({ url: nextUrl }));
+
+                const initialTarget = initialTargetRef.current;
+                if (
+                    initialTarget &&
+                    !peakdResetAttemptedRef.current &&
+                    initialTarget.replace(/\/+$/, '') === 'https://peakd.com' &&
+                    /^https:\/\/peakd\.com\/@[^/]+\/feed\/?$/i.test(nextUrl)
+                ) {
+                    peakdResetAttemptedRef.current = true;
+                    console.log('[GWDBG][browser:peakd-reset-trigger]', JSON.stringify({ initialTarget, redirectedTo: nextUrl }));
+                    const resetPeakdState = `
+                        (async () => {
+                            try {
+                                localStorage.clear();
+                                sessionStorage.clear();
+                                if (window.indexedDB && typeof window.indexedDB.databases === 'function') {
+                                    const dbs = await window.indexedDB.databases();
+                                    await Promise.all((dbs || []).map((db) => db && db.name ? new Promise((resolve) => {
+                                        const req = window.indexedDB.deleteDatabase(db.name);
+                                        req.onsuccess = req.onerror = req.onblocked = () => resolve(true);
+                                    }) : Promise.resolve(true)));
+                                }
+                                if (window.caches && typeof window.caches.keys === 'function') {
+                                    const keys = await window.caches.keys();
+                                    await Promise.all(keys.map((key) => window.caches.delete(key)));
+                                }
+                                if (navigator.serviceWorker && typeof navigator.serviceWorker.getRegistrations === 'function') {
+                                    const regs = await navigator.serviceWorker.getRegistrations();
+                                    await Promise.all(regs.map((reg) => reg.unregister()));
+                                }
+                            } catch (error) {
+                                console.error('[GWDBG][browser:peakd-reset-script-error]', error);
+                            }
+                            window.location.replace('https://peakd.com/');
+                        })();
+                    `;
+                    InAppBrowser.clearCookies({ url: 'https://peakd.com' }).catch((err) =>
+                        console.error('[BrowserView] peakd clearCookies failed', err)
+                    );
+                    InAppBrowser.executeScript({ code: resetPeakdState }).catch((err) =>
+                        console.error('[BrowserView] peakd reset script failed', err)
+                    );
+                }
             });
 
             await InAppBrowser.addListener('browserPageLoaded', () => {
@@ -266,52 +315,56 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
         e.preventDefault();
         if (!inputUrl) return;
         const target = normalizeTarget(inputUrl);
+        setShowUrlModal(false);
         openBrowser(target);
     };
 
     return (
         <div className="flex flex-col h-full w-full space-y-6 animate-fadeIn pb-32 overflow-y-auto px-4 pt-6 bg-dark-950">
-            <div className="bg-dark-800/50 border border-dark-700/50 rounded-[32px] p-6 shadow-2xl backdrop-blur-md">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="w-12 h-12 bg-blue-600/20 rounded-2xl flex items-center justify-center text-blue-400 border border-blue-500/20">
-                        <Globe size={24} />
+            <div className="bg-dark-800/50 border border-dark-700/50 rounded-[28px] p-5 shadow-2xl backdrop-blur-md">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-blue-600/20 rounded-2xl flex items-center justify-center text-blue-400 border border-blue-500/20 shrink-0">
+                        <Globe size={20} />
                     </div>
-                    <div>
-                        <h2 className="text-xl font-black tracking-tight text-white">Web 3.0 Explorer</h2>
+                    <div className="min-w-0">
+                        <h2 className="text-lg font-black tracking-tight text-white">Web 3.0 Explorer</h2>
                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Secure Blockchain Gateway</p>
                     </div>
                 </div>
 
-                <form onSubmit={handleGo} className="relative mb-0">
-                    <input
-                        type="text"
-                        value={inputUrl}
-                        onChange={(e) => setInputUrl(e.target.value)}
-                        placeholder="Enter URL or search..."
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        autoComplete="off"
-                        spellCheck={false}
-                        className="w-full bg-dark-900 border border-dark-600 rounded-2xl py-4 pl-12 pr-28 text-sm font-medium text-white focus:outline-none focus:border-blue-500/50 transition-all shadow-inner"
-                    />
-                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <button
+                    type="button"
+                    onClick={() => setShowUrlModal(true)}
+                    className="w-full flex items-center justify-between rounded-2xl border border-dark-600 bg-dark-900 px-4 py-4 text-left transition-all active:scale-[0.99]"
+                >
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600/10 text-blue-400">
+                            <Globe size={18} />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="text-sm font-bold text-white">Open URL</div>
+                            <div className="truncate text-xs text-slate-400">
+                                {inputUrl || 'Type a website or search term'}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-900/40">
+                        <ArrowRight size={18} />
+                    </div>
+                </button>
+                <div className="mt-3 flex items-center justify-between gap-3 px-1">
+                    <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-500">
+                        Quick access shortcuts
+                    </p>
                     <button
                         type="button"
                         onClick={addCurrentSite}
-                        className="absolute right-20 top-1/2 -translate-y-1/2 bg-dark-700 text-slate-200 px-3 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95"
+                        className="inline-flex items-center gap-2 rounded-full border border-dark-600 bg-dark-900 px-3 py-1.5 text-[11px] font-bold text-slate-300 transition-all active:scale-95"
                     >
-                        <Plus size={14} />
+                        <Plus size={12} />
+                        Save current
                     </button>
-                    <button 
-                        type="submit"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-blue-500 transition-all active:scale-95 shadow-lg shadow-blue-900/40"
-                    >
-                        GO
-                    </button>
-                </form>
-                <p className="mt-3 px-1 text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-500">
-                    Add or remove your landing shortcuts here. Inside the webview you now get a fixed top browser bar instead of the floating menu.
-                </p>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -371,6 +424,63 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
                         <div className="text-sm font-black uppercase tracking-[0.22em] text-blue-300">Opening dApp</div>
                         <div className="mt-3 text-xs font-semibold text-slate-400 break-all">{launchingTarget}</div>
                         <div className="mt-4 text-[11px] text-slate-500">Please wait. Repeated taps are disabled while the webview is preparing.</div>
+                    </div>
+                </div>
+            )}
+
+            {showUrlModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4 pb-[max(env(safe-area-inset-bottom),1rem)] pt-6">
+                    <div className="w-full max-w-md rounded-[28px] border border-dark-700 bg-dark-900 p-5 shadow-2xl mb-[22vh]">
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                            <div>
+                                <h3 className="text-lg font-black text-white">Open URL</h3>
+                                <p className="text-xs font-medium text-slate-400">Enter a site address or search term</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowUrlModal(false)}
+                                className="flex h-10 w-10 items-center justify-center rounded-full bg-dark-800 text-slate-400"
+                                aria-label="Close URL modal"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleGo} className="space-y-5">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={inputUrl}
+                                    onChange={(e) => setInputUrl(e.target.value)}
+                                    placeholder="https://example.com"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    autoFocus
+                                    className="w-full rounded-2xl border border-dark-600 bg-dark-800 py-4 pl-12 pr-4 text-sm font-medium text-white focus:outline-none focus:border-blue-500/50"
+                                />
+                                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={addCurrentSite}
+                                    className="inline-flex min-h-[48px] items-center gap-2 rounded-full border border-dark-600 bg-dark-800 px-4 py-3 text-xs font-bold text-slate-300"
+                                >
+                                    <Plus size={12} />
+                                    Save shortcut
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="inline-flex min-h-[48px] items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-900/40"
+                                >
+                                    Open
+                                    <ArrowRight size={16} />
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
