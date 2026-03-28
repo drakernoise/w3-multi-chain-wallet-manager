@@ -71,6 +71,26 @@ const normalizeMultiSigExpiration = (rawValue?: string | null): { localValue: st
   };
 };
 
+const calculateCoordinationProgress = (
+  proposal: SavedMultiSigProposal,
+  partialSignatures: PartialTransactionSignature[]
+): { current: number; threshold: number; canBroadcast: boolean } => {
+  const signedNames = new Set(partialSignatures.map((entry) => entry.username));
+  const eligibleNames = new Set((proposal.signers || []).map((name) => name.replace(/^@/, '')));
+  let current = 0;
+
+  eligibleNames.forEach((name) => {
+    if (signedNames.has(name)) current += 1;
+  });
+
+  const threshold = Math.max(1, proposal.threshold || 1);
+  return {
+    current,
+    threshold,
+    canBroadcast: current >= threshold
+  };
+};
+
 const normalizeSavedProposal = (proposal: Partial<SavedMultiSigProposal> | null | undefined): SavedMultiSigProposal | null => {
   if (!proposal || !proposal.chain || !proposal.initiator || !proposal.operation) {
     return null;
@@ -279,7 +299,6 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const activeAuthorityAccounts = authority?.accountAuths ?? [];
   const activeAuthorityKeys = authority?.keyAuths ?? [];
   const looksLikeMultisig = !!authority && (activeAuthorityAccounts.length > 0 || authority.threshold > 1);
-  const effectiveThreshold = authority?.threshold || request.threshold;
 
   const addSigner = (signerName?: string) => {
     const signer = (signerName ?? newSigner).trim().replace(/^@/, '');
@@ -296,7 +315,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     return JSON.stringify({
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: effectiveThreshold,
+      threshold: request.threshold,
       signers: request.signers,
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operation: (() => {
@@ -308,7 +327,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       })(),
       authoritySnapshot: authority
     }, null, 2);
-  }, [authority, effectiveThreshold, expiresAt, request.initiator, request.operation, request.signers, selectedChain]);
+  }, [authority, expiresAt, request.initiator, request.operation, request.signers, request.threshold, selectedChain]);
 
   const handleCopyDraft = async () => {
     await navigator.clipboard.writeText(proposalDraft);
@@ -341,7 +360,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || 'unknown'}`,
       chain: selectedChain,
       initiator: request.initiator,
-      threshold: effectiveThreshold,
+      threshold: request.threshold,
       signers: request.signers,
       expiration: normalizedExpiration.isoValue,
       operationType: opType,
@@ -580,17 +599,14 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                 <input
                   type="number"
                   min="1"
-                  max={Math.max(1, effectiveThreshold || request.signers.length || 1)}
-                  value={effectiveThreshold}
+                  max={Math.max(1, request.signers.length || 1)}
+                  value={request.threshold}
                   onChange={(e) => setRequest(prev => ({ ...prev, threshold: Math.max(1, Number(e.target.value) || 1) }))}
-                  disabled={!!authority}
-                  className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 disabled:text-slate-400 disabled:bg-dark-800 disabled:border-dark-700"
+                  className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
                 />
-                {authority && (
-                  <p className="mt-2 text-[10px] text-slate-500">
-                    Locked to on-chain threshold while authority is available.
-                  </p>
-                )}
+                <p className="mt-2 text-[10px] text-slate-500">
+                  Coordination threshold for this draft. On-chain authority is shown separately below.
+                </p>
               </div>
               <div>
                 <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.expiration')}</label>
@@ -832,9 +848,10 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   <div key={proposal.id} className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3">
                     {(() => {
                       const partialSignatures = Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [];
-                      const progress = proposal.authoritySnapshot
+                      const onChainProgress = proposal.authoritySnapshot
                         ? calculateThresholdProgress(proposal.authoritySnapshot, partialSignatures)
                         : null;
+                      const coordinationProgress = calculateCoordinationProgress(proposal, partialSignatures);
                       const localSigners = getLocalSigners(proposal);
                       const signedNames = new Set(partialSignatures.map((entry) => entry.username));
 
@@ -848,14 +865,17 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                         <div className="text-[10px] text-slate-500 mt-1">
                           {new Date(proposal.createdAt).toLocaleString()}
                         </div>
-                        {progress && (
+                        <div className="mt-2 text-[10px] text-slate-300">
+                          Coordination: <span className="font-bold text-white">{coordinationProgress.current}</span> / {coordinationProgress.threshold}
+                        </div>
+                        {onChainProgress && (
                           <div className="mt-2 text-[10px] text-slate-400">
-                            Progress: <span className="font-bold text-white">{progress.currentWeight}</span> / {progress.threshold} on-chain
+                            On-chain: <span className="font-bold text-white">{onChainProgress.currentWeight}</span> / {onChainProgress.threshold}
                           </div>
                         )}
-                        {progress && proposal.threshold !== progress.threshold && (
+                        {onChainProgress && proposal.threshold !== onChainProgress.threshold && (
                           <div className="mt-1 text-[10px] text-amber-400 break-words">
-                            Saved draft threshold differs from current on-chain threshold. On-chain value wins.
+                            Draft coordination threshold differs from current on-chain authority threshold.
                           </div>
                         )}
                         {partialSignatures.length > 0 && (
@@ -916,7 +936,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                         </div>
                         <button
                           onClick={() => handleBroadcastProposal(proposal)}
-                          disabled={!progress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
+                          disabled={!coordinationProgress.canBroadcast || !onChainProgress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
                           className="w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
                         >
                           Broadcast
