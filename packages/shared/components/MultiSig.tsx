@@ -1,12 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Chain, Account, MultiSigRequest } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
-import { getAccountAuthorities, MultiSigAuthority } from '../services/chainService';
+import {
+  broadcastSignedTransaction,
+  calculateThresholdProgress,
+  createUnsignedTransaction,
+  getAccountAuthorities,
+  MultiSigAuthority,
+  PartialTransactionSignature,
+  signTransactionEnvelope
+} from '../services/chainService';
 import { storageService } from '../services/storageService';
 
 interface MultiSigProps {
   chain: Chain;
   accounts: Account[];
+  onChainChange?: (chain: Chain) => void;
 }
 
 type OpType = 'transfer' | 'delegate_vesting_shares' | 'transfer_to_vesting' | 'withdraw_vesting' | 'custom';
@@ -21,6 +30,10 @@ interface SavedMultiSigProposal {
   expiration: string | null;
   operationType: OpType;
   operation: string;
+  authoritySnapshot?: MultiSigAuthority | null;
+  unsignedTransaction?: any;
+  partialSignatures: PartialTransactionSignature[];
+  lastBroadcastTxId?: string;
   createdAt: number;
 }
 
@@ -38,7 +51,7 @@ const chainTheme = {
   [Chain.BLURT]: 'bg-blurt text-white shadow-lg'
 };
 
-export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts }) => {
+export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
   const [selectedChain, setSelectedChain] = useState<Chain>(initialChain);
   const [newSigner, setNewSigner] = useState('');
@@ -51,6 +64,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const [saveLabel, setSaveLabel] = useState('');
   const [importPayload, setImportPayload] = useState('');
   const [savedProposals, setSavedProposals] = useState<SavedMultiSigProposal[]>([]);
+  const [proposalBusyId, setProposalBusyId] = useState<string | null>(null);
   const [authorityLoading, setAuthorityLoading] = useState(false);
   const [authority, setAuthority] = useState<MultiSigAuthority | null>(null);
   const [authorityError, setAuthorityError] = useState<string | null>(null);
@@ -250,6 +264,19 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   };
 
   const handleSaveProposal = async () => {
+    let operationPayload: any;
+    try {
+      operationPayload = JSON.parse(request.operation);
+    } catch {
+      operationPayload = request.operation;
+    }
+
+    const unsignedTransaction = await createUnsignedTransaction(
+      selectedChain,
+      Array.isArray(operationPayload) ? [operationPayload] : operationPayload,
+      expiresAt ? new Date(expiresAt).toISOString() : undefined
+    );
+
     const proposal: SavedMultiSigProposal = {
       id: crypto.randomUUID(),
       title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || 'unknown'}`,
@@ -260,6 +287,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operationType: opType,
       operation: request.operation,
+      authoritySnapshot: authority,
+      unsignedTransaction,
+      partialSignatures: [],
       createdAt: Date.now()
     };
 
@@ -305,6 +335,82 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     await persistSavedProposals(proposals);
   };
 
+  const findLocalSigner = (proposal: SavedMultiSigProposal): Account | null => {
+    const allowedNames = new Set([
+      ...proposal.signers,
+      ...(proposal.authoritySnapshot?.accountAuths.map(([name]) => name) || [])
+    ]);
+
+    return accounts.find((account) =>
+      account.chain === proposal.chain &&
+      !!account.activeKey &&
+      allowedNames.has(account.name)
+    ) || null;
+  };
+
+  const handlePartialSignProposal = async (proposal: SavedMultiSigProposal) => {
+    const signer = findLocalSigner(proposal);
+    if (!signer?.activeKey || !proposal.unsignedTransaction) return;
+
+    setProposalBusyId(proposal.id);
+    try {
+      const signResult = await signTransactionEnvelope(
+        proposal.chain,
+        proposal.unsignedTransaction,
+        signer.activeKey,
+        signer.name
+      );
+
+      if (!signResult.success || !signResult.signature || !signResult.publicKey) {
+        throw new Error(signResult.error || 'Partial sign failed');
+      }
+
+      const nextProposal: SavedMultiSigProposal = {
+        ...proposal,
+        partialSignatures: [
+          ...proposal.partialSignatures.filter((entry) => entry.username !== signer.name),
+          {
+            username: signer.name,
+            pubKey: signResult.publicKey,
+            signature: signResult.signature
+          }
+        ]
+      };
+
+      await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
+    } catch (error) {
+      console.warn('Failed to partial-sign multisig proposal:', error);
+    } finally {
+      setProposalBusyId(null);
+    }
+  };
+
+  const handleBroadcastProposal = async (proposal: SavedMultiSigProposal) => {
+    if (!proposal.unsignedTransaction || !proposal.authoritySnapshot) return;
+
+    setProposalBusyId(proposal.id);
+    try {
+      const signedTransaction = {
+        ...proposal.unsignedTransaction,
+        signatures: proposal.partialSignatures.map((entry) => entry.signature)
+      };
+
+      const result = await broadcastSignedTransaction(proposal.chain, signedTransaction);
+      if (!result.success) throw new Error(result.error || 'Broadcast failed');
+
+      const nextProposal: SavedMultiSigProposal = {
+        ...proposal,
+        lastBroadcastTxId: result.txId
+      };
+
+      await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
+    } catch (error) {
+      console.warn('Failed to broadcast multisig proposal:', error);
+    } finally {
+      setProposalBusyId(null);
+    }
+  };
+
   const buildSharedPackage = (proposal: SavedMultiSigProposal): SharedMultiSigPackage => ({
     version: 1,
     kind: 'gravity-multisig-proposal',
@@ -334,6 +440,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
         signers: Array.isArray(proposal.signers) ? proposal.signers : [],
         threshold: Number(proposal.threshold) || 1,
+        partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
         createdAt: proposal.createdAt || Date.now()
       };
 
@@ -369,7 +476,10 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             {[Chain.BLURT, Chain.HIVE, Chain.STEEM].map((chain) => (
               <button
                 key={chain}
-                onClick={() => setSelectedChain(chain)}
+                onClick={() => {
+                  setSelectedChain(chain);
+                  onChainChange?.(chain);
+                }}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedChain === chain ? chainTheme[chain] : 'text-slate-500 hover:text-slate-300'}`}
               >
                 {chain}
@@ -643,6 +753,13 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   <div className="text-xs text-slate-500 italic">No saved multisig proposals yet.</div>
                 ) : savedProposals.map((proposal) => (
                   <div key={proposal.id} className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3">
+                    {(() => {
+                      const progress = proposal.authoritySnapshot
+                        ? calculateThresholdProgress(proposal.authoritySnapshot, proposal.partialSignatures)
+                        : null;
+                      const localSigner = findLocalSigner(proposal);
+
+                      return (
                     <div className="space-y-3">
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-white truncate">{proposal.title}</div>
@@ -652,6 +769,21 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                         <div className="text-[10px] text-slate-500 mt-1">
                           {new Date(proposal.createdAt).toLocaleString()}
                         </div>
+                        {progress && (
+                          <div className="mt-2 text-[10px] text-slate-400">
+                            Progress: <span className="font-bold text-white">{progress.currentWeight}</span> / {progress.threshold}
+                          </div>
+                        )}
+                        {proposal.partialSignatures.length > 0 && (
+                          <div className="mt-1 text-[10px] text-blue-400 break-words">
+                            Signed by {proposal.partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
+                          </div>
+                        )}
+                        {proposal.lastBroadcastTxId && (
+                          <div className="mt-1 text-[10px] text-green-400 break-all">
+                            Broadcasted: {proposal.lastBroadcastTxId}
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <button
@@ -673,7 +805,25 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                           Delete
                         </button>
                       </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handlePartialSignProposal(proposal)}
+                          disabled={!localSigner || proposalBusyId === proposal.id}
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                        >
+                          {proposalBusyId === proposal.id ? '...' : localSigner ? `Sign @${localSigner.name}` : 'No local signer'}
+                        </button>
+                        <button
+                          onClick={() => handleBroadcastProposal(proposal)}
+                          disabled={!progress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
+                          className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
+                        >
+                          Broadcast
+                        </button>
+                      </div>
                     </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

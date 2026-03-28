@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as getAccountAuthorities, z as indexBrowserExports, A as indexBrowserExports$1, B as validateAccountKeys, D as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, E as fetchBalances, F as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as calculateThresholdProgress, z as getAccountAuthorities, A as createUnsignedTransaction, B as signTransactionEnvelope, D as broadcastSignedTransaction, E as indexBrowserExports, F as indexBrowserExports$1, G as validateAccountKeys, H as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, I as fetchBalances, J as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -11412,7 +11412,7 @@ const chainTheme = {
   [Chain.STEEM]: "bg-steem text-white shadow-lg",
   [Chain.BLURT]: "bg-blurt text-white shadow-lg"
 };
-const MultiSig = ({ chain: initialChain, accounts }) => {
+const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
   const [selectedChain, setSelectedChain] = reactExports.useState(initialChain);
   const [newSigner, setNewSigner] = reactExports.useState("");
@@ -11425,6 +11425,7 @@ const MultiSig = ({ chain: initialChain, accounts }) => {
   const [saveLabel, setSaveLabel] = reactExports.useState("");
   const [importPayload, setImportPayload] = reactExports.useState("");
   const [savedProposals, setSavedProposals] = reactExports.useState([]);
+  const [proposalBusyId, setProposalBusyId] = reactExports.useState(null);
   const [authorityLoading, setAuthorityLoading] = reactExports.useState(false);
   const [authority, setAuthority] = reactExports.useState(null);
   const [authorityError, setAuthorityError] = reactExports.useState(null);
@@ -11598,6 +11599,17 @@ const MultiSig = ({ chain: initialChain, accounts }) => {
     await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(proposals));
   };
   const handleSaveProposal = async () => {
+    let operationPayload;
+    try {
+      operationPayload = JSON.parse(request.operation);
+    } catch {
+      operationPayload = request.operation;
+    }
+    const unsignedTransaction = await createUnsignedTransaction(
+      selectedChain,
+      Array.isArray(operationPayload) ? [operationPayload] : operationPayload,
+      expiresAt ? new Date(expiresAt).toISOString() : void 0
+    );
     const proposal = {
       id: crypto.randomUUID(),
       title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || "unknown"}`,
@@ -11608,6 +11620,9 @@ const MultiSig = ({ chain: initialChain, accounts }) => {
       expiration: expiresAt ? new Date(expiresAt).toISOString() : null,
       operationType: opType,
       operation: request.operation,
+      authoritySnapshot: authority,
+      unsignedTransaction,
+      partialSignatures: [],
       createdAt: Date.now()
     };
     const proposals = [proposal, ...savedProposals].slice(0, 20);
@@ -11644,6 +11659,68 @@ const MultiSig = ({ chain: initialChain, accounts }) => {
     const proposals = savedProposals.filter((proposal) => proposal.id !== proposalId);
     await persistSavedProposals(proposals);
   };
+  const findLocalSigner = (proposal) => {
+    const allowedNames = /* @__PURE__ */ new Set([
+      ...proposal.signers,
+      ...proposal.authoritySnapshot?.accountAuths.map(([name]) => name) || []
+    ]);
+    return accounts.find(
+      (account) => account.chain === proposal.chain && !!account.activeKey && allowedNames.has(account.name)
+    ) || null;
+  };
+  const handlePartialSignProposal = async (proposal) => {
+    const signer = findLocalSigner(proposal);
+    if (!signer?.activeKey || !proposal.unsignedTransaction) return;
+    setProposalBusyId(proposal.id);
+    try {
+      const signResult = await signTransactionEnvelope(
+        proposal.chain,
+        proposal.unsignedTransaction,
+        signer.activeKey,
+        signer.name
+      );
+      if (!signResult.success || !signResult.signature || !signResult.publicKey) {
+        throw new Error(signResult.error || "Partial sign failed");
+      }
+      const nextProposal = {
+        ...proposal,
+        partialSignatures: [
+          ...proposal.partialSignatures.filter((entry) => entry.username !== signer.name),
+          {
+            username: signer.name,
+            pubKey: signResult.publicKey,
+            signature: signResult.signature
+          }
+        ]
+      };
+      await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
+    } catch (error) {
+      console.warn("Failed to partial-sign multisig proposal:", error);
+    } finally {
+      setProposalBusyId(null);
+    }
+  };
+  const handleBroadcastProposal = async (proposal) => {
+    if (!proposal.unsignedTransaction || !proposal.authoritySnapshot) return;
+    setProposalBusyId(proposal.id);
+    try {
+      const signedTransaction = {
+        ...proposal.unsignedTransaction,
+        signatures: proposal.partialSignatures.map((entry) => entry.signature)
+      };
+      const result = await broadcastSignedTransaction(proposal.chain, signedTransaction);
+      if (!result.success) throw new Error(result.error || "Broadcast failed");
+      const nextProposal = {
+        ...proposal,
+        lastBroadcastTxId: result.txId
+      };
+      await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
+    } catch (error) {
+      console.warn("Failed to broadcast multisig proposal:", error);
+    } finally {
+      setProposalBusyId(null);
+    }
+  };
   const buildSharedPackage = (proposal) => ({
     version: 1,
     kind: "gravity-multisig-proposal",
@@ -11666,6 +11743,7 @@ const MultiSig = ({ chain: initialChain, accounts }) => {
         title: proposal.title || `${proposal.chain} proposal • @${proposal.initiator}`,
         signers: Array.isArray(proposal.signers) ? proposal.signers : [],
         threshold: Number(proposal.threshold) || 1,
+        partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
         createdAt: proposal.createdAt || Date.now()
       };
       const proposals = [
@@ -11690,7 +11768,10 @@ const MultiSig = ({ chain: initialChain, accounts }) => {
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex p-1 bg-dark-900 rounded-xl mt-5 border border-dark-700", children: [Chain.BLURT, Chain.HIVE, Chain.STEEM].map((chain) => /* @__PURE__ */ jsxRuntimeExports.jsx(
         "button",
         {
-          onClick: () => setSelectedChain(chain),
+          onClick: () => {
+            setSelectedChain(chain);
+            onChainChange?.(chain);
+          },
           className: `flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedChain === chain ? chainTheme[chain] : "text-slate-500 hover:text-slate-300"}`,
           children: chain
         },
@@ -11943,45 +12024,83 @@ const MultiSig = ({ chain: initialChain, accounts }) => {
               }
             )
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: savedProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No saved multisig proposals yet." }) : savedProposals.map((proposal) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-dark-700 bg-dark-800 px-3 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-bold text-white truncate", children: proposal.title }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] text-slate-400 mt-1 break-words", children: [
-                proposal.chain,
-                " • @",
-                proposal.initiator,
-                " • threshold ",
-                proposal.threshold
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: savedProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No saved multisig proposals yet." }) : savedProposals.map((proposal) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-dark-700 bg-dark-800 px-3 py-3", children: (() => {
+            const progress = proposal.authoritySnapshot ? calculateThresholdProgress(proposal.authoritySnapshot, proposal.partialSignatures) : null;
+            const localSigner = findLocalSigner(proposal);
+            return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-bold text-white truncate", children: proposal.title }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] text-slate-400 mt-1 break-words", children: [
+                  proposal.chain,
+                  " • @",
+                  proposal.initiator,
+                  " • threshold ",
+                  proposal.threshold
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: new Date(proposal.createdAt).toLocaleString() }),
+                progress && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-2 text-[10px] text-slate-400", children: [
+                  "Progress: ",
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-white", children: progress.currentWeight }),
+                  " / ",
+                  progress.threshold
+                ] }),
+                proposal.partialSignatures.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 text-[10px] text-blue-400 break-words", children: [
+                  "Signed by ",
+                  proposal.partialSignatures.map((entry) => `@${entry.username}`).join(", ")
+                ] }),
+                proposal.lastBroadcastTxId && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 text-[10px] text-green-400 break-all", children: [
+                  "Broadcasted: ",
+                  proposal.lastBroadcastTxId
+                ] })
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: new Date(proposal.createdAt).toLocaleString() })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-2", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "button",
-                {
-                  onClick: () => handleLoadProposal(proposal),
-                  className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors",
-                  children: "Load"
-                }
-              ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "button",
-                {
-                  onClick: () => handleCopyProposalPackage(proposal),
-                  className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors",
-                  children: "Copy"
-                }
-              ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                "button",
-                {
-                  onClick: () => handleDeleteProposal(proposal.id),
-                  className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors",
-                  children: "Delete"
-                }
-              )
-            ] })
-          ] }) }, proposal.id)) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    onClick: () => handleLoadProposal(proposal),
+                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors",
+                    children: "Load"
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    onClick: () => handleCopyProposalPackage(proposal),
+                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors",
+                    children: "Copy"
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    onClick: () => handleDeleteProposal(proposal.id),
+                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors",
+                    children: "Delete"
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    onClick: () => handlePartialSignProposal(proposal),
+                    disabled: !localSigner || proposalBusyId === proposal.id,
+                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
+                    children: proposalBusyId === proposal.id ? "..." : localSigner ? `Sign @${localSigner.name}` : "No local signer"
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    onClick: () => handleBroadcastProposal(proposal),
+                    disabled: !progress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId,
+                    className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
+                    children: "Broadcast"
+                  }
+                )
+              ] })
+            ] });
+          })() }, proposal.id)) }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 border-t border-dark-700/80 space-y-2", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400", children: "Paste a shared proposal package here to import it into this device." }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -16482,7 +16601,14 @@ function AppContent() {
             onAddAccount: () => setShowImport(true)
           }
         ),
-        currentView === ViewState.MULTISIG && /* @__PURE__ */ jsxRuntimeExports.jsx(MultiSig, { chain: activeChain, accounts: walletState.accounts }),
+        currentView === ViewState.MULTISIG && /* @__PURE__ */ jsxRuntimeExports.jsx(
+          MultiSig,
+          {
+            chain: activeChain,
+            accounts: walletState.accounts,
+            onChainChange: setActiveChain
+          }
+        ),
         currentView === ViewState.HELP && /* @__PURE__ */ jsxRuntimeExports.jsx(HelpView, {}),
         currentView === ViewState.CHAT && /* @__PURE__ */ jsxRuntimeExports.jsx(
           ChatView,

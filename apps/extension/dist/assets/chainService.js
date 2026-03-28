@@ -88720,6 +88720,180 @@ const fetchGlobalProps = async (chain) => {
     return cached?.data || null;
   }
 };
+const normalizeOperations = (operations) => {
+  const normalizedOps = (operations || []).map((op) => {
+    if (Array.isArray(op)) return op;
+    if (op && typeof op === "object") {
+      const type = op.type || op.operation || op.method;
+      const data = op.data || op.op || op.operation_data || (({ type: _t, operation: _o, method: _m, ...rest }) => rest)(op);
+      if (type) return [type, data];
+    }
+    return op;
+  });
+  return normalizedOps.map((op) => {
+    if (Array.isArray(op) && op.length >= 2 && typeof op[1] === "object") {
+      const data = { ...op[1] };
+      Object.keys(data).forEach((key) => {
+        if (key.startsWith("__")) delete data[key];
+      });
+      return [op[0], data];
+    }
+    return op;
+  });
+};
+const convertAssetSymbolRecursively = (value, fromSymbol, toSymbol) => {
+  if (typeof value === "string") {
+    return value.replace(new RegExp(` ${fromSymbol}`, "g"), ` ${toSymbol}`);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => convertAssetSymbolRecursively(entry, fromSymbol, toSymbol));
+  }
+  if (value !== null && typeof value === "object") {
+    const converted = {};
+    for (const key in value) {
+      converted[key] = convertAssetSymbolRecursively(value[key], fromSymbol, toSymbol);
+    }
+    return converted;
+  }
+  return value;
+};
+const createUnsignedTransaction = async (chain, operations, expiration) => {
+  const props = await fetchGlobalProps(chain);
+  if (!props) throw new Error(`Could not fetch global properties for ${chain}`);
+  const cleanOperations = normalizeOperations(operations);
+  return {
+    ref_block_num: props.head_block_number & 65535,
+    ref_block_prefix: Buffer.from(props.head_block_id, "hex").readUInt32LE(4),
+    expiration: expiration || new Date(Date.now() + 60 * 1e3).toISOString().slice(0, -5),
+    operations: cleanOperations,
+    extensions: []
+  };
+};
+const signTransactionEnvelope = async (chain, transaction, key, username) => {
+  try {
+    let signedTx;
+    const cleanKey = key.trim();
+    const config = getChainConfig(chain);
+    const baseKey = indexBrowserExports$1.PrivateKey.fromString(cleanKey);
+    let publicKey = baseKey.createPublic().toString();
+    if (config.addressPrefix !== "STM" && publicKey.startsWith("STM")) {
+      publicKey = config.addressPrefix + publicKey.substring(3);
+    }
+    if (chain === Chain.HIVE) {
+      signedTx = indexBrowserExports$1.cryptoUtils.signTransaction(transaction, [baseKey]);
+    } else if (chain === Chain.STEEM) {
+      signedTx = indexBrowserExports.cryptoUtils.signTransaction(transaction, indexBrowserExports.PrivateKey.fromString(cleanKey));
+    } else if (chain === Chain.BLURT) {
+      libExports.config.set("address_prefix", config.addressPrefix);
+      libExports.config.set("chain_id", config.chainId);
+      try {
+        const txWithBlurt = {
+          ...transaction,
+          operations: convertAssetSymbolRecursively(transaction.operations, "STEEM", "BLURT")
+        };
+        signedTx = libExports.auth.signTransaction(txWithBlurt, [cleanKey]);
+      } catch (error) {
+        if (error?.message && (error.message.includes("Invalid asset symbol") || error.message.includes("Unable to serialize"))) {
+          const txWithSteem = {
+            ...transaction,
+            operations: convertAssetSymbolRecursively(transaction.operations, "BLURT", "STEEM")
+          };
+          signedTx = libExports.auth.signTransaction(txWithSteem, [cleanKey]);
+          signedTx = JSON.parse(JSON.stringify(signedTx));
+          signedTx.operations = convertAssetSymbolRecursively(signedTx.operations, "STEEM", "BLURT");
+        } else {
+          throw error;
+        }
+      }
+    } else {
+      throw new Error("Chain not supported");
+    }
+    const signatures = signedTx?.signatures || [];
+    return {
+      success: true,
+      signedTx,
+      publicKey,
+      signature: signatures[signatures.length - 1],
+      username
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error?.message || "Failed to sign transaction"
+    };
+  }
+};
+const broadcastSignedTransaction = async (chain, signedTransaction) => {
+  try {
+    const nodeUrl = getActiveNode(chain);
+    if (chain === Chain.HIVE) {
+      const response = await fetch(nodeUrl, {
+        method: "POST",
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "condenser_api.broadcast_transaction_synchronous",
+          params: [signedTransaction],
+          id: 1
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          "Connection": "keep-alive"
+        }
+      });
+      if (!response.ok) throw new Error(`Node ${nodeUrl} returned HTTP ${response.status}`);
+      const json = await parseJsonResponse(response, nodeUrl);
+      if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+      return {
+        success: true,
+        txId: json.result?.id,
+        opResult: json.result,
+        signatures: signedTransaction.signatures,
+        transaction: signedTransaction,
+        signedTx: signedTransaction
+      };
+    }
+    if (chain === Chain.STEEM) {
+      const client = new indexBrowserExports.Client(nodeUrl);
+      const result = await client.broadcast.send(signedTransaction);
+      return {
+        success: true,
+        txId: result.id,
+        opResult: result,
+        signatures: signedTransaction.signatures,
+        transaction: signedTransaction,
+        signedTx: signedTransaction
+      };
+    }
+    if (chain === Chain.BLURT) {
+      const response = await fetch(nodeUrl, {
+        method: "POST",
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "condenser_api.broadcast_transaction_synchronous",
+          params: [signedTransaction],
+          id: 1
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          "Connection": "keep-alive"
+        }
+      });
+      const json = await response.json();
+      if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+      return {
+        success: true,
+        txId: json.result?.id,
+        opResult: json.result,
+        signatures: signedTransaction.signatures,
+        transaction: signedTransaction,
+        signedTx: signedTransaction
+      };
+    }
+    throw new Error("Chain not supported");
+  } catch (error) {
+    return { success: false, error: error?.message || "Broadcast failed" };
+  }
+};
 const convertToVests = async (chain, amountInPower) => {
   const props = await fetchGlobalProps(chain);
   if (!props) throw new Error("Could not fetch global properties for conversion");
@@ -88868,6 +89042,20 @@ const getAccountAuthorities = async (chain, username, type = "active") => {
     console.error("Failed to fetch authorities:", e);
     return null;
   }
+};
+const calculateThresholdProgress = (auth, signatures) => {
+  let currentWeight = 0;
+  signatures.forEach((sig) => {
+    const keyMatch = auth.keyAuths.find((k) => k[0] === sig.pubKey);
+    if (keyMatch) currentWeight += keyMatch[1];
+    const accMatch = auth.accountAuths.find((a) => a[0] === sig.username);
+    if (accMatch) currentWeight += accMatch[1];
+  });
+  return {
+    currentWeight,
+    threshold: auth.threshold,
+    canBroadcast: currentWeight >= auth.threshold
+  };
 };
 const broadcastTransfer = async (chain, from, activeKey, to, amount, memo, tokenSymbol) => {
   const formattedAmount = parseFloat(amount).toFixed(3);
@@ -89145,25 +89333,7 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
 const broadcastOperations = async (chain, activeKey, operations) => {
   const nodeUrl = getActiveNode(chain);
   console.log("[BroadcastOps] Chain:", chain, "NodeUrl:", nodeUrl, "Operations:", operations);
-  const normalizedOps = (operations || []).map((op) => {
-    if (Array.isArray(op)) return op;
-    if (op && typeof op === "object") {
-      const type = op.type || op.operation || op.method;
-      const data = op.data || op.op || op.operation_data || (({ type: _t, operation: _o, method: _m, ...rest }) => rest)(op);
-      if (type) return [type, data];
-    }
-    return op;
-  });
-  const cleanOperations = normalizedOps.map((op) => {
-    if (Array.isArray(op) && op.length >= 2 && typeof op[1] === "object") {
-      const data = { ...op[1] };
-      Object.keys(data).forEach((key) => {
-        if (key.startsWith("__")) delete data[key];
-      });
-      return [op[0], data];
-    }
-    return op;
-  });
+  const cleanOperations = normalizeOperations(operations);
   const getFallbackNodes = (chain2) => {
     const nodes = {
       [Chain.HIVE]: ["https://api.deathwing.me", "https://techcoderx.com", "https://rpc.mahdiyari.info", "https://hive-api.3speak.tv"],
@@ -89573,4 +89743,4 @@ const decodeMemo = async (chain, _username, encodedMemo, key) => {
   }
 };
 
-export { indexBrowserExports as A, validateAccountKeys as B, Chain as C, fetchAccountHistory as D, fetchBalances as E, detectWeb3Context as F, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, getAccountAuthorities as y, indexBrowserExports$1 as z };
+export { createUnsignedTransaction as A, signTransactionEnvelope as B, Chain as C, broadcastSignedTransaction as D, indexBrowserExports$1 as E, indexBrowserExports as F, validateAccountKeys as G, fetchAccountHistory as H, fetchBalances as I, detectWeb3Context as J, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, calculateThresholdProgress as y, getAccountAuthorities as z };

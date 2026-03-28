@@ -1,6 +1,6 @@
 import { Chain } from '../types';
 import { PrivateKey as HivePrivateKey, cryptoUtils, Memo as HiveMemo } from '@hiveio/dhive';
-import { Client as SteemClient, PrivateKey as SteemPrivateKey } from 'dsteem';
+import { Client as SteemClient, PrivateKey as SteemPrivateKey, cryptoUtils as steemCryptoUtils } from 'dsteem';
 import { getActiveNode } from './nodeService';
 import { getChainConfig } from '../config/chainConfig';
 import * as blurt from '@blurtfoundation/blurtjs';
@@ -38,6 +38,12 @@ export interface MultisigProgress {
     currentWeight: number;
     threshold: number;
     canBroadcast: boolean;
+}
+
+export interface PartialTransactionSignature {
+    username: string;
+    pubKey: string;
+    signature: string;
 }
 
 // --- HELPER: Parse JSON response with HTML error detection ---
@@ -186,6 +192,207 @@ const fetchGlobalProps = async (chain: Chain): Promise<any> => {
         }
         // Return stale cache if available on error
         return cached?.data || null;
+    }
+};
+
+const normalizeOperations = (operations: any[]): any[] => {
+    const normalizedOps = (operations || []).map(op => {
+        if (Array.isArray(op)) return op;
+        if (op && typeof op === 'object') {
+            const type = op.type || op.operation || op.method;
+            const data = op.data || op.op || op.operation_data || (({ type: _t, operation: _o, method: _m, ...rest }) => rest)(op);
+            if (type) return [type, data];
+        }
+        return op;
+    });
+
+    return normalizedOps.map(op => {
+        if (Array.isArray(op) && op.length >= 2 && typeof op[1] === 'object') {
+            const data = { ...op[1] };
+            Object.keys(data).forEach(key => {
+                if (key.startsWith('__')) delete data[key];
+            });
+            return [op[0], data];
+        }
+        return op;
+    });
+};
+
+const convertAssetSymbolRecursively = (value: any, fromSymbol: string, toSymbol: string): any => {
+    if (typeof value === 'string') {
+        return value.replace(new RegExp(` ${fromSymbol}`, 'g'), ` ${toSymbol}`);
+    }
+    if (Array.isArray(value)) {
+        return value.map((entry) => convertAssetSymbolRecursively(entry, fromSymbol, toSymbol));
+    }
+    if (value !== null && typeof value === 'object') {
+        const converted: any = {};
+        for (const key in value) {
+            converted[key] = convertAssetSymbolRecursively(value[key], fromSymbol, toSymbol);
+        }
+        return converted;
+    }
+    return value;
+};
+
+export const createUnsignedTransaction = async (
+    chain: Chain,
+    operations: any[],
+    expiration?: string
+): Promise<any> => {
+    const props = await fetchGlobalProps(chain);
+    if (!props) throw new Error(`Could not fetch global properties for ${chain}`);
+
+    const cleanOperations = normalizeOperations(operations);
+    return {
+        ref_block_num: props.head_block_number & 0xFFFF,
+        ref_block_prefix: Buffer.from(props.head_block_id, 'hex').readUInt32LE(4),
+        expiration: expiration || new Date(Date.now() + 60 * 1000).toISOString().slice(0, -5),
+        operations: cleanOperations,
+        extensions: []
+    };
+};
+
+export const signTransactionEnvelope = async (
+    chain: Chain,
+    transaction: any,
+    key: string,
+    username: string
+): Promise<{ success: boolean; signedTx?: any; publicKey?: string; signature?: string; username?: string; error?: string }> => {
+    try {
+        let signedTx: any;
+        const cleanKey = key.trim();
+        const config = getChainConfig(chain);
+        const baseKey = HivePrivateKey.fromString(cleanKey);
+        let publicKey = baseKey.createPublic().toString();
+        if (config.addressPrefix !== 'STM' && publicKey.startsWith('STM')) {
+            publicKey = config.addressPrefix + publicKey.substring(3);
+        }
+
+        if (chain === Chain.HIVE) {
+            signedTx = cryptoUtils.signTransaction(transaction, [baseKey]);
+        } else if (chain === Chain.STEEM) {
+            signedTx = steemCryptoUtils.signTransaction(transaction, SteemPrivateKey.fromString(cleanKey));
+        } else if (chain === Chain.BLURT) {
+            blurt.config.set('address_prefix', config.addressPrefix);
+            blurt.config.set('chain_id', config.chainId);
+
+            try {
+                const txWithBlurt = {
+                    ...transaction,
+                    operations: convertAssetSymbolRecursively(transaction.operations, 'STEEM', 'BLURT')
+                };
+                signedTx = blurt.auth.signTransaction(txWithBlurt, [cleanKey]);
+            } catch (error: any) {
+                if (error?.message && (error.message.includes('Invalid asset symbol') || error.message.includes('Unable to serialize'))) {
+                    const txWithSteem = {
+                        ...transaction,
+                        operations: convertAssetSymbolRecursively(transaction.operations, 'BLURT', 'STEEM')
+                    };
+                    signedTx = blurt.auth.signTransaction(txWithSteem, [cleanKey]);
+                    signedTx = JSON.parse(JSON.stringify(signedTx));
+                    signedTx.operations = convertAssetSymbolRecursively(signedTx.operations, 'STEEM', 'BLURT');
+                } else {
+                    throw error;
+                }
+            }
+        } else {
+            throw new Error('Chain not supported');
+        }
+
+        const signatures = signedTx?.signatures || [];
+        return {
+            success: true,
+            signedTx,
+            publicKey,
+            signature: signatures[signatures.length - 1],
+            username
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            error: error?.message || 'Failed to sign transaction'
+        };
+    }
+};
+
+export const broadcastSignedTransaction = async (
+    chain: Chain,
+    signedTransaction: any
+): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any; signatures?: string[]; transaction?: any; signedTx?: any }> => {
+    try {
+        const nodeUrl = getActiveNode(chain);
+        if (chain === Chain.HIVE) {
+            const response = await fetch(nodeUrl, {
+                method: 'POST',
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'condenser_api.broadcast_transaction_synchronous',
+                    params: [signedTransaction],
+                    id: 1
+                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Connection': 'keep-alive'
+                }
+            });
+
+            if (!response.ok) throw new Error(`Node ${nodeUrl} returned HTTP ${response.status}`);
+            const json = await parseJsonResponse(response, nodeUrl);
+            if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+            return {
+                success: true,
+                txId: json.result?.id,
+                opResult: json.result,
+                signatures: signedTransaction.signatures,
+                transaction: signedTransaction,
+                signedTx: signedTransaction
+            };
+        }
+
+        if (chain === Chain.STEEM) {
+            const client = new SteemClient(nodeUrl);
+            const result = await client.broadcast.send(signedTransaction);
+            return {
+                success: true,
+                txId: result.id,
+                opResult: result,
+                signatures: signedTransaction.signatures,
+                transaction: signedTransaction,
+                signedTx: signedTransaction
+            };
+        }
+
+        if (chain === Chain.BLURT) {
+            const response = await fetch(nodeUrl, {
+                method: 'POST',
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'condenser_api.broadcast_transaction_synchronous',
+                    params: [signedTransaction],
+                    id: 1
+                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Connection': 'keep-alive'
+                }
+            });
+
+            const json = await response.json();
+            if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+            return {
+                success: true,
+                txId: json.result?.id,
+                opResult: json.result,
+                signatures: signedTransaction.signatures,
+                transaction: signedTransaction,
+                signedTx: signedTransaction
+            };
+        }
+
+        throw new Error('Chain not supported');
+    } catch (error: any) {
+        return { success: false, error: error?.message || 'Broadcast failed' };
     }
 };
 
@@ -737,27 +944,7 @@ export const broadcastOperations = async (
 
     // 1. ROBUST NORMALIZATION: Handle both array [name, data] and object { type, ... }
     // Some dApps (like blurt.blog) send operations as objects inside requestBroadcast
-    const normalizedOps = (operations || []).map(op => {
-        if (Array.isArray(op)) return op;
-        if (op && typeof op === 'object') {
-            const type = op.type || op.operation || op.method;
-            const data = op.data || op.op || op.operation_data || (({ type: _t, operation: _o, method: _m, ...rest }) => rest)(op);
-            if (type) return [type, data];
-        }
-        return op;
-    });
-
-    // 2. GLOBAL SANITIZATION: Clean properties like __config, __rshares for ALL chains
-    const cleanOperations = normalizedOps.map(op => {
-        if (Array.isArray(op) && op.length >= 2 && typeof op[1] === 'object') {
-            const data = { ...op[1] };
-            Object.keys(data).forEach(key => {
-                if (key.startsWith('__')) delete data[key];
-            });
-            return [op[0], data];
-        }
-        return op;
-    });
+    const cleanOperations = normalizeOperations(operations);
 
     // 3. Get fallback nodes for retry (prioritized by reliability)
     const getFallbackNodes = (chain: Chain): string[] => {

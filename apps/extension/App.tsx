@@ -736,7 +736,11 @@ function AppContent() {
           )}
 
           {currentView === ViewState.MULTISIG && (
-            <MultiSig chain={activeChain} accounts={walletState.accounts} />
+            <MultiSig
+              chain={activeChain}
+              accounts={walletState.accounts}
+              onChainChange={setActiveChain}
+            />
           )}
 
           {currentView === ViewState.HELP && (
