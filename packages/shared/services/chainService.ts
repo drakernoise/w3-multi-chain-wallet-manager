@@ -46,6 +46,17 @@ export interface PartialTransactionSignature {
     signature: string;
 }
 
+export interface CustomJsonEvent {
+    block: number;
+    timestamp: string;
+    trxId: string;
+    account: string;
+    requiredAuths: string[];
+    requiredPostingAuths: string[];
+    id: string;
+    json: any;
+}
+
 const getSignatureWeight = (auth: MultiSigAuthority, sig: PartialTransactionSignature): number => {
     const accountWeight = auth.accountAuths.find((entry) => entry[0] === sig.username)?.[1] || 0;
     const keyWeight = auth.keyAuths.find((entry) => entry[0] === sig.pubKey)?.[1] || 0;
@@ -256,6 +267,76 @@ const normalizeBlockchainExpiration = (expiration?: string): string => {
     }
 
     return expiration;
+};
+
+export const getHeadBlockNumber = async (chain: Chain): Promise<number | null> => {
+    const props = await fetchGlobalProps(chain);
+    const head = props?.head_block_number;
+    return typeof head === 'number' ? head : null;
+};
+
+export const fetchCustomJsonEvents = async (
+    chain: Chain,
+    fromBlock: number,
+    toBlock: number,
+    expectedId?: string
+): Promise<CustomJsonEvent[]> => {
+    const nodeUrl = getActiveNode(chain);
+    const events: CustomJsonEvent[] = [];
+    const safeFrom = Math.max(1, Math.floor(fromBlock));
+    const safeTo = Math.max(safeFrom, Math.floor(toBlock));
+
+    for (let blockNum = safeFrom; blockNum <= safeTo; blockNum += 1) {
+        try {
+            const response = await fetch(nodeUrl, {
+                method: 'POST',
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'condenser_api.get_ops_in_block',
+                    params: [blockNum, false],
+                    id: 1
+                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Connection': 'keep-alive'
+                }
+            });
+
+            if (!response.ok) continue;
+            const json = await response.json();
+            const result = Array.isArray(json?.result) ? json.result : [];
+
+            result.forEach((entry: any) => {
+                const op = entry?.op;
+                if (!Array.isArray(op) || op[0] !== 'custom_json' || !op[1]) return;
+
+                const opData = op[1];
+                if (expectedId && opData.id !== expectedId) return;
+
+                let parsedJson: any = opData.json;
+                try {
+                    parsedJson = typeof opData.json === 'string' ? JSON.parse(opData.json) : opData.json;
+                } catch {
+                    parsedJson = opData.json;
+                }
+
+                events.push({
+                    block: blockNum,
+                    timestamp: entry?.timestamp || '',
+                    trxId: entry?.trx_id || '',
+                    account: opData.required_posting_auths?.[0] || opData.required_auths?.[0] || '',
+                    requiredAuths: Array.isArray(opData.required_auths) ? opData.required_auths : [],
+                    requiredPostingAuths: Array.isArray(opData.required_posting_auths) ? opData.required_posting_auths : [],
+                    id: opData.id,
+                    json: parsedJson
+                });
+            });
+        } catch (error) {
+            console.warn(`Failed to fetch custom_json events for ${chain} block ${blockNum}:`, error);
+        }
+    }
+
+    return events;
 };
 
 export const createUnsignedTransaction = async (

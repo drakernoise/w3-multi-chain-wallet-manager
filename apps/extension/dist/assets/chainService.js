@@ -88775,6 +88775,62 @@ const normalizeBlockchainExpiration = (expiration) => {
   }
   return expiration;
 };
+const getHeadBlockNumber = async (chain) => {
+  const props = await fetchGlobalProps(chain);
+  const head = props?.head_block_number;
+  return typeof head === "number" ? head : null;
+};
+const fetchCustomJsonEvents = async (chain, fromBlock, toBlock, expectedId) => {
+  const nodeUrl = getActiveNode(chain);
+  const events = [];
+  const safeFrom = Math.max(1, Math.floor(fromBlock));
+  const safeTo = Math.max(safeFrom, Math.floor(toBlock));
+  for (let blockNum = safeFrom; blockNum <= safeTo; blockNum += 1) {
+    try {
+      const response = await fetch(nodeUrl, {
+        method: "POST",
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "condenser_api.get_ops_in_block",
+          params: [blockNum, false],
+          id: 1
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          "Connection": "keep-alive"
+        }
+      });
+      if (!response.ok) continue;
+      const json = await response.json();
+      const result = Array.isArray(json?.result) ? json.result : [];
+      result.forEach((entry) => {
+        const op = entry?.op;
+        if (!Array.isArray(op) || op[0] !== "custom_json" || !op[1]) return;
+        const opData = op[1];
+        if (expectedId && opData.id !== expectedId) return;
+        let parsedJson = opData.json;
+        try {
+          parsedJson = typeof opData.json === "string" ? JSON.parse(opData.json) : opData.json;
+        } catch {
+          parsedJson = opData.json;
+        }
+        events.push({
+          block: blockNum,
+          timestamp: entry?.timestamp || "",
+          trxId: entry?.trx_id || "",
+          account: opData.required_posting_auths?.[0] || opData.required_auths?.[0] || "",
+          requiredAuths: Array.isArray(opData.required_auths) ? opData.required_auths : [],
+          requiredPostingAuths: Array.isArray(opData.required_posting_auths) ? opData.required_posting_auths : [],
+          id: opData.id,
+          json: parsedJson
+        });
+      });
+    } catch (error) {
+      console.warn(`Failed to fetch custom_json events for ${chain} block ${blockNum}:`, error);
+    }
+  }
+  return events;
+};
 const createUnsignedTransaction = async (chain, operations, expiration) => {
   const props = await fetchGlobalProps(chain);
   if (!props) throw new Error(`Could not fetch global properties for ${chain}`);
@@ -89784,4 +89840,4 @@ const decodeMemo = async (chain, _username, encodedMemo, key) => {
   }
 };
 
-export { createUnsignedTransaction as A, signTransactionEnvelope as B, Chain as C, selectBroadcastSignatures as D, broadcastSignedTransaction as E, indexBrowserExports$1 as F, indexBrowserExports as G, validateAccountKeys as H, fetchAccountHistory as I, fetchBalances as J, detectWeb3Context as K, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, calculateThresholdProgress as y, getAccountAuthorities as z };
+export { getHeadBlockNumber as A, fetchCustomJsonEvents as B, Chain as C, createUnsignedTransaction as D, signTransactionEnvelope as E, selectBroadcastSignatures as F, broadcastSignedTransaction as G, indexBrowserExports$1 as H, indexBrowserExports as I, validateAccountKeys as J, fetchAccountHistory as K, fetchBalances as L, detectWeb3Context as M, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, broadcastRCDelegate as v, broadcastRCUndelegate as w, broadcastBulkTransfer as x, calculateThresholdProgress as y, getAccountAuthorities as z };

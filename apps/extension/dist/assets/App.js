@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as calculateThresholdProgress, z as getAccountAuthorities, A as createUnsignedTransaction, B as signTransactionEnvelope, D as selectBroadcastSignatures, E as broadcastSignedTransaction, F as indexBrowserExports, G as indexBrowserExports$1, H as validateAccountKeys, I as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, J as fetchBalances, K as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as calculateThresholdProgress, z as getAccountAuthorities, A as getHeadBlockNumber, B as fetchCustomJsonEvents, D as createUnsignedTransaction, E as signTransactionEnvelope, F as selectBroadcastSignatures, G as broadcastSignedTransaction, d as broadcastCustomJson, H as indexBrowserExports, I as indexBrowserExports$1, J as validateAccountKeys, K as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, L as fetchBalances, M as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -11524,6 +11524,10 @@ const useNotification = () => {
 const MULTISIG_STORAGE_KEY = "gravity_multisig_proposals";
 const MULTISIG_INCOMING_STORAGE_KEY = "gravity_multisig_incoming_proposals";
 const MULTISIG_SYNC_KIND = "gravity-multisig-proposal";
+const MULTISIG_CUSTOM_JSON_ID = "gravity.multisig";
+const MULTISIG_CHAIN_CURSOR_PREFIX = "gravity_multisig_chain_cursor_";
+const MULTISIG_INITIAL_LOOKBACK_BLOCKS = 300;
+const MULTISIG_SYNC_POLL_MS = 15e3;
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
 const toLocalDateTimeInput = (date) => {
   const pad = (value) => String(value).padStart(2, "0");
@@ -11598,6 +11602,25 @@ const toTransportProposal = (proposal) => {
     authoritySnapshot: proposal.authoritySnapshot || void 0
   };
 };
+const isLocalProposalRelevant = (proposal, localUsernames) => {
+  if (localUsernames.has(proposal.initiator)) return true;
+  return (proposal.signers || []).some((name) => localUsernames.has(name.replace(/^@/, "").trim()));
+};
+const normalizeChainEvent = (value) => {
+  if (!value || value.namespace !== "gravity.multisig" || value.v !== 1 || !value.type || !value.proposalId || !value.chain) {
+    return null;
+  }
+  if (value.type === "proposal_created" && value.proposal) {
+    return value;
+  }
+  if (value.type === "proposal_signed" && value.signature) {
+    return value;
+  }
+  if (value.type === "proposal_broadcasted" && value.txId) {
+    return value;
+  }
+  return null;
+};
 const chainTheme = {
   [Chain.HIVE]: "bg-hive text-white shadow-lg",
   [Chain.STEEM]: "bg-steem text-white shadow-lg",
@@ -11623,6 +11646,8 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const [authority, setAuthority] = reactExports.useState(null);
   const [authorityError, setAuthorityError] = reactExports.useState(null);
   const [transportInfo, setTransportInfo] = reactExports.useState(null);
+  const savedProposalsRef = reactExports.useRef([]);
+  const incomingProposalsRef = reactExports.useRef([]);
   const chainAccounts = reactExports.useMemo(
     () => accounts.filter((account) => account.chain === selectedChain),
     [accounts, selectedChain]
@@ -11633,6 +11658,12 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     threshold: 1,
     operation: "{}"
   });
+  reactExports.useEffect(() => {
+    savedProposalsRef.current = savedProposals;
+  }, [savedProposals]);
+  reactExports.useEffect(() => {
+    incomingProposalsRef.current = incomingProposals;
+  }, [incomingProposals]);
   reactExports.useEffect(() => {
     setSelectedChain(initialChain);
   }, [initialChain]);
@@ -11844,53 +11875,37 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     kind: MULTISIG_SYNC_KIND,
     proposal: toTransportProposal(proposal)
   });
-  const buildSyncEnvelope = (proposal) => {
-    const currentUser = chatService.getCurrentUser();
-    if (!currentUser?.username) return null;
-    return {
-      ...buildSharedPackage(proposal),
-      transport: "chat-dm",
-      sentAt: Date.now(),
-      sentBy: currentUser.username
-    };
+  const getAnnouncementAccount = (username, chain) => {
+    const normalized = username.replace(/^@/, "").trim();
+    const account = accounts.find((entry) => entry.chain === chain && entry.name === normalized);
+    if (!account) return null;
+    if (account.postingKey) return { account, key: account.postingKey, keyType: "Posting" };
+    if (account.activeKey) return { account, key: account.activeKey, keyType: "Active" };
+    return null;
   };
-  const shareProposalToChatRecipients = async (proposal) => {
-    const envelope = buildSyncEnvelope(proposal);
-    if (!envelope) {
-      const message = "Auto-share unavailable: sign in to chat first.";
+  const publishMultiSigEvent = async (event, announcerName) => {
+    const announcer = getAnnouncementAccount(announcerName, event.chain);
+    if (!announcer) {
+      const message = `On-chain multisig sync unavailable for @${announcerName}: import a posting or active key first.`;
       setTransportInfo(message);
       showNotification(message, "info");
       return;
     }
-    const currentUser = envelope.sentBy.toLowerCase();
-    const recipients = Array.from(
-      new Set(
-        [proposal.initiator, ...proposal.signers].map((name) => name.replace(/^@/, "").trim()).filter(Boolean)
-      )
-    ).filter((name) => name.toLowerCase() !== currentUser);
-    if (recipients.length === 0) return;
-    const payload = JSON.stringify(envelope);
-    const sent = [];
-    const failed = [];
-    for (const recipient of recipients) {
-      try {
-        await chatService.sendDirectMessageToUsername(recipient, payload);
-        sent.push(recipient);
-      } catch (error) {
-        console.warn(`Failed to auto-share multisig proposal with @${recipient}:`, error);
-        failed.push(recipient);
-      }
-    }
-    if (sent.length > 0) {
-      const message = `Auto-shared with ${sent.map((name) => `@${name}`).join(", ")}`;
+    const result = await broadcastCustomJson(
+      event.chain,
+      announcer.account.name,
+      announcer.key,
+      MULTISIG_CUSTOM_JSON_ID,
+      JSON.stringify(event),
+      announcer.keyType
+    );
+    if (!result.success) {
+      const message = result.error || "Failed to publish multisig sync event on-chain.";
       setTransportInfo(message);
-      showNotification(message, "success");
+      showNotification(message, "info");
+      return;
     }
-    if (failed.length > 0) {
-      const failureMessage = `Could not auto-share with ${failed.map((name) => `@${name}`).join(", ")}`;
-      setTransportInfo(failureMessage);
-      showNotification(failureMessage, "info");
-    }
+    setTransportInfo(`On-chain multisig update published by @${announcer.account.name}`);
   };
   const ensureProposalArtifacts = async (proposal) => {
     let nextProposal = proposal;
@@ -11962,7 +11977,16 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     };
     const proposals = [proposal, ...savedProposals].slice(0, 20);
     await persistSavedProposals(proposals);
-    await shareProposalToChatRecipients(proposal);
+    await publishMultiSigEvent({
+      v: 1,
+      namespace: "gravity.multisig",
+      type: "proposal_created",
+      proposalId: proposal.id,
+      sentAt: Date.now(),
+      sender: request.initiator,
+      chain: proposal.chain,
+      proposal: toTransportProposal(proposal)
+    }, request.initiator);
     setSaveLabel("");
   };
   const handleLoadProposal = (proposal) => {
@@ -12050,7 +12074,16 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         ]
       };
       await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
-      await shareProposalToChatRecipients(nextProposal);
+      await publishMultiSigEvent({
+        v: 1,
+        namespace: "gravity.multisig",
+        type: "proposal_signed",
+        proposalId: nextProposal.id,
+        sentAt: Date.now(),
+        sender: signer.name,
+        chain: nextProposal.chain,
+        signature: nextProposal.partialSignatures[nextProposal.partialSignatures.length - 1]
+      }, signer.name);
     } catch (error) {
       console.warn("Failed to partial-sign multisig proposal:", error);
     } finally {
@@ -12080,7 +12113,17 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         lastBroadcastTxId: result.txId
       };
       await persistSavedProposals(savedProposals.map((entry) => entry.id === proposal.id ? nextProposal : entry));
-      await shareProposalToChatRecipients(nextProposal);
+      const publisher = proposal.partialSignatures.map((entry) => entry.username).find((username) => !!getAnnouncementAccount(username, nextProposal.chain)) || readyProposal.initiator;
+      await publishMultiSigEvent({
+        v: 1,
+        namespace: "gravity.multisig",
+        type: "proposal_broadcasted",
+        proposalId: nextProposal.id,
+        sentAt: Date.now(),
+        sender: publisher,
+        chain: nextProposal.chain,
+        txId: result.txId || ""
+      }, publisher);
     } catch (error) {
       console.warn("Failed to broadcast multisig proposal:", error);
     } finally {
@@ -12124,36 +12167,123 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     await persistIncomingProposals(nextIncoming);
   };
   reactExports.useEffect(() => {
-    const incomingListener = async (_roomId, message) => {
-      if (!message?.content) return;
+    let cancelled = false;
+    const syncOnChainProposals = async () => {
+      const localUsernames = new Set(
+        accounts.filter((account) => account.chain === selectedChain).map((account) => account.name)
+      );
+      if (localUsernames.size === 0) return;
       try {
-        const parsed = JSON.parse(message.content);
-        if (parsed?.kind !== MULTISIG_SYNC_KIND || !parsed?.proposal) return;
-        const normalizedProposal = normalizeSavedProposal(parsed.proposal);
-        if (!normalizedProposal) return;
-        const incomingEntry = {
-          proposal: normalizedProposal,
-          sentAt: parsed.sentAt || normalizedProposal.updatedAt || Date.now(),
-          sentBy: parsed.sentBy || message.senderName || "unknown"
-        };
-        const currentSaved = savedProposals.find((entry) => entry.id === normalizedProposal.id);
-        if (currentSaved && (currentSaved.updatedAt || currentSaved.createdAt || 0) >= (normalizedProposal.updatedAt || normalizedProposal.createdAt || 0)) {
-          return;
+        const cursorKey = `${MULTISIG_CHAIN_CURSOR_PREFIX}${selectedChain}`;
+        const headBlock = await getHeadBlockNumber(selectedChain);
+        if (!headBlock) return;
+        const rawCursor = await storageService.getItem(cursorKey);
+        const fromBlock = rawCursor ? Math.min(headBlock, Math.max(1, Number(rawCursor) + 1)) : Math.max(1, headBlock - MULTISIG_INITIAL_LOOKBACK_BLOCKS);
+        if (fromBlock > headBlock) return;
+        const rawEvents = await fetchCustomJsonEvents(selectedChain, fromBlock, headBlock, MULTISIG_CUSTOM_JSON_ID);
+        const events = rawEvents.map((entry) => ({
+          event: normalizeChainEvent(entry.json),
+          sender: entry.account,
+          timestamp: entry.timestamp,
+          txId: entry.trxId
+        })).filter((entry) => !!entry.event);
+        let nextSaved = savedProposalsRef.current;
+        let nextIncoming = incomingProposalsRef.current;
+        let savedChanged = false;
+        let incomingChanged = false;
+        const shouldNotify = !!rawCursor;
+        for (const { event, sender } of events) {
+          if (event.chain !== selectedChain) continue;
+          if (event.type === "proposal_created") {
+            const normalizedProposal = normalizeSavedProposal(event.proposal);
+            if (!normalizedProposal || !isLocalProposalRelevant(normalizedProposal, localUsernames)) continue;
+            if (nextSaved.some((entry) => entry.id === normalizedProposal.id)) {
+              nextSaved = mergeProposalIntoList({
+                ...normalizedProposal,
+                updatedAt: Math.max(normalizedProposal.updatedAt, event.sentAt)
+              }, nextSaved);
+              savedChanged = true;
+              continue;
+            }
+            const incomingEntry = {
+              proposal: {
+                ...normalizedProposal,
+                updatedAt: Math.max(normalizedProposal.updatedAt, event.sentAt)
+              },
+              sentAt: event.sentAt,
+              sentBy: event.sender || sender
+            };
+            if (localUsernames.has(normalizedProposal.initiator)) {
+              nextSaved = mergeProposalIntoList(incomingEntry.proposal, nextSaved);
+              savedChanged = true;
+            } else {
+              nextIncoming = mergeIncomingProposal(incomingEntry, nextIncoming);
+              incomingChanged = true;
+              if (shouldNotify) {
+                setTransportInfo(`Incoming on-chain proposal pending review from @${incomingEntry.sentBy}`);
+                showNotification(`On-chain multisig proposal pending review from @${incomingEntry.sentBy}`, "info");
+              }
+            }
+            continue;
+          }
+          const applyUpdate = (proposal) => {
+            if (event.type === "proposal_signed") {
+              return {
+                ...proposal,
+                updatedAt: Math.max(proposal.updatedAt, event.sentAt),
+                partialSignatures: [
+                  ...proposal.partialSignatures.filter((entry) => entry.username !== event.signature.username),
+                  event.signature
+                ]
+              };
+            }
+            return {
+              ...proposal,
+              updatedAt: Math.max(proposal.updatedAt, event.sentAt),
+              lastBroadcastTxId: event.txId
+            };
+          };
+          const savedMatch = nextSaved.find((entry) => entry.id === event.proposalId);
+          if (savedMatch) {
+            nextSaved = nextSaved.map((entry) => entry.id === event.proposalId ? applyUpdate(entry) : entry);
+            savedChanged = true;
+            if (shouldNotify && event.type === "proposal_signed") {
+              showNotification(`@${event.signature.username} signed proposal ${savedMatch.title}`, "info");
+            }
+            if (shouldNotify && event.type === "proposal_broadcasted") {
+              showNotification(`Proposal ${savedMatch.title} was broadcasted on-chain`, "success");
+            }
+            continue;
+          }
+          const incomingMatch = nextIncoming.find((entry) => entry.proposal.id === event.proposalId);
+          if (incomingMatch) {
+            nextIncoming = nextIncoming.map((entry) => entry.proposal.id === event.proposalId ? {
+              ...entry,
+              proposal: applyUpdate(entry.proposal),
+              sentAt: event.sentAt,
+              sentBy: event.sender || sender
+            } : entry);
+            incomingChanged = true;
+          }
         }
-        const mergedIncoming = mergeIncomingProposal(incomingEntry, incomingProposals);
-        const changed = JSON.stringify(mergedIncoming) !== JSON.stringify(incomingProposals);
-        if (!changed) return;
-        await persistIncomingProposals(mergedIncoming);
-        setTransportInfo(`Incoming update pending review from @${incomingEntry.sentBy}`);
-        showNotification(`Multisig update pending review from @${incomingEntry.sentBy}`, "info");
-      } catch {
+        if (!cancelled && savedChanged) {
+          await persistSavedProposals(nextSaved);
+        }
+        if (!cancelled && incomingChanged) {
+          await persistIncomingProposals(nextIncoming);
+        }
+        await storageService.setItem(cursorKey, String(headBlock));
+      } catch (error) {
+        console.warn("Failed to sync on-chain multisig events:", error);
       }
     };
-    chatService.addMessageListener(incomingListener);
+    syncOnChainProposals();
+    const interval = window.setInterval(syncOnChainProposals, MULTISIG_SYNC_POLL_MS);
     return () => {
-      chatService.removeMessageListener(incomingListener);
+      cancelled = true;
+      window.clearInterval(interval);
     };
-  }, [incomingProposals, savedProposals, showNotification]);
+  }, [accounts, selectedChain, showNotification]);
   return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "h-full overflow-y-auto custom-scrollbar p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start justify-between gap-4", children: [
@@ -12396,7 +12526,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-between gap-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: "Incoming proposals" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Review DM-delivered proposal updates before they enter your local multisig tray." })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Review on-chain proposal updates before they enter your local multisig tray." })
           ] }) }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: incomingProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: "No pending incoming multisig proposals." }) : incomingProposals.map((incoming) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
@@ -12437,7 +12567,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "pt-2 border-t border-dark-700/80" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-between gap-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: "Saved proposals" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Keep local drafts here while we finish the signer notification and collection flow." }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: "Keep local drafts here while the wallet syncs signer updates from on-chain multisig events." }),
             transportInfo && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-blue-400 mt-2 break-words", children: transportInfo })
           ] }) }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 items-stretch", children: [
