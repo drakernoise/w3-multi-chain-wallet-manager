@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as calculateThresholdProgress, z as getAccountAuthorities, A as getHeadBlockNumber, B as fetchCustomJsonEvents, D as createUnsignedTransaction, E as signTransactionEnvelope, F as selectBroadcastSignatures, G as broadcastSignedTransaction, d as broadcastCustomJson, H as indexBrowserExports, I as indexBrowserExports$1, J as validateAccountKeys, K as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, L as fetchBalances, M as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as calculateThresholdProgress, z as getAccountAuthorities, A as fetchCustomJsonEventsForAccounts, B as createUnsignedTransaction, D as signTransactionEnvelope, E as selectBroadcastSignatures, F as broadcastSignedTransaction, d as broadcastCustomJson, G as indexBrowserExports, H as indexBrowserExports$1, I as validateAccountKeys, J as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, K as fetchBalances, L as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -11525,8 +11525,7 @@ const MULTISIG_STORAGE_KEY = "gravity_multisig_proposals";
 const MULTISIG_INCOMING_STORAGE_KEY = "gravity_multisig_incoming_proposals";
 const MULTISIG_SYNC_KIND = "gravity-multisig-proposal";
 const MULTISIG_CUSTOM_JSON_ID = "gravity.multisig";
-const MULTISIG_CHAIN_CURSOR_PREFIX = "gravity_multisig_chain_cursor_";
-const MULTISIG_INITIAL_LOOKBACK_BLOCKS = 300;
+const MULTISIG_HISTORY_CURSOR_PREFIX = "gravity_multisig_history_cursor_";
 const MULTISIG_SYNC_POLL_MS = 15e3;
 const MULTISIG_SUPPORTED_CHAIN = Chain.BLURT;
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
@@ -12173,31 +12172,29 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   reactExports.useEffect(() => {
     let cancelled = false;
     const syncOnChainProposals = async () => {
-      const localUsernames = new Set(
-        accounts.filter((account) => account.chain === selectedChain).map((account) => account.name)
-      );
+      const localAccountNames = accounts.filter((account) => account.chain === selectedChain).map((account) => account.name);
+      const localUsernames = new Set(localAccountNames);
       if (localUsernames.size === 0) return;
       try {
-        const cursorKey = `${MULTISIG_CHAIN_CURSOR_PREFIX}${selectedChain}`;
-        const headBlock = await getHeadBlockNumber(selectedChain);
-        if (!headBlock) return;
+        const cursorKey = `${MULTISIG_HISTORY_CURSOR_PREFIX}${selectedChain}`;
         const rawCursor = await storageService.getItem(cursorKey);
-        const fromBlock = rawCursor ? Math.min(headBlock, Math.max(1, Number(rawCursor) + 1)) : Math.max(1, headBlock - MULTISIG_INITIAL_LOOKBACK_BLOCKS);
-        if (fromBlock > headBlock) return;
-        const rawEvents = await fetchCustomJsonEvents(selectedChain, fromBlock, headBlock, MULTISIG_CUSTOM_JSON_ID);
+        const lastSeenAt = rawCursor ? Number(rawCursor) : 0;
+        const rawEvents = await fetchCustomJsonEventsForAccounts(selectedChain, localAccountNames, MULTISIG_CUSTOM_JSON_ID);
         const events = rawEvents.map((entry) => ({
           event: normalizeChainEvent(entry.json),
           sender: entry.account,
           timestamp: entry.timestamp,
           txId: entry.trxId
-        })).filter((entry) => !!entry.event);
+        })).filter((entry) => !!entry.event).filter(({ event }) => (event.sentAt || 0) > lastSeenAt).sort((left, right) => (left.event.sentAt || 0) - (right.event.sentAt || 0));
         let nextSaved = savedProposalsRef.current;
         let nextIncoming = incomingProposalsRef.current;
         let savedChanged = false;
         let incomingChanged = false;
-        const shouldNotify = !!rawCursor;
+        const shouldNotify = lastSeenAt > 0;
+        let maxSeenAt = lastSeenAt;
         for (const { event, sender } of events) {
           if (event.chain !== selectedChain) continue;
+          maxSeenAt = Math.max(maxSeenAt, event.sentAt || 0);
           if (event.type === "proposal_created") {
             const normalizedProposal = normalizeSavedProposal(event.proposal);
             if (!normalizedProposal || !isLocalProposalRelevant(normalizedProposal, localUsernames)) continue;
@@ -12271,7 +12268,9 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         if (!cancelled && incomingChanged) {
           await persistIncomingProposals(nextIncoming);
         }
-        await storageService.setItem(cursorKey, String(headBlock));
+        if (maxSeenAt > lastSeenAt) {
+          await storageService.setItem(cursorKey, String(maxSeenAt));
+        }
       } catch (error) {
         console.warn("Failed to sync on-chain multisig events:", error);
       }

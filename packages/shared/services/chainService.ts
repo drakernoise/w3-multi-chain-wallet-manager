@@ -339,6 +339,76 @@ export const fetchCustomJsonEvents = async (
     return events;
 };
 
+export const fetchCustomJsonEventsForAccounts = async (
+    chain: Chain,
+    usernames: string[],
+    expectedId?: string,
+    limit: number = 200
+): Promise<CustomJsonEvent[]> => {
+    const node = getActiveNode(chain);
+    const events: CustomJsonEvent[] = [];
+    const uniqueUsernames = Array.from(new Set((usernames || []).map((name) => name.trim()).filter(Boolean)));
+
+    for (const username of uniqueUsernames) {
+        try {
+            const response = await fetch(node, {
+                method: 'POST',
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'condenser_api.get_account_history',
+                    params: [username, -1, limit],
+                    id: 1
+                }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Connection': 'keep-alive'
+                }
+            });
+
+            if (!response.ok) continue;
+            const json = await response.json();
+            const result = Array.isArray(json?.result) ? json.result : [];
+
+            result.forEach((historyEntry: any) => {
+                const payload = historyEntry?.[1];
+                const op = payload?.op;
+                if (!Array.isArray(op) || op[0] !== 'custom_json' || !op[1]) return;
+
+                const opData = op[1];
+                if (expectedId && opData.id !== expectedId) return;
+
+                let parsedJson: any = opData.json;
+                try {
+                    parsedJson = typeof opData.json === 'string' ? JSON.parse(opData.json) : opData.json;
+                } catch {
+                    parsedJson = opData.json;
+                }
+
+                events.push({
+                    block: payload?.block || 0,
+                    timestamp: payload?.timestamp || '',
+                    trxId: payload?.trx_id || '',
+                    account: opData.required_posting_auths?.[0] || opData.required_auths?.[0] || username,
+                    requiredAuths: Array.isArray(opData.required_auths) ? opData.required_auths : [],
+                    requiredPostingAuths: Array.isArray(opData.required_posting_auths) ? opData.required_posting_auths : [],
+                    id: opData.id,
+                    json: parsedJson
+                });
+            });
+        } catch (error) {
+            console.warn(`Failed to fetch custom_json account history for ${chain} @${username}:`, error);
+        }
+    }
+
+    const seen = new Set<string>();
+    return events.filter((event) => {
+        const key = event.trxId || `${event.block}:${event.account}:${JSON.stringify(event.json)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+};
+
 export const createUnsignedTransaction = async (
     chain: Chain,
     operations: any[],
