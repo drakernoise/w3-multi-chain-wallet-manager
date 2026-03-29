@@ -923,25 +923,25 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     await persistSavedProposals(proposals);
   };
 
-  const getLocalSigners = (proposal: SavedMultiSigProposal): Account[] => {
-    const allowedNames = new Set([
-      ...proposal.signers,
-      ...(proposal.authoritySnapshot?.accountAuths.map(([name]) => name) || [])
-    ]);
+  const getProposalSignerStates = (proposal: SavedMultiSigProposal) => {
+    const normalizedSignerOrder = Array.from(new Set(
+      (proposal.signers || [])
+        .map((name) => name.replace(/^@/, '').trim())
+        .filter(Boolean)
+    ));
     const signedNames = new Set((proposal.partialSignatures || []).map((entry) => entry.username));
 
-    return accounts
-      .filter((account) =>
-        account.chain === proposal.chain &&
-        !!account.activeKey &&
-        allowedNames.has(account.name)
-      )
-      .sort((left, right) => {
-        const leftSigned = signedNames.has(left.name) ? 1 : 0;
-        const rightSigned = signedNames.has(right.name) ? 1 : 0;
-        if (leftSigned !== rightSigned) return leftSigned - rightSigned;
-        return left.name.localeCompare(right.name);
-      });
+    return normalizedSignerOrder.map((name) => {
+      const localAccount = accounts.find((account) => account.chain === proposal.chain && account.name === name);
+      const hasActiveKey = !!localAccount?.activeKey;
+      return {
+        name,
+        account: localAccount || null,
+        hasActiveKey,
+        isSigned: signedNames.has(name),
+        canSign: !!localAccount?.activeKey && !signedNames.has(name)
+      };
+    });
   };
 
   const handlePartialSignProposal = async (proposal: SavedMultiSigProposal, signer: Account) => {
@@ -1785,8 +1785,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                       const coordinationProgress = calculateCoordinationProgress(proposal, partialSignatures);
                       const status = getProposalStatus(proposal, coordinationProgress, onChainProgress, t);
                       const timeline = buildProposalTimeline(proposal, t);
-                      const localSigners = getLocalSigners(proposal);
-                      const signedNames = new Set(partialSignatures.map((entry) => entry.username));
+                      const signerStates = getProposalSignerStates(proposal);
                       const isBroadcasted = !!proposal.lastBroadcastTxId;
                       const isExpired = isProposalExpired(proposal);
                       const isBroadcastedExpanded = !!expandedBroadcasted[proposal.id];
@@ -1807,6 +1806,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                           <div className="text-[11px] text-slate-400 mt-1 break-words">
                             {proposal.chain} • @{proposal.initiator}
                           </div>
+                          {proposal.signers.length > 0 && (
+                            <div className="mt-1 text-[10px] text-slate-300 break-words">
+                              {(t('multisig.required_signers') || 'Required signers')}: {proposal.signers.map((name) => `@${name.replace(/^@/, '')}`).join(', ')}
+                            </div>
+                          )}
                           {partialSignatures.length > 0 && (
                             <div className="mt-1 text-[10px] text-blue-400 break-words">
                               {(t('multisig.signed_by') || 'Signed by')} {partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
@@ -1949,20 +1953,24 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                           </div>
                           <div className="space-y-2">
                             <div className="grid grid-cols-2 gap-2">
-                              {localSigners.length > 0 ? localSigners.map((signer) => (
+                              {signerStates.length > 0 ? signerStates.map((signer) => (
                                 <button
-                                  key={`${proposal.id}:${signer.chain}:${signer.name}`}
-                                  onClick={() => handlePartialSignProposal(proposal, signer)}
-                                  disabled={proposalBusyId === proposal.id || signedNames.has(signer.name) || isExpired}
+                                  key={`${proposal.id}:${proposal.chain}:${signer.name}`}
+                                  onClick={() => signer.account && handlePartialSignProposal(proposal, signer.account)}
+                                  disabled={proposalBusyId === proposal.id || !signer.canSign || isExpired}
                                   className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
                                 >
-                                  {proposalBusyId === proposal.id ? '...' : signedNames.has(signer.name) ? (
+                                  {proposalBusyId === proposal.id && signer.canSign ? '...' : signer.isSigned ? (
                                     <span className="block break-words normal-case tracking-normal font-bold">
                                       {(t('multisig.signed') || 'Signed')} @{signer.name}
                                     </span>
-                                  ) : (
+                                  ) : signer.hasActiveKey ? (
                                     <span className="block break-words normal-case tracking-normal font-bold">
                                       {(t('multisig.sign') || 'Sign')} @{signer.name}
+                                    </span>
+                                  ) : (
+                                    <span className="block break-words normal-case tracking-normal font-bold">
+                                      {(t('multisig.signer_unavailable') || 'Unavailable')} @{signer.name}
                                     </span>
                                   )}
                                 </button>

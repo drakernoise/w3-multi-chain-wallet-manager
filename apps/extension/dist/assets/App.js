@@ -5975,6 +5975,7 @@ const translations = {
     "multisig.save": "Save",
     "multisig.saved_empty": "No saved multisig proposals yet.",
     "multisig.signers_count": "signers",
+    "multisig.required_signers": "Required signers",
     "multisig.coordination": "Coordination",
     "multisig.on_chain": "On-chain",
     "multisig.threshold_mismatch": "Draft coordination threshold differs from current on-chain authority threshold.",
@@ -5994,6 +5995,7 @@ const translations = {
     "multisig.signed": "Signed",
     "multisig.sign": "Sign",
     "multisig.no_local_signer": "No local signer",
+    "multisig.signer_unavailable": "Unavailable",
     "multisig.broadcast": "Broadcast",
     "multisig.import_desc": "Paste a shared proposal package here to import it into this device.",
     "multisig.import_package": "Import package",
@@ -6561,6 +6563,7 @@ const translations = {
     "multisig.save": "Guardar",
     "multisig.saved_empty": "Todavía no hay propuestas multisig guardadas.",
     "multisig.signers_count": "firmantes",
+    "multisig.required_signers": "Firmantes requeridos",
     "multisig.coordination": "Coordinación",
     "multisig.on_chain": "On-chain",
     "multisig.threshold_mismatch": "El umbral de coordinación del borrador difiere del umbral actual de autoridad on-chain.",
@@ -6580,6 +6583,7 @@ const translations = {
     "multisig.signed": "Firmada",
     "multisig.sign": "Firmar",
     "multisig.no_local_signer": "No hay firmante local",
+    "multisig.signer_unavailable": "No disponible",
     "multisig.broadcast": "Transmitir",
     "multisig.import_desc": "Pega aquí un paquete compartido de propuesta para importarlo en este dispositivo.",
     "multisig.import_package": "Importar paquete",
@@ -12360,19 +12364,21 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     const proposals = savedProposalsRef.current.filter((proposal) => proposal.id !== proposalId);
     await persistSavedProposals(proposals);
   };
-  const getLocalSigners = (proposal) => {
-    const allowedNames = /* @__PURE__ */ new Set([
-      ...proposal.signers,
-      ...proposal.authoritySnapshot?.accountAuths.map(([name]) => name) || []
-    ]);
+  const getProposalSignerStates = (proposal) => {
+    const normalizedSignerOrder = Array.from(new Set(
+      (proposal.signers || []).map((name) => name.replace(/^@/, "").trim()).filter(Boolean)
+    ));
     const signedNames = new Set((proposal.partialSignatures || []).map((entry) => entry.username));
-    return accounts.filter(
-      (account) => account.chain === proposal.chain && !!account.activeKey && allowedNames.has(account.name)
-    ).sort((left, right) => {
-      const leftSigned = signedNames.has(left.name) ? 1 : 0;
-      const rightSigned = signedNames.has(right.name) ? 1 : 0;
-      if (leftSigned !== rightSigned) return leftSigned - rightSigned;
-      return left.name.localeCompare(right.name);
+    return normalizedSignerOrder.map((name) => {
+      const localAccount = accounts.find((account) => account.chain === proposal.chain && account.name === name);
+      const hasActiveKey = !!localAccount?.activeKey;
+      return {
+        name,
+        account: localAccount || null,
+        hasActiveKey,
+        isSigned: signedNames.has(name),
+        canSign: !!localAccount?.activeKey && !signedNames.has(name)
+      };
     });
   };
   const handlePartialSignProposal = async (proposal, signer) => {
@@ -13062,8 +13068,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
             const coordinationProgress = calculateCoordinationProgress(proposal, partialSignatures);
             const status = getProposalStatus(proposal, coordinationProgress, onChainProgress, t);
             const timeline = buildProposalTimeline(proposal, t);
-            const localSigners = getLocalSigners(proposal);
-            const signedNames = new Set(partialSignatures.map((entry) => entry.username));
+            const signerStates = getProposalSignerStates(proposal);
             const isBroadcasted = !!proposal.lastBroadcastTxId;
             const isExpired = isProposalExpired(proposal);
             const isBroadcastedExpanded = !!expandedBroadcasted[proposal.id];
@@ -13082,6 +13087,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                       proposal.chain,
                       " • @",
                       proposal.initiator
+                    ] }),
+                    proposal.signers.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 text-[10px] text-slate-300 break-words", children: [
+                      t("multisig.required_signers") || "Required signers",
+                      ": ",
+                      proposal.signers.map((name) => `@${name.replace(/^@/, "")}`).join(", ")
                     ] }),
                     partialSignatures.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-1 text-[10px] text-blue-400 break-words", children: [
                       t("multisig.signed_by") || "Signed by",
@@ -13199,23 +13209,27 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   )
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: localSigners.length > 0 ? localSigners.map((signer) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: signerStates.length > 0 ? signerStates.map((signer) => /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "button",
                     {
-                      onClick: () => handlePartialSignProposal(proposal, signer),
-                      disabled: proposalBusyId === proposal.id || signedNames.has(signer.name) || isExpired,
+                      onClick: () => signer.account && handlePartialSignProposal(proposal, signer.account),
+                      disabled: proposalBusyId === proposal.id || !signer.canSign || isExpired,
                       className: "min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700",
-                      children: proposalBusyId === proposal.id ? "..." : signedNames.has(signer.name) ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
+                      children: proposalBusyId === proposal.id && signer.canSign ? "..." : signer.isSigned ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
                         t("multisig.signed") || "Signed",
                         " @",
                         signer.name
-                      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
+                      ] }) : signer.hasActiveKey ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
                         t("multisig.sign") || "Sign",
+                        " @",
+                        signer.name
+                      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "block break-words normal-case tracking-normal font-bold", children: [
+                        t("multisig.signer_unavailable") || "Unavailable",
                         " @",
                         signer.name
                       ] })
                     },
-                    `${proposal.id}:${signer.chain}:${signer.name}`
+                    `${proposal.id}:${proposal.chain}:${signer.name}`
                   )) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-2 min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-700 text-[10px] text-slate-500 text-center", children: t("multisig.no_local_signer") || "No local signer" }) }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "button",
