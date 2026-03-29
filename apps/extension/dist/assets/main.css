@@ -1583,6 +1583,9 @@ video {
 .bg-blue-500\/10 {
   background-color: rgb(59 130 246 / 0.1);
 }
+.bg-blue-500\/15 {
+  background-color: rgb(59 130 246 / 0.15);
+}
 .bg-blue-500\/20 {
   background-color: rgb(59 130 246 / 0.2);
 }

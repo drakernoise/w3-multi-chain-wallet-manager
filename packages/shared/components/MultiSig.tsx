@@ -85,9 +85,13 @@ const MULTISIG_SYNC_KIND = 'gravity-multisig-proposal';
 const MULTISIG_CUSTOM_JSON_ID = 'gravity.multisig';
 const MULTISIG_HISTORY_CURSOR_PREFIX = 'gravity_multisig_history_cursor_';
 const MULTISIG_SYNC_POLL_MS = 15000;
-const MULTISIG_SUPPORTED_CHAIN = Chain.BLURT;
+const MULTISIG_SUPPORTED_CHAINS: Chain[] = [Chain.BLURT, Chain.HIVE];
+const MULTISIG_DEFAULT_CHAIN = Chain.BLURT;
 
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
+
+const getSupportedMultiSigChain = (chain: Chain): Chain =>
+  MULTISIG_SUPPORTED_CHAINS.includes(chain) ? chain : MULTISIG_DEFAULT_CHAIN;
 
 interface MultiSigCreatedEvent {
   v: 1;
@@ -370,7 +374,7 @@ const buildProposalTimeline = (proposal: SavedMultiSigProposal, t: (key: string)
 export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
-  const [selectedChain, setSelectedChain] = useState<Chain>(MULTISIG_SUPPORTED_CHAIN);
+  const [selectedChain, setSelectedChain] = useState<Chain>(() => getSupportedMultiSigChain(initialChain));
   const [newSigner, setNewSigner] = useState('');
   const [opType, setOpType] = useState<OpType>('transfer');
   const [to, setTo] = useState('');
@@ -397,8 +401,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const incomingProposalsRef = useRef<IncomingMultiSigProposal[]>([]);
 
   const chainAccounts = useMemo(
-    () => accounts.filter((account) => account.chain === MULTISIG_SUPPORTED_CHAIN),
-    [accounts]
+    () => accounts.filter((account) => account.chain === selectedChain),
+    [accounts, selectedChain]
   );
 
   const [request, setRequest] = useState<MultiSigRequest>({
@@ -428,10 +432,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   }, [incomingProposals]);
 
   useEffect(() => {
-    if (initialChain !== MULTISIG_SUPPORTED_CHAIN) {
-      onChainChange?.(MULTISIG_SUPPORTED_CHAIN);
+    const nextChain = getSupportedMultiSigChain(initialChain);
+    if (initialChain !== nextChain) {
+      onChainChange?.(nextChain);
     }
-    setSelectedChain(MULTISIG_SUPPORTED_CHAIN);
+    setSelectedChain(nextChain);
   }, [initialChain, onChainChange]);
 
   useEffect(() => {
@@ -636,6 +641,12 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
   const removeSigner = (signer: string) => {
     setRequest(prev => ({ ...prev, signers: prev.signers.filter(candidate => candidate !== signer) }));
+  };
+
+  const handleSelectChain = (chain: Chain) => {
+    const nextChain = getSupportedMultiSigChain(chain);
+    setSelectedChain(nextChain);
+    onChainChange?.(nextChain);
   };
 
   const proposalDraft = useMemo(() => {
@@ -1404,8 +1415,24 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             </div>
           </div>
 
+          <div className="mt-4 flex flex-wrap gap-2">
+            {MULTISIG_SUPPORTED_CHAINS.map((chainOption) => (
+              <button
+                key={chainOption}
+                onClick={() => handleSelectChain(chainOption)}
+                className={`px-3 py-1.5 rounded-full text-[10px] uppercase tracking-[0.18em] font-black border transition-colors ${
+                  selectedChain === chainOption
+                    ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                    : 'bg-dark-900 text-slate-400 border-dark-600 hover:text-white hover:border-dark-500'
+                }`}
+              >
+                {chainOption}
+              </button>
+            ))}
+          </div>
+
           <p className="mt-4 text-[10px] text-slate-500">
-            {(t('multisig.blurt_only') || 'MultiSig sync is currently implemented only for {chain}.').replace('{chain}', MULTISIG_SUPPORTED_CHAIN)}
+            {(t('multisig.supported_chains') || 'MultiSig sync is currently implemented for {chains}.').replace('{chains}', MULTISIG_SUPPORTED_CHAINS.join(' / '))}
           </p>
         </div>
 

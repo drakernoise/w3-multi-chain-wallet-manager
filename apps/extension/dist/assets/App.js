@@ -5934,6 +5934,7 @@ const translations = {
     "multisig.header_desc": "Build a multisig proposal draft and inspect the live account authority before coordinating signatures.",
     "multisig.alpha_badge": "Alpha",
     "multisig.blurt_only": "MultiSig sync is currently implemented only for {chain}.",
+    "multisig.supported_chains": "MultiSig sync is currently implemented for {chains}.",
     "multisig.incoming_title": "Incoming proposals",
     "multisig.incoming_desc": "Review on-chain proposal updates before they enter your local multisig tray.",
     "multisig.incoming_empty": "No pending incoming multisig proposals.",
@@ -6519,6 +6520,7 @@ const translations = {
     "multisig.header_desc": "Construye un borrador multisig y revisa la autoridad activa real antes de coordinar las firmas.",
     "multisig.alpha_badge": "Alpha",
     "multisig.blurt_only": "La sincronización MultiSig está implementada por ahora solo para {chain}.",
+    "multisig.supported_chains": "La sincronización MultiSig está implementada por ahora para {chains}.",
     "multisig.incoming_title": "Propuestas entrantes",
     "multisig.incoming_desc": "Revisa las actualizaciones on-chain antes de que entren en tu bandeja local multisig.",
     "multisig.incoming_empty": "No hay propuestas multisig pendientes de revisión.",
@@ -11711,8 +11713,10 @@ const MULTISIG_SYNC_KIND = "gravity-multisig-proposal";
 const MULTISIG_CUSTOM_JSON_ID = "gravity.multisig";
 const MULTISIG_HISTORY_CURSOR_PREFIX = "gravity_multisig_history_cursor_";
 const MULTISIG_SYNC_POLL_MS = 15e3;
-const MULTISIG_SUPPORTED_CHAIN = Chain.BLURT;
+const MULTISIG_SUPPORTED_CHAINS = [Chain.BLURT, Chain.HIVE];
+const MULTISIG_DEFAULT_CHAIN = Chain.BLURT;
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
+const getSupportedMultiSigChain = (chain) => MULTISIG_SUPPORTED_CHAINS.includes(chain) ? chain : MULTISIG_DEFAULT_CHAIN;
 const toLocalDateTimeInput = (date) => {
   const pad = (value) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -11882,7 +11886,7 @@ const buildProposalTimeline = (proposal, t) => {
 const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
-  const [selectedChain, setSelectedChain] = reactExports.useState(MULTISIG_SUPPORTED_CHAIN);
+  const [selectedChain, setSelectedChain] = reactExports.useState(() => getSupportedMultiSigChain(initialChain));
   const [newSigner, setNewSigner] = reactExports.useState("");
   const [opType, setOpType] = reactExports.useState("transfer");
   const [to, setTo] = reactExports.useState("");
@@ -11908,8 +11912,8 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const savedProposalsRef = reactExports.useRef([]);
   const incomingProposalsRef = reactExports.useRef([]);
   const chainAccounts = reactExports.useMemo(
-    () => accounts.filter((account) => account.chain === MULTISIG_SUPPORTED_CHAIN),
-    [accounts]
+    () => accounts.filter((account) => account.chain === selectedChain),
+    [accounts, selectedChain]
   );
   const [request, setRequest] = reactExports.useState({
     initiator: chainAccounts[0]?.name || "",
@@ -11934,10 +11938,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     incomingProposalsRef.current = incomingProposals;
   }, [incomingProposals]);
   reactExports.useEffect(() => {
-    if (initialChain !== MULTISIG_SUPPORTED_CHAIN) {
-      onChainChange?.(MULTISIG_SUPPORTED_CHAIN);
+    const nextChain = getSupportedMultiSigChain(initialChain);
+    if (initialChain !== nextChain) {
+      onChainChange?.(nextChain);
     }
-    setSelectedChain(MULTISIG_SUPPORTED_CHAIN);
+    setSelectedChain(nextChain);
   }, [initialChain, onChainChange]);
   reactExports.useEffect(() => {
     let cancelled = false;
@@ -12114,6 +12119,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   };
   const removeSigner = (signer) => {
     setRequest((prev) => ({ ...prev, signers: prev.signers.filter((candidate) => candidate !== signer) }));
+  };
+  const handleSelectChain = (chain) => {
+    const nextChain = getSupportedMultiSigChain(chain);
+    setSelectedChain(nextChain);
+    onChainChange?.(nextChain);
   };
   const proposalDraft = reactExports.useMemo(() => {
     const coordinationThreshold = getCoordinationThreshold(request.signers);
@@ -12744,7 +12754,16 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "shrink-0 px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20", children: t("multisig.alpha_badge") || "Alpha" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-4 text-[10px] text-slate-500", children: (t("multisig.blurt_only") || "MultiSig sync is currently implemented only for {chain}.").replace("{chain}", MULTISIG_SUPPORTED_CHAIN) })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-4 flex flex-wrap gap-2", children: MULTISIG_SUPPORTED_CHAINS.map((chainOption) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => handleSelectChain(chainOption),
+          className: `px-3 py-1.5 rounded-full text-[10px] uppercase tracking-[0.18em] font-black border transition-colors ${selectedChain === chainOption ? "bg-blue-500/15 text-blue-300 border-blue-500/30" : "bg-dark-900 text-slate-400 border-dark-600 hover:text-white hover:border-dark-500"}`,
+          children: chainOption
+        },
+        chainOption
+      )) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-4 text-[10px] text-slate-500", children: (t("multisig.supported_chains") || "MultiSig sync is currently implemented for {chains}.").replace("{chains}", MULTISIG_SUPPORTED_CHAINS.join(" / ")) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-3", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center justify-between gap-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
