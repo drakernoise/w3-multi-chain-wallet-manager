@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, y as fetchCustomJsonEventsForAccounts, z as calculateThresholdProgress, A as getAccountAuthorities, d as broadcastCustomJson, B as createUnsignedTransaction, D as signTransactionEnvelope, E as selectBroadcastSignatures, F as broadcastSignedTransaction, G as indexBrowserExports, H as indexBrowserExports$1, I as validateAccountKeys, J as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, K as fetchBalances, L as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, d as broadcastCustomJson, y as fetchCustomJsonEventsForAccounts, z as calculateThresholdProgress, A as getAccountAuthorities, B as createUnsignedTransaction, D as signTransactionEnvelope, E as selectBroadcastSignatures, F as broadcastSignedTransaction, G as indexBrowserExports, H as indexBrowserExports$1, I as validateAccountKeys, J as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, K as fetchBalances, L as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -11719,6 +11719,7 @@ const MULTISIG_VISIBLE_OPERATION_TYPES = [
 ];
 const MULTISIG_STORAGE_KEY = "gravity_multisig_proposals";
 const MULTISIG_INCOMING_STORAGE_KEY = "gravity_multisig_incoming_proposals";
+const MULTISIG_OUTBOX_STORAGE_KEY = "gravity_multisig_outbox";
 const MULTISIG_SYNC_KIND = "gravity-multisig-proposal";
 const MULTISIG_CUSTOM_JSON_ID = "gravity.multisig";
 const MULTISIG_HISTORY_CURSOR_PREFIX = "gravity_multisig_history_cursor_";
@@ -11856,6 +11857,19 @@ const normalizeChainEvent = (value) => {
   }
   return null;
 };
+const getPendingEventId = (event) => {
+  switch (event.type) {
+    case "proposal_signed":
+      return `${event.proposalId}:${event.type}:${event.signature.username}:${event.signature.signature}`;
+    case "proposal_broadcasted":
+      return `${event.proposalId}:${event.type}:${event.txId}`;
+    case "proposal_created":
+    case "proposal_deleted":
+      return `${event.proposalId}:${event.type}`;
+    case "proposal_expired":
+      return `${event.proposalId}:${event.type}:${event.expiredAt}`;
+  }
+};
 const IconChevron = ({ open }) => /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: `w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`, fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 9l-7 7-7-7" }) });
 const IconJump = () => /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 5l7 7-7 7M5 5h6v14H5" }) });
 const IconLoad = () => /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 10l7-7m0 0l7 7m-7-7v18" }) });
@@ -11941,9 +11955,10 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const [expandedBroadcasted, setExpandedBroadcasted] = reactExports.useState({});
   const isMountedRef = reactExports.useRef(true);
   const copyResetTimeoutRef = reactExports.useRef(null);
-  const deferredWorkTimeoutsRef = reactExports.useRef([]);
   const savedProposalsRef = reactExports.useRef([]);
   const incomingProposalsRef = reactExports.useRef([]);
+  const pendingEventsRef = reactExports.useRef([]);
+  const flushingOutboxRef = reactExports.useRef(false);
   const chainAccounts = reactExports.useMemo(
     () => accounts.filter((account) => account.chain === selectedChain),
     [accounts, selectedChain]
@@ -11962,8 +11977,6 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         window.clearTimeout(copyResetTimeoutRef.current);
         copyResetTimeoutRef.current = null;
       }
-      deferredWorkTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-      deferredWorkTimeoutsRef.current = [];
     };
   }, []);
   reactExports.useEffect(() => {
@@ -11972,6 +11985,10 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   reactExports.useEffect(() => {
     incomingProposalsRef.current = incomingProposals;
   }, [incomingProposals]);
+  const persistPendingEvents = async (entries) => {
+    pendingEventsRef.current = entries;
+    await storageService.setItem(MULTISIG_OUTBOX_STORAGE_KEY, JSON.stringify(entries));
+  };
   reactExports.useEffect(() => {
     const nextChain = getSupportedMultiSigChain(initialChain);
     if (initialChain !== nextChain) {
@@ -12011,6 +12028,25 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
           }
           if (JSON.stringify(parsedIncoming) !== JSON.stringify(normalizedIncoming)) {
             await storageService.setItem(MULTISIG_INCOMING_STORAGE_KEY, JSON.stringify(normalizedIncoming));
+          }
+        }
+        const rawOutbox = await storageService.getItem(MULTISIG_OUTBOX_STORAGE_KEY);
+        if (!cancelled && rawOutbox) {
+          try {
+            const parsedOutbox = JSON.parse(rawOutbox);
+            const normalizedOutbox = (parsedOutbox || []).filter((entry) => entry?.event && entry?.announcerName).map((entry) => ({
+              id: entry.id || getPendingEventId(entry.event),
+              announcerName: entry.announcerName,
+              event: entry.event,
+              queuedAt: entry.queuedAt || entry.event.sentAt || Date.now()
+            }));
+            pendingEventsRef.current = normalizedOutbox;
+            if (JSON.stringify(parsedOutbox) !== JSON.stringify(normalizedOutbox)) {
+              await storageService.setItem(MULTISIG_OUTBOX_STORAGE_KEY, JSON.stringify(normalizedOutbox));
+            }
+          } catch (error) {
+            console.warn("Failed to load multisig event outbox:", error);
+            pendingEventsRef.current = [];
           }
         }
       } catch (error) {
@@ -12272,13 +12308,15 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     if (account.activeKey) return { account, key: account.activeKey, keyType: "Active" };
     return null;
   };
-  const publishMultiSigEvent = async (event, announcerName) => {
+  const publishMultiSigEvent = reactExports.useCallback(async (event, announcerName, options) => {
     const announcer = getAnnouncementAccount(announcerName, event.chain);
     if (!announcer) {
       const message = `On-chain multisig sync unavailable for @${announcerName}: import a posting or active key first.`;
-      if (isMountedRef.current) setTransportInfo(message);
-      showNotification(message, "info");
-      return;
+      if (!options?.silent) {
+        if (isMountedRef.current) setTransportInfo(message);
+        showNotification(message, "info");
+      }
+      return false;
     }
     const result = await broadcastCustomJson(
       event.chain,
@@ -12290,30 +12328,48 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     );
     if (!result.success) {
       const message = result.error || "Failed to publish multisig sync event on-chain.";
-      if (isMountedRef.current) setTransportInfo(message);
-      showNotification(message, "info");
-      return;
+      if (!options?.silent) {
+        if (isMountedRef.current) setTransportInfo(message);
+        showNotification(message, "info");
+      }
+      return false;
     }
-    if (isMountedRef.current) {
+    if (!options?.silent && isMountedRef.current) {
       setTransportInfo(`On-chain multisig update published by @${announcer.account.name}`);
     }
-  };
-  const scheduleDeferredWork = (task, delayMs = 0) => {
-    const timeoutId = window.setTimeout(async () => {
-      deferredWorkTimeoutsRef.current = deferredWorkTimeoutsRef.current.filter((entry) => entry !== timeoutId);
-      try {
-        await task();
-      } catch (error) {
-        console.warn("Deferred MultiSig task failed:", error);
+    return true;
+  }, [accounts, showNotification]);
+  const flushPendingEvents = reactExports.useCallback(async () => {
+    if (flushingOutboxRef.current || pendingEventsRef.current.length === 0) return;
+    flushingOutboxRef.current = true;
+    try {
+      let queue = [...pendingEventsRef.current];
+      const remaining = [];
+      for (const entry of queue) {
+        const published = await publishMultiSigEvent(entry.event, entry.announcerName, { silent: true });
+        if (!published) {
+          remaining.push(entry);
+        }
       }
-    }, delayMs);
-    deferredWorkTimeoutsRef.current.push(timeoutId);
-  };
-  const publishMultiSigEventInBackground = (event, announcerName) => {
-    Promise.resolve().then(() => publishMultiSigEvent(event, announcerName)).catch((error) => {
-      console.warn("Background MultiSig event publish failed:", error);
-    });
-  };
+      await persistPendingEvents(remaining);
+    } finally {
+      flushingOutboxRef.current = false;
+    }
+  }, [publishMultiSigEvent]);
+  const enqueuePendingEvent = reactExports.useCallback(async (event, announcerName) => {
+    const entry = {
+      id: getPendingEventId(event),
+      announcerName,
+      event,
+      queuedAt: Date.now()
+    };
+    const nextQueue = [
+      entry,
+      ...pendingEventsRef.current.filter((pending) => pending.id !== entry.id)
+    ].slice(0, 50);
+    await persistPendingEvents(nextQueue);
+    await flushPendingEvents();
+  }, [flushPendingEvents]);
   const ensureProposalArtifacts = async (proposal) => {
     let nextProposal = proposal;
     let changed = false;
@@ -12455,7 +12511,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       setTransportInfo(`Deleted ${proposal.title}`);
     }
     showNotification(`Deleted proposal ${proposal.title}`, "success");
-    scheduleDeferredWork(() => publishMultiSigEvent({
+    await enqueuePendingEvent({
       v: 1,
       namespace: "gravity.multisig",
       type: "proposal_deleted",
@@ -12463,7 +12519,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       sentAt: Date.now(),
       sender: proposal.initiator,
       chain: proposal.chain
-    }, proposal.initiator), 150);
+    }, proposal.initiator);
   };
   const getProposalSignerStates = (proposal) => {
     const normalizedSignerOrder = Array.from(new Set(
@@ -12572,7 +12628,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       }
       showNotification(`Broadcasted ${nextProposal.title} successfully`, "success");
       const publisher = proposal.partialSignatures.map((entry) => entry.username).find((username) => !!getAnnouncementAccount(username, nextProposal.chain)) || readyProposal.initiator;
-      publishMultiSigEventInBackground({
+      await enqueuePendingEvent({
         v: 1,
         namespace: "gravity.multisig",
         type: "proposal_broadcasted",
@@ -12667,7 +12723,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     for (const proposal of [...newlyExpiredSaved, ...newlyExpiredIncoming]) {
       const publisher = getExpirationPublisher(proposal);
       if (!publisher) continue;
-      await publishMultiSigEvent({
+      await enqueuePendingEvent({
         v: 1,
         namespace: "gravity.multisig",
         type: "proposal_expired",
@@ -12856,6 +12912,8 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     let cancelled = false;
     const runSync = async () => {
       if (cancelled) return;
+      await flushPendingEvents();
+      if (cancelled) return;
       await syncOnChainProposals();
     };
     runSync();
@@ -12864,7 +12922,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [syncOnChainProposals]);
+  }, [flushPendingEvents, syncOnChainProposals]);
   reactExports.useEffect(() => {
     expireProposalsIfNeeded();
     const interval = window.setInterval(() => {
@@ -12877,6 +12935,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       setRefreshingChain(true);
     }
     try {
+      await flushPendingEvents();
       await syncOnChainProposals({ resetCursor: true, announceRefresh: true });
     } finally {
       if (isMountedRef.current) {

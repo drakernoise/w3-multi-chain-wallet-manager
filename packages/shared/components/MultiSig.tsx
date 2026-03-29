@@ -56,6 +56,7 @@ interface SavedMultiSigProposal {
 
 const MULTISIG_STORAGE_KEY = 'gravity_multisig_proposals';
 const MULTISIG_INCOMING_STORAGE_KEY = 'gravity_multisig_incoming_proposals';
+const MULTISIG_OUTBOX_STORAGE_KEY = 'gravity_multisig_outbox';
 
 interface SharedMultiSigPackage {
   version: 1;
@@ -67,6 +68,13 @@ interface IncomingMultiSigProposal {
   proposal: SavedMultiSigProposal;
   sentAt: number;
   sentBy: string;
+}
+
+interface PendingMultiSigEvent {
+  id: string;
+  announcerName: string;
+  event: MultiSigChainEvent;
+  queuedAt: number;
 }
 
 interface ProposalTimelineEntry {
@@ -322,6 +330,20 @@ const normalizeChainEvent = (value: any): MultiSigChainEvent | null => {
   return null;
 };
 
+const getPendingEventId = (event: MultiSigChainEvent): string => {
+  switch (event.type) {
+    case 'proposal_signed':
+      return `${event.proposalId}:${event.type}:${event.signature.username}:${event.signature.signature}`;
+    case 'proposal_broadcasted':
+      return `${event.proposalId}:${event.type}:${event.txId}`;
+    case 'proposal_created':
+    case 'proposal_deleted':
+      return `${event.proposalId}:${event.type}`;
+    case 'proposal_expired':
+      return `${event.proposalId}:${event.type}:${event.expiredAt}`;
+  }
+};
+
 const IconChevron = ({ open }: { open: boolean }) => (
   <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -449,9 +471,10 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const [expandedBroadcasted, setExpandedBroadcasted] = useState<Record<string, boolean>>({});
   const isMountedRef = useRef(true);
   const copyResetTimeoutRef = useRef<number | null>(null);
-  const deferredWorkTimeoutsRef = useRef<number[]>([]);
   const savedProposalsRef = useRef<SavedMultiSigProposal[]>([]);
   const incomingProposalsRef = useRef<IncomingMultiSigProposal[]>([]);
+  const pendingEventsRef = useRef<PendingMultiSigEvent[]>([]);
+  const flushingOutboxRef = useRef(false);
 
   const chainAccounts = useMemo(
     () => accounts.filter((account) => account.chain === selectedChain),
@@ -473,8 +496,6 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         window.clearTimeout(copyResetTimeoutRef.current);
         copyResetTimeoutRef.current = null;
       }
-      deferredWorkTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-      deferredWorkTimeoutsRef.current = [];
     };
   }, []);
 
@@ -485,6 +506,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   useEffect(() => {
     incomingProposalsRef.current = incomingProposals;
   }, [incomingProposals]);
+
+  const persistPendingEvents = async (entries: PendingMultiSigEvent[]) => {
+    pendingEventsRef.current = entries;
+    await storageService.setItem(MULTISIG_OUTBOX_STORAGE_KEY, JSON.stringify(entries));
+  };
 
   useEffect(() => {
     const nextChain = getSupportedMultiSigChain(initialChain);
@@ -536,6 +562,30 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
           if (JSON.stringify(parsedIncoming) !== JSON.stringify(normalizedIncoming)) {
             await storageService.setItem(MULTISIG_INCOMING_STORAGE_KEY, JSON.stringify(normalizedIncoming));
+          }
+        }
+
+        const rawOutbox = await storageService.getItem(MULTISIG_OUTBOX_STORAGE_KEY);
+        if (!cancelled && rawOutbox) {
+          try {
+            const parsedOutbox = JSON.parse(rawOutbox) as PendingMultiSigEvent[];
+            const normalizedOutbox = (parsedOutbox || [])
+              .filter((entry) => entry?.event && entry?.announcerName)
+              .map((entry) => ({
+                id: entry.id || getPendingEventId(entry.event),
+                announcerName: entry.announcerName,
+                event: entry.event,
+                queuedAt: entry.queuedAt || entry.event.sentAt || Date.now()
+              }));
+
+            pendingEventsRef.current = normalizedOutbox;
+
+            if (JSON.stringify(parsedOutbox) !== JSON.stringify(normalizedOutbox)) {
+              await storageService.setItem(MULTISIG_OUTBOX_STORAGE_KEY, JSON.stringify(normalizedOutbox));
+            }
+          } catch (error) {
+            console.warn('Failed to load multisig event outbox:', error);
+            pendingEventsRef.current = [];
           }
         }
       } catch (error) {
@@ -835,13 +885,19 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     return null;
   };
 
-  const publishMultiSigEvent = async (event: MultiSigChainEvent, announcerName: string) => {
+  const publishMultiSigEvent = useCallback(async (
+    event: MultiSigChainEvent,
+    announcerName: string,
+    options?: { silent?: boolean }
+  ): Promise<boolean> => {
     const announcer = getAnnouncementAccount(announcerName, event.chain);
     if (!announcer) {
       const message = `On-chain multisig sync unavailable for @${announcerName}: import a posting or active key first.`;
-      if (isMountedRef.current) setTransportInfo(message);
-      showNotification(message, 'info');
-      return;
+      if (!options?.silent) {
+        if (isMountedRef.current) setTransportInfo(message);
+        showNotification(message, 'info');
+      }
+      return false;
     }
 
     const result = await broadcastCustomJson(
@@ -855,35 +911,56 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
     if (!result.success) {
       const message = result.error || 'Failed to publish multisig sync event on-chain.';
-      if (isMountedRef.current) setTransportInfo(message);
-      showNotification(message, 'info');
-      return;
+      if (!options?.silent) {
+        if (isMountedRef.current) setTransportInfo(message);
+        showNotification(message, 'info');
+      }
+      return false;
     }
 
-    if (isMountedRef.current) {
+    if (!options?.silent && isMountedRef.current) {
       setTransportInfo(`On-chain multisig update published by @${announcer.account.name}`);
     }
-  };
+    return true;
+  }, [accounts, showNotification]);
 
-  const scheduleDeferredWork = (task: () => void | Promise<void>, delayMs: number = 0) => {
-    const timeoutId = window.setTimeout(async () => {
-      deferredWorkTimeoutsRef.current = deferredWorkTimeoutsRef.current.filter((entry) => entry !== timeoutId);
-      try {
-        await task();
-      } catch (error) {
-        console.warn('Deferred MultiSig task failed:', error);
+  const flushPendingEvents = useCallback(async () => {
+    if (flushingOutboxRef.current || pendingEventsRef.current.length === 0) return;
+
+    flushingOutboxRef.current = true;
+    try {
+      let queue = [...pendingEventsRef.current];
+      const remaining: PendingMultiSigEvent[] = [];
+
+      for (const entry of queue) {
+        const published = await publishMultiSigEvent(entry.event, entry.announcerName, { silent: true });
+        if (!published) {
+          remaining.push(entry);
+        }
       }
-    }, delayMs);
-    deferredWorkTimeoutsRef.current.push(timeoutId);
-  };
 
-  const publishMultiSigEventInBackground = (event: MultiSigChainEvent, announcerName: string) => {
-    Promise.resolve()
-      .then(() => publishMultiSigEvent(event, announcerName))
-      .catch((error) => {
-        console.warn('Background MultiSig event publish failed:', error);
-      });
-  };
+      await persistPendingEvents(remaining);
+    } finally {
+      flushingOutboxRef.current = false;
+    }
+  }, [publishMultiSigEvent]);
+
+  const enqueuePendingEvent = useCallback(async (event: MultiSigChainEvent, announcerName: string) => {
+    const entry: PendingMultiSigEvent = {
+      id: getPendingEventId(event),
+      announcerName,
+      event,
+      queuedAt: Date.now()
+    };
+
+    const nextQueue = [
+      entry,
+      ...pendingEventsRef.current.filter((pending) => pending.id !== entry.id)
+    ].slice(0, 50);
+
+    await persistPendingEvents(nextQueue);
+    await flushPendingEvents();
+  }, [flushPendingEvents]);
 
   const ensureProposalArtifacts = async (proposal: SavedMultiSigProposal): Promise<SavedMultiSigProposal> => {
     let nextProposal = proposal;
@@ -1045,7 +1122,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       setTransportInfo(`Deleted ${proposal.title}`);
     }
     showNotification(`Deleted proposal ${proposal.title}`, 'success');
-    scheduleDeferredWork(() => publishMultiSigEvent({
+    await enqueuePendingEvent({
       v: 1,
       namespace: 'gravity.multisig',
       type: 'proposal_deleted',
@@ -1053,7 +1130,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       sentAt: Date.now(),
       sender: proposal.initiator,
       chain: proposal.chain
-    }, proposal.initiator), 150);
+    }, proposal.initiator);
   };
 
   const getProposalSignerStates = (proposal: SavedMultiSigProposal) => {
@@ -1180,7 +1257,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         .map((entry) => entry.username)
         .find((username) => !!getAnnouncementAccount(username, nextProposal.chain))
         || readyProposal.initiator;
-      publishMultiSigEventInBackground({
+      await enqueuePendingEvent({
         v: 1,
         namespace: 'gravity.multisig',
         type: 'proposal_broadcasted',
@@ -1304,7 +1381,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     for (const proposal of [...newlyExpiredSaved, ...newlyExpiredIncoming]) {
       const publisher = getExpirationPublisher(proposal);
       if (!publisher) continue;
-      await publishMultiSigEvent({
+      await enqueuePendingEvent({
         v: 1,
         namespace: 'gravity.multisig',
         type: 'proposal_expired',
@@ -1536,6 +1613,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
     const runSync = async () => {
       if (cancelled) return;
+      await flushPendingEvents();
+      if (cancelled) return;
       await syncOnChainProposals();
     };
 
@@ -1545,7 +1624,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [syncOnChainProposals]);
+  }, [flushPendingEvents, syncOnChainProposals]);
 
   useEffect(() => {
     expireProposalsIfNeeded();
@@ -1560,6 +1639,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       setRefreshingChain(true);
     }
     try {
+      await flushPendingEvents();
       await syncOnChainProposals({ resetCursor: true, announceRefresh: true });
     } finally {
       if (isMountedRef.current) {
