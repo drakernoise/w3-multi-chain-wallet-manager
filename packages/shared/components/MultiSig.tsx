@@ -68,6 +68,7 @@ const MULTISIG_CUSTOM_JSON_ID = 'gravity.multisig';
 const MULTISIG_CHAIN_CURSOR_PREFIX = 'gravity_multisig_chain_cursor_';
 const MULTISIG_INITIAL_LOOKBACK_BLOCKS = 300;
 const MULTISIG_SYNC_POLL_MS = 15000;
+const MULTISIG_SUPPORTED_CHAIN = Chain.BLURT;
 
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
 
@@ -228,7 +229,7 @@ const chainTheme = {
 export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
-  const [selectedChain, setSelectedChain] = useState<Chain>(initialChain);
+  const [selectedChain, setSelectedChain] = useState<Chain>(MULTISIG_SUPPORTED_CHAIN);
   const [newSigner, setNewSigner] = useState('');
   const [opType, setOpType] = useState<OpType>('transfer');
   const [to, setTo] = useState('');
@@ -249,8 +250,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const incomingProposalsRef = useRef<IncomingMultiSigProposal[]>([]);
 
   const chainAccounts = useMemo(
-    () => accounts.filter((account) => account.chain === selectedChain),
-    [accounts, selectedChain]
+    () => accounts.filter((account) => account.chain === MULTISIG_SUPPORTED_CHAIN),
+    [accounts]
   );
 
   const [request, setRequest] = useState<MultiSigRequest>({
@@ -269,8 +270,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   }, [incomingProposals]);
 
   useEffect(() => {
-    setSelectedChain(initialChain);
-  }, [initialChain]);
+    if (initialChain !== MULTISIG_SUPPORTED_CHAIN) {
+      onChainChange?.(MULTISIG_SUPPORTED_CHAIN);
+    }
+    setSelectedChain(MULTISIG_SUPPORTED_CHAIN);
+  }, [initialChain, onChainChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1033,19 +1037,13 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
           </div>
 
           <div className="flex p-1 bg-dark-900 rounded-xl mt-5 border border-dark-700">
-            {[Chain.BLURT, Chain.HIVE, Chain.STEEM].map((chain) => (
-              <button
-                key={chain}
-                onClick={() => {
-                  setSelectedChain(chain);
-                  onChainChange?.(chain);
-                }}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedChain === chain ? chainTheme[chain] : 'text-slate-500 hover:text-slate-300'}`}
-              >
-                {chain}
-              </button>
-            ))}
+            <div className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${chainTheme[MULTISIG_SUPPORTED_CHAIN]}`}>
+              {MULTISIG_SUPPORTED_CHAIN}
+            </div>
           </div>
+          <p className="mt-2 text-[10px] text-slate-500">
+            MultiSig sync is currently implemented only for {MULTISIG_SUPPORTED_CHAIN}.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4">

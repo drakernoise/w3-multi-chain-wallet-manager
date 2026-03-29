@@ -11528,6 +11528,7 @@ const MULTISIG_CUSTOM_JSON_ID = "gravity.multisig";
 const MULTISIG_CHAIN_CURSOR_PREFIX = "gravity_multisig_chain_cursor_";
 const MULTISIG_INITIAL_LOOKBACK_BLOCKS = 300;
 const MULTISIG_SYNC_POLL_MS = 15e3;
+const MULTISIG_SUPPORTED_CHAIN = Chain.BLURT;
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
 const toLocalDateTimeInput = (date) => {
   const pad = (value) => String(value).padStart(2, "0");
@@ -11629,7 +11630,7 @@ const chainTheme = {
 const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
-  const [selectedChain, setSelectedChain] = reactExports.useState(initialChain);
+  const [selectedChain, setSelectedChain] = reactExports.useState(MULTISIG_SUPPORTED_CHAIN);
   const [newSigner, setNewSigner] = reactExports.useState("");
   const [opType, setOpType] = reactExports.useState("transfer");
   const [to, setTo] = reactExports.useState("");
@@ -11649,8 +11650,8 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const savedProposalsRef = reactExports.useRef([]);
   const incomingProposalsRef = reactExports.useRef([]);
   const chainAccounts = reactExports.useMemo(
-    () => accounts.filter((account) => account.chain === selectedChain),
-    [accounts, selectedChain]
+    () => accounts.filter((account) => account.chain === MULTISIG_SUPPORTED_CHAIN),
+    [accounts]
   );
   const [request, setRequest] = reactExports.useState({
     initiator: chainAccounts[0]?.name || "",
@@ -11665,8 +11666,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     incomingProposalsRef.current = incomingProposals;
   }, [incomingProposals]);
   reactExports.useEffect(() => {
-    setSelectedChain(initialChain);
-  }, [initialChain]);
+    if (initialChain !== MULTISIG_SUPPORTED_CHAIN) {
+      onChainChange?.(MULTISIG_SUPPORTED_CHAIN);
+    }
+    setSelectedChain(MULTISIG_SUPPORTED_CHAIN);
+  }, [initialChain, onChainChange]);
   reactExports.useEffect(() => {
     let cancelled = false;
     const loadStoredData = async () => {
@@ -12293,18 +12297,12 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20", children: "Alpha" })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex p-1 bg-dark-900 rounded-xl mt-5 border border-dark-700", children: [Chain.BLURT, Chain.HIVE, Chain.STEEM].map((chain) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "button",
-        {
-          onClick: () => {
-            setSelectedChain(chain);
-            onChainChange?.(chain);
-          },
-          className: `flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedChain === chain ? chainTheme[chain] : "text-slate-500 hover:text-slate-300"}`,
-          children: chain
-        },
-        chain
-      )) })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex p-1 bg-dark-900 rounded-xl mt-5 border border-dark-700", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${chainTheme[MULTISIG_SUPPORTED_CHAIN]}`, children: MULTISIG_SUPPORTED_CHAIN }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "mt-2 text-[10px] text-slate-500", children: [
+        "MultiSig sync is currently implemented only for ",
+        MULTISIG_SUPPORTED_CHAIN,
+        "."
+      ] })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 gap-4", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4", children: [
