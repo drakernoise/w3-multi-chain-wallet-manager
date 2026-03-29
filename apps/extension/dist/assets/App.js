@@ -5996,6 +5996,9 @@ const translations = {
     "multisig.sign": "Sign",
     "multisig.no_local_signer": "No local signer",
     "multisig.signer_unavailable": "Unavailable",
+    "multisig.delete_initiator_only": "Only the initiator can delete this proposal from every device.",
+    "multisig.validation_hint": "Complete the required fields marked with * before saving.",
+    "multisig.validation_required": "Fill in the required fields before saving this proposal.",
     "multisig.broadcast": "Broadcast",
     "multisig.import_desc": "Paste a shared proposal package here to import it into this device.",
     "multisig.import_package": "Import package",
@@ -6584,6 +6587,9 @@ const translations = {
     "multisig.sign": "Firmar",
     "multisig.no_local_signer": "No hay firmante local",
     "multisig.signer_unavailable": "No disponible",
+    "multisig.delete_initiator_only": "Solo el iniciador puede borrar esta propuesta de todos los dispositivos.",
+    "multisig.validation_hint": "Completa los campos obligatorios marcados con * antes de guardar.",
+    "multisig.validation_required": "Completa los campos obligatorios antes de guardar esta propuesta.",
     "multisig.broadcast": "Transmitir",
     "multisig.import_desc": "Pega aquí un paquete compartido de propuesta para importarlo en este dispositivo.",
     "multisig.import_package": "Importar paquete",
@@ -11721,6 +11727,24 @@ const MULTISIG_SUPPORTED_CHAINS = [Chain.BLURT, Chain.HIVE];
 const MULTISIG_DEFAULT_CHAIN = Chain.BLURT;
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
 const getSupportedMultiSigChain = (chain) => MULTISIG_SUPPORTED_CHAINS.includes(chain) ? chain : MULTISIG_DEFAULT_CHAIN;
+const getDefaultProposalTitle = (chain, initiator, opType, toValue) => {
+  const cleanInitiator = initiator.replace(/^@/, "").trim();
+  const cleanTarget = toValue.replace(/^@/, "").trim();
+  switch (opType) {
+    case "transfer":
+      return cleanTarget ? `${chain} transfer • @${cleanInitiator} → @${cleanTarget}` : `${chain} transfer • @${cleanInitiator}`;
+    case "delegate_vesting_shares":
+      return cleanTarget ? `${chain} delegate • @${cleanInitiator} → @${cleanTarget}` : `${chain} delegate • @${cleanInitiator}`;
+    case "undelegate_vesting_shares":
+      return cleanTarget ? `${chain} undelegate • @${cleanInitiator} → @${cleanTarget}` : `${chain} undelegate • @${cleanInitiator}`;
+    case "transfer_to_vesting":
+      return cleanTarget ? `${chain} power up • @${cleanInitiator} → @${cleanTarget}` : `${chain} power up • @${cleanInitiator}`;
+    case "withdraw_vesting":
+      return `${chain} power down • @${cleanInitiator}`;
+    default:
+      return `${chain} proposal • @${cleanInitiator || "unknown"}`;
+  }
+};
 const toLocalDateTimeInput = (date) => {
   const pad = (value) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -11826,6 +11850,9 @@ const normalizeChainEvent = (value) => {
   if (value.type === "proposal_expired" && value.expiredAt) {
     return value;
   }
+  if (value.type === "proposal_deleted") {
+    return value;
+  }
   return null;
 };
 const IconChevron = ({ open }) => /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: `w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`, fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 9l-7 7-7-7" }) });
@@ -11913,6 +11940,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const [expandedBroadcasted, setExpandedBroadcasted] = reactExports.useState({});
   const isMountedRef = reactExports.useRef(true);
   const copyResetTimeoutRef = reactExports.useRef(null);
+  const deferredWorkTimeoutsRef = reactExports.useRef([]);
   const savedProposalsRef = reactExports.useRef([]);
   const incomingProposalsRef = reactExports.useRef([]);
   const chainAccounts = reactExports.useMemo(
@@ -11933,6 +11961,8 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         window.clearTimeout(copyResetTimeoutRef.current);
         copyResetTimeoutRef.current = null;
       }
+      deferredWorkTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      deferredWorkTimeoutsRef.current = [];
     };
   }, []);
   reactExports.useEffect(() => {
@@ -12147,6 +12177,36 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       authoritySnapshot: authority
     }, null, 2);
   }, [authority, expiresAt, request.initiator, request.operation, request.signers, selectedChain]);
+  const saveValidation = reactExports.useMemo(() => {
+    const issues = [];
+    if (!request.initiator.trim()) {
+      issues.push("initiator");
+    }
+    if (request.signers.length === 0) {
+      issues.push("signers");
+    }
+    if (opType !== "custom") {
+      if (opType !== "withdraw_vesting" && !to.trim()) {
+        issues.push("target");
+      }
+      if (opType !== "undelegate_vesting_shares") {
+        const numericAmount = Number(amount);
+        if (!amount.trim() || Number.isNaN(numericAmount) || numericAmount <= 0) {
+          issues.push("amount");
+        }
+      }
+    } else {
+      try {
+        JSON.parse(request.operation);
+      } catch {
+        issues.push("operation");
+      }
+    }
+    return {
+      isValid: issues.length === 0,
+      issues
+    };
+  }, [amount, opType, request.initiator, request.operation, request.signers, to]);
   const handleCopyDraft = async () => {
     await navigator.clipboard.writeText(proposalDraft);
     if (isMountedRef.current) {
@@ -12237,6 +12297,17 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       setTransportInfo(`On-chain multisig update published by @${announcer.account.name}`);
     }
   };
+  const scheduleDeferredWork = (task, delayMs = 0) => {
+    const timeoutId = window.setTimeout(async () => {
+      deferredWorkTimeoutsRef.current = deferredWorkTimeoutsRef.current.filter((entry) => entry !== timeoutId);
+      try {
+        await task();
+      } catch (error) {
+        console.warn("Deferred MultiSig task failed:", error);
+      }
+    }, delayMs);
+    deferredWorkTimeoutsRef.current.push(timeoutId);
+  };
   const ensureProposalArtifacts = async (proposal) => {
     let nextProposal = proposal;
     let changed = false;
@@ -12276,6 +12347,10 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     return nextProposal;
   };
   const handleSaveProposal = async () => {
+    if (!saveValidation.isValid) {
+      showNotification(t("multisig.validation_required") || "Fill in the required fields before saving this proposal.", "info");
+      return;
+    }
     const coordinationThreshold = getCoordinationThreshold(request.signers);
     const normalizedExpiration = normalizeMultiSigExpiration(expiresAt);
     let operationPayload;
@@ -12291,7 +12366,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     );
     const proposal = {
       id: crypto.randomUUID(),
-      title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || "unknown"}`,
+      title: saveLabel.trim() || getDefaultProposalTitle(selectedChain, request.initiator, opType, to),
       chain: selectedChain,
       initiator: request.initiator,
       threshold: coordinationThreshold,
@@ -12360,9 +12435,29 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       expiration: null
     });
   };
-  const handleDeleteProposal = async (proposalId) => {
-    const proposals = savedProposalsRef.current.filter((proposal) => proposal.id !== proposalId);
+  const handleDeleteProposal = async (proposal) => {
+    const initiatorPublisher = getAnnouncementAccount(proposal.initiator, proposal.chain);
+    if (!initiatorPublisher) {
+      showNotification(t("multisig.delete_initiator_only") || "Only the initiator can delete this proposal from every device.", "info");
+      return;
+    }
+    const proposals = savedProposalsRef.current.filter((entry) => entry.id !== proposal.id);
+    const nextIncoming = incomingProposalsRef.current.filter((entry) => entry.proposal.id !== proposal.id);
     await persistSavedProposals(proposals);
+    await persistIncomingProposals(nextIncoming);
+    if (isMountedRef.current) {
+      setTransportInfo(`Deleted ${proposal.title}`);
+    }
+    showNotification(`Deleted proposal ${proposal.title}`, "success");
+    scheduleDeferredWork(() => publishMultiSigEvent({
+      v: 1,
+      namespace: "gravity.multisig",
+      type: "proposal_deleted",
+      proposalId: proposal.id,
+      sentAt: Date.now(),
+      sender: proposal.initiator,
+      chain: proposal.chain
+    }, proposal.initiator), 150);
   };
   const getProposalSignerStates = (proposal) => {
     const normalizedSignerOrder = Array.from(new Set(
@@ -12471,7 +12566,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       }
       showNotification(`Broadcasted ${nextProposal.title} successfully`, "success");
       const publisher = proposal.partialSignatures.map((entry) => entry.username).find((username) => !!getAnnouncementAccount(username, nextProposal.chain)) || readyProposal.initiator;
-      await publishMultiSigEvent({
+      scheduleDeferredWork(() => publishMultiSigEvent({
         v: 1,
         namespace: "gravity.multisig",
         type: "proposal_broadcasted",
@@ -12480,7 +12575,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         sender: publisher,
         chain: nextProposal.chain,
         txId: result.txId || ""
-      }, publisher);
+      }, publisher), 150);
     } catch (error) {
       console.warn("Failed to broadcast multisig proposal:", error);
       showNotification(error?.message || "Failed to broadcast multisig proposal", "error");
@@ -12642,6 +12737,19 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
           if (shouldNotify) {
             setTransportInfo(`Incoming on-chain proposal pending review from @${incomingEntry.sentBy}`);
             showNotification(`On-chain multisig proposal pending review from @${incomingEntry.sentBy}`, "info");
+          }
+          continue;
+        }
+        if (event.type === "proposal_deleted") {
+          const hadSaved = nextSaved.some((entry) => entry.id === event.proposalId);
+          const hadIncoming = nextIncoming.some((entry) => entry.proposal.id === event.proposalId);
+          if (hadSaved) {
+            nextSaved = nextSaved.filter((entry) => entry.id !== event.proposalId);
+            savedChanged = true;
+          }
+          if (hadIncoming) {
+            nextIncoming = nextIncoming.filter((entry) => entry.proposal.id !== event.proposalId);
+            incomingChanged = true;
           }
           continue;
         }
@@ -12816,7 +12924,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 gap-4", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.initiator") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "text-xs text-slate-500 uppercase font-bold", children: [
+            t("multisig.initiator"),
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-amber-400", children: "*" })
+          ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "select",
             {
@@ -12856,7 +12968,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.signers") }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "text-xs text-slate-500 uppercase font-bold", children: [
+            t("multisig.signers"),
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-amber-400", children: "*" })
+          ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[minmax(0,1fr)_auto] gap-2 mt-2", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "input",
@@ -12894,50 +13010,23 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
           signer,
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => removeSigner(signer), className: "text-blue-200 hover:text-white transition-colors", children: "×" })
         ] }, signer)) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.create_section") || "Create proposal" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: t("multisig.create_desc") || "Build the proposal here, then save it to start collecting signatures." })
-            ] }),
-            activeProposal && /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              "button",
-              {
-                onClick: handleJumpToActiveProposal,
-                className: "w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.08em] text-slate-200 hover:border-blue-500 hover:text-white transition-colors shrink-0",
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(IconJump, {}),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("multisig.jump_active") || "Go to active proposal" })
-                ]
-              }
-            )
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.create_section") || "Create proposal" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: t("multisig.create_desc") || "Build the proposal here, then save it to start collecting signatures." })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col sm:flex-row gap-2 items-stretch", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "input",
-              {
-                value: saveLabel,
-                onChange: (e) => setSaveLabel(e.target.value),
-                placeholder: t("multisig.proposal_label") || "Proposal label",
-                className: "min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
-              }
-            ),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              "button",
-              {
-                onClick: handleSaveProposal,
-                disabled: !request.initiator || !request.operation,
-                title: t("multisig.save") || "Save",
-                "aria-label": t("multisig.save") || "Save",
-                className: "w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 min-w-[52px] shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors",
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(IconSave, {}),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "sm:hidden", children: t("multisig.save") || "Save" })
-                ]
-              }
-            )
-          ] })
-        ] }),
+          activeProposal && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              onClick: handleJumpToActiveProposal,
+              className: "w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.08em] text-slate-200 hover:border-blue-500 hover:text-white transition-colors shrink-0",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(IconJump, {}),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("multisig.jump_active") || "Go to active proposal" })
+              ]
+            }
+          )
+        ] }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.proposal") }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -12952,7 +13041,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         ] }),
         opType !== "custom" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3 rounded-2xl border border-dark-700 bg-dark-900/60 p-4", children: [
           opType !== "withdraw_vesting" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-400 block mb-1", children: t("multisig.target_account") || "Target account" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "text-xs text-slate-400 block mb-1", children: [
+              t("multisig.target_account") || "Target account",
+              " ",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-amber-400", children: "*" })
+            ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "input",
               {
@@ -12964,7 +13057,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
             )
           ] }),
           opType !== "undelegate_vesting_shares" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-xs text-slate-400 block mb-1", children: opType === "delegate_vesting_shares" || opType === "withdraw_vesting" ? t("multisig.amount_vests") || "Amount (VESTS)" : (t("multisig.amount_chain") || "Amount ({chain})").replace("{chain}", selectedChain) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "text-xs text-slate-400 block mb-1", children: [
+              opType === "delegate_vesting_shares" || opType === "withdraw_vesting" ? t("multisig.amount_vests") || "Amount (VESTS)" : (t("multisig.amount_chain") || "Amount ({chain})").replace("{chain}", selectedChain),
+              " ",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-amber-400", children: "*" })
+            ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               "input",
               {
@@ -13045,6 +13142,34 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
             /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { className: "mt-3 text-[10px] text-slate-300 whitespace-pre-wrap break-all bg-black/30 rounded-xl p-3 border border-dark-700 max-h-48 overflow-y-auto custom-scrollbar", children: proposalDraft })
           ] })
         ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col sm:flex-row gap-2 items-stretch", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: saveLabel,
+                onChange: (e) => setSaveLabel(e.target.value),
+                placeholder: t("multisig.proposal_label") || "Proposal label",
+                className: "min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                onClick: handleSaveProposal,
+                disabled: !saveValidation.isValid,
+                title: t("multisig.save") || "Save",
+                "aria-label": t("multisig.save") || "Save",
+                className: "w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 min-w-[52px] shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(IconSave, {}),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "sm:hidden", children: t("multisig.save") || "Save" })
+                ]
+              }
+            )
+          ] }),
+          !saveValidation.isValid && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-2 text-[10px] text-slate-500", children: t("multisig.validation_hint") || "Complete the required fields marked with * before saving." })
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
@@ -13072,14 +13197,15 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
             const isBroadcasted = !!proposal.lastBroadcastTxId;
             const isExpired = isProposalExpired(proposal);
             const isBroadcastedExpanded = !!expandedBroadcasted[proposal.id];
+            const canDeleteProposal = !!getAnnouncementAccount(proposal.initiator, proposal.chain);
             return isBroadcasted && !isBroadcastedExpanded ? /* @__PURE__ */ jsxRuntimeExports.jsxs(
               "button",
               {
                 onClick: () => setExpandedBroadcasted((prev) => ({ ...prev, [proposal.id]: true })),
-                className: "w-full flex items-center justify-between gap-3 text-left",
+                className: "w-full flex items-start justify-between gap-3 text-left",
                 children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
-                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-start gap-2 sm:flex-row sm:items-center", children: [
                       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-bold text-white break-words leading-tight", children: proposal.title }),
                       /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-[0.08em] ${status.tone}`, children: status.label })
                     ] }),
@@ -13105,7 +13231,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
               }
             ) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start justify-between gap-3", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between", children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "min-w-0", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-bold text-white break-words leading-tight", children: proposal.title }) }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-[0.08em] ${status.tone}`, children: status.label })
                 ] }),
@@ -13176,7 +13302,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                   children: t("multisig.reuse") || "Reuse"
                 }
               ) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `grid gap-2 ${canDeleteProposal ? "grid-cols-3" : "grid-cols-2"}`, children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "button",
                     {
@@ -13197,10 +13323,10 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
                       children: /* @__PURE__ */ jsxRuntimeExports.jsx(IconCopy, {})
                     }
                   ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  canDeleteProposal && /* @__PURE__ */ jsxRuntimeExports.jsx(
                     "button",
                     {
-                      onClick: () => handleDeleteProposal(proposal.id),
+                      onClick: () => handleDeleteProposal(proposal),
                       title: t("multisig.delete") || "Delete",
                       "aria-label": t("multisig.delete") || "Delete",
                       className: "min-w-0 inline-flex items-center justify-center px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors",

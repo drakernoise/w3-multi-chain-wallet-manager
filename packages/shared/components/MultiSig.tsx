@@ -93,6 +93,38 @@ const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
 const getSupportedMultiSigChain = (chain: Chain): Chain =>
   MULTISIG_SUPPORTED_CHAINS.includes(chain) ? chain : MULTISIG_DEFAULT_CHAIN;
 
+const getDefaultProposalTitle = (
+  chain: Chain,
+  initiator: string,
+  opType: OpType,
+  toValue: string
+): string => {
+  const cleanInitiator = initiator.replace(/^@/, '').trim();
+  const cleanTarget = toValue.replace(/^@/, '').trim();
+  switch (opType) {
+    case 'transfer':
+      return cleanTarget
+        ? `${chain} transfer • @${cleanInitiator} → @${cleanTarget}`
+        : `${chain} transfer • @${cleanInitiator}`;
+    case 'delegate_vesting_shares':
+      return cleanTarget
+        ? `${chain} delegate • @${cleanInitiator} → @${cleanTarget}`
+        : `${chain} delegate • @${cleanInitiator}`;
+    case 'undelegate_vesting_shares':
+      return cleanTarget
+        ? `${chain} undelegate • @${cleanInitiator} → @${cleanTarget}`
+        : `${chain} undelegate • @${cleanInitiator}`;
+    case 'transfer_to_vesting':
+      return cleanTarget
+        ? `${chain} power up • @${cleanInitiator} → @${cleanTarget}`
+        : `${chain} power up • @${cleanInitiator}`;
+    case 'withdraw_vesting':
+      return `${chain} power down • @${cleanInitiator}`;
+    default:
+      return `${chain} proposal • @${cleanInitiator || 'unknown'}`;
+  }
+};
+
 interface MultiSigCreatedEvent {
   v: 1;
   namespace: 'gravity.multisig';
@@ -137,7 +169,22 @@ interface MultiSigExpiredEvent {
   expiredAt: number;
 }
 
-type MultiSigChainEvent = MultiSigCreatedEvent | MultiSigSignedEvent | MultiSigBroadcastedEvent | MultiSigExpiredEvent;
+interface MultiSigDeletedEvent {
+  v: 1;
+  namespace: 'gravity.multisig';
+  type: 'proposal_deleted';
+  proposalId: string;
+  sentAt: number;
+  sender: string;
+  chain: Chain;
+}
+
+type MultiSigChainEvent =
+  | MultiSigCreatedEvent
+  | MultiSigSignedEvent
+  | MultiSigBroadcastedEvent
+  | MultiSigExpiredEvent
+  | MultiSigDeletedEvent;
 
 const toLocalDateTimeInput = (date: Date): string => {
   const pad = (value: number) => String(value).padStart(2, '0');
@@ -265,6 +312,10 @@ const normalizeChainEvent = (value: any): MultiSigChainEvent | null => {
 
   if (value.type === 'proposal_expired' && value.expiredAt) {
     return value as MultiSigExpiredEvent;
+  }
+
+  if (value.type === 'proposal_deleted') {
+    return value as MultiSigDeletedEvent;
   }
 
   return null;
@@ -397,6 +448,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const [expandedBroadcasted, setExpandedBroadcasted] = useState<Record<string, boolean>>({});
   const isMountedRef = useRef(true);
   const copyResetTimeoutRef = useRef<number | null>(null);
+  const deferredWorkTimeoutsRef = useRef<number[]>([]);
   const savedProposalsRef = useRef<SavedMultiSigProposal[]>([]);
   const incomingProposalsRef = useRef<IncomingMultiSigProposal[]>([]);
 
@@ -420,6 +472,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         window.clearTimeout(copyResetTimeoutRef.current);
         copyResetTimeoutRef.current = null;
       }
+      deferredWorkTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      deferredWorkTimeoutsRef.current = [];
     };
   }, []);
 
@@ -668,6 +722,39 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     }, null, 2);
   }, [authority, expiresAt, request.initiator, request.operation, request.signers, selectedChain]);
 
+  const saveValidation = useMemo(() => {
+    const issues: string[] = [];
+    if (!request.initiator.trim()) {
+      issues.push('initiator');
+    }
+    if (request.signers.length === 0) {
+      issues.push('signers');
+    }
+
+    if (opType !== 'custom') {
+      if (opType !== 'withdraw_vesting' && !to.trim()) {
+        issues.push('target');
+      }
+      if (opType !== 'undelegate_vesting_shares') {
+        const numericAmount = Number(amount);
+        if (!amount.trim() || Number.isNaN(numericAmount) || numericAmount <= 0) {
+          issues.push('amount');
+        }
+      }
+    } else {
+      try {
+        JSON.parse(request.operation);
+      } catch {
+        issues.push('operation');
+      }
+    }
+
+    return {
+      isValid: issues.length === 0,
+      issues
+    };
+  }, [amount, opType, request.initiator, request.operation, request.signers, to]);
+
   const handleCopyDraft = async () => {
     await navigator.clipboard.writeText(proposalDraft);
     if (isMountedRef.current) {
@@ -777,6 +864,18 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     }
   };
 
+  const scheduleDeferredWork = (task: () => void | Promise<void>, delayMs: number = 0) => {
+    const timeoutId = window.setTimeout(async () => {
+      deferredWorkTimeoutsRef.current = deferredWorkTimeoutsRef.current.filter((entry) => entry !== timeoutId);
+      try {
+        await task();
+      } catch (error) {
+        console.warn('Deferred MultiSig task failed:', error);
+      }
+    }, delayMs);
+    deferredWorkTimeoutsRef.current.push(timeoutId);
+  };
+
   const ensureProposalArtifacts = async (proposal: SavedMultiSigProposal): Promise<SavedMultiSigProposal> => {
     let nextProposal = proposal;
     let changed = false;
@@ -823,6 +922,10 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   };
 
   const handleSaveProposal = async () => {
+    if (!saveValidation.isValid) {
+      showNotification(t('multisig.validation_required') || 'Fill in the required fields before saving this proposal.', 'info');
+      return;
+    }
     const coordinationThreshold = getCoordinationThreshold(request.signers);
     const normalizedExpiration = normalizeMultiSigExpiration(expiresAt);
     let operationPayload: any;
@@ -840,7 +943,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
     const proposal: SavedMultiSigProposal = {
       id: crypto.randomUUID(),
-      title: saveLabel.trim() || `${selectedChain} proposal • @${request.initiator || 'unknown'}`,
+      title: saveLabel.trim() || getDefaultProposalTitle(selectedChain, request.initiator, opType, to),
       chain: selectedChain,
       initiator: request.initiator,
       threshold: coordinationThreshold,
@@ -918,9 +1021,30 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     });
   };
 
-  const handleDeleteProposal = async (proposalId: string) => {
-    const proposals = savedProposalsRef.current.filter((proposal) => proposal.id !== proposalId);
+  const handleDeleteProposal = async (proposal: SavedMultiSigProposal) => {
+    const initiatorPublisher = getAnnouncementAccount(proposal.initiator, proposal.chain);
+    if (!initiatorPublisher) {
+      showNotification(t('multisig.delete_initiator_only') || 'Only the initiator can delete this proposal from every device.', 'info');
+      return;
+    }
+
+    const proposals = savedProposalsRef.current.filter((entry) => entry.id !== proposal.id);
+    const nextIncoming = incomingProposalsRef.current.filter((entry) => entry.proposal.id !== proposal.id);
     await persistSavedProposals(proposals);
+    await persistIncomingProposals(nextIncoming);
+    if (isMountedRef.current) {
+      setTransportInfo(`Deleted ${proposal.title}`);
+    }
+    showNotification(`Deleted proposal ${proposal.title}`, 'success');
+    scheduleDeferredWork(() => publishMultiSigEvent({
+      v: 1,
+      namespace: 'gravity.multisig',
+      type: 'proposal_deleted',
+      proposalId: proposal.id,
+      sentAt: Date.now(),
+      sender: proposal.initiator,
+      chain: proposal.chain
+    }, proposal.initiator), 150);
   };
 
   const getProposalSignerStates = (proposal: SavedMultiSigProposal) => {
@@ -1047,7 +1171,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         .map((entry) => entry.username)
         .find((username) => !!getAnnouncementAccount(username, nextProposal.chain))
         || readyProposal.initiator;
-      await publishMultiSigEvent({
+      scheduleDeferredWork(() => publishMultiSigEvent({
         v: 1,
         namespace: 'gravity.multisig',
         type: 'proposal_broadcasted',
@@ -1056,7 +1180,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         sender: publisher,
         chain: nextProposal.chain,
         txId: result.txId || ''
-      }, publisher);
+      }, publisher), 150);
     } catch (error) {
       console.warn('Failed to broadcast multisig proposal:', error);
       showNotification((error as Error)?.message || 'Failed to broadcast multisig proposal', 'error');
@@ -1277,6 +1401,20 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             continue;
           }
 
+          if (event.type === 'proposal_deleted') {
+            const hadSaved = nextSaved.some((entry) => entry.id === event.proposalId);
+            const hadIncoming = nextIncoming.some((entry) => entry.proposal.id === event.proposalId);
+            if (hadSaved) {
+              nextSaved = nextSaved.filter((entry) => entry.id !== event.proposalId);
+              savedChanged = true;
+            }
+            if (hadIncoming) {
+              nextIncoming = nextIncoming.filter((entry) => entry.proposal.id !== event.proposalId);
+              incomingChanged = true;
+            }
+            continue;
+          }
+
           const applyUpdate = (proposal: SavedMultiSigProposal): SavedMultiSigProposal => {
             if (event.type === 'proposal_signed') {
               return {
@@ -1487,7 +1625,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         <div className="grid grid-cols-1 gap-4">
           <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4">
             <div>
-              <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.initiator')}</label>
+              <label className="text-xs text-slate-500 uppercase font-bold">
+                {t('multisig.initiator')} <span className="text-amber-400">*</span>
+              </label>
               <select
                 value={request.initiator}
                 onChange={(e) => setRequest(prev => ({ ...prev, initiator: e.target.value }))}
@@ -1536,7 +1676,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
           <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4">
             <div>
-              <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.signers')}</label>
+              <label className="text-xs text-slate-500 uppercase font-bold">
+                {t('multisig.signers')} <span className="text-amber-400">*</span>
+              </label>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 mt-2">
                 <input
                   value={newSigner}
@@ -1598,24 +1740,6 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 items-stretch">
-                <input
-                  value={saveLabel}
-                  onChange={(e) => setSaveLabel(e.target.value)}
-                  placeholder={t('multisig.proposal_label') || 'Proposal label'}
-                  className="min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
-                />
-                <button
-                  onClick={handleSaveProposal}
-                  disabled={!request.initiator || !request.operation}
-                  title={t('multisig.save') || 'Save'}
-                  aria-label={t('multisig.save') || 'Save'}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 min-w-[52px] shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors"
-                >
-                  <IconSave />
-                  <span className="sm:hidden">{t('multisig.save') || 'Save'}</span>
-                </button>
-              </div>
             </div>
 
             <div>
@@ -1637,7 +1761,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
               <div className="space-y-3 rounded-2xl border border-dark-700 bg-dark-900/60 p-4">
                 {opType !== 'withdraw_vesting' && (
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">{t('multisig.target_account') || 'Target account'}</label>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      {t('multisig.target_account') || 'Target account'} <span className="text-amber-400">*</span>
+                    </label>
                     <input
                       value={to}
                       onChange={(e) => setTo(e.target.value)}
@@ -1654,7 +1780,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                     <label className="text-xs text-slate-400 block mb-1">
                       {opType === 'delegate_vesting_shares' || opType === 'withdraw_vesting'
                         ? (t('multisig.amount_vests') || 'Amount (VESTS)')
-                        : (t('multisig.amount_chain') || 'Amount ({chain})').replace('{chain}', selectedChain)}
+                        : (t('multisig.amount_chain') || 'Amount ({chain})').replace('{chain}', selectedChain)} <span className="text-amber-400">*</span>
                     </label>
                     <input
                       type="number"
@@ -1750,6 +1876,32 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
               )}
             </div>
 
+            <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4">
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+                <input
+                  value={saveLabel}
+                  onChange={(e) => setSaveLabel(e.target.value)}
+                  placeholder={t('multisig.proposal_label') || 'Proposal label'}
+                  className="min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleSaveProposal}
+                  disabled={!saveValidation.isValid}
+                  title={t('multisig.save') || 'Save'}
+                  aria-label={t('multisig.save') || 'Save'}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 min-w-[52px] shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors"
+                >
+                  <IconSave />
+                  <span className="sm:hidden">{t('multisig.save') || 'Save'}</span>
+                </button>
+              </div>
+              {!saveValidation.isValid && (
+                <p className="mt-2 text-[10px] text-slate-500">
+                  {t('multisig.validation_hint') || 'Complete the required fields marked with * before saving.'}
+                </p>
+              )}
+            </div>
+
             <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="min-w-0">
@@ -1789,15 +1941,16 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                       const isBroadcasted = !!proposal.lastBroadcastTxId;
                       const isExpired = isProposalExpired(proposal);
                       const isBroadcastedExpanded = !!expandedBroadcasted[proposal.id];
+                      const canDeleteProposal = !!getAnnouncementAccount(proposal.initiator, proposal.chain);
 
                       return (
                     isBroadcasted && !isBroadcastedExpanded ? (
                       <button
                         onClick={() => setExpandedBroadcasted((prev) => ({ ...prev, [proposal.id]: true }))}
-                        className="w-full flex items-center justify-between gap-3 text-left"
+                        className="w-full flex items-start justify-between gap-3 text-left"
                       >
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
                             <div className="text-sm font-bold text-white break-words leading-tight">{proposal.title}</div>
                             <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-[0.08em] ${status.tone}`}>
                               {status.label}
@@ -1827,7 +1980,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                     ) : (
                     <div className="space-y-3">
                       <div className="min-w-0">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
                             <div className="text-sm font-bold text-white break-words leading-tight">{proposal.title}</div>
                           </div>
@@ -1925,7 +2078,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                         </button>
                       ) : (
                         <>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className={`grid gap-2 ${canDeleteProposal ? 'grid-cols-3' : 'grid-cols-2'}`}>
                             <button
                               onClick={() => handleLoadProposal(proposal)}
                               title={t('multisig.load') || 'Load'}
@@ -1942,14 +2095,16 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                             >
                               <IconCopy />
                             </button>
-                            <button
-                              onClick={() => handleDeleteProposal(proposal.id)}
-                              title={t('multisig.delete') || 'Delete'}
-                              aria-label={t('multisig.delete') || 'Delete'}
-                              className="min-w-0 inline-flex items-center justify-center px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
-                            >
-                              <IconTrash />
-                            </button>
+                            {canDeleteProposal && (
+                              <button
+                                onClick={() => handleDeleteProposal(proposal)}
+                                title={t('multisig.delete') || 'Delete'}
+                                aria-label={t('multisig.delete') || 'Delete'}
+                                className="min-w-0 inline-flex items-center justify-center px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
+                              >
+                                <IconTrash />
+                              </button>
+                            )}
                           </div>
                           <div className="space-y-2">
                             <div className="grid grid-cols-2 gap-2">
