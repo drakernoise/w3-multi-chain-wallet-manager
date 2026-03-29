@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chain, Account, MultiSigRequest } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -24,12 +24,16 @@ interface MultiSigProps {
 
 type OpType = 'transfer' | 'delegate_vesting_shares' | 'undelegate_vesting_shares' | 'transfer_to_vesting' | 'withdraw_vesting' | 'custom';
 
-const MULTISIG_VISIBLE_OPERATION_TYPES: Array<{ value: OpType; label: string }> = [
-  { value: 'transfer', label: 'Transfer' },
-  { value: 'delegate_vesting_shares', label: 'Delegate Power' },
-  { value: 'undelegate_vesting_shares', label: 'Undelegate Power' },
-  { value: 'transfer_to_vesting', label: 'Power Up' }
+const MULTISIG_VISIBLE_OPERATION_TYPES: Array<{ value: OpType; labelKey: string; fallback: string }> = [
+  { value: 'transfer', labelKey: 'multisig.op_transfer', fallback: 'Transfer' },
+  { value: 'delegate_vesting_shares', labelKey: 'multisig.op_delegate', fallback: 'Delegate Power' },
+  { value: 'undelegate_vesting_shares', labelKey: 'multisig.op_undelegate', fallback: 'Undelegate Power' },
+  { value: 'transfer_to_vesting', labelKey: 'multisig.op_powerup', fallback: 'Power Up' }
 ];
+
+interface MultiSigPartialSignature extends PartialTransactionSignature {
+  signedAt?: number;
+}
 
 interface SavedMultiSigProposal {
   id: string;
@@ -43,7 +47,7 @@ interface SavedMultiSigProposal {
   operation: string;
   authoritySnapshot?: MultiSigAuthority | null;
   unsignedTransaction?: any;
-  partialSignatures: PartialTransactionSignature[];
+  partialSignatures: MultiSigPartialSignature[];
   lastBroadcastTxId?: string;
   createdAt: number;
   updatedAt: number;
@@ -62,6 +66,13 @@ interface IncomingMultiSigProposal {
   proposal: SavedMultiSigProposal;
   sentAt: number;
   sentBy: string;
+}
+
+interface ProposalTimelineEntry {
+  id: string;
+  tone: 'neutral' | 'info' | 'success';
+  label: string;
+  at: number | null;
 }
 
 type TransportMultiSigProposal = Omit<SavedMultiSigProposal, 'unsignedTransaction' | 'authoritySnapshot'> & {
@@ -142,7 +153,7 @@ const getCoordinationThreshold = (signers: string[]): number => {
 
 const calculateCoordinationProgress = (
   proposal: SavedMultiSigProposal,
-  partialSignatures: PartialTransactionSignature[]
+  partialSignatures: MultiSigPartialSignature[]
 ): { current: number; threshold: number; canBroadcast: boolean } => {
   const signedNames = new Set(partialSignatures.map((entry) => entry.username));
   const eligibleNames = new Set((proposal.signers || []).map((name) => name.replace(/^@/, '')));
@@ -231,6 +242,58 @@ const chainTheme = {
   [Chain.BLURT]: 'bg-blurt text-white shadow-lg'
 };
 
+const getProposalStatus = (
+  proposal: SavedMultiSigProposal,
+  coordinationProgress: { current: number; threshold: number; canBroadcast: boolean },
+  onChainProgress: { currentWeight: number; threshold: number; canBroadcast: boolean } | null,
+  t: (key: string) => string
+): { label: string; tone: string } => {
+  if (proposal.lastBroadcastTxId) {
+    return {
+      label: t('multisig.status_broadcasted') || 'Broadcasted',
+      tone: 'bg-green-500/10 text-green-400 border border-green-500/20'
+    };
+  }
+
+  if (coordinationProgress.canBroadcast && onChainProgress?.canBroadcast) {
+    return {
+      label: t('multisig.status_ready') || 'Ready to Broadcast',
+      tone: 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+    };
+  }
+
+  return {
+    label: t('multisig.status_pending') || 'Pending Signatures',
+    tone: 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+  };
+};
+
+const buildProposalTimeline = (proposal: SavedMultiSigProposal, t: (key: string) => string): ProposalTimelineEntry[] => {
+  const entries: ProposalTimelineEntry[] = [
+    {
+      id: `${proposal.id}:created`,
+      tone: 'neutral',
+      label: t('multisig.timeline_created') || 'Created',
+      at: proposal.createdAt || null
+    },
+    ...proposal.partialSignatures
+      .map((signature) => ({
+        id: `${proposal.id}:signed:${signature.username}`,
+        tone: 'info' as const,
+        label: `${t('multisig.timeline_signed') || 'Signed'} @${signature.username}`,
+        at: signature.signedAt || null
+      })),
+    ...(proposal.lastBroadcastTxId ? [{
+      id: `${proposal.id}:broadcasted`,
+      tone: 'success' as const,
+      label: t('multisig.timeline_broadcasted') || 'Broadcasted',
+      at: proposal.updatedAt || null
+    }] : [])
+  ];
+
+  return entries.sort((left, right) => (left.at || 0) - (right.at || 0));
+};
+
 export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts, onChainChange }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
@@ -251,6 +314,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const [authority, setAuthority] = useState<MultiSigAuthority | null>(null);
   const [authorityError, setAuthorityError] = useState<string | null>(null);
   const [transportInfo, setTransportInfo] = useState<string | null>(null);
+  const [refreshingChain, setRefreshingChain] = useState(false);
   const savedProposalsRef = useRef<SavedMultiSigProposal[]>([]);
   const incomingProposalsRef = useRef<IncomingMultiSigProposal[]>([]);
 
@@ -771,7 +835,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
           {
             username: signer.name,
             pubKey: signResult.publicKey,
-            signature: signResult.signature
+            signature: signResult.signature,
+            signedAt: Date.now()
           }
         ]
       };
@@ -896,10 +961,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     await persistIncomingProposals(nextIncoming);
   };
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncOnChainProposals = async () => {
+  const syncOnChainProposals = useCallback(async (options?: { resetCursor?: boolean; announceRefresh?: boolean }) => {
+      const resetCursor = !!options?.resetCursor;
       const localAccountNames = accounts
         .filter((account) => account.chain === selectedChain)
         .map((account) => account.name);
@@ -922,20 +985,32 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
       try {
         const cursorKey = `${MULTISIG_HISTORY_CURSOR_PREFIX}${selectedChain}`;
-        const rawCursor = await storageService.getItem(cursorKey);
+        const rawCursor = resetCursor ? null : await storageService.getItem(cursorKey);
         const lastSeenAt = rawCursor ? Number(rawCursor) : 0;
 
         const rawEvents = await fetchCustomJsonEventsForAccounts(selectedChain, watchedAccountNames, MULTISIG_CUSTOM_JSON_ID);
-        const events = rawEvents
-          .map((entry) => ({
-            event: normalizeChainEvent(entry.json),
-            sender: entry.account,
-            timestamp: entry.timestamp,
-            txId: entry.trxId
-          }))
-          .filter((entry): entry is { event: MultiSigChainEvent; sender: string; timestamp: string; txId: string } => !!entry.event)
-          .filter(({ event }) => (event.sentAt || 0) > lastSeenAt)
-          .sort((left, right) => (left.event.sentAt || 0) - (right.event.sentAt || 0));
+        const events = Array.from(
+          new Map(
+            rawEvents
+              .map((entry) => ({
+                event: normalizeChainEvent(entry.json),
+                sender: entry.account,
+                timestamp: entry.timestamp,
+                txId: entry.trxId
+              }))
+              .filter((entry): entry is { event: MultiSigChainEvent; sender: string; timestamp: string; txId: string } => !!entry.event)
+              .filter(({ event }) => (event.sentAt || 0) > lastSeenAt)
+              .map((entry) => {
+                const { event } = entry;
+                const dedupeKey = event.type === 'proposal_signed'
+                  ? `${event.proposalId}:${event.type}:${event.signature.username}:${event.signature.signature}`
+                  : event.type === 'proposal_broadcasted'
+                    ? `${event.proposalId}:${event.type}:${event.txId}`
+                    : `${event.proposalId}:${event.type}`;
+                return [dedupeKey, entry] as const;
+              })
+          ).values()
+        ).sort((left, right) => (left.event.sentAt || 0) - (right.event.sentAt || 0));
 
         let nextSaved = savedProposalsRef.current;
         let nextIncoming = incomingProposalsRef.current;
@@ -987,7 +1062,10 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                 updatedAt: Math.max(proposal.updatedAt, event.sentAt),
                 partialSignatures: [
                   ...proposal.partialSignatures.filter((entry) => entry.username !== event.signature.username),
-                  event.signature
+                  {
+                    ...event.signature,
+                    signedAt: event.sentAt
+                  }
                 ]
               };
             }
@@ -1024,29 +1102,57 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
           }
         }
 
-        if (!cancelled && savedChanged) {
+        if (savedChanged) {
           await persistSavedProposals(nextSaved);
         }
 
-        if (!cancelled && incomingChanged) {
+        if (incomingChanged) {
           await persistIncomingProposals(nextIncoming);
         }
 
         if (maxSeenAt > lastSeenAt) {
           await storageService.setItem(cursorKey, String(maxSeenAt));
         }
+
+        if (options?.announceRefresh) {
+          setTransportInfo(
+            maxSeenAt > lastSeenAt
+              ? (t('multisig.sync_refreshed') || 'Synced from chain.')
+              : (t('multisig.sync_no_updates') || 'No new on-chain multisig updates found.')
+          );
+        }
       } catch (error) {
         console.warn('Failed to sync on-chain multisig events:', error);
+        if (options?.announceRefresh) {
+          showNotification(t('multisig.sync_failed') || 'Failed to refresh multisig updates from chain.', 'error');
+        }
       }
+    }, [accounts, selectedChain, showNotification, t]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const runSync = async () => {
+      if (cancelled) return;
+      await syncOnChainProposals();
     };
 
-    syncOnChainProposals();
-    const interval = window.setInterval(syncOnChainProposals, MULTISIG_SYNC_POLL_MS);
+    runSync();
+    const interval = window.setInterval(runSync, MULTISIG_SYNC_POLL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [accounts, selectedChain, showNotification]);
+  }, [syncOnChainProposals]);
+
+  const handleRefreshFromChain = async () => {
+    setRefreshingChain(true);
+    try {
+      await syncOnChainProposals({ resetCursor: true, announceRefresh: true });
+    } finally {
+      setRefreshingChain(false);
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto custom-scrollbar p-4">
@@ -1056,11 +1162,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             <div>
               <h2 className="text-xl font-black text-white tracking-tight">{t('multisig.title')}</h2>
               <p className="text-xs text-slate-500 mt-1">
-                Build a multisig proposal draft and inspect the live account authority before coordinating signatures.
+                {t('multisig.header_desc') || 'Build a multisig proposal draft and inspect the live account authority before coordinating signatures.'}
               </p>
             </div>
             <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              Alpha
+              {t('multisig.alpha_badge') || 'Alpha'}
             </div>
           </div>
 
@@ -1070,36 +1176,36 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             </div>
           </div>
           <p className="mt-2 text-[10px] text-slate-500">
-            MultiSig sync is currently implemented only for {MULTISIG_SUPPORTED_CHAIN}.
+            {(t('multisig.blurt_only') || 'MultiSig sync is currently implemented only for {chain}.').replace('{chain}', MULTISIG_SUPPORTED_CHAIN)}
           </p>
         </div>
 
         <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-slate-500 uppercase font-bold">Incoming proposals</p>
+              <p className="text-xs text-slate-500 uppercase font-bold">{t('multisig.incoming_title') || 'Incoming proposals'}</p>
               <p className="text-[11px] text-slate-400 mt-1">
-                Review on-chain proposal updates before they enter your local multisig tray.
+                {t('multisig.incoming_desc') || 'Review on-chain proposal updates before they enter your local multisig tray.'}
               </p>
             </div>
           </div>
 
           <div className="space-y-2">
             {incomingProposals.length === 0 ? (
-              <div className="text-xs text-slate-500 italic">No pending incoming multisig proposals.</div>
+              <div className="text-xs text-slate-500 italic">{t('multisig.incoming_empty') || 'No pending incoming multisig proposals.'}</div>
             ) : incomingProposals.map((incoming) => (
               <div key={`incoming:${incoming.proposal.id}`} className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-3">
                 <div className="space-y-3">
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-white truncate">{incoming.proposal.title}</div>
                     <div className="text-[11px] text-slate-400 mt-1 break-words">
-                      From @{incoming.sentBy} • {incoming.proposal.chain} • @{incoming.proposal.initiator}
+                      {(t('multisig.incoming_from') || 'From @{user}').replace('{user}', incoming.sentBy)} • {incoming.proposal.chain} • @{incoming.proposal.initiator}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-1">
                       {new Date(incoming.sentAt).toLocaleString()}
                     </div>
                     <div className="mt-2 text-[10px] text-slate-300">
-                      Coordination target: <span className="font-bold text-white">{getCoordinationThreshold(incoming.proposal.signers)}</span>
+                      {(t('multisig.coordination_target') || 'Coordination target')}: <span className="font-bold text-white">{getCoordinationThreshold(incoming.proposal.signers)}</span>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -1107,13 +1213,13 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                       onClick={() => handleAcceptIncomingProposal(incoming)}
                       className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.1em] text-slate-200 hover:border-green-500 hover:text-white transition-colors"
                     >
-                      Accept
+                      {t('multisig.accept') || 'Accept'}
                     </button>
                     <button
                       onClick={() => handleRejectIncomingProposal(incoming.proposal.id)}
                       className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.1em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
                     >
-                      Reject
+                      {t('multisig.reject') || 'Reject'}
                     </button>
                   </div>
                 </div>
@@ -1131,7 +1237,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                 onChange={(e) => setRequest(prev => ({ ...prev, initiator: e.target.value }))}
                 className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
               >
-                {chainAccounts.length === 0 && <option value="">No {selectedChain} accounts imported</option>}
+                {chainAccounts.length === 0 && (
+                  <option value="">
+                    {(t('multisig.no_accounts') || 'No {chain} accounts imported').replace('{chain}', selectedChain)}
+                  </option>
+                )}
                 {chainAccounts.map((account) => (
                   <option key={`${account.chain}:${account.name}`} value={account.name}>
                     @{account.name}
@@ -1147,7 +1257,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   {getCoordinationThreshold(request.signers)}
                 </div>
                 <p className="mt-2 text-[10px] text-slate-500">
-                  Coordination requires all selected signers in this draft.
+                  {t('multisig.coordination_hint') || 'Coordination requires all selected signers in this draft.'}
                 </p>
               </div>
               <div>
@@ -1159,66 +1269,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
                 />
                 <p className="mt-2 text-[10px] text-slate-500">
-                  Direct multisig transactions should stay within about {DIRECT_MULTISIG_EXPIRATION_MINUTES} minutes.
+                  {(t('multisig.expiration_hint') || 'Direct multisig transactions should stay within about {minutes} minutes.').replace('{minutes}', String(DIRECT_MULTISIG_EXPIRATION_MINUTES))}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase font-bold">{t('multisig.authorities_title')}</p>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {authorityLoading
-                      ? 'Inspecting live active authority...'
-                      : looksLikeMultisig
-                        ? `On-chain threshold ${authority?.threshold}. Account auths and keys below are the real source of truth.`
-                        : 'This account does not currently expose a clear on-chain multisig active authority.'}
-                  </p>
-                </div>
-                {authority && (
-                  <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.18em] ${looksLikeMultisig ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-                    {looksLikeMultisig ? 'Ready' : 'Single Signer'}
-                  </div>
-                )}
-              </div>
-
-              {authorityError && (
-                <div className="text-xs text-red-400 bg-red-500/5 border border-red-500/10 rounded-xl p-3">
-                  {authorityError}
-                </div>
-              )}
-
-              {authority && (
-                <div className="space-y-3">
-                  <div className="text-xs text-slate-300">
-                    Threshold: <span className="font-black text-white">{authority.threshold}</span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {activeAuthorityAccounts.length > 0 ? activeAuthorityAccounts.map(([name, weight]) => (
-                      <div key={`acc:${name}`} className="flex items-center justify-between bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-xs">
-                        <span className="text-slate-200">@{name}</span>
-                        <span className="text-blue-400 font-black">+{weight}</span>
-                      </div>
-                    )) : (
-                      <div className="text-xs text-slate-500 italic">No account-based signers defined on-chain.</div>
-                    )}
-
-                    {activeAuthorityKeys.length > 0 && (
-                      <div className="pt-1 space-y-2">
-                        {activeAuthorityKeys.map(([key, weight]) => (
-                          <div key={`key:${key}`} className="flex items-center justify-between bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-[11px]">
-                            <span className="text-slate-400 font-mono truncate">{key.slice(0, 10)}...{key.slice(-8)}</span>
-                            <span className="text-purple-400 font-black">+{weight}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-4">
@@ -1228,14 +1283,14 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                 <input
                   value={newSigner}
                   onChange={(e) => setNewSigner(e.target.value)}
-                  placeholder="username"
+                  placeholder={t('multisig.username_placeholder') || 'username'}
                   className="min-w-0 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
                 />
                 <button
                   onClick={() => addSigner()}
                   className="px-3 sm:px-4 min-w-[64px] rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-black transition-colors"
                 >
-                  Add
+                  {t('multisig.add') || 'Add'}
                 </button>
               </div>
               {availableSigners.length > 0 && (
@@ -1255,7 +1310,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
             <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
               {request.signers.length === 0 ? (
-                <div className="text-xs text-slate-500 italic">No proposal signers selected yet.</div>
+                <div className="text-xs text-slate-500 italic">{t('multisig.signers_empty') || 'No proposal signers selected yet.'}</div>
               ) : request.signers.map((signer) => (
                 <span key={signer} className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs">
                   @{signer}
@@ -1275,7 +1330,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
               >
                 {MULTISIG_VISIBLE_OPERATION_TYPES.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.labelKey) || option.fallback}
                   </option>
                 ))}
               </select>
@@ -1285,11 +1340,13 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
               <div className="space-y-3 rounded-2xl border border-dark-700 bg-dark-900/60 p-4">
                 {opType !== 'withdraw_vesting' && (
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">Target account</label>
+                    <label className="text-xs text-slate-400 block mb-1">{t('multisig.target_account') || 'Target account'}</label>
                     <input
                       value={to}
                       onChange={(e) => setTo(e.target.value)}
-                      placeholder={opType === 'transfer_to_vesting' ? `Default: @${request.initiator}` : 'username'}
+                      placeholder={opType === 'transfer_to_vesting'
+                        ? (t('multisig.target_default') || 'Default: @{user}').replace('{user}', request.initiator)
+                        : (t('multisig.username_placeholder') || 'username')}
                       className="w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
                     />
                   </div>
@@ -1299,8 +1356,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       {opType === 'delegate_vesting_shares' || opType === 'withdraw_vesting'
-                        ? 'Amount (VESTS)'
-                        : `Amount (${selectedChain})`}
+                        ? (t('multisig.amount_vests') || 'Amount (VESTS)')
+                        : (t('multisig.amount_chain') || 'Amount ({chain})').replace('{chain}', selectedChain)}
                     </label>
                     <input
                       type="number"
@@ -1314,17 +1371,17 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
                 {opType === 'undelegate_vesting_shares' && (
                   <div className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3 text-xs text-slate-400">
-                    This proposal will undelegate the full power delegation from the selected account by setting the delegation amount to zero.
+                    {t('multisig.undelegate_hint') || 'This proposal will undelegate the full power delegation from the selected account by setting the delegation amount to zero.'}
                   </div>
                 )}
 
                 {opType === 'transfer' && (
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">Memo</label>
+                    <label className="text-xs text-slate-400 block mb-1">{t('multisig.memo') || 'Memo'}</label>
                     <input
                       value={memo}
                       onChange={(e) => setMemo(e.target.value)}
-                      placeholder="Optional note"
+                      placeholder={t('multisig.memo_placeholder') || 'Optional note'}
                       className="w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
                     />
                   </div>
@@ -1334,8 +1391,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-slate-500 uppercase font-bold">Operation preview</label>
-                {opType !== 'custom' && <span className="text-[10px] text-blue-400">Generated</span>}
+                <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.operation_preview') || 'Operation preview'}</label>
+                {opType !== 'custom' && <span className="text-[10px] text-blue-400">{t('multisig.generated') || 'Generated'}</span>}
               </div>
               <textarea
                 className={`w-full bg-dark-950 border border-dark-600 rounded-2xl p-3 text-[11px] font-mono h-32 outline-none focus:border-blue-500 ${opType !== 'custom' ? 'text-slate-400' : 'text-white'}`}
@@ -1348,16 +1405,16 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs text-slate-500 uppercase font-bold">Proposal draft</p>
+                  <p className="text-xs text-slate-500 uppercase font-bold">{t('multisig.proposal_draft') || 'Proposal draft'}</p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Export this JSON to coordinate signatures manually while we finish the full multisig transport flow.
+                    {t('multisig.draft_desc') || 'Export this JSON to coordinate signatures manually while we finish the full multisig transport flow.'}
                   </p>
                 </div>
                 <button
                   onClick={handleCopyDraft}
                   className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-[0.18em] transition-colors shrink-0"
                 >
-                  {copied ? 'Copied' : 'Copy'}
+                  {copied ? (t('multisig.copied') || 'Copied') : (t('multisig.copy') || 'Copy')}
                 </button>
               </div>
               <pre className="mt-3 text-[10px] text-slate-300 whitespace-pre-wrap break-all bg-black/30 rounded-xl p-3 border border-dark-700 max-h-48 overflow-y-auto custom-scrollbar">
@@ -1366,11 +1423,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             </div>
 
             <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase font-bold">Saved proposals</p>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500 uppercase font-bold">{t('multisig.saved_title') || 'Saved proposals'}</p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Keep local drafts here while the wallet syncs signer updates from on-chain multisig events.
+                    {t('multisig.saved_desc') || 'Keep local drafts here while the wallet syncs signer updates from on-chain multisig events.'}
                   </p>
                   {transportInfo && (
                     <p className="text-[10px] text-blue-400 mt-2 break-words">
@@ -1378,13 +1435,20 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                     </p>
                   )}
                 </div>
+                <button
+                  onClick={handleRefreshFromChain}
+                  disabled={refreshingChain}
+                  className="w-full sm:w-auto px-3 py-2 rounded-xl bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.08em] text-slate-200 hover:border-blue-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700 shrink-0"
+                >
+                  {refreshingChain ? (t('multisig.refreshing_chain') || 'Refreshing...') : (t('multisig.refresh_chain') || 'Refresh from chain')}
+                </button>
               </div>
 
               <div className="flex gap-2 items-stretch">
                 <input
                   value={saveLabel}
                   onChange={(e) => setSaveLabel(e.target.value)}
-                  placeholder="Proposal label"
+                  placeholder={t('multisig.proposal_label') || 'Proposal label'}
                   className="min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
                 />
                 <button
@@ -1392,13 +1456,13 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   disabled={!request.initiator || !request.operation}
                   className="px-4 shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors"
                 >
-                  Save
+                  {t('multisig.save') || 'Save'}
                 </button>
               </div>
 
               <div className="space-y-2">
                 {savedProposals.length === 0 ? (
-                  <div className="text-xs text-slate-500 italic">No saved multisig proposals yet.</div>
+                  <div className="text-xs text-slate-500 italic">{t('multisig.saved_empty') || 'No saved multisig proposals yet.'}</div>
                 ) : savedProposals.map((proposal) => (
                   <div key={proposal.id} className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3">
                     {(() => {
@@ -1407,42 +1471,78 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                         ? calculateThresholdProgress(proposal.authoritySnapshot, partialSignatures)
                         : null;
                       const coordinationProgress = calculateCoordinationProgress(proposal, partialSignatures);
+                      const status = getProposalStatus(proposal, coordinationProgress, onChainProgress, t);
+                      const timeline = buildProposalTimeline(proposal, t);
                       const localSigners = getLocalSigners(proposal);
                       const signedNames = new Set(partialSignatures.map((entry) => entry.username));
 
                       return (
                     <div className="space-y-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-bold text-white truncate">{proposal.title}</div>
-                        <div className="text-[11px] text-slate-400 mt-1 break-words">
-                          {proposal.chain} • @{proposal.initiator} • {getCoordinationThreshold(proposal.signers)} signers
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-white truncate">{proposal.title}</div>
+                            <div className="text-[11px] text-slate-400 mt-1 break-words">
+                              {proposal.chain} • @{proposal.initiator} • {getCoordinationThreshold(proposal.signers)} {(t('multisig.signers_count') || 'signers')}
+                            </div>
+                          </div>
+                          <span className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.12em] ${status.tone}`}>
+                            {status.label}
+                          </span>
                         </div>
-                        <div className="text-[10px] text-slate-500 mt-1">
+                        <div className="text-[11px] text-slate-400 mt-1 break-words">
                           {new Date(proposal.createdAt).toLocaleString()}
                         </div>
                         <div className="mt-2 text-[10px] text-slate-300">
-                          Coordination: <span className="font-bold text-white">{coordinationProgress.current}</span> / {coordinationProgress.threshold}
+                          {(t('multisig.coordination') || 'Coordination')}: <span className="font-bold text-white">{coordinationProgress.current}</span> / {coordinationProgress.threshold}
                         </div>
                         {onChainProgress && (
                           <div className="mt-2 text-[10px] text-slate-400">
-                            On-chain: <span className="font-bold text-white">{onChainProgress.currentWeight}</span> / {onChainProgress.threshold}
+                            {(t('multisig.on_chain') || 'On-chain')}: <span className="font-bold text-white">{onChainProgress.currentWeight}</span> / {onChainProgress.threshold}
                           </div>
                         )}
                         {onChainProgress && proposal.threshold !== onChainProgress.threshold && (
                           <div className="mt-1 text-[10px] text-amber-400 break-words">
-                            Draft coordination threshold differs from current on-chain authority threshold.
+                            {t('multisig.threshold_mismatch') || 'Draft coordination threshold differs from current on-chain authority threshold.'}
                           </div>
                         )}
                         {partialSignatures.length > 0 && (
                           <div className="mt-1 text-[10px] text-blue-400 break-words">
-                            Signed by {partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
+                            {(t('multisig.signed_by') || 'Signed by')} {partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
                           </div>
                         )}
                         {proposal.lastBroadcastTxId && (
                           <div className="mt-1 text-[10px] text-green-400 break-all">
-                            Broadcasted: {proposal.lastBroadcastTxId}
+                            {(t('multisig.broadcasted_tx') || 'Broadcasted')}: {proposal.lastBroadcastTxId}
                           </div>
                         )}
+                      </div>
+                      <div className="rounded-xl border border-dark-700 bg-dark-900/70 px-3 py-3 space-y-2">
+                        <div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                          {t('multisig.timeline_title') || 'Proposal history'}
+                        </div>
+                        <div className="space-y-1.5">
+                          {timeline.length === 0 ? (
+                            <div className="text-[10px] text-slate-500 italic">
+                              {t('multisig.timeline_empty') || 'No history yet.'}
+                            </div>
+                          ) : timeline.map((entry) => (
+                            <div key={entry.id} className="flex items-center justify-between gap-3 text-[10px]">
+                              <span className={
+                                entry.tone === 'success'
+                                  ? 'text-green-400'
+                                  : entry.tone === 'info'
+                                    ? 'text-blue-400'
+                                    : 'text-slate-300'
+                              }>
+                                {entry.label}
+                              </span>
+                              <span className="text-slate-500 shrink-0">
+                                {entry.at ? new Date(entry.at).toLocaleString() : '—'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                       {proposal.lastBroadcastTxId ? (
                         <button
@@ -1458,19 +1558,19 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                               onClick={() => handleLoadProposal(proposal)}
                               className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors"
                             >
-                              Load
+                              {t('multisig.load') || 'Load'}
                             </button>
                             <button
                               onClick={() => handleCopyProposalPackage(proposal)}
                               className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors"
                             >
-                              Copy
+                              {t('multisig.copy') || 'Copy'}
                             </button>
                             <button
                               onClick={() => handleDeleteProposal(proposal.id)}
                               className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
                             >
-                              Delete
+                              {t('multisig.delete') || 'Delete'}
                             </button>
                           </div>
                           <div className="space-y-2">
@@ -1484,17 +1584,17 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                                 >
                                   {proposalBusyId === proposal.id ? '...' : signedNames.has(signer.name) ? (
                                     <span className="block break-words normal-case tracking-normal font-bold">
-                                      Signed @{signer.name}
+                                      {(t('multisig.signed') || 'Signed')} @{signer.name}
                                     </span>
                                   ) : (
                                     <span className="block break-words normal-case tracking-normal font-bold">
-                                      Sign @{signer.name}
+                                      {(t('multisig.sign') || 'Sign')} @{signer.name}
                                     </span>
                                   )}
                                 </button>
                               )) : (
                                 <div className="col-span-2 min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-700 text-[10px] text-slate-500 text-center">
-                                  No local signer
+                                  {t('multisig.no_local_signer') || 'No local signer'}
                                 </div>
                               )}
                             </div>
@@ -1503,7 +1603,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                               disabled={!coordinationProgress.canBroadcast || !onChainProgress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
                               className="w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
                             >
-                              Broadcast
+                              {t('multisig.broadcast') || 'Broadcast'}
                             </button>
                           </div>
                         </>
@@ -1517,7 +1617,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
               <div className="pt-2 border-t border-dark-700/80 space-y-2">
                 <p className="text-[11px] text-slate-400">
-                  Paste a shared proposal package here to import it into this device.
+                  {t('multisig.import_desc') || 'Paste a shared proposal package here to import it into this device.'}
                 </p>
                 <textarea
                   value={importPayload}
@@ -1531,10 +1631,71 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                     disabled={!importPayload.trim()}
                     className="px-4 py-2 rounded-xl bg-dark-900 border border-dark-600 disabled:text-slate-600 disabled:border-dark-700 text-slate-200 text-xs font-black uppercase tracking-[0.14em] hover:border-blue-500 hover:text-white transition-colors"
                   >
-                    Import package
+                    {t('multisig.import_package') || 'Import package'}
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl">
+            <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-bold">{t('multisig.authorities_title')}</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {t('multisig.authority_reference_hint') || 'This is a reference view of the live on-chain authority for the initiator account. It does not change the coordination quorum of this draft.'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-2">
+                    {authorityLoading
+                      ? (t('multisig.authority_loading') || 'Inspecting live active authority...')
+                      : looksLikeMultisig
+                        ? (t('multisig.authority_ready_desc') || 'On-chain threshold {threshold}. Account auths and keys below are the real source of truth.').replace('{threshold}', String(authority?.threshold || 0))
+                        : (t('multisig.authority_single_desc') || 'This account signs normally on-chain with a single active authority. Your practical multisig coordination still happens above at the draft level.')}
+                  </p>
+                </div>
+                {authority && (
+                  <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.18em] ${looksLikeMultisig ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                    {looksLikeMultisig ? (t('multisig.authority_ready_badge') || 'Ready') : (t('multisig.authority_single_badge') || 'Single Signer')}
+                  </div>
+                )}
+              </div>
+
+              {authorityError && (
+                <div className="text-xs text-red-400 bg-red-500/5 border border-red-500/10 rounded-xl p-3">
+                  {authorityError}
+                </div>
+              )}
+
+              {authority && (
+                <div className="space-y-3">
+                  <div className="text-xs text-slate-300">
+                    {t('multisig.threshold_label') || 'Threshold'}: <span className="font-black text-white">{authority.threshold}</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {activeAuthorityAccounts.length > 0 ? activeAuthorityAccounts.map(([name, weight]) => (
+                      <div key={`acc:${name}`} className="flex items-center justify-between bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-xs">
+                        <span className="text-slate-200">@{name}</span>
+                        <span className="text-blue-400 font-black">+{weight}</span>
+                      </div>
+                    )) : (
+                      <div className="text-xs text-slate-500 italic">{t('multisig.authority_no_accounts') || 'No account-based signers defined on-chain.'}</div>
+                    )}
+
+                    {activeAuthorityKeys.length > 0 && (
+                      <div className="pt-1 space-y-2">
+                        {activeAuthorityKeys.map(([key, weight]) => (
+                          <div key={`key:${key}`} className="flex items-center justify-between bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-[11px]">
+                            <span className="text-slate-400 font-mono truncate">{key.slice(0, 10)}...{key.slice(-8)}</span>
+                            <span className="text-purple-400 font-black">+{weight}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
