@@ -12217,16 +12217,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
               sentAt: event.sentAt,
               sentBy: event.sender || sender
             };
-            if (localUsernames.has(normalizedProposal.initiator)) {
-              nextSaved = mergeProposalIntoList(incomingEntry.proposal, nextSaved);
-              savedChanged = true;
-            } else {
-              nextIncoming = mergeIncomingProposal(incomingEntry, nextIncoming);
-              incomingChanged = true;
-              if (shouldNotify) {
-                setTransportInfo(`Incoming on-chain proposal pending review from @${incomingEntry.sentBy}`);
-                showNotification(`On-chain multisig proposal pending review from @${incomingEntry.sentBy}`, "info");
-              }
+            nextIncoming = mergeIncomingProposal(incomingEntry, nextIncoming);
+            incomingChanged = true;
+            if (shouldNotify) {
+              setTransportInfo(`Incoming on-chain proposal pending review from @${incomingEntry.sentBy}`);
+              showNotification(`On-chain multisig proposal pending review from @${incomingEntry.sentBy}`, "info");
             }
             continue;
           }
