@@ -704,9 +704,6 @@ video {
 .mt-4 {
   margin-top: 1rem;
 }
-.mt-5 {
-  margin-top: 1.25rem;
-}
 .mt-6 {
   margin-top: 1.5rem;
 }
@@ -959,6 +956,9 @@ video {
 }
 .min-w-\[180px\] {
   min-width: 180px;
+}
+.min-w-\[52px\] {
+  min-width: 52px;
 }
 .min-w-\[64px\] {
   min-width: 64px;
@@ -1315,6 +1315,9 @@ video {
 }
 .whitespace-pre-wrap {
   white-space: pre-wrap;
+}
+.text-balance {
+  text-wrap: balance;
 }
 .break-words {
   overflow-wrap: break-word;
@@ -3228,6 +3231,10 @@ body,
 
 @media (min-width: 640px) {
 
+  .sm\:hidden {
+    display: none;
+  }
+
   .sm\:w-auto {
     width: auto;
   }
@@ -3255,6 +3262,11 @@ body,
   .sm\:px-4 {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+
+  .sm\:text-xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
   }
 }
 

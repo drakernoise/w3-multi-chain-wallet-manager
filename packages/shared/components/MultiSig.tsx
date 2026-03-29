@@ -49,6 +49,7 @@ interface SavedMultiSigProposal {
   unsignedTransaction?: any;
   partialSignatures: MultiSigPartialSignature[];
   lastBroadcastTxId?: string;
+  expiredAt?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -121,7 +122,18 @@ interface MultiSigBroadcastedEvent {
   txId: string;
 }
 
-type MultiSigChainEvent = MultiSigCreatedEvent | MultiSigSignedEvent | MultiSigBroadcastedEvent;
+interface MultiSigExpiredEvent {
+  v: 1;
+  namespace: 'gravity.multisig';
+  type: 'proposal_expired';
+  proposalId: string;
+  sentAt: number;
+  sender: string;
+  chain: Chain;
+  expiredAt: number;
+}
+
+type MultiSigChainEvent = MultiSigCreatedEvent | MultiSigSignedEvent | MultiSigBroadcastedEvent | MultiSigExpiredEvent;
 
 const toLocalDateTimeInput = (date: Date): string => {
   const pad = (value: number) => String(value).padStart(2, '0');
@@ -149,6 +161,19 @@ const normalizeMultiSigExpiration = (rawValue?: string | null): { localValue: st
 const getCoordinationThreshold = (signers: string[]): number => {
   const unique = new Set((signers || []).map((name) => name.replace(/^@/, '').trim()).filter(Boolean));
   return Math.max(1, unique.size);
+};
+
+const getProposalExpirationTime = (proposal: Pick<SavedMultiSigProposal, 'expiration'>): number | null => {
+  if (!proposal.expiration) return null;
+  const parsed = new Date(proposal.expiration).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const isProposalExpired = (proposal: Pick<SavedMultiSigProposal, 'expiration' | 'lastBroadcastTxId' | 'expiredAt'>): boolean => {
+  if (proposal.lastBroadcastTxId) return false;
+  if (proposal.expiredAt) return true;
+  const expirationTime = getProposalExpirationTime(proposal);
+  return expirationTime !== null && Date.now() >= expirationTime;
 };
 
 const calculateCoordinationProgress = (
@@ -190,6 +215,7 @@ const normalizeSavedProposal = (proposal: Partial<SavedMultiSigProposal> | null 
     unsignedTransaction: proposal.unsignedTransaction,
     partialSignatures: Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [],
     lastBroadcastTxId: proposal.lastBroadcastTxId,
+    expiredAt: proposal.expiredAt,
     createdAt: proposal.createdAt || Date.now(),
     updatedAt: proposal.updatedAt || proposal.createdAt || Date.now()
   };
@@ -233,14 +259,48 @@ const normalizeChainEvent = (value: any): MultiSigChainEvent | null => {
     return value as MultiSigBroadcastedEvent;
   }
 
+  if (value.type === 'proposal_expired' && value.expiredAt) {
+    return value as MultiSigExpiredEvent;
+  }
+
   return null;
 };
 
-const chainTheme = {
-  [Chain.HIVE]: 'bg-hive text-white shadow-lg',
-  [Chain.STEEM]: 'bg-steem text-white shadow-lg',
-  [Chain.BLURT]: 'bg-blurt text-white shadow-lg'
-};
+const IconChevron = ({ open }: { open: boolean }) => (
+  <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
+const IconJump = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5h6v14H5" />
+  </svg>
+);
+
+const IconLoad = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+  </svg>
+);
+
+const IconCopy = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8a2 2 0 012 2v8m-10 0H6a2 2 0 01-2-2V7m4 10h8a2 2 0 002-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+);
+
+const IconTrash = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+  </svg>
+);
+
+const IconSave = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
 
 const getProposalStatus = (
   proposal: SavedMultiSigProposal,
@@ -248,6 +308,13 @@ const getProposalStatus = (
   onChainProgress: { currentWeight: number; threshold: number; canBroadcast: boolean } | null,
   t: (key: string) => string
 ): { label: string; tone: string } => {
+  if (isProposalExpired(proposal)) {
+    return {
+      label: t('multisig.status_expired') || 'Expired',
+      tone: 'bg-red-500/10 text-red-400 border border-red-500/20'
+    };
+  }
+
   if (proposal.lastBroadcastTxId) {
     return {
       label: t('multisig.status_broadcasted') || 'Broadcasted',
@@ -283,6 +350,12 @@ const buildProposalTimeline = (proposal: SavedMultiSigProposal, t: (key: string)
         label: `${t('multisig.timeline_signed') || 'Signed'} @${signature.username}`,
         at: signature.signedAt || null
       })),
+    ...(proposal.expiredAt ? [{
+      id: `${proposal.id}:expired`,
+      tone: 'neutral' as const,
+      label: t('multisig.timeline_expired') || 'Expired',
+      at: proposal.expiredAt
+    }] : []),
     ...(proposal.lastBroadcastTxId ? [{
       id: `${proposal.id}:broadcasted`,
       tone: 'success' as const,
@@ -315,6 +388,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const [authorityError, setAuthorityError] = useState<string | null>(null);
   const [transportInfo, setTransportInfo] = useState<string | null>(null);
   const [refreshingChain, setRefreshingChain] = useState(false);
+  const [showOperationPreview, setShowOperationPreview] = useState(false);
+  const [showProposalDraft, setShowProposalDraft] = useState(false);
+  const [expandedBroadcasted, setExpandedBroadcasted] = useState<Record<string, boolean>>({});
+  const isMountedRef = useRef(true);
+  const copyResetTimeoutRef = useRef<number | null>(null);
   const savedProposalsRef = useRef<SavedMultiSigProposal[]>([]);
   const incomingProposalsRef = useRef<IncomingMultiSigProposal[]>([]);
 
@@ -329,6 +407,17 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     threshold: 1,
     operation: '{}'
   });
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (copyResetTimeoutRef.current) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+        copyResetTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     savedProposalsRef.current = savedProposals;
@@ -357,7 +446,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             .map((proposal) => normalizeSavedProposal(proposal))
             .filter((proposal): proposal is SavedMultiSigProposal => !!proposal);
 
-          setSavedProposals(normalized);
+          if (isMountedRef.current) {
+            setSavedProposals(normalized);
+          }
 
           if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
             await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(normalized));
@@ -379,7 +470,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             })
             .filter((entry): entry is IncomingMultiSigProposal => !!entry);
 
-          setIncomingProposals(normalizedIncoming);
+          if (isMountedRef.current) {
+            setIncomingProposals(normalizedIncoming);
+          }
 
           if (JSON.stringify(parsedIncoming) !== JSON.stringify(normalizedIncoming)) {
             await storageService.setItem(MULTISIG_INCOMING_STORAGE_KEY, JSON.stringify(normalizedIncoming));
@@ -410,19 +503,25 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
     const loadAuthority = async () => {
       if (!request.initiator) {
-        setAuthority(null);
-        setAuthorityError(null);
+        if (isMountedRef.current) {
+          setAuthority(null);
+          setAuthorityError(null);
+        }
         return;
       }
 
-      setAuthorityLoading(true);
-      setAuthorityError(null);
+      if (isMountedRef.current) {
+        setAuthorityLoading(true);
+        setAuthorityError(null);
+      }
 
       try {
         const auth = await getAccountAuthorities(selectedChain, request.initiator, 'active');
         if (cancelled) return;
-        setAuthority(auth);
-        if (auth?.threshold) {
+        if (isMountedRef.current) {
+          setAuthority(auth);
+        }
+        if (auth?.threshold && isMountedRef.current) {
           setRequest(prev => ({
             ...prev,
             threshold: Math.max(1, Math.min(prev.threshold || auth.threshold, auth.threshold))
@@ -430,10 +529,12 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
         }
       } catch (error: any) {
         if (cancelled) return;
-        setAuthority(null);
-        setAuthorityError(error?.message || 'Failed to inspect account authority.');
+        if (isMountedRef.current) {
+          setAuthority(null);
+          setAuthorityError(error?.message || 'Failed to inspect account authority.');
+        }
       } finally {
-        if (!cancelled) setAuthorityLoading(false);
+        if (!cancelled && isMountedRef.current) setAuthorityLoading(false);
       }
     };
 
@@ -521,6 +622,10 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const activeAuthorityAccounts = authority?.accountAuths ?? [];
   const activeAuthorityKeys = authority?.keyAuths ?? [];
   const looksLikeMultisig = !!authority && (activeAuthorityAccounts.length > 0 || authority.threshold > 1);
+  const activeProposal = useMemo(
+    () => savedProposals.find((proposal) => !proposal.lastBroadcastTxId && !isProposalExpired(proposal)) || null,
+    [savedProposals]
+  );
 
   const addSigner = (signerName?: string) => {
     const signer = (signerName ?? newSigner).trim().replace(/^@/, '');
@@ -554,17 +659,33 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
   const handleCopyDraft = async () => {
     await navigator.clipboard.writeText(proposalDraft);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    if (isMountedRef.current) {
+      setCopied(true);
+    }
+    if (copyResetTimeoutRef.current) {
+      window.clearTimeout(copyResetTimeoutRef.current);
+    }
+    copyResetTimeoutRef.current = window.setTimeout(() => {
+      if (isMountedRef.current) {
+        setCopied(false);
+      }
+      copyResetTimeoutRef.current = null;
+    }, 1800);
   };
 
   const persistSavedProposals = async (proposals: SavedMultiSigProposal[]) => {
-    setSavedProposals(proposals);
+    savedProposalsRef.current = proposals;
+    if (isMountedRef.current) {
+      setSavedProposals(proposals);
+    }
     await storageService.setItem(MULTISIG_STORAGE_KEY, JSON.stringify(proposals));
   };
 
   const persistIncomingProposals = async (entries: IncomingMultiSigProposal[]) => {
-    setIncomingProposals(entries);
+    incomingProposalsRef.current = entries;
+    if (isMountedRef.current) {
+      setIncomingProposals(entries);
+    }
     await storageService.setItem(MULTISIG_INCOMING_STORAGE_KEY, JSON.stringify(entries));
   };
 
@@ -619,7 +740,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     const announcer = getAnnouncementAccount(announcerName, event.chain);
     if (!announcer) {
       const message = `On-chain multisig sync unavailable for @${announcerName}: import a posting or active key first.`;
-      setTransportInfo(message);
+      if (isMountedRef.current) setTransportInfo(message);
       showNotification(message, 'info');
       return;
     }
@@ -635,12 +756,14 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
     if (!result.success) {
       const message = result.error || 'Failed to publish multisig sync event on-chain.';
-      setTransportInfo(message);
+      if (isMountedRef.current) setTransportInfo(message);
       showNotification(message, 'info');
       return;
     }
 
-    setTransportInfo(`On-chain multisig update published by @${announcer.account.name}`);
+    if (isMountedRef.current) {
+      setTransportInfo(`On-chain multisig update published by @${announcer.account.name}`);
+    }
   };
 
   const ensureProposalArtifacts = async (proposal: SavedMultiSigProposal): Promise<SavedMultiSigProposal> => {
@@ -812,8 +935,14 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
   const handlePartialSignProposal = async (proposal: SavedMultiSigProposal, signer: Account) => {
     if (!signer?.activeKey) return;
+    if (isProposalExpired(proposal)) {
+      showNotification(t('multisig.sign_expired_blocked') || 'This proposal has expired. Reuse it to generate a fresh one.', 'info');
+      return;
+    }
 
-    setProposalBusyId(proposal.id);
+    if (isMountedRef.current) {
+      setProposalBusyId(proposal.id);
+    }
     try {
       const readyProposal = await ensureProposalArtifacts(proposal);
       const signResult = await signTransactionEnvelope(
@@ -842,7 +971,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       };
 
       await persistSavedProposals(savedProposalsRef.current.map((entry) => entry.id === proposal.id ? nextProposal : entry));
-      setTransportInfo(`Signed locally as @${signer.name}`);
+      if (isMountedRef.current) {
+        setTransportInfo(`Signed locally as @${signer.name}`);
+      }
       showNotification(`Signed proposal as @${signer.name}`, 'success');
       await publishMultiSigEvent({
         v: 1,
@@ -857,12 +988,20 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     } catch (error) {
       console.warn('Failed to partial-sign multisig proposal:', error);
     } finally {
-      setProposalBusyId(null);
+      if (isMountedRef.current) {
+        setProposalBusyId(null);
+      }
     }
   };
 
   const handleBroadcastProposal = async (proposal: SavedMultiSigProposal) => {
-    setProposalBusyId(proposal.id);
+    if (isProposalExpired(proposal)) {
+      showNotification(t('multisig.broadcast_expired_blocked') || 'This proposal has expired. Reuse it to generate a fresh one.', 'info');
+      return;
+    }
+    if (isMountedRef.current) {
+      setProposalBusyId(proposal.id);
+    }
     try {
       const readyProposal = await ensureProposalArtifacts(proposal);
       if (!readyProposal.authoritySnapshot || !readyProposal.unsignedTransaction) {
@@ -889,7 +1028,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       };
 
       await persistSavedProposals(savedProposalsRef.current.map((entry) => entry.id === proposal.id ? nextProposal : entry));
-      setTransportInfo(`Broadcasted ${nextProposal.title} successfully`);
+      if (isMountedRef.current) {
+        setTransportInfo(`Broadcasted ${nextProposal.title} successfully`);
+      }
       showNotification(`Broadcasted ${nextProposal.title} successfully`, 'success');
       const publisher = proposal.partialSignatures
         .map((entry) => entry.username)
@@ -909,7 +1050,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       console.warn('Failed to broadcast multisig proposal:', error);
       showNotification((error as Error)?.message || 'Failed to broadcast multisig proposal', 'error');
     } finally {
-      setProposalBusyId(null);
+      if (isMountedRef.current) {
+        setProposalBusyId(null);
+      }
     }
   };
 
@@ -952,7 +1095,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     const nextIncoming = incomingProposalsRef.current.filter((entry) => entry.proposal.id !== incoming.proposal.id);
     await persistSavedProposals(mergedSaved);
     await persistIncomingProposals(nextIncoming);
-    setTransportInfo(`Accepted update from @${incoming.sentBy}`);
+    if (isMountedRef.current) {
+      setTransportInfo(`Accepted update from @${incoming.sentBy}`);
+    }
     showNotification(`Accepted multisig update from @${incoming.sentBy}`, 'success');
   };
 
@@ -960,6 +1105,70 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     const nextIncoming = incomingProposalsRef.current.filter((entry) => entry.proposal.id !== proposalId);
     await persistIncomingProposals(nextIncoming);
   };
+
+  const handleJumpToActiveProposal = () => {
+    if (!activeProposal) return;
+    const element = document.getElementById(`proposal-card-${activeProposal.id}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const getExpirationPublisher = (proposal: SavedMultiSigProposal): string | null => {
+    const candidates = [
+      proposal.initiator,
+      ...proposal.signers,
+      ...proposal.partialSignatures.map((entry) => entry.username)
+    ].map((value) => value.replace(/^@/, '').trim()).filter(Boolean);
+
+    return candidates.find((username) => !!getAnnouncementAccount(username, proposal.chain)) || null;
+  };
+
+  const expireProposalsIfNeeded = useCallback(async () => {
+    const now = Date.now();
+    const expireEntry = (proposal: SavedMultiSigProposal): SavedMultiSigProposal =>
+      !proposal.expiredAt && !proposal.lastBroadcastTxId && getProposalExpirationTime(proposal) !== null && getProposalExpirationTime(proposal)! <= now
+        ? {
+            ...proposal,
+            expiredAt: getProposalExpirationTime(proposal)!,
+            updatedAt: Math.max(proposal.updatedAt, getProposalExpirationTime(proposal)!)
+          }
+        : proposal;
+
+    const nextSaved = savedProposalsRef.current.map(expireEntry);
+    const nextIncoming = incomingProposalsRef.current.map((entry) => ({
+      ...entry,
+      proposal: expireEntry(entry.proposal)
+    }));
+
+    const newlyExpiredSaved = nextSaved.filter((proposal) => proposal.expiredAt && !savedProposalsRef.current.find((entry) => entry.id === proposal.id)?.expiredAt);
+    const newlyExpiredIncoming = nextIncoming
+      .map((entry) => entry.proposal)
+      .filter((proposal) => proposal.expiredAt && !incomingProposalsRef.current.find((entry) => entry.proposal.id === proposal.id)?.proposal.expiredAt);
+
+    if (JSON.stringify(nextSaved) !== JSON.stringify(savedProposalsRef.current)) {
+      await persistSavedProposals(nextSaved);
+    }
+
+    if (JSON.stringify(nextIncoming) !== JSON.stringify(incomingProposalsRef.current)) {
+      await persistIncomingProposals(nextIncoming);
+    }
+
+    for (const proposal of [...newlyExpiredSaved, ...newlyExpiredIncoming]) {
+      const publisher = getExpirationPublisher(proposal);
+      if (!publisher) continue;
+      await publishMultiSigEvent({
+        v: 1,
+        namespace: 'gravity.multisig',
+        type: 'proposal_expired',
+        proposalId: proposal.id,
+        sentAt: Date.now(),
+        sender: publisher,
+        chain: proposal.chain,
+        expiredAt: proposal.expiredAt || now
+      }, publisher);
+    }
+  }, [accounts]);
 
   const syncOnChainProposals = useCallback(async (options?: { resetCursor?: boolean; announceRefresh?: boolean }) => {
       const resetCursor = !!options?.resetCursor;
@@ -1006,6 +1215,8 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   ? `${event.proposalId}:${event.type}:${event.signature.username}:${event.signature.signature}`
                   : event.type === 'proposal_broadcasted'
                     ? `${event.proposalId}:${event.type}:${event.txId}`
+                    : event.type === 'proposal_expired'
+                      ? `${event.proposalId}:${event.type}`
                     : `${event.proposalId}:${event.type}`;
                 return [dedupeKey, entry] as const;
               })
@@ -1070,6 +1281,14 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
               };
             }
 
+            if (event.type === 'proposal_expired') {
+              return {
+                ...proposal,
+                updatedAt: Math.max(proposal.updatedAt, event.sentAt),
+                expiredAt: event.expiredAt
+              };
+            }
+
             return {
               ...proposal,
               updatedAt: Math.max(proposal.updatedAt, event.sentAt),
@@ -1086,6 +1305,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             }
             if (shouldNotify && event.type === 'proposal_broadcasted') {
               showNotification(`Proposal ${savedMatch.title} was broadcasted on-chain`, 'success');
+            }
+            if (shouldNotify && event.type === 'proposal_expired') {
+              showNotification(`Proposal ${savedMatch.title} expired before broadcast`, 'info');
             }
             continue;
           }
@@ -1145,12 +1367,24 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     };
   }, [syncOnChainProposals]);
 
+  useEffect(() => {
+    expireProposalsIfNeeded();
+    const interval = window.setInterval(() => {
+      expireProposalsIfNeeded();
+    }, 30000);
+    return () => window.clearInterval(interval);
+  }, [expireProposalsIfNeeded]);
+
   const handleRefreshFromChain = async () => {
-    setRefreshingChain(true);
+    if (isMountedRef.current) {
+      setRefreshingChain(true);
+    }
     try {
       await syncOnChainProposals({ resetCursor: true, announceRefresh: true });
     } finally {
-      setRefreshingChain(false);
+      if (isMountedRef.current) {
+        setRefreshingChain(false);
+      }
     }
   };
 
@@ -1159,23 +1393,18 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
       <div className="space-y-4">
         <div className="bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-black text-white tracking-tight">{t('multisig.title')}</h2>
-              <p className="text-xs text-slate-500 mt-1">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-black text-white tracking-tight leading-tight text-balance">{t('multisig.title')}</h2>
+              <p className="text-xs text-slate-500 mt-2 max-w-md">
                 {t('multisig.header_desc') || 'Build a multisig proposal draft and inspect the live account authority before coordinating signatures.'}
               </p>
             </div>
-            <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <div className="shrink-0 px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20">
               {t('multisig.alpha_badge') || 'Alpha'}
             </div>
           </div>
 
-          <div className="flex p-1 bg-dark-900 rounded-xl mt-5 border border-dark-700">
-            <div className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${chainTheme[MULTISIG_SUPPORTED_CHAIN]}`}>
-              {MULTISIG_SUPPORTED_CHAIN}
-            </div>
-          </div>
-          <p className="mt-2 text-[10px] text-slate-500">
+          <p className="mt-4 text-[10px] text-slate-500">
             {(t('multisig.blurt_only') || 'MultiSig sync is currently implemented only for {chain}.').replace('{chain}', MULTISIG_SUPPORTED_CHAIN)}
           </p>
         </div>
@@ -1250,16 +1479,18 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.threshold')}</label>
-                <div className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white">
-                  {getCoordinationThreshold(request.signers)}
+            <div className={`grid gap-3 ${looksLikeMultisig ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {looksLikeMultisig && (
+                <div>
+                  <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.threshold')}</label>
+                  <div className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white">
+                    {authority?.threshold || getCoordinationThreshold(request.signers)}
+                  </div>
+                  <p className="mt-2 text-[10px] text-slate-500">
+                    {t('multisig.threshold_hint_onchain') || 'Visible only because this account already exposes a multisig authority on-chain.'}
+                  </p>
                 </div>
-                <p className="mt-2 text-[10px] text-slate-500">
-                  {t('multisig.coordination_hint') || 'Coordination requires all selected signers in this draft.'}
-                </p>
-              </div>
+              )}
               <div>
                 <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.expiration')}</label>
                 <input
@@ -1269,7 +1500,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   className="w-full mt-2 bg-dark-900 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
                 />
                 <p className="mt-2 text-[10px] text-slate-500">
-                  {(t('multisig.expiration_hint') || 'Direct multisig transactions should stay within about {minutes} minutes.').replace('{minutes}', String(DIRECT_MULTISIG_EXPIRATION_MINUTES))}
+                  {(t('multisig.expiration_hint_practical') || 'This is the expiration of the signed transaction itself. If it expires before the final broadcast, signatures must be collected again.').replace('{minutes}', String(DIRECT_MULTISIG_EXPIRATION_MINUTES))}
                 </p>
               </div>
             </div>
@@ -1319,6 +1550,45 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                   </button>
                 </span>
               ))}
+            </div>
+
+            <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500 uppercase font-bold">{t('multisig.create_section') || 'Create proposal'}</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {t('multisig.create_desc') || 'Build the proposal here, then save it to start collecting signatures.'}
+                  </p>
+                </div>
+                {activeProposal && (
+                  <button
+                    onClick={handleJumpToActiveProposal}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.08em] text-slate-200 hover:border-blue-500 hover:text-white transition-colors shrink-0"
+                  >
+                    <IconJump />
+                    <span>{t('multisig.jump_active') || 'Go to active proposal'}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+                <input
+                  value={saveLabel}
+                  onChange={(e) => setSaveLabel(e.target.value)}
+                  placeholder={t('multisig.proposal_label') || 'Proposal label'}
+                  className="min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleSaveProposal}
+                  disabled={!request.initiator || !request.operation}
+                  title={t('multisig.save') || 'Save'}
+                  aria-label={t('multisig.save') || 'Save'}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 min-w-[52px] shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors"
+                >
+                  <IconSave />
+                  <span className="sm:hidden">{t('multisig.save') || 'Save'}</span>
+                </button>
+              </div>
             </div>
 
             <div>
@@ -1389,37 +1659,68 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
               </div>
             )}
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-slate-500 uppercase font-bold">{t('multisig.operation_preview') || 'Operation preview'}</label>
-                {opType !== 'custom' && <span className="text-[10px] text-blue-400">{t('multisig.generated') || 'Generated'}</span>}
-              </div>
-              <textarea
-                className={`w-full bg-dark-950 border border-dark-600 rounded-2xl p-3 text-[11px] font-mono h-32 outline-none focus:border-blue-500 ${opType !== 'custom' ? 'text-slate-400' : 'text-white'}`}
-                value={request.operation}
-                onChange={(e) => opType === 'custom' && setRequest(prev => ({ ...prev, operation: e.target.value }))}
-                readOnly={opType !== 'custom'}
-              />
+            <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4">
+              <button
+                onClick={() => setShowOperationPreview((prev) => !prev)}
+                className="w-full flex items-center justify-between gap-3 text-left"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-slate-500 uppercase font-bold cursor-pointer">{t('multisig.operation_preview') || 'Operation preview'}</label>
+                    {opType !== 'custom' && <span className="text-[10px] text-blue-400">{t('multisig.generated') || 'Generated'}</span>}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {showOperationPreview
+                      ? (t('multisig.preview_expanded') || 'Raw operation payload visible for review.')
+                      : (t('multisig.preview_collapsed') || 'Collapsed by default to keep the form clean.')}
+                  </p>
+                </div>
+                <span className="shrink-0 text-slate-400">
+                  <IconChevron open={showOperationPreview} />
+                </span>
+              </button>
+              {showOperationPreview && (
+                <textarea
+                  className={`w-full mt-3 bg-dark-950 border border-dark-600 rounded-2xl p-3 text-[11px] font-mono h-32 outline-none focus:border-blue-500 ${opType !== 'custom' ? 'text-slate-400' : 'text-white'}`}
+                  value={request.operation}
+                  onChange={(e) => opType === 'custom' && setRequest(prev => ({ ...prev, operation: e.target.value }))}
+                  readOnly={opType !== 'custom'}
+                />
+              )}
             </div>
 
             <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <button
+                onClick={() => setShowProposalDraft((prev) => !prev)}
+                className="w-full flex items-center justify-between gap-3 text-left"
+              >
+                <div className="min-w-0">
                   <p className="text-xs text-slate-500 uppercase font-bold">{t('multisig.proposal_draft') || 'Proposal draft'}</p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    {t('multisig.draft_desc') || 'Export this JSON to coordinate signatures manually while we finish the full multisig transport flow.'}
+                    {showProposalDraft
+                      ? (t('multisig.draft_expanded') || 'Raw draft JSON visible for manual review and export.')
+                      : (t('multisig.draft_collapsed') || 'Collapsed by default to keep attention on active proposals.')}
                   </p>
                 </div>
-                <button
-                  onClick={handleCopyDraft}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-[0.18em] transition-colors shrink-0"
-                >
-                  {copied ? (t('multisig.copied') || 'Copied') : (t('multisig.copy') || 'Copy')}
-                </button>
-              </div>
-              <pre className="mt-3 text-[10px] text-slate-300 whitespace-pre-wrap break-all bg-black/30 rounded-xl p-3 border border-dark-700 max-h-48 overflow-y-auto custom-scrollbar">
-                {proposalDraft}
-              </pre>
+                <span className="shrink-0 text-slate-400">
+                  <IconChevron open={showProposalDraft} />
+                </span>
+              </button>
+              {showProposalDraft && (
+                <>
+                  <div className="flex justify-end mt-3">
+                    <button
+                      onClick={handleCopyDraft}
+                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-[0.18em] transition-colors shrink-0"
+                    >
+                      {copied ? (t('multisig.copied') || 'Copied') : (t('multisig.copy') || 'Copy')}
+                    </button>
+                  </div>
+                  <pre className="mt-3 text-[10px] text-slate-300 whitespace-pre-wrap break-all bg-black/30 rounded-xl p-3 border border-dark-700 max-h-48 overflow-y-auto custom-scrollbar">
+                    {proposalDraft}
+                  </pre>
+                </>
+              )}
             </div>
 
             <div className="rounded-2xl border border-dark-700 bg-dark-900/60 p-4 space-y-3">
@@ -1444,27 +1745,11 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                 </button>
               </div>
 
-              <div className="flex gap-2 items-stretch">
-                <input
-                  value={saveLabel}
-                  onChange={(e) => setSaveLabel(e.target.value)}
-                  placeholder={t('multisig.proposal_label') || 'Proposal label'}
-                  className="min-w-0 flex-1 bg-dark-800 border border-dark-600 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500"
-                />
-                <button
-                  onClick={handleSaveProposal}
-                  disabled={!request.initiator || !request.operation}
-                  className="px-4 shrink-0 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-dark-700 disabled:text-slate-500 text-white text-sm font-black transition-colors"
-                >
-                  {t('multisig.save') || 'Save'}
-                </button>
-              </div>
-
               <div className="space-y-2">
                 {savedProposals.length === 0 ? (
                   <div className="text-xs text-slate-500 italic">{t('multisig.saved_empty') || 'No saved multisig proposals yet.'}</div>
                 ) : savedProposals.map((proposal) => (
-                  <div key={proposal.id} className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3">
+                  <div id={`proposal-card-${proposal.id}`} key={proposal.id} className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3">
                     {(() => {
                       const partialSignatures = Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [];
                       const onChainProgress = proposal.authoritySnapshot
@@ -1475,24 +1760,73 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                       const timeline = buildProposalTimeline(proposal, t);
                       const localSigners = getLocalSigners(proposal);
                       const signedNames = new Set(partialSignatures.map((entry) => entry.username));
+                      const isBroadcasted = !!proposal.lastBroadcastTxId;
+                      const isExpired = isProposalExpired(proposal);
+                      const isBroadcastedExpanded = !!expandedBroadcasted[proposal.id];
 
                       return (
+                    isBroadcasted && !isBroadcastedExpanded ? (
+                      <button
+                        onClick={() => setExpandedBroadcasted((prev) => ({ ...prev, [proposal.id]: true }))}
+                        className="w-full flex items-center justify-between gap-3 text-left"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-bold text-white break-words leading-tight">{proposal.title}</div>
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-[0.08em] ${status.tone}`}>
+                              {status.label}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-1 break-words">
+                            {proposal.chain} • @{proposal.initiator}
+                          </div>
+                          {partialSignatures.length > 0 && (
+                            <div className="mt-1 text-[10px] text-blue-400 break-words">
+                              {(t('multisig.signed_by') || 'Signed by')} {partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
+                            </div>
+                          )}
+                          <div className="text-[11px] text-slate-500 mt-1">
+                            {new Date(proposal.updatedAt || proposal.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-slate-400">
+                          <IconChevron open={false} />
+                        </span>
+                      </button>
+                    ) : (
                     <div className="space-y-3">
                       <div className="min-w-0">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="text-sm font-bold text-white truncate">{proposal.title}</div>
-                            <div className="text-[11px] text-slate-400 mt-1 break-words">
-                              {proposal.chain} • @{proposal.initiator} • {getCoordinationThreshold(proposal.signers)} {(t('multisig.signers_count') || 'signers')}
-                            </div>
+                            <div className="text-sm font-bold text-white break-words leading-tight">{proposal.title}</div>
                           </div>
-                          <span className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.12em] ${status.tone}`}>
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-[0.08em] ${status.tone}`}>
                             {status.label}
                           </span>
                         </div>
                         <div className="text-[11px] text-slate-400 mt-1 break-words">
+                          {proposal.chain} • @{proposal.initiator}
+                        </div>
+                        {partialSignatures.length > 0 && (
+                          <div className="mt-1 text-[10px] text-blue-400 break-words">
+                            {(t('multisig.signed_by') || 'Signed by')} {partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
+                          </div>
+                        )}
+                        <div className="text-[11px] text-slate-400 mt-2 break-words">
                           {new Date(proposal.createdAt).toLocaleString()}
                         </div>
+                        {isBroadcasted && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setExpandedBroadcasted((prev) => ({ ...prev, [proposal.id]: false }))}
+                              title={t('multisig.hide_broadcasted_details') || 'Hide'}
+                              aria-label={t('multisig.hide_broadcasted_details') || 'Hide'}
+                              className="inline-flex items-center justify-center p-1.5 rounded-lg bg-dark-900 border border-dark-600 text-slate-300 hover:border-blue-500 hover:text-white transition-colors"
+                            >
+                              <IconChevron open={true} />
+                            </button>
+                          </div>
+                        )}
                         <div className="mt-2 text-[10px] text-slate-300">
                           {(t('multisig.coordination') || 'Coordination')}: <span className="font-bold text-white">{coordinationProgress.current}</span> / {coordinationProgress.threshold}
                         </div>
@@ -1511,40 +1845,47 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                             {(t('multisig.signed_by') || 'Signed by')} {partialSignatures.map((entry) => `@${entry.username}`).join(', ')}
                           </div>
                         )}
+                        {isExpired && !proposal.lastBroadcastTxId && (
+                          <div className="mt-1 text-[10px] text-red-400 break-words">
+                            {(t('multisig.expired_at') || 'Expired at')}: {proposal.expiredAt ? new Date(proposal.expiredAt).toLocaleString() : (proposal.expiration || '—')}
+                          </div>
+                        )}
                         {proposal.lastBroadcastTxId && (
                           <div className="mt-1 text-[10px] text-green-400 break-all">
                             {(t('multisig.broadcasted_tx') || 'Broadcasted')}: {proposal.lastBroadcastTxId}
                           </div>
                         )}
                       </div>
-                      <div className="rounded-xl border border-dark-700 bg-dark-900/70 px-3 py-3 space-y-2">
-                        <div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-                          {t('multisig.timeline_title') || 'Proposal history'}
+                      {(!isBroadcasted || isBroadcastedExpanded) && (
+                        <div className="rounded-xl border border-dark-700 bg-dark-900/70 px-3 py-3 space-y-2">
+                          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                            {t('multisig.timeline_title') || 'Proposal history'}
+                          </div>
+                          <div className="space-y-1.5">
+                            {timeline.length === 0 ? (
+                              <div className="text-[10px] text-slate-500 italic">
+                                {t('multisig.timeline_empty') || 'No history yet.'}
+                              </div>
+                            ) : timeline.map((entry) => (
+                              <div key={entry.id} className="flex items-center justify-between gap-3 text-[10px]">
+                                <span className={
+                                  entry.tone === 'success'
+                                    ? 'text-green-400'
+                                    : entry.tone === 'info'
+                                      ? 'text-blue-400'
+                                      : 'text-slate-300'
+                                }>
+                                  {entry.label}
+                                </span>
+                                <span className="text-slate-500 shrink-0">
+                                  {entry.at ? new Date(entry.at).toLocaleString() : '—'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <div className="space-y-1.5">
-                          {timeline.length === 0 ? (
-                            <div className="text-[10px] text-slate-500 italic">
-                              {t('multisig.timeline_empty') || 'No history yet.'}
-                            </div>
-                          ) : timeline.map((entry) => (
-                            <div key={entry.id} className="flex items-center justify-between gap-3 text-[10px]">
-                              <span className={
-                                entry.tone === 'success'
-                                  ? 'text-green-400'
-                                  : entry.tone === 'info'
-                                    ? 'text-blue-400'
-                                    : 'text-slate-300'
-                              }>
-                                {entry.label}
-                              </span>
-                              <span className="text-slate-500 shrink-0">
-                                {entry.at ? new Date(entry.at).toLocaleString() : '—'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      {proposal.lastBroadcastTxId ? (
+                      )}
+                      {proposal.lastBroadcastTxId || isExpired ? (
                         <button
                           onClick={() => handleReuseProposal(proposal)}
                           className="w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-200 hover:border-blue-500 hover:text-white transition-colors"
@@ -1556,21 +1897,27 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                           <div className="grid grid-cols-3 gap-2">
                             <button
                               onClick={() => handleLoadProposal(proposal)}
-                              className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-blue-500 hover:text-white transition-colors"
+                              title={t('multisig.load') || 'Load'}
+                              aria-label={t('multisig.load') || 'Load'}
+                              className="min-w-0 inline-flex items-center justify-center px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-slate-300 hover:border-blue-500 hover:text-white transition-colors"
                             >
-                              {t('multisig.load') || 'Load'}
+                              <IconLoad />
                             </button>
                             <button
                               onClick={() => handleCopyProposalPackage(proposal)}
-                              className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors"
+                              title={t('multisig.copy') || 'Copy'}
+                              aria-label={t('multisig.copy') || 'Copy'}
+                              className="min-w-0 inline-flex items-center justify-center px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-slate-300 hover:border-purple-500 hover:text-white transition-colors"
                             >
-                              {t('multisig.copy') || 'Copy'}
+                              <IconCopy />
                             </button>
                             <button
                               onClick={() => handleDeleteProposal(proposal.id)}
-                              className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
+                              title={t('multisig.delete') || 'Delete'}
+                              aria-label={t('multisig.delete') || 'Delete'}
+                              className="min-w-0 inline-flex items-center justify-center px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-slate-300 hover:border-red-500 hover:text-red-300 transition-colors"
                             >
-                              {t('multisig.delete') || 'Delete'}
+                              <IconTrash />
                             </button>
                           </div>
                           <div className="space-y-2">
@@ -1579,7 +1926,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                                 <button
                                   key={`${proposal.id}:${signer.chain}:${signer.name}`}
                                   onClick={() => handlePartialSignProposal(proposal, signer)}
-                                  disabled={proposalBusyId === proposal.id || signedNames.has(signer.name)}
+                                  disabled={proposalBusyId === proposal.id || signedNames.has(signer.name) || isExpired}
                                   className="min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-purple-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
                                 >
                                   {proposalBusyId === proposal.id ? '...' : signedNames.has(signer.name) ? (
@@ -1600,7 +1947,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                             </div>
                             <button
                               onClick={() => handleBroadcastProposal(proposal)}
-                              disabled={!coordinationProgress.canBroadcast || !onChainProgress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId}
+                              disabled={!coordinationProgress.canBroadcast || !onChainProgress?.canBroadcast || proposalBusyId === proposal.id || !!proposal.lastBroadcastTxId || isExpired}
                               className="w-full min-w-0 px-2 py-2 rounded-lg bg-dark-900 border border-dark-600 text-[9px] leading-tight font-black uppercase tracking-[0.08em] text-slate-300 hover:border-green-500 hover:text-white transition-colors disabled:text-slate-600 disabled:border-dark-700"
                             >
                               {t('multisig.broadcast') || 'Broadcast'}
@@ -1609,6 +1956,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
                         </>
                       )}
                     </div>
+                    )
                       );
                     })()}
                   </div>
