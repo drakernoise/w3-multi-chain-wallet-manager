@@ -53,7 +53,14 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     useEffect(() => {
         // Clear background badge when UI opens
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-            chrome.runtime.sendMessage({ type: 'CHAT_UI_OPENED' }).catch(() => { });
+            try {
+                const maybePromise = chrome.runtime.sendMessage({ type: 'CHAT_UI_OPENED' });
+                if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === 'function') {
+                    (maybePromise as Promise<unknown>).catch(() => { });
+                }
+            } catch {
+                // Ignore badge-clear failures in popup mode
+            }
         }
 
         // Restore rooms from service if they exist

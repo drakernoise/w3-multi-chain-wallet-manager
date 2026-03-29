@@ -11725,6 +11725,7 @@ const MULTISIG_HISTORY_CURSOR_PREFIX = "gravity_multisig_history_cursor_";
 const MULTISIG_SYNC_POLL_MS = 15e3;
 const MULTISIG_SUPPORTED_CHAINS = [Chain.BLURT, Chain.HIVE];
 const MULTISIG_DEFAULT_CHAIN = Chain.BLURT;
+const MULTISIG_EXPIRATION_GRACE_MS = 2 * 60 * 1e3;
 const DIRECT_MULTISIG_EXPIRATION_MINUTES = 55;
 const getSupportedMultiSigChain = (chain) => MULTISIG_SUPPORTED_CHAINS.includes(chain) ? chain : MULTISIG_DEFAULT_CHAIN;
 const getDefaultProposalTitle = (chain, initiator, opType, toValue) => {
@@ -11777,7 +11778,7 @@ const isProposalExpired = (proposal) => {
   if (proposal.lastBroadcastTxId) return false;
   if (proposal.expiredAt) return true;
   const expirationTime = getProposalExpirationTime(proposal);
-  return expirationTime !== null && Date.now() >= expirationTime;
+  return expirationTime !== null && Date.now() >= expirationTime + MULTISIG_EXPIRATION_GRACE_MS;
 };
 const calculateCoordinationProgress = (proposal, partialSignatures) => {
   const signedNames = new Set(partialSignatures.map((entry) => entry.username));
@@ -12308,6 +12309,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     }, delayMs);
     deferredWorkTimeoutsRef.current.push(timeoutId);
   };
+  const publishMultiSigEventInBackground = (event, announcerName) => {
+    Promise.resolve().then(() => publishMultiSigEvent(event, announcerName)).catch((error) => {
+      console.warn("Background MultiSig event publish failed:", error);
+    });
+  };
   const ensureProposalArtifacts = async (proposal) => {
     let nextProposal = proposal;
     let changed = false;
@@ -12566,7 +12572,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
       }
       showNotification(`Broadcasted ${nextProposal.title} successfully`, "success");
       const publisher = proposal.partialSignatures.map((entry) => entry.username).find((username) => !!getAnnouncementAccount(username, nextProposal.chain)) || readyProposal.initiator;
-      scheduleDeferredWork(() => publishMultiSigEvent({
+      publishMultiSigEventInBackground({
         v: 1,
         namespace: "gravity.multisig",
         type: "proposal_broadcasted",
@@ -12575,7 +12581,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         sender: publisher,
         chain: nextProposal.chain,
         txId: result.txId || ""
-      }, publisher), 150);
+      }, publisher);
     } catch (error) {
       console.warn("Failed to broadcast multisig proposal:", error);
       showNotification(error?.message || "Failed to broadcast multisig proposal", "error");
@@ -12640,10 +12646,10 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   };
   const expireProposalsIfNeeded = reactExports.useCallback(async () => {
     const now = Date.now();
-    const expireEntry = (proposal) => !proposal.expiredAt && !proposal.lastBroadcastTxId && getProposalExpirationTime(proposal) !== null && getProposalExpirationTime(proposal) <= now ? {
+    const expireEntry = (proposal) => !proposal.expiredAt && !proposal.lastBroadcastTxId && getProposalExpirationTime(proposal) !== null && getProposalExpirationTime(proposal) + MULTISIG_EXPIRATION_GRACE_MS <= now ? {
       ...proposal,
-      expiredAt: getProposalExpirationTime(proposal),
-      updatedAt: Math.max(proposal.updatedAt, getProposalExpirationTime(proposal))
+      expiredAt: getProposalExpirationTime(proposal) + MULTISIG_EXPIRATION_GRACE_MS,
+      updatedAt: Math.max(proposal.updatedAt, getProposalExpirationTime(proposal) + MULTISIG_EXPIRATION_GRACE_MS)
     } : proposal;
     const nextSaved = savedProposalsRef.current.map(expireEntry);
     const nextIncoming = incomingProposalsRef.current.map((entry) => ({
@@ -12768,10 +12774,15 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
             };
           }
           if (event.type === "proposal_expired") {
+            const expirationTime = getProposalExpirationTime(proposal);
+            const canExpireNow = expirationTime !== null && Date.now() >= expirationTime + MULTISIG_EXPIRATION_GRACE_MS;
+            if (!canExpireNow) {
+              return proposal;
+            }
             return {
               ...proposal,
               updatedAt: Math.max(proposal.updatedAt, event.sentAt),
-              expiredAt: event.expiredAt
+              expiredAt: Math.max(event.expiredAt, expirationTime + MULTISIG_EXPIRATION_GRACE_MS)
             };
           }
           return {
@@ -12782,6 +12793,13 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         };
         const savedMatch = nextSaved.find((entry) => entry.id === event.proposalId);
         if (savedMatch) {
+          if (event.type === "proposal_expired") {
+            const expirationTime = getProposalExpirationTime(savedMatch);
+            const canExpireNow = expirationTime !== null && Date.now() >= expirationTime + MULTISIG_EXPIRATION_GRACE_MS;
+            if (!canExpireNow) {
+              continue;
+            }
+          }
           nextSaved = nextSaved.map((entry) => entry.id === event.proposalId ? applyUpdate(entry) : entry);
           savedChanged = true;
           if (shouldNotify && event.type === "proposal_signed") {
@@ -12797,6 +12815,13 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         }
         const incomingMatch = nextIncoming.find((entry) => entry.proposal.id === event.proposalId);
         if (incomingMatch) {
+          if (event.type === "proposal_expired") {
+            const expirationTime = getProposalExpirationTime(incomingMatch.proposal);
+            const canExpireNow = expirationTime !== null && Date.now() >= expirationTime + MULTISIG_EXPIRATION_GRACE_MS;
+            if (!canExpireNow) {
+              continue;
+            }
+          }
           nextIncoming = nextIncoming.map((entry) => entry.proposal.id === event.proposalId ? {
             ...entry,
             proposal: applyUpdate(entry.proposal),
@@ -15537,8 +15562,14 @@ const ChatView = ({ onClose }) => {
   };
   reactExports.useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({ type: "CHAT_UI_OPENED" }).catch(() => {
-      });
+      try {
+        const maybePromise = chrome.runtime.sendMessage({ type: "CHAT_UI_OPENED" });
+        if (maybePromise && typeof maybePromise.catch === "function") {
+          maybePromise.catch(() => {
+          });
+        }
+      } catch {
+      }
     }
     const existingRooms = chatService.getRooms();
     if (existingRooms.length > 0) {
