@@ -7,6 +7,7 @@ import { LockScreen } from '@components/LockScreen'
 import { bridgeService, SignRequest, SignResponse } from '@services/bridgeService'
 import { broadcastTransfer, broadcastOperations, broadcastVote, broadcastCustomJson, signMessage, fetchBalances } from '@services/chainService'
 import { ensureMobileInternalKey, getVault, saveVault, tryRestoreSession, unlockVaultWithCachedSession } from '@services/cryptoService'
+import { chatService } from '@services/chatService'
 import { mobileProvider, SignRequest as MobileSignRequest } from './services/mobileProvider'
 import { SignRequestModal } from './components/SignRequestModal'
 import { PermissionsManager } from './components/PermissionsManager'
@@ -309,16 +310,28 @@ function MobileContent() {
       setActiveRequest(req)
       setCurrentView('bridge')
     }
-    bridgeService.onSyncAccounts = (accounts) => {
-      console.log('[Mobile] Sync accounts received:', accounts)
-      setWalletState(prev => ({ ...prev, accounts, encryptedMaster: true }))
+    bridgeService.onSyncAccounts = (payload) => {
+      console.log('[Mobile] Sync payload received:', payload)
+      const accounts = payload.accounts || []
+      if (payload.chatIdentity) {
+        chatService.restoreSyncIdentity(payload.chatIdentity)
+      }
+      setWalletState(prev => ({
+        ...prev,
+        accounts,
+        encryptedMaster: true,
+        useGoogleAuth: payload.settings?.useGoogleAuth ?? prev.useGoogleAuth,
+        useBiometrics: payload.settings?.useBiometrics ?? prev.useBiometrics,
+        useDeviceAuth: payload.settings?.useDeviceAuth ?? prev.useDeviceAuth,
+        useTOTP: payload.settings?.useTOTP ?? prev.useTOTP
+      }))
       persistAccountsVault(accounts).catch(err =>
         console.error('[Mobile] Immediate vault save after sync failed', err)
       )
       setNeedsSave(true)
       setIsVerifying(false)
       setShowPinPrompt(false)
-      showToast("Accounts imported from extension successfully!")
+      showToast(payload.chatIdentity ? "Accounts and chat identity imported successfully!" : "Accounts imported from extension successfully!")
     }
     bridgeService.init()
 
@@ -977,9 +990,20 @@ function MobileContent() {
       }
     })
 
-    setWalletState(prev => ({ ...prev, accounts: mergedAccounts }))
+    if (payload.chatIdentity) {
+      chatService.restoreSyncIdentity(payload.chatIdentity)
+    }
+
+    setWalletState(prev => ({
+      ...prev,
+      accounts: mergedAccounts,
+      useGoogleAuth: payload.settings?.useGoogleAuth ?? prev.useGoogleAuth,
+      useBiometrics: payload.settings?.useBiometrics ?? prev.useBiometrics,
+      useDeviceAuth: payload.settings?.useDeviceAuth ?? prev.useDeviceAuth,
+      useTOTP: payload.settings?.useTOTP ?? prev.useTOTP
+    }))
     await persistAccountsVault(mergedAccounts)
-    showToast('Wallet imported from another device')
+    showToast(payload.chatIdentity ? 'Wallet and chat identity imported from another device' : 'Wallet imported from another device')
   }
 
   const startScan = async () => {

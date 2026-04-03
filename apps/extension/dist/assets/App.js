@@ -1534,6 +1534,59 @@ class ChatService {
       encryptionPublicKey: keys.encryptionPublicKey
     });
   }
+  getSyncIdentity() {
+    const username = localStorage.getItem("gravity_chat_username");
+    const id = localStorage.getItem("gravity_chat_id");
+    const privateKey = localStorage.getItem("gravity_chat_priv");
+    const publicKey = localStorage.getItem("gravity_chat_pub");
+    if (!username || !id || !privateKey || !publicKey) {
+      return null;
+    }
+    return {
+      username,
+      id,
+      privateKey,
+      publicKey,
+      encryptionPrivateKey: localStorage.getItem("gravity_chat_enc_priv") || void 0,
+      encryptionPublicKey: localStorage.getItem("gravity_chat_enc_pub") || void 0
+    };
+  }
+  restoreSyncIdentity(identity) {
+    if (!identity?.username || !identity?.id || !identity?.privateKey || !identity?.publicKey) {
+      return;
+    }
+    localStorage.setItem("gravity_chat_username", identity.username);
+    localStorage.setItem("gravity_chat_id", identity.id);
+    localStorage.setItem("gravity_chat_priv", identity.privateKey);
+    localStorage.setItem("gravity_chat_pub", identity.publicKey);
+    if (identity.encryptionPrivateKey) {
+      localStorage.setItem("gravity_chat_enc_priv", identity.encryptionPrivateKey);
+    }
+    if (identity.encryptionPublicKey) {
+      localStorage.setItem("gravity_chat_enc_pub", identity.encryptionPublicKey);
+    }
+    this.userId = identity.id;
+    this.username = identity.username;
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      try {
+        const maybePromise = chrome.runtime.sendMessage({
+          type: "CHAT_SYNC_CREDS",
+          data: {
+            username: identity.username,
+            privateKey: identity.privateKey,
+            publicKey: identity.publicKey,
+            encPrivateKey: identity.encryptionPrivateKey,
+            encPublicKey: identity.encryptionPublicKey
+          }
+        });
+        if (maybePromise && typeof maybePromise.catch === "function") {
+          maybePromise.catch(() => {
+          });
+        }
+      } catch {
+      }
+    }
+  }
   async sendMessage(roomId, content, isEncrypted = false) {
     if (!this.socket) return;
     const privateKeyHex = localStorage.getItem("gravity_chat_priv");
@@ -9492,9 +9545,10 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
     };
   }, []);
   const payloadSummary = reactExports.useMemo(() => {
+    const chatIdentity = chatService.getSyncIdentity();
     return {
       accountCount: accounts.length,
-      chatIdentity: !!localStorage.getItem("gravity_chat_registration"),
+      chatIdentity: !!chatIdentity,
       settingsCount: [
         walletConfig?.useGoogleAuth,
         walletConfig?.useBiometrics,
@@ -9514,22 +9568,9 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
         useTOTP: walletConfig?.useTOTP
       }
     };
-    const registrationRaw = localStorage.getItem("gravity_chat_registration");
-    const privateKey = await storageService.getItem("gravity_chat_key");
-    const publicKey = await storageService.getItem("gravity_chat_pub");
-    if (registrationRaw && privateKey && publicKey) {
-      try {
-        const registration = JSON.parse(registrationRaw);
-        if (registration?.username && registration?.id) {
-          payload.chatIdentity = {
-            username: registration.username,
-            id: registration.id,
-            privateKey,
-            publicKey
-          };
-        }
-      } catch (e) {
-      }
+    const chatIdentity = chatService.getSyncIdentity();
+    if (chatIdentity) {
+      payload.chatIdentity = chatIdentity;
     }
     return payload;
   };
@@ -15616,6 +15657,8 @@ const HelpView = () => {
 const ChatView = ({ onClose }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
+  const isNativeMobile = typeof window !== "undefined" && !!window.Capacitor?.isNativePlatform?.();
+  const supportsBrowserNotifications = typeof Notification !== "undefined";
   const [user, setUser] = reactExports.useState(null);
   const [isRegistering, setIsRegistering] = reactExports.useState(false);
   const [usernameInput, setUsernameInput] = reactExports.useState("");
@@ -15779,6 +15822,11 @@ const ChatView = ({ onClose }) => {
   const [pushGranted, setPushGranted] = reactExports.useState(false);
   const handleEnablePush = async () => {
     try {
+      if (isNativeMobile || !supportsBrowserNotifications) {
+        showNotification("Chat push setup is not required in the mobile app.", "info");
+        setPushGranted(true);
+        return;
+      }
       if (window.innerWidth < 600 && typeof chrome !== "undefined" && chrome.tabs) {
         console.log("Gravity: Detected popup mode, opening dedicated tab for permissions");
         chrome.tabs.create({ url: chrome.runtime.getURL("index.html?action=enable_notifications") });
@@ -15819,6 +15867,10 @@ const ChatView = ({ onClose }) => {
   };
   reactExports.useEffect(() => {
     if (socketStatus === "authenticated") {
+      if (isNativeMobile || !supportsBrowserNotifications) {
+        setPushGranted(true);
+        return;
+      }
       if (Notification.permission === "granted") {
         if (typeof chrome !== "undefined" && chrome.runtime) {
           chrome.runtime.sendMessage({ type: "CHAT_CHECK_PUSH" }, (res) => {
@@ -15842,7 +15894,7 @@ const ChatView = ({ onClose }) => {
         setPushGranted(false);
       }
     }
-  }, [socketStatus]);
+  }, [isNativeMobile, socketStatus, supportsBrowserNotifications]);
   reactExports.useEffect(() => {
     if (activeRoomId) {
       chatService.joinRoom(activeRoomId);
@@ -16008,7 +16060,7 @@ const ChatView = ({ onClose }) => {
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setIsCreating(true), className: "p-1.5 bg-dark-700 hover:bg-purple-600/20 text-slate-400 hover:text-purple-400 rounded-lg transition-all", title: "New Room", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 4v16m8-8H4" }) }) })
       ] }),
-      !pushGranted && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-2 border-b border-dark-700 bg-indigo-900/10", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: handleEnablePush, className: "w-full text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95", children: [
+      !pushGranted && !isNativeMobile && supportsBrowserNotifications && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-2 border-b border-dark-700 bg-indigo-900/10", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: handleEnablePush, className: "w-full text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" }) }),
         "Enable Notifications"
       ] }) }),
@@ -17224,8 +17276,9 @@ class BridgeService {
       if (!this.sharedKey) return;
       try {
         const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
-        const accounts = JSON.parse(decrypted);
-        if (this.onSyncAccounts) this.onSyncAccounts(accounts);
+        const parsed = JSON.parse(decrypted);
+        const payload = Array.isArray(parsed) ? { timestamp: Date.now(), accounts: parsed } : parsed;
+        if (this.onSyncAccounts) this.onSyncAccounts(payload);
       } catch (e) {
         console.error("Bridge accounts sync failed", e);
       }
@@ -17296,11 +17349,12 @@ class BridgeService {
       });
     });
   }
-  async syncAccounts(accounts) {
+  async syncAccounts(payload) {
     if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
-    const encrypted = await encryptMessage(JSON.stringify(accounts), this.sharedKey);
+    const normalizedPayload = Array.isArray(payload) ? { timestamp: Date.now(), accounts: payload } : payload;
+    const encrypted = await encryptMessage(JSON.stringify(normalizedPayload), this.sharedKey);
     this.socket.emit("bridge_sync_accounts", { sessionId: this.sessionId, encrypted });
-    this.addLog(`Sent bridge_sync_accounts with ${accounts.length} accounts`);
+    this.addLog(`Sent bridge_sync_accounts with ${normalizedPayload.accounts.length} accounts`);
     this.onStatusChange?.("paired");
   }
   async validatePairing(pin) {
@@ -17414,6 +17468,17 @@ function AppContent() {
   const [isDataLoaded, setIsDataLoaded] = reactExports.useState(false);
   const [isRefreshing, setIsRefreshing] = reactExports.useState(false);
   const [needsSave, setNeedsSave] = reactExports.useState(false);
+  const buildBridgeSyncPayload = (accounts) => ({
+    timestamp: Date.now(),
+    accounts,
+    chatIdentity: chatService.getSyncIdentity() || void 0,
+    settings: {
+      useGoogleAuth: walletState.useGoogleAuth,
+      useBiometrics: walletState.useBiometrics,
+      useDeviceAuth: walletState.useDeviceAuth,
+      useTOTP: walletState.useTOTP
+    }
+  });
   const [web3Context, setWeb3Context] = reactExports.useState(null);
   const { showNotification } = useNotification();
   const [lockReason, setLockReason] = reactExports.useState(null);
@@ -17459,7 +17524,7 @@ function AppContent() {
           }
         }
         if (vault) {
-          bridgeService.syncAccounts(vault.accounts);
+          bridgeService.syncAccounts(buildBridgeSyncPayload(vault.accounts));
           showNotification("Mobile device paired and synced!", "success");
         } else {
           showNotification("Pairing failed: Invalid PIN or Password", "error");
@@ -18042,7 +18107,7 @@ function AppContent() {
       BridgeModal,
       {
         onClose: () => setShowBridge(false),
-        onSync: () => bridgeService.syncAccounts(walletState.accounts)
+        onSync: () => bridgeService.syncAccounts(buildBridgeSyncPayload(walletState.accounts))
       }
     )
   ] });

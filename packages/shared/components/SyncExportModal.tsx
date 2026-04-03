@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Account, SyncPayload } from '../types';
 import { deviceTransferService } from '../services/deviceTransferService';
-import { storageService } from '../services/storageService';
+import { chatService } from '../services/chatService';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface SyncExportModalProps {
@@ -36,9 +36,10 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
     }, []);
 
     const payloadSummary = useMemo(() => {
+        const chatIdentity = chatService.getSyncIdentity();
         return {
             accountCount: accounts.length,
-            chatIdentity: !!localStorage.getItem('gravity_chat_registration'),
+            chatIdentity: !!chatIdentity,
             settingsCount: [
                 walletConfig?.useGoogleAuth,
                 walletConfig?.useBiometrics,
@@ -60,22 +61,9 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
             }
         };
 
-        const registrationRaw = localStorage.getItem('gravity_chat_registration');
-        const privateKey = await storageService.getItem('gravity_chat_key');
-        const publicKey = await storageService.getItem('gravity_chat_pub');
-
-        if (registrationRaw && privateKey && publicKey) {
-            try {
-                const registration = JSON.parse(registrationRaw);
-                if (registration?.username && registration?.id) {
-                    payload.chatIdentity = {
-                        username: registration.username,
-                        id: registration.id,
-                        privateKey,
-                        publicKey
-                    };
-                }
-            } catch (e) {}
+        const chatIdentity = chatService.getSyncIdentity();
+        if (chatIdentity) {
+            payload.chatIdentity = chatIdentity;
         }
 
         return payload;

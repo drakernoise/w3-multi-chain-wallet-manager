@@ -67,6 +67,8 @@ export interface SyncPayload {
     id: string;
     privateKey: string; // Base64 export
     publicKey: string; // Base64 export
+    encryptionPrivateKey?: string;
+    encryptionPublicKey?: string;
   };
   settings?: {
     useGoogleAuth?: boolean;

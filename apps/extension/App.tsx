@@ -78,6 +78,18 @@ function AppContent() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [needsSave, setNeedsSave] = useState(false);
+
+  const buildBridgeSyncPayload = (accounts: Account[]): SyncPayload => ({
+    timestamp: Date.now(),
+    accounts,
+    chatIdentity: chatService.getSyncIdentity() || undefined,
+    settings: {
+      useGoogleAuth: walletState.useGoogleAuth,
+      useBiometrics: walletState.useBiometrics,
+      useDeviceAuth: walletState.useDeviceAuth,
+      useTOTP: walletState.useTOTP
+    }
+  });
   const [web3Context, setWeb3Context] = useState<string | null>(null);
 
   // Notifications
@@ -141,7 +153,7 @@ function AppContent() {
         }
 
         if (vault) {
-          bridgeService.syncAccounts(vault.accounts);
+          bridgeService.syncAccounts(buildBridgeSyncPayload(vault.accounts));
           showNotification("Mobile device paired and synced!", "success");
         } else {
           showNotification("Pairing failed: Invalid PIN or Password", "error");
@@ -800,7 +812,7 @@ function AppContent() {
       {showBridge && (
         <BridgeModal
           onClose={() => setShowBridge(false)}
-          onSync={() => bridgeService.syncAccounts(walletState.accounts)}
+          onSync={() => bridgeService.syncAccounts(buildBridgeSyncPayload(walletState.accounts))}
         />
       )}
     </div>

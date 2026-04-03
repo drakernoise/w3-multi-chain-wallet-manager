@@ -1,5 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { generateEncryptionKeys, exportKeyToBase64, importKeyFromBase64, deriveSharedSecret, encryptMessage, decryptMessage } from './cryptoService';
+import { SyncPayload } from '../types';
 
 declare var chrome: any;
 
@@ -540,6 +541,67 @@ class ChatService {
             publicKey: keys.publicKey,
             encryptionPublicKey: keys.encryptionPublicKey
         });
+    }
+
+    public getSyncIdentity(): SyncPayload['chatIdentity'] | null {
+        const username = localStorage.getItem('gravity_chat_username');
+        const id = localStorage.getItem('gravity_chat_id');
+        const privateKey = localStorage.getItem('gravity_chat_priv');
+        const publicKey = localStorage.getItem('gravity_chat_pub');
+
+        if (!username || !id || !privateKey || !publicKey) {
+            return null;
+        }
+
+        return {
+            username,
+            id,
+            privateKey,
+            publicKey,
+            encryptionPrivateKey: localStorage.getItem('gravity_chat_enc_priv') || undefined,
+            encryptionPublicKey: localStorage.getItem('gravity_chat_enc_pub') || undefined
+        };
+    }
+
+    public restoreSyncIdentity(identity?: SyncPayload['chatIdentity'] | null) {
+        if (!identity?.username || !identity?.id || !identity?.privateKey || !identity?.publicKey) {
+            return;
+        }
+
+        localStorage.setItem('gravity_chat_username', identity.username);
+        localStorage.setItem('gravity_chat_id', identity.id);
+        localStorage.setItem('gravity_chat_priv', identity.privateKey);
+        localStorage.setItem('gravity_chat_pub', identity.publicKey);
+
+        if (identity.encryptionPrivateKey) {
+            localStorage.setItem('gravity_chat_enc_priv', identity.encryptionPrivateKey);
+        }
+        if (identity.encryptionPublicKey) {
+            localStorage.setItem('gravity_chat_enc_pub', identity.encryptionPublicKey);
+        }
+
+        this.userId = identity.id;
+        this.username = identity.username;
+
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            try {
+                const maybePromise = chrome.runtime.sendMessage({
+                    type: 'CHAT_SYNC_CREDS',
+                    data: {
+                        username: identity.username,
+                        privateKey: identity.privateKey,
+                        publicKey: identity.publicKey,
+                        encPrivateKey: identity.encryptionPrivateKey,
+                        encPublicKey: identity.encryptionPublicKey
+                    }
+                });
+                if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === 'function') {
+                    (maybePromise as Promise<unknown>).catch(() => { });
+                }
+            } catch {
+                // Ignore runtime sync errors outside extension contexts
+            }
+        }
     }
 
     public async sendMessage(roomId: string, content: string, isEncrypted: boolean = false) {

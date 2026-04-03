@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import { SyncPayload } from '../types';
 import {
     generateEncryptionKeys,
     exportKeyToBase64,
@@ -33,7 +34,7 @@ class BridgeService {
 
     public onStatusChange: ((status: string) => void) | null = null;
     public onSignRequest: ((request: SignRequest) => void) | null = null;
-    public onSyncAccounts: ((accounts: any[]) => void) | null = null;
+    public onSyncAccounts: ((payload: SyncPayload) => void) | null = null;
     public onValidatePIN: ((pin: string) => void) | null = null;
     public onLog: ((msg: string) => void) | null = null;
 
@@ -96,8 +97,11 @@ class BridgeService {
             if (!this.sharedKey) return;
             try {
                 const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
-                const accounts = JSON.parse(decrypted);
-                if (this.onSyncAccounts) this.onSyncAccounts(accounts);
+                const parsed = JSON.parse(decrypted);
+                const payload: SyncPayload = Array.isArray(parsed)
+                    ? { timestamp: Date.now(), accounts: parsed }
+                    : parsed;
+                if (this.onSyncAccounts) this.onSyncAccounts(payload);
             } catch (e) {
                 console.error("Bridge accounts sync failed", e);
             }
@@ -186,11 +190,14 @@ class BridgeService {
         });
     }
 
-    public async syncAccounts(accounts: any[]) {
+    public async syncAccounts(payload: SyncPayload | any[]) {
         if (!this.socket || !this.sharedKey || !this.sessionId) throw new Error("Bridge not ready");
-        const encrypted = await encryptMessage(JSON.stringify(accounts), this.sharedKey);
+        const normalizedPayload: SyncPayload = Array.isArray(payload)
+            ? { timestamp: Date.now(), accounts: payload }
+            : payload;
+        const encrypted = await encryptMessage(JSON.stringify(normalizedPayload), this.sharedKey);
         this.socket.emit('bridge_sync_accounts', { sessionId: this.sessionId, encrypted });
-        this.addLog(`Sent bridge_sync_accounts with ${accounts.length} accounts`);
+        this.addLog(`Sent bridge_sync_accounts with ${normalizedPayload.accounts.length} accounts`);
         this.onStatusChange?.('paired');
     }
 

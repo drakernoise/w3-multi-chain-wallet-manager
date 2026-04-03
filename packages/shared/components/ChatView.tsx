@@ -6,6 +6,8 @@ import { useNotification } from '../contexts/NotificationContext';
 export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { t } = useTranslation();
     const { showNotification } = useNotification();
+    const isNativeMobile = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+    const supportsBrowserNotifications = typeof Notification !== 'undefined';
     // Identity State
     const [user, setUser] = useState<ChatUser | null>(null);
     const [isRegistering, setIsRegistering] = useState(false);
@@ -218,6 +220,11 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     const handleEnablePush = async () => {
         try {
+            if (isNativeMobile || !supportsBrowserNotifications) {
+                showNotification("Chat push setup is not required in the mobile app.", 'info');
+                setPushGranted(true);
+                return;
+            }
             // If in popup (narrow width), open a full tab to request permission reliably
             if (window.innerWidth < 600 && typeof chrome !== 'undefined' && chrome.tabs) {
                 console.log("Gravity: Detected popup mode, opening dedicated tab for permissions");
@@ -264,6 +271,10 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     // Check Status on Auth
     useEffect(() => {
         if (socketStatus === 'authenticated') {
+            if (isNativeMobile || !supportsBrowserNotifications) {
+                setPushGranted(true);
+                return;
+            }
             // 1. Check Permission
             if (Notification.permission === 'granted') {
                 // 2. Check Exisiting Sub in Background (Safe check)
@@ -294,7 +305,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 setPushGranted(false);
             }
         }
-    }, [socketStatus]);
+    }, [isNativeMobile, socketStatus, supportsBrowserNotifications]);
 
     // Effect to load messages when active room changes
     useEffect(() => {
@@ -493,7 +504,7 @@ export const ChatView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 </div>
 
                 {/* Push Notification Trigger */}
-                {!pushGranted && (
+                {!pushGranted && !isNativeMobile && supportsBrowserNotifications && (
                     <div className="p-2 border-b border-dark-700 bg-indigo-900/10">
                         <button onClick={handleEnablePush} className="w-full text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
