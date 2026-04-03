@@ -11929,7 +11929,7 @@ const buildProposalTimeline = (proposal, t) => {
   ];
   return entries.sort((left, right) => (left.at || 0) - (right.at || 0));
 };
-const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
+const MultiSig = ({ chain: initialChain, accounts, onChainChange, onSyncStateChange }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
   const [selectedChain, setSelectedChain] = reactExports.useState(() => getSupportedMultiSigChain(initialChain));
@@ -11950,6 +11950,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   const [authorityError, setAuthorityError] = reactExports.useState(null);
   const [transportInfo, setTransportInfo] = reactExports.useState(null);
   const [refreshingChain, setRefreshingChain] = reactExports.useState(false);
+  const [syncingChain, setSyncingChain] = reactExports.useState(false);
   const [showOperationPreview, setShowOperationPreview] = reactExports.useState(false);
   const [showProposalDraft, setShowProposalDraft] = reactExports.useState(false);
   const [expandedBroadcasted, setExpandedBroadcasted] = reactExports.useState({});
@@ -11985,6 +11986,12 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
   reactExports.useEffect(() => {
     incomingProposalsRef.current = incomingProposals;
   }, [incomingProposals]);
+  reactExports.useEffect(() => {
+    onSyncStateChange?.({
+      chain: selectedChain,
+      syncing: refreshingChain || authorityLoading || syncingChain
+    });
+  }, [authorityLoading, onSyncStateChange, refreshingChain, selectedChain, syncingChain]);
   const persistPendingEvents = async (entries) => {
     pendingEventsRef.current = entries;
     await storageService.setItem(MULTISIG_OUTBOX_STORAGE_KEY, JSON.stringify(entries));
@@ -12920,9 +12927,18 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     let cancelled = false;
     const runSync = async () => {
       if (cancelled) return;
-      await flushPendingEvents();
-      if (cancelled) return;
-      await syncOnChainProposals();
+      if (isMountedRef.current) {
+        setSyncingChain(true);
+      }
+      try {
+        await flushPendingEvents();
+        if (cancelled) return;
+        await syncOnChainProposals();
+      } finally {
+        if (!cancelled && isMountedRef.current) {
+          setSyncingChain(false);
+        }
+      }
     };
     runSync();
     const interval = window.setInterval(runSync, MULTISIG_SYNC_POLL_MS);
@@ -12970,9 +12986,9 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         chainOption
       )) }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-4 inline-flex items-center gap-2 rounded-full border border-dark-600 bg-dark-900 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-flex h-2.5 w-2.5 rounded-full ${refreshingChain || authorityLoading ? "animate-pulse bg-blue-400" : "bg-emerald-400"}` }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-flex h-2.5 w-2.5 rounded-full ${refreshingChain || authorityLoading || syncingChain ? "animate-pulse bg-blue-400" : "bg-emerald-400"}` }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: selectedChain }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500 normal-case tracking-normal font-medium", children: refreshingChain ? t("multisig.refreshing_chain") || "Refreshing..." : authorityLoading ? t("multisig.loading_authority") || "Loading authority..." : t("multisig.synced_chain") || "Synced" })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500 normal-case tracking-normal font-medium", children: refreshingChain || syncingChain ? t("multisig.refreshing_chain") || "Refreshing..." : authorityLoading ? t("multisig.loading_authority") || "Loading authority..." : t("multisig.synced_chain") || "Synced" })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-4 text-[10px] text-slate-500", children: (t("multisig.supported_chains") || "MultiSig sync is currently implemented for {chains}.").replace("{chains}", MULTISIG_SUPPORTED_CHAINS.join(" / ")) })
     ] }),

@@ -261,6 +261,10 @@ function MobileContent() {
   const [mobileSignRequest, setMobileSignRequest] = useState<MobileSignRequest | null>(null)
   const [modalSuggestedAccount, setModalSuggestedAccount] = useState<Account | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [mobileMultiSigSync, setMobileMultiSigSync] = useState<{ chain: Chain; syncing: boolean }>({
+    chain: activeChain,
+    syncing: false
+  })
 
 
   const showToast = (msg: string) => {
@@ -1206,11 +1210,30 @@ function MobileContent() {
         )}
 
         {currentView === 'multisig' && (
-          <div className="h-full w-full">
+          <div className="h-full w-full space-y-4">
+            <div className="bg-dark-800 border border-dark-700 rounded-2xl p-4 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-2xl bg-dark-900 border border-dark-700 flex items-center justify-center ${mobileMultiSigSync.syncing ? 'animate-spin' : ''}`}>
+                  <img
+                    src={activeChain === Chain.HIVE ? '/Logo_hive.png' : activeChain === Chain.STEEM ? '/logosteem.png' : '/logoblurt.png'}
+                    alt={activeChain}
+                    className="w-6 h-6 object-contain"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-[0.18em] font-black text-slate-500">{activeChain} Network</div>
+                  <div className="text-lg font-black text-white leading-tight">MultiSig</div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    {mobileMultiSigSync.syncing ? 'Syncing on-chain proposals...' : 'Review and coordinate multisig proposals on this chain.'}
+                  </div>
+                </div>
+              </div>
+            </div>
             <MultiSig
               chain={activeChain}
               accounts={walletState.accounts}
               onChainChange={setActiveChain}
+              onSyncStateChange={setMobileMultiSigSync}
             />
           </div>
         )}

@@ -20,6 +20,7 @@ interface MultiSigProps {
   chain: Chain;
   accounts: Account[];
   onChainChange?: (chain: Chain) => void;
+  onSyncStateChange?: (state: { chain: Chain; syncing: boolean }) => void;
 }
 
 type OpType = 'transfer' | 'delegate_vesting_shares' | 'undelegate_vesting_shares' | 'transfer_to_vesting' | 'withdraw_vesting' | 'custom';
@@ -445,7 +446,7 @@ const buildProposalTimeline = (proposal: SavedMultiSigProposal, t: (key: string)
   return entries.sort((left, right) => (left.at || 0) - (right.at || 0));
 };
 
-export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts, onChainChange }) => {
+export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, accounts, onChainChange, onSyncStateChange }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
   const [selectedChain, setSelectedChain] = useState<Chain>(() => getSupportedMultiSigChain(initialChain));
@@ -466,6 +467,7 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   const [authorityError, setAuthorityError] = useState<string | null>(null);
   const [transportInfo, setTransportInfo] = useState<string | null>(null);
   const [refreshingChain, setRefreshingChain] = useState(false);
+  const [syncingChain, setSyncingChain] = useState(false);
   const [showOperationPreview, setShowOperationPreview] = useState(false);
   const [showProposalDraft, setShowProposalDraft] = useState(false);
   const [expandedBroadcasted, setExpandedBroadcasted] = useState<Record<string, boolean>>({});
@@ -506,6 +508,13 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
   useEffect(() => {
     incomingProposalsRef.current = incomingProposals;
   }, [incomingProposals]);
+
+  useEffect(() => {
+    onSyncStateChange?.({
+      chain: selectedChain,
+      syncing: refreshingChain || authorityLoading || syncingChain
+    });
+  }, [authorityLoading, onSyncStateChange, refreshingChain, selectedChain, syncingChain]);
 
   const persistPendingEvents = async (entries: PendingMultiSigEvent[]) => {
     pendingEventsRef.current = entries;
@@ -1623,9 +1632,18 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
 
     const runSync = async () => {
       if (cancelled) return;
-      await flushPendingEvents();
-      if (cancelled) return;
-      await syncOnChainProposals();
+      if (isMountedRef.current) {
+        setSyncingChain(true);
+      }
+      try {
+        await flushPendingEvents();
+        if (cancelled) return;
+        await syncOnChainProposals();
+      } finally {
+        if (!cancelled && isMountedRef.current) {
+          setSyncingChain(false);
+        }
+      }
     };
 
     runSync();
@@ -1691,10 +1709,10 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
           </div>
 
           <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-dark-600 bg-dark-900 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
-            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${refreshingChain || authorityLoading ? 'animate-pulse bg-blue-400' : 'bg-emerald-400'}`}></span>
+            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${refreshingChain || authorityLoading || syncingChain ? 'animate-pulse bg-blue-400' : 'bg-emerald-400'}`}></span>
             <span>{selectedChain}</span>
             <span className="text-slate-500 normal-case tracking-normal font-medium">
-              {refreshingChain
+              {refreshingChain || syncingChain
                 ? (t('multisig.refreshing_chain') || 'Refreshing...')
                 : authorityLoading
                   ? (t('multisig.loading_authority') || 'Loading authority...')
