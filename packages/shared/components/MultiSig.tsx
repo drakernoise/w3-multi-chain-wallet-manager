@@ -729,12 +729,22 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
     return Array.from(new Set([...local, ...onChain])).filter(Boolean);
   }, [authority?.accountAuths, chainAccounts]);
 
+  const visibleIncomingProposals = useMemo(
+    () => incomingProposals.filter((entry) => entry.proposal.chain === selectedChain),
+    [incomingProposals, selectedChain]
+  );
+
+  const visibleSavedProposals = useMemo(
+    () => savedProposals.filter((proposal) => proposal.chain === selectedChain),
+    [savedProposals, selectedChain]
+  );
+
   const activeAuthorityAccounts = authority?.accountAuths ?? [];
   const activeAuthorityKeys = authority?.keyAuths ?? [];
   const looksLikeMultisig = !!authority && (activeAuthorityAccounts.length > 0 || authority.threshold > 1);
   const activeProposal = useMemo(
-    () => savedProposals.find((proposal) => !proposal.lastBroadcastTxId && !isProposalExpired(proposal)) || null,
-    [savedProposals]
+    () => visibleSavedProposals.find((proposal) => !proposal.lastBroadcastTxId && !isProposalExpired(proposal)) || null,
+    [visibleSavedProposals]
   );
 
   const addSigner = (signerName?: string) => {
@@ -1680,6 +1690,18 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
             ))}
           </div>
 
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-dark-600 bg-dark-900 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300">
+            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${refreshingChain || authorityLoading ? 'animate-pulse bg-blue-400' : 'bg-emerald-400'}`}></span>
+            <span>{selectedChain}</span>
+            <span className="text-slate-500 normal-case tracking-normal font-medium">
+              {refreshingChain
+                ? (t('multisig.refreshing_chain') || 'Refreshing...')
+                : authorityLoading
+                  ? (t('multisig.loading_authority') || 'Loading authority...')
+                  : (t('multisig.synced_chain') || 'Synced')}
+            </span>
+          </div>
+
           <p className="mt-4 text-[10px] text-slate-500">
             {(t('multisig.supported_chains') || 'MultiSig sync is currently implemented for {chains}.').replace('{chains}', MULTISIG_SUPPORTED_CHAINS.join(' / '))}
           </p>
@@ -1696,9 +1718,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
           </div>
 
           <div className="space-y-2">
-            {incomingProposals.length === 0 ? (
+            {visibleIncomingProposals.length === 0 ? (
               <div className="text-xs text-slate-500 italic">{t('multisig.incoming_empty') || 'No pending incoming multisig proposals.'}</div>
-            ) : incomingProposals.map((incoming) => (
+            ) : visibleIncomingProposals.map((incoming) => (
               <div key={`incoming:${incoming.proposal.id}`} className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-3">
                 <div className="space-y-3">
                   <div className="min-w-0">
@@ -2036,9 +2058,9 @@ export const MultiSig: React.FC<MultiSigProps> = ({ chain: initialChain, account
               </div>
 
               <div className="space-y-2">
-                {savedProposals.length === 0 ? (
+                {visibleSavedProposals.length === 0 ? (
                   <div className="text-xs text-slate-500 italic">{t('multisig.saved_empty') || 'No saved multisig proposals yet.'}</div>
-                ) : savedProposals.map((proposal) => (
+                ) : visibleSavedProposals.map((proposal) => (
                   <div id={`proposal-card-${proposal.id}`} key={proposal.id} className="rounded-xl border border-dark-700 bg-dark-800 px-3 py-3">
                     {(() => {
                       const partialSignatures = Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [];

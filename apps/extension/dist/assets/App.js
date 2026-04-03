@@ -12175,12 +12175,20 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
     const onChain = authority?.accountAuths.map(([name]) => name) || [];
     return Array.from(/* @__PURE__ */ new Set([...local, ...onChain])).filter(Boolean);
   }, [authority?.accountAuths, chainAccounts]);
+  const visibleIncomingProposals = reactExports.useMemo(
+    () => incomingProposals.filter((entry) => entry.proposal.chain === selectedChain),
+    [incomingProposals, selectedChain]
+  );
+  const visibleSavedProposals = reactExports.useMemo(
+    () => savedProposals.filter((proposal) => proposal.chain === selectedChain),
+    [savedProposals, selectedChain]
+  );
   const activeAuthorityAccounts = authority?.accountAuths ?? [];
   const activeAuthorityKeys = authority?.keyAuths ?? [];
   const looksLikeMultisig = !!authority && (activeAuthorityAccounts.length > 0 || authority.threshold > 1);
   const activeProposal = reactExports.useMemo(
-    () => savedProposals.find((proposal) => !proposal.lastBroadcastTxId && !isProposalExpired(proposal)) || null,
-    [savedProposals]
+    () => visibleSavedProposals.find((proposal) => !proposal.lastBroadcastTxId && !isProposalExpired(proposal)) || null,
+    [visibleSavedProposals]
   );
   const addSigner = (signerName) => {
     const signer = (signerName ?? newSigner).trim().replace(/^@/, "");
@@ -12961,6 +12969,11 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         },
         chainOption
       )) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-4 inline-flex items-center gap-2 rounded-full border border-dark-600 bg-dark-900 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-300", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-flex h-2.5 w-2.5 rounded-full ${refreshingChain || authorityLoading ? "animate-pulse bg-blue-400" : "bg-emerald-400"}` }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: selectedChain }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500 normal-case tracking-normal font-medium", children: refreshingChain ? t("multisig.refreshing_chain") || "Refreshing..." : authorityLoading ? t("multisig.loading_authority") || "Loading authority..." : t("multisig.synced_chain") || "Synced" })
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-4 text-[10px] text-slate-500", children: (t("multisig.supported_chains") || "MultiSig sync is currently implemented for {chains}.").replace("{chains}", MULTISIG_SUPPORTED_CHAINS.join(" / ")) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-2xl p-5 shadow-xl space-y-3", children: [
@@ -12968,7 +12981,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 uppercase font-bold", children: t("multisig.incoming_title") || "Incoming proposals" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400 mt-1", children: t("multisig.incoming_desc") || "Review on-chain proposal updates before they enter your local multisig tray." })
       ] }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: incomingProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: t("multisig.incoming_empty") || "No pending incoming multisig proposals." }) : incomingProposals.map((incoming) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: visibleIncomingProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: t("multisig.incoming_empty") || "No pending incoming multisig proposals." }) : visibleIncomingProposals.map((incoming) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm font-bold text-white truncate", children: incoming.proposal.title }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] text-slate-400 mt-1 break-words", children: [
@@ -13271,7 +13284,7 @@ const MultiSig = ({ chain: initialChain, accounts, onChainChange }) => {
               }
             )
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: savedProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: t("multisig.saved_empty") || "No saved multisig proposals yet." }) : savedProposals.map((proposal) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { id: `proposal-card-${proposal.id}`, className: "rounded-xl border border-dark-700 bg-dark-800 px-3 py-3", children: (() => {
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: visibleSavedProposals.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-500 italic", children: t("multisig.saved_empty") || "No saved multisig proposals yet." }) : visibleSavedProposals.map((proposal) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { id: `proposal-card-${proposal.id}`, className: "rounded-xl border border-dark-700 bg-dark-800 px-3 py-3", children: (() => {
             const partialSignatures = Array.isArray(proposal.partialSignatures) ? proposal.partialSignatures : [];
             const onChainProgress = proposal.authoritySnapshot ? calculateThresholdProgress(proposal.authoritySnapshot, partialSignatures) : null;
             const coordinationProgress = calculateCoordinationProgress(proposal, partialSignatures);
