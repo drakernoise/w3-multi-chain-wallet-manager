@@ -88844,7 +88844,7 @@ const fetchCustomJsonEventsForAccounts = async (chain, usernames, expectedId, li
   for (const node of candidateNodes) {
     const nodeEvents = await fetchEventsFromNode(node);
     events = [...events, ...nodeEvents];
-    if (nodeEvents.length > 0) {
+    if (chain !== Chain.STEEM && nodeEvents.length > 0) {
       break;
     }
   }
