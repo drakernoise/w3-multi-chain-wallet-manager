@@ -93,7 +93,7 @@ const MULTISIG_SYNC_KIND = 'gravity-multisig-proposal';
 const MULTISIG_CUSTOM_JSON_ID = 'gravity.multisig';
 const MULTISIG_HISTORY_CURSOR_PREFIX = 'gravity_multisig_history_cursor_';
 const MULTISIG_SYNC_POLL_MS = 15000;
-const MULTISIG_SUPPORTED_CHAINS: Chain[] = [Chain.BLURT, Chain.HIVE];
+const MULTISIG_SUPPORTED_CHAINS: Chain[] = [Chain.BLURT, Chain.HIVE, Chain.STEEM];
 const MULTISIG_DEFAULT_CHAIN = Chain.BLURT;
 const MULTISIG_EXPIRATION_GRACE_MS = 2 * 60 * 1000;
 
