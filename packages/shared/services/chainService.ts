@@ -1,7 +1,7 @@
 import { Chain } from '../types';
 import { PrivateKey as HivePrivateKey, cryptoUtils, Memo as HiveMemo } from '@hiveio/dhive';
 import { Client as SteemClient, PrivateKey as SteemPrivateKey, cryptoUtils as steemCryptoUtils } from 'dsteem';
-import { getActiveNode } from './nodeService';
+import { BLURT_CANDIDATES, getActiveNode, getActiveNodeAsync, HIVE_CANDIDATES, STEEM_CANDIDATES } from './nodeService';
 import { getChainConfig } from '../config/chainConfig';
 import * as blurt from '@blurtfoundation/blurtjs';
 
@@ -345,58 +345,82 @@ export const fetchCustomJsonEventsForAccounts = async (
     expectedId?: string,
     limit: number = 200
 ): Promise<CustomJsonEvent[]> => {
-    const node = getActiveNode(chain);
-    const events: CustomJsonEvent[] = [];
     const uniqueUsernames = Array.from(new Set((usernames || []).map((name) => name.trim()).filter(Boolean)));
+    const activeNode = await getActiveNodeAsync(chain);
+    const fallbackNodesByChain: Record<Chain, string[]> = {
+        [Chain.HIVE]: HIVE_CANDIDATES,
+        [Chain.STEEM]: STEEM_CANDIDATES,
+        [Chain.BLURT]: BLURT_CANDIDATES
+    };
+    const candidateNodes = Array.from(new Set([
+        activeNode,
+        ...(fallbackNodesByChain[chain] || [])
+    ].filter(Boolean)));
 
-    for (const username of uniqueUsernames) {
-        try {
-            const response = await fetch(node, {
-                method: 'POST',
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    method: 'condenser_api.get_account_history',
-                    params: [username, -1, limit],
-                    id: 1
-                }),
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Connection': 'keep-alive'
-                }
-            });
+    const fetchEventsFromNode = async (node: string): Promise<CustomJsonEvent[]> => {
+        const events: CustomJsonEvent[] = [];
 
-            if (!response.ok) continue;
-            const json = await response.json();
-            const result = Array.isArray(json?.result) ? json.result : [];
-
-            result.forEach((historyEntry: any) => {
-                const payload = historyEntry?.[1];
-                const op = payload?.op;
-                if (!Array.isArray(op) || op[0] !== 'custom_json' || !op[1]) return;
-
-                const opData = op[1];
-                if (expectedId && opData.id !== expectedId) return;
-
-                let parsedJson: any = opData.json;
-                try {
-                    parsedJson = typeof opData.json === 'string' ? JSON.parse(opData.json) : opData.json;
-                } catch {
-                    parsedJson = opData.json;
-                }
-
-                events.push({
-                    block: payload?.block || 0,
-                    timestamp: payload?.timestamp || '',
-                    trxId: payload?.trx_id || '',
-                    account: opData.required_posting_auths?.[0] || opData.required_auths?.[0] || username,
-                    requiredAuths: Array.isArray(opData.required_auths) ? opData.required_auths : [],
-                    requiredPostingAuths: Array.isArray(opData.required_posting_auths) ? opData.required_posting_auths : [],
-                    id: opData.id,
-                    json: parsedJson
+        for (const username of uniqueUsernames) {
+            try {
+                const response = await fetch(node, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'condenser_api.get_account_history',
+                        params: [username, -1, limit],
+                        id: 1
+                    }),
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Connection': 'keep-alive'
+                    }
                 });
-            });
-        } catch (error) {
-            console.warn(`Failed to fetch custom_json account history for ${chain} @${username}:`, error);
+
+                if (!response.ok) continue;
+                const json = await response.json();
+                const result = Array.isArray(json?.result) ? json.result : [];
+
+                result.forEach((historyEntry: any) => {
+                    const payload = historyEntry?.[1];
+                    const op = payload?.op;
+                    if (!Array.isArray(op) || op[0] !== 'custom_json' || !op[1]) return;
+
+                    const opData = op[1];
+                    if (expectedId && opData.id !== expectedId) return;
+
+                    let parsedJson: any = opData.json;
+                    try {
+                        parsedJson = typeof opData.json === 'string' ? JSON.parse(opData.json) : opData.json;
+                    } catch {
+                        parsedJson = opData.json;
+                    }
+
+                    events.push({
+                        block: payload?.block || 0,
+                        timestamp: payload?.timestamp || '',
+                        trxId: payload?.trx_id || '',
+                        account: opData.required_posting_auths?.[0] || opData.required_auths?.[0] || username,
+                        requiredAuths: Array.isArray(opData.required_auths) ? opData.required_auths : [],
+                        requiredPostingAuths: Array.isArray(opData.required_posting_auths) ? opData.required_posting_auths : [],
+                        id: opData.id,
+                        json: parsedJson
+                    });
+                });
+            } catch (error) {
+                console.warn(`Failed to fetch custom_json account history for ${chain} @${username} from ${node}:`, error);
+            }
+        }
+
+        return events;
+    };
+
+    let events: CustomJsonEvent[] = [];
+
+    for (const node of candidateNodes) {
+        const nodeEvents = await fetchEventsFromNode(node);
+        events = [...events, ...nodeEvents];
+        if (nodeEvents.length > 0) {
+            break;
         }
     }
 

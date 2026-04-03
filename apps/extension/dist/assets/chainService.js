@@ -70499,6 +70499,10 @@ const getActiveNode = (chain) => {
   }
   return node;
 };
+const getActiveNodeAsync = async (chain) => {
+  await syncNodesFromStorage();
+  return getActiveNode(chain);
+};
 
 const CHAIN_CONFIGS = {
   [Chain.HIVE]: {
@@ -88776,52 +88780,72 @@ const normalizeBlockchainExpiration = (expiration) => {
   return expiration;
 };
 const fetchCustomJsonEventsForAccounts = async (chain, usernames, expectedId, limit = 200) => {
-  const node = getActiveNode(chain);
-  const events = [];
   const uniqueUsernames = Array.from(new Set((usernames || []).map((name) => name.trim()).filter(Boolean)));
-  for (const username of uniqueUsernames) {
-    try {
-      const response = await fetch(node, {
-        method: "POST",
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "condenser_api.get_account_history",
-          params: [username, -1, limit],
-          id: 1
-        }),
-        headers: {
-          "Content-Type": "application/json",
-          "Connection": "keep-alive"
-        }
-      });
-      if (!response.ok) continue;
-      const json = await response.json();
-      const result = Array.isArray(json?.result) ? json.result : [];
-      result.forEach((historyEntry) => {
-        const payload = historyEntry?.[1];
-        const op = payload?.op;
-        if (!Array.isArray(op) || op[0] !== "custom_json" || !op[1]) return;
-        const opData = op[1];
-        if (expectedId && opData.id !== expectedId) return;
-        let parsedJson = opData.json;
-        try {
-          parsedJson = typeof opData.json === "string" ? JSON.parse(opData.json) : opData.json;
-        } catch {
-          parsedJson = opData.json;
-        }
-        events.push({
-          block: payload?.block || 0,
-          timestamp: payload?.timestamp || "",
-          trxId: payload?.trx_id || "",
-          account: opData.required_posting_auths?.[0] || opData.required_auths?.[0] || username,
-          requiredAuths: Array.isArray(opData.required_auths) ? opData.required_auths : [],
-          requiredPostingAuths: Array.isArray(opData.required_posting_auths) ? opData.required_posting_auths : [],
-          id: opData.id,
-          json: parsedJson
+  const activeNode = await getActiveNodeAsync(chain);
+  const fallbackNodesByChain = {
+    [Chain.HIVE]: HIVE_CANDIDATES,
+    [Chain.STEEM]: STEEM_CANDIDATES,
+    [Chain.BLURT]: BLURT_CANDIDATES
+  };
+  const candidateNodes = Array.from(new Set([
+    activeNode,
+    ...fallbackNodesByChain[chain] || []
+  ].filter(Boolean)));
+  const fetchEventsFromNode = async (node) => {
+    const events2 = [];
+    for (const username of uniqueUsernames) {
+      try {
+        const response = await fetch(node, {
+          method: "POST",
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "condenser_api.get_account_history",
+            params: [username, -1, limit],
+            id: 1
+          }),
+          headers: {
+            "Content-Type": "application/json",
+            "Connection": "keep-alive"
+          }
         });
-      });
-    } catch (error) {
-      console.warn(`Failed to fetch custom_json account history for ${chain} @${username}:`, error);
+        if (!response.ok) continue;
+        const json = await response.json();
+        const result = Array.isArray(json?.result) ? json.result : [];
+        result.forEach((historyEntry) => {
+          const payload = historyEntry?.[1];
+          const op = payload?.op;
+          if (!Array.isArray(op) || op[0] !== "custom_json" || !op[1]) return;
+          const opData = op[1];
+          if (expectedId && opData.id !== expectedId) return;
+          let parsedJson = opData.json;
+          try {
+            parsedJson = typeof opData.json === "string" ? JSON.parse(opData.json) : opData.json;
+          } catch {
+            parsedJson = opData.json;
+          }
+          events2.push({
+            block: payload?.block || 0,
+            timestamp: payload?.timestamp || "",
+            trxId: payload?.trx_id || "",
+            account: opData.required_posting_auths?.[0] || opData.required_auths?.[0] || username,
+            requiredAuths: Array.isArray(opData.required_auths) ? opData.required_auths : [],
+            requiredPostingAuths: Array.isArray(opData.required_posting_auths) ? opData.required_posting_auths : [],
+            id: opData.id,
+            json: parsedJson
+          });
+        });
+      } catch (error) {
+        console.warn(`Failed to fetch custom_json account history for ${chain} @${username} from ${node}:`, error);
+      }
+    }
+    return events2;
+  };
+  let events = [];
+  for (const node of candidateNodes) {
+    const nodeEvents = await fetchEventsFromNode(node);
+    events = [...events, ...nodeEvents];
+    if (nodeEvents.length > 0) {
+      break;
     }
   }
   const seen = /* @__PURE__ */ new Set();
