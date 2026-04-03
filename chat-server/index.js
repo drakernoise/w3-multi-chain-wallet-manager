@@ -199,6 +199,7 @@ const userMessageHistory = {}; // userId -> [{ content: string, timestamp: numbe
 const RATE_LIMIT_TOKENS = 5; // Max 5 messages in 10 seconds
 const RATE_LIMIT_WINDOW = 10000; // 10 seconds
 const DUPLICATE_WINDOW = 30000; // 30 seconds for duplicate check
+const DUPLICATE_SPAM_THRESHOLD = 5; // Allow up to 4 repeated messages inside the duplicate window
 const MAX_MESSAGE_LENGTH = 1000;
 
 // Helper: Check for spam and bots
@@ -221,8 +222,8 @@ function isSpamming(userId, content) {
     }
 
     // 2. Duplicate Message Detection
-    const isDuplicate = history.some(m => m.content === content && (now - m.timestamp) < DUPLICATE_WINDOW);
-    if (isDuplicate) {
+    const duplicateCount = history.filter(m => m.content === content && (now - m.timestamp) < DUPLICATE_WINDOW).length;
+    if (duplicateCount >= DUPLICATE_SPAM_THRESHOLD) {
         return "Duplicate message detected. Please don't spam.";
     }
 
