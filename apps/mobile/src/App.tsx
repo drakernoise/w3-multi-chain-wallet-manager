@@ -2,6 +2,7 @@ import './polyfills/chrome'
 import { useState, useEffect, useRef } from 'react'
 import { Chain, WalletState, Account, Vault, SyncPayload } from '@types'
 import { LanguageProvider } from '@contexts/LanguageContext'
+import { NotificationProvider } from '@contexts/NotificationContext'
 import { LockScreen } from '@components/LockScreen'
 import { bridgeService, SignRequest, SignResponse } from '@services/bridgeService'
 import { broadcastTransfer, broadcastOperations, broadcastVote, broadcastCustomJson, signMessage, fetchBalances } from '@services/chainService'
@@ -16,6 +17,7 @@ import './App.css'
 // Shared Components
 import { WalletView } from '@components/WalletView'
 import { ChatView } from '@components/ChatView'
+import { MultiSig } from '@components/MultiSig'
 import { BrowserView } from './components/BrowserView'
 import { TransferModal } from '@components/TransferModal'
 import { ReceiveModal } from '@components/ReceiveModal'
@@ -229,7 +231,9 @@ const resolveAccountForRequest = (
 function App() {
   return (
     <LanguageProvider>
-      <MobileContent />
+      <NotificationProvider>
+        <MobileContent />
+      </NotificationProvider>
     </LanguageProvider>
   )
 }
@@ -246,7 +250,7 @@ function MobileContent() {
   const [needsSave, setNeedsSave] = useState(false)
 
   // Navigation & View State
-  const [currentView, setCurrentView] = useState<'wallets' | 'bridge' | 'chat' | 'settings' | 'explorer'>('wallets')
+  const [currentView, setCurrentView] = useState<'wallets' | 'multisig' | 'bridge' | 'chat' | 'settings' | 'explorer'>('wallets')
   const [activeChain, setActiveChain] = useState<Chain>(Chain.HIVE)
 
   // Bridge State
@@ -1201,6 +1205,16 @@ function MobileContent() {
           />
         )}
 
+        {currentView === 'multisig' && (
+          <div className="h-full w-full">
+            <MultiSig
+              chain={activeChain}
+              accounts={walletState.accounts}
+              onChainChange={setActiveChain}
+            />
+          </div>
+        )}
+
         {/* CHAT VIEW */}
         {currentView === 'chat' && (
           <div className="h-full w-full">
@@ -1234,7 +1248,7 @@ function MobileContent() {
       </main>
 
       {/* Navigation Bar */}
-      <nav className="shrink-0 grid grid-cols-4 gap-2 border-t border-dark-800 pt-6 mt-4">
+      <nav className="shrink-0 grid grid-cols-6 gap-2 border-t border-dark-800 pt-6 mt-4">
         <button
           onClick={() => setCurrentView('wallets')}
           className={`flex flex-col items-center gap-1.5 transition-all outline-none bg-transparent border-none p-0 ${currentView === 'wallets' ? 'text-purple-400 opacity-100' : 'opacity-30'}`}
@@ -1242,6 +1256,15 @@ function MobileContent() {
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
           <span className={`text-[8px] font-black uppercase tracking-widest ${currentView === 'wallets' ? 'border-b border-purple-400' : ''}`}>Wallets</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentView('multisig')}
+          className={`flex flex-col items-center gap-1.5 transition-all outline-none bg-transparent border-none p-0 ${currentView === 'multisig' ? 'text-purple-400 opacity-100' : 'opacity-30'}`}
+          style={{ backgroundColor: 'transparent' }}
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+          <span className={`text-[8px] font-black uppercase tracking-widest ${currentView === 'multisig' ? 'border-b border-purple-400' : ''}`}>MultiSig</span>
         </button>
 
         <button
