@@ -1112,19 +1112,30 @@ io.on('connection', (socket) => {
     // --- 4. Cross-Device Sync Bridge (Ephemeral) ---
     // Allows secure, direct, encrypted communication between two devices sharing a QR code session.
     socket.on('bridge_join', (data) => {
-        const { sessionId } = data;
+        const { sessionId, publicKey } = data;
         if (!sessionId || typeof sessionId !== 'string') return;
 
         const bridgeRoom = `sync-bridge:${sessionId}`;
-        console.log(`[BRIDGE] Socket ${socket.id} joined bridge ${sessionId}`);
+        const room = io.sockets.adapter.rooms.get(bridgeRoom);
+        const memberCount = room ? room.size : 0;
+
+        console.log(`[BRIDGE] Socket ${socket.id} joining bridge ${sessionId}. Current members: ${memberCount}. Data:`, JSON.stringify(data));
         socket.join(bridgeRoom);
+
+        if (publicKey) {
+            socket.to(bridgeRoom).emit('bridge_signer_ready', { publicKey });
+            console.log(`[BRIDGE] Relay publicKey from ${socket.id} to room ${sessionId}`);
+        } else {
+            console.log(`[BRIDGE] Socket ${socket.id} joined as receiver (no publicKey)`);
+        }
     });
 
     socket.on('bridge_request', (data) => {
         const { sessionId, encrypted } = data;
         if (!sessionId) return;
-        socket.to(`sync-bridge:${sessionId}`).emit('bridge_request', { encrypted });
-        console.log(`[BRIDGE] Request forwarded in ${sessionId}`);
+        const bridgeRoom = `sync-bridge:${sessionId}`;
+        socket.to(bridgeRoom).emit('bridge_request', { encrypted });
+        console.log(`[BRIDGE] Request relayed in ${sessionId} from ${socket.id}`);
     });
 
     socket.on('bridge_response', (data) => {
@@ -1132,6 +1143,20 @@ io.on('connection', (socket) => {
         if (!sessionId) return;
         socket.to(`sync-bridge:${sessionId}`).emit('bridge_response', { encrypted });
         console.log(`[BRIDGE] Response forwarded in ${sessionId}`);
+    });
+
+    socket.on('bridge_validate_pin', (data) => {
+        const { sessionId, encrypted } = data;
+        if (!sessionId) return;
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_validate_pin', { encrypted });
+        console.log(`[BRIDGE] PIN validation forwarded in ${sessionId}`);
+    });
+
+    socket.on('bridge_sync_accounts', (data) => {
+        const { sessionId, encrypted } = data;
+        if (!sessionId) return;
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_sync_accounts', { encrypted });
+        console.log(`[BRIDGE] Accounts sync forwarded in ${sessionId}`);
     });
 
     socket.on('disconnect', () => {
