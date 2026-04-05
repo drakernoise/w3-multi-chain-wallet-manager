@@ -100,6 +100,38 @@ function AppContent() {
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showBridge, setShowBridge] = useState(false);
 
+  const dedupeAccounts = (accounts: Account[]): Account[] => {
+    const byKey = new Map<string, Account>();
+
+    for (const account of accounts) {
+      const key = `${account.chain}:${account.name}`.toLowerCase();
+      const previous = byKey.get(key);
+
+      if (!previous) {
+        byKey.set(key, account);
+        continue;
+      }
+
+      // Prefer the most complete account snapshot when duplicates exist.
+      byKey.set(key, {
+        ...previous,
+        ...account,
+        postingKey: account.postingKey || previous.postingKey,
+        activeKey: account.activeKey || previous.activeKey,
+        memoKey: account.memoKey || previous.memoKey,
+        publicKey: account.publicKey || previous.publicKey,
+        balance: account.balance ?? previous.balance,
+        secondaryBalance: account.secondaryBalance ?? previous.secondaryBalance,
+        stakedBalance: account.stakedBalance ?? previous.stakedBalance,
+        powerDownActive: account.powerDownActive ?? previous.powerDownActive,
+        nextPowerDown: account.nextPowerDown ?? previous.nextPowerDown,
+        powerDownAmount: account.powerDownAmount ?? previous.powerDownAmount
+      });
+    }
+
+    return Array.from(byKey.values());
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const req = params.get('requestId');
@@ -192,9 +224,13 @@ function AppContent() {
           await new Promise<void>((resolve) => {
             chrome.storage.session.get(['session_accounts'], (res: any) => {
               if (res.session_accounts && res.session_accounts.length > 0) {
+                const sessionAccounts = dedupeAccounts(res.session_accounts);
                 if (restored) {
-                  setWalletState(prev => ({ ...prev, accounts: res.session_accounts }));
+                  setWalletState(prev => ({ ...prev, accounts: sessionAccounts }));
                   setIsLocked(false);
+                  if (sessionAccounts.length !== res.session_accounts.length) {
+                    chrome.storage.session.set({ session_accounts: sessionAccounts });
+                  }
                   setTimeout(fetchBalances, 500);
                 } else {
                   console.warn("Session accounts found but crypto key missing. Forcing re-login.");
@@ -257,14 +293,15 @@ function AppContent() {
 
   useEffect(() => {
     if (!isLocked && walletState.accounts.length > 0) {
+      const dedupedAccounts = dedupeAccounts(walletState.accounts);
       // 1. Sync to Session Storage (Fixes disappearance on popup close)
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
-        chrome.storage.session.set({ session_accounts: walletState.accounts });
+        chrome.storage.session.set({ session_accounts: dedupedAccounts });
       }
 
       // 2. Sync to Persistent Vault (if needed)
       if (needsSave && walletState.encryptedMaster) {
-        const vault: Vault = { accounts: walletState.accounts, lastUpdated: Date.now() };
+        const vault: Vault = { accounts: dedupedAccounts, lastUpdated: Date.now() };
         saveVault('cached', vault)
           .then(() => setNeedsSave(false))
           .catch((err: Error) => {
@@ -329,12 +366,13 @@ function AppContent() {
   }, [currentView, activeChain, isLocked, walletState.accounts.length]);
 
   const handleUnlock = (decryptedAccounts: Account[]) => {
-    setWalletState(prev => ({ ...prev, accounts: decryptedAccounts }));
+    const dedupedAccounts = dedupeAccounts(decryptedAccounts);
+    setWalletState(prev => ({ ...prev, accounts: dedupedAccounts }));
     setIsLocked(false);
 
     // Save to Session
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
-      chrome.storage.session.set({ session_accounts: decryptedAccounts });
+      chrome.storage.session.set({ session_accounts: dedupedAccounts });
     }
 
     setTimeout(() => fetchBalances(), 500);
@@ -354,7 +392,7 @@ function AppContent() {
       };
     }));
 
-    const updatedAccounts = [...walletState.accounts, ...withBalance];
+    const updatedAccounts = dedupeAccounts([...walletState.accounts, ...withBalance]);
 
     try {
       if (!walletState.encryptedMaster) {

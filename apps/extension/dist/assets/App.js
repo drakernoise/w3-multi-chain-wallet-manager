@@ -17512,6 +17512,32 @@ function AppContent() {
   const [lockReason, setLockReason] = reactExports.useState(null);
   const [requestId, setRequestId] = reactExports.useState(null);
   const [showBridge, setShowBridge] = reactExports.useState(false);
+  const dedupeAccounts = (accounts) => {
+    const byKey = /* @__PURE__ */ new Map();
+    for (const account of accounts) {
+      const key = `${account.chain}:${account.name}`.toLowerCase();
+      const previous = byKey.get(key);
+      if (!previous) {
+        byKey.set(key, account);
+        continue;
+      }
+      byKey.set(key, {
+        ...previous,
+        ...account,
+        postingKey: account.postingKey || previous.postingKey,
+        activeKey: account.activeKey || previous.activeKey,
+        memoKey: account.memoKey || previous.memoKey,
+        publicKey: account.publicKey || previous.publicKey,
+        balance: account.balance ?? previous.balance,
+        secondaryBalance: account.secondaryBalance ?? previous.secondaryBalance,
+        stakedBalance: account.stakedBalance ?? previous.stakedBalance,
+        powerDownActive: account.powerDownActive ?? previous.powerDownActive,
+        nextPowerDown: account.nextPowerDown ?? previous.nextPowerDown,
+        powerDownAmount: account.powerDownAmount ?? previous.powerDownAmount
+      });
+    }
+    return Array.from(byKey.values());
+  };
   reactExports.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const req = params.get("requestId");
@@ -17585,9 +17611,13 @@ function AppContent() {
           await new Promise((resolve) => {
             chrome.storage.session.get(["session_accounts"], (res) => {
               if (res.session_accounts && res.session_accounts.length > 0) {
+                const sessionAccounts = dedupeAccounts(res.session_accounts);
                 if (restored) {
-                  setWalletState((prev) => ({ ...prev, accounts: res.session_accounts }));
+                  setWalletState((prev) => ({ ...prev, accounts: sessionAccounts }));
                   setIsLocked(false);
+                  if (sessionAccounts.length !== res.session_accounts.length) {
+                    chrome.storage.session.set({ session_accounts: sessionAccounts });
+                  }
                   setTimeout(fetchBalances$1, 500);
                 } else {
                   console.warn("Session accounts found but crypto key missing. Forcing re-login.");
@@ -17643,11 +17673,12 @@ function AppContent() {
   }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, isDataLoaded]);
   reactExports.useEffect(() => {
     if (!isLocked && walletState.accounts.length > 0) {
+      const dedupedAccounts = dedupeAccounts(walletState.accounts);
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-        chrome.storage.session.set({ session_accounts: walletState.accounts });
+        chrome.storage.session.set({ session_accounts: dedupedAccounts });
       }
       if (needsSave && walletState.encryptedMaster) {
-        const vault = { accounts: walletState.accounts, lastUpdated: Date.now() };
+        const vault = { accounts: dedupedAccounts, lastUpdated: Date.now() };
         saveVault("cached", vault).then(() => setNeedsSave(false)).catch((err) => {
           console.warn("Auto-save failed:", err);
           if (err.message && err.message.includes("cache is empty")) {
@@ -17702,10 +17733,11 @@ function AppContent() {
     }
   }, [currentView, activeChain, isLocked, walletState.accounts.length]);
   const handleUnlock = (decryptedAccounts) => {
-    setWalletState((prev) => ({ ...prev, accounts: decryptedAccounts }));
+    const dedupedAccounts = dedupeAccounts(decryptedAccounts);
+    setWalletState((prev) => ({ ...prev, accounts: dedupedAccounts }));
     setIsLocked(false);
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-      chrome.storage.session.set({ session_accounts: decryptedAccounts });
+      chrome.storage.session.set({ session_accounts: dedupedAccounts });
     }
     setTimeout(() => fetchBalances$1(), 500);
   };
@@ -17722,7 +17754,7 @@ function AppContent() {
         powerDownAmount: balances.powerDownAmount
       };
     }));
-    const updatedAccounts = [...walletState.accounts, ...withBalance];
+    const updatedAccounts = dedupeAccounts([...walletState.accounts, ...withBalance]);
     try {
       if (!walletState.encryptedMaster) {
         await enablePasswordless(updatedAccounts);

@@ -113,6 +113,37 @@ function normalizeKeyType(type: any): 'posting' | 'active' | 'memo' | '' {
     return '';
 }
 
+async function resolveBestAccountForRequest(accounts: any[], username: string, detectedChain: string | null, normalizedKeyType: 'posting' | 'active' | 'memo' | '' = '') {
+    const potentialAccounts = accounts.filter((a: any) => a.name === username);
+    if (potentialAccounts.length === 0) return null;
+
+    let candidates = detectedChain
+        ? potentialAccounts.filter((a: any) => a.chain === detectedChain)
+        : potentialAccounts;
+
+    if (candidates.length === 0) {
+        candidates = potentialAccounts;
+    }
+
+    if (normalizedKeyType === 'posting' && candidates.length > 1) {
+        for (const candidate of candidates) {
+            if (!candidate.postingKey) continue;
+            const validation = await validateAccountKeys(candidate.chain, candidate.name, { posting: candidate.postingKey });
+            if (validation.valid) return candidate;
+        }
+    }
+
+    if (normalizedKeyType === 'active' && candidates.length > 1) {
+        for (const candidate of candidates) {
+            if (!candidate.activeKey) continue;
+            const validation = await validateAccountKeys(candidate.chain, candidate.name, { active: candidate.activeKey });
+            if (validation.valid) return candidate;
+        }
+    }
+
+    return candidates[0] || null;
+}
+
 // Listen for messages from Content Script or Popup
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
     if (!request) return false;
@@ -496,21 +527,18 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const detectedChain = detectChainFromUrl(url);
 
         // 2. Find account matching Name AND Chain (if known)
-        let account = null;
-        const potentialAccounts = session.session_accounts.filter((a: any) => a.name === username);
-
-        if (potentialAccounts.length === 0) {
-            return null;
-        }
-
-        if (detectedChain) {
-            account = potentialAccounts.find((a: any) => a.chain === detectedChain);
-        }
+        const requestedKeyType = normalizeKeyType(request.params?.[2]);
+        let account = await resolveBestAccountForRequest(
+            session.session_accounts,
+            username,
+            detectedChain,
+            requestedKeyType
+        );
 
         // 3. Fallback: If no detected chain or exact match not found
-        if (!account) {
-            account = potentialAccounts.find((a: any) => a.chain === 'HIVE');
-            if (!account) account = potentialAccounts[0];
+        if (!account && !detectedChain) {
+            account = session.session_accounts.find((a: any) => a.name === username && a.chain === 'HIVE');
+            if (!account) account = session.session_accounts.find((a: any) => a.name === username);
         }
 
         if (!account) return { success: false, error: 'Account not found or wallet locked' };

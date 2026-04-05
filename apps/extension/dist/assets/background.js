@@ -86,6 +86,29 @@ function normalizeKeyType(type) {
   }
   return "";
 }
+async function resolveBestAccountForRequest(accounts, username, detectedChain, normalizedKeyType = "") {
+  const potentialAccounts = accounts.filter((a) => a.name === username);
+  if (potentialAccounts.length === 0) return null;
+  let candidates = detectedChain ? potentialAccounts.filter((a) => a.chain === detectedChain) : potentialAccounts;
+  if (candidates.length === 0) {
+    candidates = potentialAccounts;
+  }
+  if (normalizedKeyType === "posting" && candidates.length > 1) {
+    for (const candidate of candidates) {
+      if (!candidate.postingKey) continue;
+      const validation = await validateAccountKeys(candidate.chain, candidate.name, { posting: candidate.postingKey });
+      if (validation.valid) return candidate;
+    }
+  }
+  if (normalizedKeyType === "active" && candidates.length > 1) {
+    for (const candidate of candidates) {
+      if (!candidate.activeKey) continue;
+      const validation = await validateAccountKeys(candidate.chain, candidate.name, { active: candidate.activeKey });
+      if (validation.valid) return candidate;
+    }
+  }
+  return candidates[0] || null;
+}
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request) return false;
   console.log("[Gravity Background] onMessage received:", request.type, request.method || "");
@@ -354,17 +377,16 @@ async function tryAutoSign(request, sender) {
     if (!session.session_accounts || session.session_accounts.length === 0) return null;
     const url = sender?.tab?.url || sender?.url || "";
     const detectedChain = detectChainFromUrl(url);
-    let account = null;
-    const potentialAccounts = session.session_accounts.filter((a) => a.name === username);
-    if (potentialAccounts.length === 0) {
-      return null;
-    }
-    if (detectedChain) {
-      account = potentialAccounts.find((a) => a.chain === detectedChain);
-    }
-    if (!account) {
-      account = potentialAccounts.find((a) => a.chain === "HIVE");
-      if (!account) account = potentialAccounts[0];
+    const requestedKeyType = normalizeKeyType(request.params?.[2]);
+    let account = await resolveBestAccountForRequest(
+      session.session_accounts,
+      username,
+      detectedChain,
+      requestedKeyType
+    );
+    if (!account && !detectedChain) {
+      account = session.session_accounts.find((a) => a.name === username && a.chain === "HIVE");
+      if (!account) account = session.session_accounts.find((a) => a.name === username);
     }
     if (!account) return { success: false, error: "Account not found or wallet locked" };
     if (!request.requestChain && detectedChain) {
