@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, v as broadcastRCDelegate, w as broadcastRCUndelegate, x as broadcastBulkTransfer, d as broadcastCustomJson, y as fetchCustomJsonEventsForAccounts, z as calculateThresholdProgress, A as getAccountAuthorities, B as createUnsignedTransaction, D as signTransactionEnvelope, E as selectBroadcastSignatures, F as broadcastSignedTransaction, G as indexBrowserExports, H as indexBrowserExports$1, I as validateAccountKeys, J as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, K as fetchBalances, L as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, w as broadcastRCDelegate, x as broadcastRCUndelegate, y as broadcastBulkTransfer, d as broadcastCustomJson, z as fetchCustomJsonEventsForAccounts, A as calculateThresholdProgress, B as getAccountAuthorities, D as createUnsignedTransaction, E as signTransactionEnvelope, F as selectBroadcastSignatures, G as broadcastSignedTransaction, H as indexBrowserExports, I as indexBrowserExports$1, v as validateAccountKeys, J as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, K as fetchBalances, L as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -14671,6 +14671,14 @@ const MultiSigProgress = ({
   ] });
 };
 
+const normalizeKeyType = (type) => {
+  if (typeof type !== "string") return "";
+  const normalized = type.trim().toLowerCase();
+  if (normalized === "posting" || normalized === "active" || normalized === "memo") {
+    return normalized;
+  }
+  return "";
+};
 const SignRequest = ({ requestId, accounts, onComplete }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
@@ -14853,7 +14861,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       const isPost2 = method2 === "requestPost" || method2 === "post";
       const isWitnessVote2 = method2 === "requestWitnessVote" || method2 === "witnessVote";
       const needsActive = isTransfer2 || isPowerUp || isPowerDown || isDelegation || isWitnessVote2 || isBroadcast2 && !account.postingKey || // Broadcast assumes Active?
-      isCustomJson2 && request.params[2] === "Active";
+      isCustomJson2 && normalizeKeyType(request.params[2]) === "active";
       if (needsActive && !account.activeKey) {
         throw new Error(t("sign.active_missing"));
       }
@@ -14894,11 +14902,19 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       } else if (isCustomJson2) {
         const id = request.params[1];
         const type = request.params[2];
+        const normalizedType = normalizeKeyType(type);
         const json = request.params[3];
         let key = account.postingKey;
-        if (type === "Active") key = account.activeKey;
-        if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", type));
-        const response = await broadcastCustomJson(account.chain, account.name, key, id, typeof json === "string" ? json : JSON.stringify(json), type);
+        if (normalizedType === "active") key = account.activeKey;
+        if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", normalizedType === "active" ? "Active" : "Posting"));
+        const response = await broadcastCustomJson(
+          account.chain,
+          account.name,
+          key,
+          id,
+          typeof json === "string" ? json : JSON.stringify(json),
+          normalizedType === "active" ? "Active" : "Posting"
+        );
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
         result = {
@@ -14913,19 +14929,31 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       } else if (isSignBuffer2) {
         const message = request.params[1];
         const type = request.params[2];
+        const normalizedType = normalizeKeyType(type);
         console.log("[SignRequest] signBuffer request:", {
           chain: account.chain,
           username: account.name,
           keyType: type,
+          normalizedKeyType: normalizedType,
           messageType: typeof message,
           messageLength: typeof message === "string" ? message.length : "N/A",
           messagePreview: typeof message === "string" ? message.substring(0, 100) : JSON.stringify(message).substring(0, 100)
         });
         let keyStr = "";
-        if (type === "Posting") keyStr = account.postingKey || "";
-        else if (type === "Active") keyStr = account.activeKey || "";
-        else if (type === "Memo") keyStr = account.memoKey || "";
-        if (!keyStr) throw new Error(t("sign.key_missing_generic").replace("{type}", type));
+        if (normalizedType === "posting") keyStr = account.postingKey || "";
+        else if (normalizedType === "active") keyStr = account.activeKey || "";
+        else if (normalizedType === "memo") keyStr = account.memoKey || "";
+        if (!keyStr) throw new Error(t("sign.key_missing_generic").replace("{type}", normalizedType || String(type)));
+        if (normalizedType === "posting" || normalizedType === "active") {
+          const validation = await validateAccountKeys(
+            account.chain,
+            account.name,
+            normalizedType === "posting" ? { posting: keyStr } : { active: keyStr }
+          );
+          if (!validation.valid) {
+            throw new Error(validation.error || `${normalizedType} key does not match account`);
+          }
+        }
         const response = signMessage(account.chain, message, keyStr);
         console.log("[SignRequest] signMessage response:", {
           success: response.success,
@@ -15016,7 +15044,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           return activeKeyOps.includes(opName);
         });
         let key = account.postingKey;
-        if (keyType === "Active") key = account.activeKey;
+        if (normalizeKeyType(keyType) === "active") key = account.activeKey;
         else if (requiresActiveKey) key = account.activeKey;
         if (!key && account.activeKey) key = account.activeKey;
         console.log("[SignRequest Broadcast] Key selection:", {

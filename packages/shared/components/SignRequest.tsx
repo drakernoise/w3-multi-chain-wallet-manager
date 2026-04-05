@@ -3,7 +3,7 @@ import { useTranslation } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Account, Chain } from '../types';
 import { MultiSigProgress } from './MultiSigProgress';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, getAccountAuthorities, MultiSigAuthority, MultisigProgress as IMultisigProgress } from '../services/chainService';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, getAccountAuthorities, MultiSigAuthority, MultisigProgress as IMultisigProgress, validateAccountKeys } from '../services/chainService';
 
 interface SignRequestProps {
     requestId: string;
@@ -12,6 +12,15 @@ interface SignRequestProps {
 }
 
 declare const chrome: any;
+
+const normalizeKeyType = (type: any): 'posting' | 'active' | 'memo' | '' => {
+    if (typeof type !== 'string') return '';
+    const normalized = type.trim().toLowerCase();
+    if (normalized === 'posting' || normalized === 'active' || normalized === 'memo') {
+        return normalized;
+    }
+    return '';
+};
 
 export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, onComplete }) => {
     const { t } = useTranslation();
@@ -248,7 +257,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             // Check Key Requirement properly
             const needsActive = isTransfer || isPowerUp || isPowerDown || isDelegation || isWitnessVote ||
                 (isBroadcast && !account.postingKey) || // Broadcast assumes Active?
-                (isCustomJson && request.params[2] === 'Active');
+                (isCustomJson && normalizeKeyType(request.params[2]) === 'active');
 
             if (needsActive && !account.activeKey) {
                 throw new Error(t('sign.active_missing'));
@@ -300,14 +309,22 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             } else if (isCustomJson) {
                 const id = request.params[1];
                 const type = request.params[2]; // 'Posting' or 'Active'
+                const normalizedType = normalizeKeyType(type);
                 const json = request.params[3];
 
                 let key = account.postingKey;
-                if (type === 'Active') key = account.activeKey;
+                if (normalizedType === 'active') key = account.activeKey;
 
-                if (!key) throw new Error(t('sign.key_missing_type').replace('{type}', type));
+                if (!key) throw new Error(t('sign.key_missing_type').replace('{type}', normalizedType === 'active' ? 'Active' : 'Posting'));
 
-                const response = await broadcastCustomJson(account.chain, account.name, key!, id, typeof json === 'string' ? json : JSON.stringify(json), type as any);
+                const response = await broadcastCustomJson(
+                    account.chain,
+                    account.name,
+                    key!,
+                    id,
+                    typeof json === 'string' ? json : JSON.stringify(json),
+                    normalizedType === 'active' ? 'Active' : 'Posting'
+                );
                 if (!response.success) throw new Error(response.error);
 
                 // Compatibility mapping (v1.1.3 robust fix)
@@ -325,22 +342,35 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             } else if (isSignBuffer) {
                 const message = request.params[1];
                 const type = request.params[2]; // Key type: 'Posting', 'Active', 'Memo'
+                const normalizedType = normalizeKeyType(type);
 
                 console.log('[SignRequest] signBuffer request:', {
                     chain: account.chain,
                     username: account.name,
                     keyType: type,
+                    normalizedKeyType: normalizedType,
                     messageType: typeof message,
                     messageLength: typeof message === 'string' ? message.length : 'N/A',
                     messagePreview: typeof message === 'string' ? message.substring(0, 100) : JSON.stringify(message).substring(0, 100)
                 });
 
                 let keyStr = "";
-                if (type === 'Posting') keyStr = account.postingKey || "";
-                else if (type === 'Active') keyStr = account.activeKey || "";
-                else if (type === 'Memo') keyStr = account.memoKey || "";
+                if (normalizedType === 'posting') keyStr = account.postingKey || "";
+                else if (normalizedType === 'active') keyStr = account.activeKey || "";
+                else if (normalizedType === 'memo') keyStr = account.memoKey || "";
 
-                if (!keyStr) throw new Error(t('sign.key_missing_generic').replace('{type}', type));
+                if (!keyStr) throw new Error(t('sign.key_missing_generic').replace('{type}', normalizedType || String(type)));
+
+                if (normalizedType === 'posting' || normalizedType === 'active') {
+                    const validation = await validateAccountKeys(
+                        account.chain,
+                        account.name,
+                        normalizedType === 'posting' ? { posting: keyStr } : { active: keyStr }
+                    );
+                    if (!validation.valid) {
+                        throw new Error(validation.error || `${normalizedType} key does not match account`);
+                    }
+                }
 
                 const response = signMessage(account.chain, message, keyStr);
 
@@ -455,7 +485,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 let key = account.postingKey;
                 // If specifically Active requested, use Active
-                if (keyType === 'Active') key = account.activeKey;
+                if (normalizeKeyType(keyType) === 'active') key = account.activeKey;
                 // If operation requires Active key, use Active
                 else if (requiresActiveKey) key = account.activeKey;
                 // If Posting requested but missing, try Active

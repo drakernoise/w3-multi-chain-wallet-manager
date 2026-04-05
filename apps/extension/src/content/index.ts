@@ -27,26 +27,44 @@ window.addEventListener('message', (event) => {
     console.log('[Gravity Content] Received request:', event.data.method, event.data.id);
     console.log('[Gravity Content] Sending to background...');
 
-    // Forward to background script
-    chrome.runtime.sendMessage(event.data, (response: any) => {
-        const lastError = chrome.runtime.lastError;
-        if (lastError) {
-            // Port might be closed if background is waking up or busy
-            console.error('[Gravity Content] sendMessage FAILED:', lastError.message);
-            return;
-        }
-        
-        console.log('[Gravity Content] Got response from background:', response);
+    const postErrorToPage = (error: string) => {
+        window.postMessage({
+            type: 'gravity_response',
+            id: event.data.id,
+            response: {
+                success: false,
+                error
+            }
+        }, '*');
+    };
 
-        // Only handle immediate responses (like handshake or errors)
-        if (response && response.pending !== true) {
-            window.postMessage({
-                type: 'gravity_response',
-                id: event.data.id,
-                response: response
-            }, '*');
-        }
-    });
+    // Forward to background script
+    try {
+        chrome.runtime.sendMessage(event.data, (response: any) => {
+            const lastError = chrome.runtime.lastError;
+            if (lastError) {
+                // Port might be closed if background is waking up or busy
+                console.error('[Gravity Content] sendMessage FAILED:', lastError.message);
+                postErrorToPage(lastError.message);
+                return;
+            }
+
+            console.log('[Gravity Content] Got response from background:', response);
+
+            // Only handle immediate responses (like handshake or errors)
+            if (response && response.pending !== true) {
+                window.postMessage({
+                    type: 'gravity_response',
+                    id: event.data.id,
+                    response: response
+                }, '*');
+            }
+        });
+    } catch (error: any) {
+        const message = error?.message || 'Failed to forward request to extension background.';
+        console.error('[Gravity Content] sendMessage THREW:', message);
+        postErrorToPage(message);
+    }
 });
 
 // Manual Injection Strategy DISABLED

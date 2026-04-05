@@ -1,5 +1,5 @@
 import './polyfill';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, encodeMemo, decodeMemo } from '@services/chainService';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, encodeMemo, decodeMemo, validateAccountKeys } from '@services/chainService';
 import { getChainConfig, isChainSupported } from '@config/chainConfig';
 import { getActiveNode, benchmarkNodes } from '@services/nodeService';
 import { Chain } from 'gravity-shared/types';
@@ -102,6 +102,15 @@ function detectChainFromUrl(url: string = ""): string | null {
     } catch (e) {
         return null;
     }
+}
+
+function normalizeKeyType(type: any): 'posting' | 'active' | 'memo' | '' {
+    if (typeof type !== 'string') return '';
+    const normalized = type.trim().toLowerCase();
+    if (normalized === 'posting' || normalized === 'active' || normalized === 'memo') {
+        return normalized;
+    }
+    return '';
 }
 
 // Listen for messages from Content Script or Popup
@@ -554,20 +563,43 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         } else if (isCustomJson) {
             const id = request.params[1];
             const type = request.params[2];
+            const normalizedType = normalizeKeyType(type);
             const json = request.params[3];
             let key = account.postingKey;
-            if (type === 'Active') key = account.activeKey;
+            if (normalizedType === 'active') key = account.activeKey;
             if (!key) return { success: false, error: 'Key required for custom JSON operation' };
-            response = await broadcastCustomJson(account.chain, account.name, key, id, typeof json === 'string' ? json : JSON.stringify(json), type as any);
+            response = await broadcastCustomJson(
+                account.chain,
+                account.name,
+                key,
+                id,
+                typeof json === 'string' ? json : JSON.stringify(json),
+                normalizedType === 'active' ? 'Active' : 'Posting'
+            );
 
         } else if (isSignBuffer) {
             const message = request.params[1];
             const type = request.params[2];
+            const normalizedType = normalizeKeyType(type);
             let keyStr = "";
-            if (type === 'Posting') keyStr = account.postingKey || "";
-            else if (type === 'Active') keyStr = account.activeKey || "";
-            else if (type === 'Memo') keyStr = account.memoKey || "";
+            if (normalizedType === 'posting') keyStr = account.postingKey || "";
+            else if (normalizedType === 'active') keyStr = account.activeKey || "";
+            else if (normalizedType === 'memo') keyStr = account.memoKey || "";
             if (!keyStr) return { success: false, error: 'Key required for signing' };
+
+            if (normalizedType === 'posting' || normalizedType === 'active') {
+                const validation = await validateAccountKeys(
+                    account.chain,
+                    account.name,
+                    normalizedType === 'posting' ? { posting: keyStr } : { active: keyStr }
+                );
+                if (!validation.valid) {
+                    return {
+                        success: false,
+                        error: validation.error || `${normalizedType} key does not match account`
+                    };
+                }
+            }
 
             const targetChain = request.requestChain || account.chain;
             const useLegacySigner = url.includes('tribaldex') || url.includes('hive-engine');
@@ -743,10 +775,11 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         } else if (isDecodeMemo) {
             const memo = request.params[1];
             const type = request.params[2];
+            const normalizedType = normalizeKeyType(type);
             let keyStr = "";
-            if (type === 'Posting') keyStr = account.postingKey || "";
-            else if (type === 'Active') keyStr = account.activeKey || "";
-            else if (type === 'Memo') keyStr = account.memoKey || "";
+            if (normalizedType === 'posting') keyStr = account.postingKey || "";
+            else if (normalizedType === 'active') keyStr = account.activeKey || "";
+            else if (normalizedType === 'memo') keyStr = account.memoKey || "";
             if (!keyStr) return { success: false, error: 'Key required for decoding memo' };
             try {
                 const decoded = await decodeMemo(account.chain, account.name, memo, keyStr);
@@ -759,10 +792,11 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             const receiver = request.params[1];
             const memo = request.params[2];
             const type = request.params[3];
+            const normalizedType = normalizeKeyType(type);
             let keyStr = "";
-            if (type === 'Posting') keyStr = account.postingKey || "";
-            else if (type === 'Active') keyStr = account.activeKey || "";
-            else if (type === 'Memo') keyStr = account.memoKey || "";
+            if (normalizedType === 'posting') keyStr = account.postingKey || "";
+            else if (normalizedType === 'active') keyStr = account.activeKey || "";
+            else if (normalizedType === 'memo') keyStr = account.memoKey || "";
             if (!keyStr) return { success: false, error: 'Key required for encoding memo' };
             try {
                 const encoded = await encodeMemo(account.chain, account.name, receiver, memo, keyStr);

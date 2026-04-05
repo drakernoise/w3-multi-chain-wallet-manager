@@ -12,21 +12,38 @@ window.addEventListener("message", (event) => {
   }
   console.log("[Gravity Content] Received request:", event.data.method, event.data.id);
   console.log("[Gravity Content] Sending to background...");
-  chrome.runtime.sendMessage(event.data, (response) => {
-    const lastError = chrome.runtime.lastError;
-    if (lastError) {
-      console.error("[Gravity Content] sendMessage FAILED:", lastError.message);
-      return;
-    }
-    console.log("[Gravity Content] Got response from background:", response);
-    if (response && response.pending !== true) {
-      window.postMessage({
-        type: "gravity_response",
-        id: event.data.id,
-        response
-      }, "*");
-    }
-  });
+  const postErrorToPage = (error) => {
+    window.postMessage({
+      type: "gravity_response",
+      id: event.data.id,
+      response: {
+        success: false,
+        error
+      }
+    }, "*");
+  };
+  try {
+    chrome.runtime.sendMessage(event.data, (response) => {
+      const lastError = chrome.runtime.lastError;
+      if (lastError) {
+        console.error("[Gravity Content] sendMessage FAILED:", lastError.message);
+        postErrorToPage(lastError.message);
+        return;
+      }
+      console.log("[Gravity Content] Got response from background:", response);
+      if (response && response.pending !== true) {
+        window.postMessage({
+          type: "gravity_response",
+          id: event.data.id,
+          response
+        }, "*");
+      }
+    });
+  } catch (error) {
+    const message = error?.message || "Failed to forward request to extension background.";
+    console.error("[Gravity Content] sendMessage THREW:", message);
+    postErrorToPage(message);
+  }
 });
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   console.log("[Gravity Content] Message from background:", msg.type);
