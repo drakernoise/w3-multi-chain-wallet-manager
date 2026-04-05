@@ -51,11 +51,13 @@ if (!(window as any)._gravityProvider) {
         public readonly name: string;
         public readonly version: string;
         public current_rpc: string;
+        private readonly chainHint: 'HIVE' | 'BLURT' | 'STEEM' | null;
 
-        constructor() {
+        constructor(chainHint: 'HIVE' | 'BLURT' | 'STEEM' | null = null) {
             this.name = PROVIDER_CONFIG.name;
             this.version = PROVIDER_CONFIG.version;
             this.callbacks = new Map();
+            this.chainHint = chainHint;
             this.setupListener();
 
             // Synchronous RPC Discovery from injected dataset (provided by content script)
@@ -144,7 +146,8 @@ if (!(window as any)._gravityProvider) {
                     id,
                     method,
                     params,
-                    appName: PROVIDER_CONFIG.name
+                    appName: PROVIDER_CONFIG.name,
+                    requestChain: this.chainHint
                 }, window.location.origin);
             };
 
@@ -418,18 +421,27 @@ if (!(window as any)._gravityProvider) {
      * Initialize the provider and set up global aliases
      */
     function initializeProvider(): void {
-        const provider = new GravityProvider();
+        const hiveProvider = new GravityProvider('HIVE');
+        const blurtProvider = new GravityProvider('BLURT');
+        const steemProvider = new GravityProvider('STEEM');
+        const defaultProvider = hiveProvider;
 
         // Set main gravity object
-        (window as any).gravity = provider;
-        (window as any)._gravityProvider = provider;
+        (window as any).gravity = defaultProvider;
+        (window as any)._gravityProvider = defaultProvider;
 
-        // Set up wallet aliases for compatibility
+        const aliasProviders: Record<typeof WALLET_ALIASES[number], GravityProvider> = {
+            hive_keychain: hiveProvider,
+            whalevault: blurtProvider,
+            blurt_keychain: blurtProvider,
+            blurt: blurtProvider,
+            steem_keychain: steemProvider
+        };
+
         WALLET_ALIASES.forEach(alias => {
             const existing = (window as any)[alias];
-            // Only inject if doesn't exist or is a placeholder without methods
             if (!existing || typeof existing.requestHandshake !== 'function') {
-                (window as any)[alias] = provider;
+                (window as any)[alias] = aliasProviders[alias];
             }
         });
     }

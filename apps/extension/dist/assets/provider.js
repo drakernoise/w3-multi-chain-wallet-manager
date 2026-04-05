@@ -1,12 +1,22 @@
 if (!window._gravityProvider) {
   let initializeProvider2 = function() {
-    const provider = new GravityProvider();
-    window.gravity = provider;
-    window._gravityProvider = provider;
+    const hiveProvider = new GravityProvider("HIVE");
+    const blurtProvider = new GravityProvider("BLURT");
+    const steemProvider = new GravityProvider("STEEM");
+    const defaultProvider = hiveProvider;
+    window.gravity = defaultProvider;
+    window._gravityProvider = defaultProvider;
+    const aliasProviders = {
+      hive_keychain: hiveProvider,
+      whalevault: blurtProvider,
+      blurt_keychain: blurtProvider,
+      blurt: blurtProvider,
+      steem_keychain: steemProvider
+    };
     WALLET_ALIASES.forEach((alias) => {
       const existing = window[alias];
       if (!existing || typeof existing.requestHandshake !== "function") {
-        window[alias] = provider;
+        window[alias] = aliasProviders[alias];
       }
     });
   }, dispatchHandshakeEvents2 = function() {
@@ -53,10 +63,12 @@ if (!window._gravityProvider) {
     name;
     version;
     current_rpc;
-    constructor() {
+    chainHint;
+    constructor(chainHint = null) {
       this.name = PROVIDER_CONFIG.name;
       this.version = PROVIDER_CONFIG.version;
       this.callbacks = /* @__PURE__ */ new Map();
+      this.chainHint = chainHint;
       this.setupListener();
       let activeNodes = {};
       try {
@@ -129,7 +141,8 @@ if (!window._gravityProvider) {
           id,
           method,
           params,
-          appName: PROVIDER_CONFIG.name
+          appName: PROVIDER_CONFIG.name,
+          requestChain: this.chainHint
         }, window.location.origin);
       };
       if (typeof callback === "function") {
