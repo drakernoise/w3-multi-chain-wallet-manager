@@ -88,3 +88,26 @@ chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any)
 });
 
 // Manual injection is no longer needed as we use Manifest V3 world: "MAIN" with raw file.
+
+// Manual Injection Strategy for Firefox
+// Firefox MV3 strictly rejects `world: "MAIN"`, forcing the provider into an isolated world.
+// To bypass this and expose `window.gravity` to dApps, we manually inject a <script> tag 
+// into the DOM that runs in the page's MAIN world context.
+if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox')) {
+    const injectProvider = () => {
+        try {
+            const script = document.createElement('script');
+            script.src = chrome.runtime.getURL('assets/provider.js');
+            // If Vite outputs ES modules with imports, this is required
+            script.type = 'module'; 
+            script.onload = () => {
+              console.log('[Gravity] Successfully injected Firefox Web3 Provider');
+              script.remove(); // Clean up DOM
+            };
+            (document.head || document.documentElement).appendChild(script);
+        } catch (e) {
+            console.error('[Gravity] Failed to inject provider for Firefox:', e);
+        }
+    };
+    injectProvider();
+}
