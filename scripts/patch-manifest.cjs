@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 const browser = process.argv[2] || 'chrome';
-const manifestPath = path.join(__dirname, '../apps/extension/dist/manifest.json');
+const folderName = `dist-${browser}`;
+const manifestPath = path.join(__dirname, `../apps/extension/${folderName}/manifest.json`);
 
 try {
     if (!fs.existsSync(manifestPath)) {

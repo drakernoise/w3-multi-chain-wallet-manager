@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const extensionDist = path.join(__dirname, '../apps/extension/dist/assets');
+const browser = process.argv[2] || 'dist';
+const folderName = browser === 'dist' ? 'dist' : `dist-${browser}`;
+const extensionDist = path.join(__dirname, `../apps/extension/${folderName}/assets`);
 const polyfillPath = path.join(extensionDist, 'ws-polyfill.js');
 
 const POLYFILL_CODE = `

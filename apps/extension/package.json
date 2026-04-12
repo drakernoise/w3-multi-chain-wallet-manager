@@ -6,9 +6,9 @@
     "scripts": {
         "dev": "vite",
         "build": "tsc && vite build && node ../../scripts/patch-dist.cjs",
-        "build:chrome": "npm run build && node ../../scripts/patch-manifest.cjs chrome",
-        "build:firefox": "npm run build && node ../../scripts/patch-manifest.cjs firefox",
-        "build:edge": "npm run build:chrome",
+        "build:chrome": "tsc && vite build --emptyOutDir --outDir dist-chrome && node ../../scripts/patch-dist.cjs chrome && node ../../scripts/patch-manifest.cjs chrome",
+        "build:firefox": "tsc && vite build --emptyOutDir --outDir dist-firefox && node ../../scripts/patch-dist.cjs firefox && node ../../scripts/patch-manifest.cjs firefox",
+        "build:edge": "tsc && vite build --emptyOutDir --outDir dist-edge && node ../../scripts/patch-dist.cjs edge && node ../../scripts/patch-manifest.cjs edge",
         "preview": "vite preview"
     },
     "dependencies": {
