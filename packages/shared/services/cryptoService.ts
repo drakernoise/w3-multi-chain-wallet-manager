@@ -269,6 +269,7 @@ export async function unlockVaultWithCachedSession(): Promise<Vault | null> {
     );
     return JSON.parse(dec.decode(decrypted));
   } catch (e) {
+    console.error("[Gravity] unlockVaultWithCachedSession CRITICAL ERROR:", e);
     return null;
   }
 }
@@ -336,8 +337,9 @@ export async function tryRestoreSession(): Promise<boolean> {
             cachedKey = importedKey;
             cachedSalt = new Uint8Array(data.salt);
             
+            // Refresh sliding window timestamp
             data.timestamp = Date.now();
-            chrome.storage.local.set({ firefox_crypto_session: data });
+            chrome.storage.local.set({ firefox_crypto_session: JSON.stringify(data) });
 
             console.log("[Gravity] tryRestoreSession: SUCCESS via Firefox local fallback");
             resolve(true);
