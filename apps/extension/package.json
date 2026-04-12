@@ -6,6 +6,9 @@
     "scripts": {
         "dev": "vite",
         "build": "tsc && vite build && node ../../scripts/patch-dist.cjs",
+        "build:chrome": "npm run build && node ../../scripts/patch-manifest.cjs chrome",
+        "build:firefox": "npm run build && node ../../scripts/patch-manifest.cjs firefox",
+        "build:edge": "npm run build:chrome",
         "preview": "vite preview"
     },
     "dependencies": {
