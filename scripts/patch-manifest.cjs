@@ -28,6 +28,11 @@ try {
                 strict_min_version: "109.0"
             }
         };
+
+        // Remove incompatible or unnecessary permissions for Firefox MV3
+        if (manifest.permissions) {
+            manifest.permissions = manifest.permissions.filter(p => !['offscreen', 'windows'].includes(p));
+        }
     }
 
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));

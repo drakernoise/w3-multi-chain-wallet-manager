@@ -27,10 +27,8 @@
     "storage",
     "activeTab",
     "tabs",
-    "windows",
     "alarms",
-    "notifications",
-    "offscreen"
+    "notifications"
   ],
   "content_scripts": [
     {
