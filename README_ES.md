@@ -60,9 +60,12 @@ Si eres desarrollador y quieres contribuir:
     ```bash
     npm run dev
     ```
-4.  Compila para producción:
+4.  Compila para producción (elige tu navegador):
     ```bash
-    npm run build
+    cd apps/extension
+    npm run build:chrome  # Para Chrome (Genera /dist-chrome)
+    npm run build:firefox # Para Firefox (Genera /dist-firefox)
+    npm run build:edge    # Para Edge (Genera /dist-edge)
     ```
 
 ## Privacidad

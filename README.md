@@ -61,14 +61,17 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
     ```bash
     npm install
     ```
-3.  Build the extension:
+3.  Build the extension for your preferred browser:
     ```bash
-    npm run build
+    cd apps/extension
+    npm run build:chrome  # Generates /dist-chrome
+    npm run build:firefox # Generates /dist-firefox
+    npm run build:edge    # Generates /dist-edge
     ```
-4.  Open Chrome/Brave/Edge and go to `chrome://extensions`.
+4.  Open Chrome/Brave/Edge and go to `chrome://extensions` (or `about:debugging` in Firefox).
 5.  Enable **"Developer mode"** (top right).
-6.  Click **"Load unpacked"**.
-7.  Select the `dist` folder generated in step 3.
+6.  Click **"Load unpacked"** (or "Load Temporary Add-on" in Firefox).
+7.  Select the `dist-chrome`, `dist-firefox`, or `dist-edge` folder generated in step 3.
 
 ### From Release Package
 
