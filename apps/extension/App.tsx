@@ -33,6 +33,7 @@ import {
   tryRestoreSession,
   enablePasswordless,
   unlockVault,
+  unlockVaultWithCachedSession,
   loadInternalKeyWithPin,
   hasPinProtectedKey
 } from '@services/cryptoService';
@@ -216,30 +217,39 @@ function AppContent() {
           }));
         }
 
-        // Check Active Session (chrome.storage.session)
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
-          // Try to restore crypto session first
-          const restored = await tryRestoreSession();
-
-          await new Promise<void>((resolve) => {
-            chrome.storage.session.get(['session_accounts'], (res: any) => {
-              if (res.session_accounts && res.session_accounts.length > 0) {
-                const sessionAccounts = dedupeAccounts(res.session_accounts);
-                if (restored) {
-                  setWalletState(prev => ({ ...prev, accounts: sessionAccounts }));
-                  setIsLocked(false);
-                  if (sessionAccounts.length !== res.session_accounts.length) {
-                    chrome.storage.session.set({ session_accounts: sessionAccounts });
-                  }
-                  setTimeout(fetchBalances, 500);
-                } else {
-                  console.warn("Session accounts found but crypto key missing. Forcing re-login.");
-                  chrome.storage.session.remove('session_accounts');
+        // Check Active Session Cache
+        const restored = await tryRestoreSession();
+        if (restored) {
+          console.log("Gravity: Crypto session restored. Attempting vault unlock.");
+          const vault = await unlockVaultWithCachedSession();
+          if (vault && vault.accounts && vault.accounts.length > 0) {
+            setWalletState(prev => ({ ...prev, accounts: vault.accounts }));
+            setIsLocked(false);
+            
+            // Backward comp: refresh session accounts
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+               chrome.storage.session.set({ session_accounts: vault.accounts });
+            }
+            setTimeout(fetchBalances, 500);
+          } else {
+            console.warn("Gravity: Crypto session existed but vault decryption failed.");
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+                chrome.storage.session.remove('session_accounts');
+            }
+          }
+        } else {
+          // Fallback just in case `session_accounts` somehow exists without crypto session
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+            await new Promise<void>((resolve) => {
+              chrome.storage.session.get(['session_accounts'], (res: any) => {
+                if (res.session_accounts && res.session_accounts.length > 0) {
+                   console.warn("Gravity: Session accounts found but crypto key missing. Forcing re-login.");
+                   chrome.storage.session.remove('session_accounts');
                 }
-              }
-              resolve();
+                resolve();
+              });
             });
-          });
+          }
         }
 
         // Also load walletConfig
@@ -631,8 +641,7 @@ function AppContent() {
       const listener = (changes: any, area: string) => {
         if (area === 'session' && changes.session_accounts) {
           if (!changes.session_accounts.newValue) {
-            setIsLocked(true);
-            setWalletState(prev => ({ ...prev, accounts: [] }));
+            console.log("Gravity: session_accounts was cleared, but trusting crypto session instead of force locking.");
           }
         }
       };
