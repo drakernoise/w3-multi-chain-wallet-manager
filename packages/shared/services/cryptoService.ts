@@ -329,7 +329,7 @@ export async function tryRestoreSession(): Promise<boolean> {
             const importedKey = await window.crypto.subtle.importKey(
               'raw',
               new Uint8Array(data.key),
-              ALGO,
+              { name: ALGO, length: 256 },
               true,
               ['encrypt', 'decrypt']
             );
@@ -363,7 +363,7 @@ export async function tryRestoreSession(): Promise<boolean> {
             const importedKey = await window.crypto.subtle.importKey(
               'raw',
               new Uint8Array(key),
-              ALGO,
+              { name: ALGO, length: 256 },
               true,
               ['encrypt', 'decrypt']
             );
@@ -393,7 +393,7 @@ export async function tryRestoreSession(): Promise<boolean> {
         const importedKey = await window.crypto.subtle.importKey(
           'raw',
           new Uint8Array(parsed.key),
-          ALGO,
+          { name: ALGO, length: 256 },
           true,
           ['encrypt', 'decrypt']
         );
