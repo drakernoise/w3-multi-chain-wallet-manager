@@ -295,10 +295,9 @@ async function persistSession() {
   const sessionData = { key: keyArr, salt: saltArr, timestamp: Date.now() };
 
   if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox') && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    console.log("[Gravity] persistSession: Falling back to Firefox chrome.storage.local");
+    console.log("[Gravity] persistSession: Falling back to Firefox chrome.storage.local with strict JSON");
     await new Promise<void>((resolve) => {
-      chrome.storage.local.set({ firefox_crypto_session: sessionData }, () => {
-        console.log("[Gravity] persistSession: Firefox local write complete, error?", chrome.runtime.lastError);
+      chrome.storage.local.set({ firefox_crypto_session: JSON.stringify(sessionData) }, () => {
         resolve();
       });
     });
@@ -319,10 +318,11 @@ export async function tryRestoreSession(): Promise<boolean> {
   }
 
   if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox') && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    console.log("[Gravity] tryRestoreSession: Attempting Firefox local fallback read");
+    console.log("[Gravity] tryRestoreSession: Attempting Firefox local fallback read with strict JSON");
     return new Promise((resolve) => {
       chrome.storage.local.get(['firefox_crypto_session'], async (res: any) => {
-        const data = res.firefox_crypto_session;
+        const rawData = res.firefox_crypto_session;
+        const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
         console.log("[Gravity] tryRestoreSession: Firefox data found?", !!data, "Timestamp valid?", data ? (Date.now() - data.timestamp < 60 * 60 * 1000) : false);
         if (data && data.timestamp && Date.now() - data.timestamp < 60 * 60 * 1000) {
           try {
