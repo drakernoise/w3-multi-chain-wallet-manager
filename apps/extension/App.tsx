@@ -222,7 +222,7 @@ function AppContent() {
         if (restored) {
           console.log("Gravity: Crypto session restored. Attempting vault unlock.");
           const vault = await unlockVaultWithCachedSession();
-          if (vault && vault.accounts && vault.accounts.length > 0) {
+          if (vault && vault.accounts) {
             setWalletState(prev => ({ ...prev, accounts: vault.accounts }));
             setIsLocked(false);
             
@@ -230,9 +230,12 @@ function AppContent() {
             if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
                chrome.storage.session.set({ session_accounts: vault.accounts });
             }
-            setTimeout(fetchBalances, 500);
+            // Only fetch balances if there are actually accounts
+            if (vault.accounts.length > 0) {
+              setTimeout(fetchBalances, 500);
+            }
           } else {
-            console.warn("Gravity: Crypto session existed but vault decryption failed.");
+            console.warn("Gravity: Crypto session existed but vault decryption actually failed.");
             if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
                 chrome.storage.session.remove('session_accounts');
             }
