@@ -288,8 +288,10 @@ async function persistSession() {
     const exported = await window.crypto.subtle.exportKey('raw', cachedKey);
     const saltArr = Array.from(cachedSalt);
     const keyArr = Array.from(new Uint8Array(exported));
-    chrome.storage.session.set({
-      crypto_session: { key: keyArr, salt: saltArr }
+    await new Promise<void>((resolve) => {
+      chrome.storage.session.set({
+        crypto_session: { key: keyArr, salt: saltArr }
+      }, () => resolve());
     });
   } else {
     const exported = await window.crypto.subtle.exportKey('raw', cachedKey);
