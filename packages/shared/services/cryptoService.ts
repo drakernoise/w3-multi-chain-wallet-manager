@@ -276,33 +276,77 @@ export async function unlockVaultWithCachedSession(): Promise<Vault | null> {
 export function clearCryptoCache() {
   cachedKey = null;
   cachedSalt = null;
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
-    chrome.storage.session.remove('crypto_session');
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    if (chrome.storage.session) {
+      chrome.storage.session.remove('crypto_session');
+    }
+    // Cleanup Firefox local session fallback aggressively
+    chrome.storage.local.remove('firefox_crypto_session');
   }
   storageService.removeItem(MOBILE_SESSION_KEY).catch(() => {});
 }
 
 async function persistSession() {
   if (!cachedKey || !cachedSalt) return;
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
-    const exported = await window.crypto.subtle.exportKey('raw', cachedKey);
-    const saltArr = Array.from(cachedSalt);
-    const keyArr = Array.from(new Uint8Array(exported));
+  
+  const exported = await window.crypto.subtle.exportKey('raw', cachedKey);
+  const saltArr = Array.from(cachedSalt);
+  const keyArr = Array.from(new Uint8Array(exported));
+  const sessionData = { key: keyArr, salt: saltArr, timestamp: Date.now() };
+
+  // Firefox MV3 storage.session is destructively volatile.
+  // We fallback to a time-limited local storage session ONLY for Firefox users.
+  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox')) {
     await new Promise<void>((resolve) => {
-      chrome.storage.session.set({
-        crypto_session: { key: keyArr, salt: saltArr }
-      }, () => resolve());
+      chrome.storage.local.set({ firefox_crypto_session: sessionData }, () => resolve());
+    });
+  } else if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+    // Chrome handles in-memory session perfectly across popup lifecycles
+    await new Promise<void>((resolve) => {
+      chrome.storage.session.set({ crypto_session: sessionData }, () => resolve());
     });
   } else {
-    const exported = await window.crypto.subtle.exportKey('raw', cachedKey);
-    const saltArr = Array.from(cachedSalt);
-    const keyArr = Array.from(new Uint8Array(exported));
-    await storageService.setItem(MOBILE_SESSION_KEY, JSON.stringify({ key: keyArr, salt: saltArr }));
+    // Mobile fallback
+    await storageService.setItem(MOBILE_SESSION_KEY, JSON.stringify(sessionData));
   }
 }
 
 export async function tryRestoreSession(): Promise<boolean> {
   if (cachedKey) return true;
+
+  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox')) {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['firefox_crypto_session'], async (res: any) => {
+        const data = res.firefox_crypto_session;
+        // 60 minutes expiration window for the Firefox local fallback
+        if (data && data.timestamp && Date.now() - data.timestamp < 60 * 60 * 1000) {
+          try {
+            const importedKey = await window.crypto.subtle.importKey(
+              'raw',
+              new Uint8Array(data.key),
+              ALGO,
+              true,
+              ['encrypt', 'decrypt']
+            );
+            cachedKey = importedKey;
+            cachedSalt = new Uint8Array(data.salt);
+            
+            // Refresh sliding window timestamp
+            data.timestamp = Date.now();
+            chrome.storage.local.set({ firefox_crypto_session: data });
+
+            resolve(true);
+          } catch (e) {
+            resolve(false);
+          }
+        } else {
+          // Expired or missing
+          chrome.storage.local.remove(['firefox_crypto_session']);
+          resolve(false);
+        }
+      });
+    });
+  }
 
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
     return new Promise((resolve) => {
@@ -335,6 +379,11 @@ export async function tryRestoreSession(): Promise<boolean> {
     if (raw) {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
       if (parsed?.key && parsed?.salt) {
+         // Verify timestamp if it exists (mobile might use this fallback too)
+         if (parsed.timestamp && Date.now() - parsed.timestamp > 60 * 60 * 1000) {
+             storageService.removeItem(MOBILE_SESSION_KEY);
+             return false;
+         }
         const importedKey = await window.crypto.subtle.importKey(
           'raw',
           new Uint8Array(parsed.key),
