@@ -33,6 +33,15 @@ try {
         if (manifest.permissions) {
             manifest.permissions = manifest.permissions.filter(p => !['offscreen', 'windows'].includes(p));
         }
+
+        // Firefox strictly rejects the 'world' property in manifest.json content_scripts
+        if (manifest.content_scripts) {
+            manifest.content_scripts.forEach(script => {
+                if (script.world) {
+                    delete script.world;
+                }
+            });
+        }
     }
 
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
