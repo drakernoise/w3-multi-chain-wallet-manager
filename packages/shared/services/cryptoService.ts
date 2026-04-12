@@ -294,31 +294,36 @@ async function persistSession() {
   const keyArr = Array.from(new Uint8Array(exported));
   const sessionData = { key: keyArr, salt: saltArr, timestamp: Date.now() };
 
-  // Firefox MV3 storage.session is destructively volatile.
-  // We fallback to a time-limited local storage session ONLY for Firefox users.
-  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox')) {
+  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox') && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    console.log("[Gravity] persistSession: Falling back to Firefox chrome.storage.local");
     await new Promise<void>((resolve) => {
-      chrome.storage.local.set({ firefox_crypto_session: sessionData }, () => resolve());
+      chrome.storage.local.set({ firefox_crypto_session: sessionData }, () => {
+        console.log("[Gravity] persistSession: Firefox local write complete, error?", chrome.runtime.lastError);
+        resolve();
+      });
     });
   } else if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
-    // Chrome handles in-memory session perfectly across popup lifecycles
+    console.log("[Gravity] persistSession: Writing to chrome.storage.session");
     await new Promise<void>((resolve) => {
       chrome.storage.session.set({ crypto_session: sessionData }, () => resolve());
     });
   } else {
-    // Mobile fallback
     await storageService.setItem(MOBILE_SESSION_KEY, JSON.stringify(sessionData));
   }
 }
 
 export async function tryRestoreSession(): Promise<boolean> {
-  if (cachedKey) return true;
+  if (cachedKey) {
+    console.log("[Gravity] tryRestoreSession: Memory cache matched.");
+    return true;
+  }
 
-  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox')) {
+  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox') && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    console.log("[Gravity] tryRestoreSession: Attempting Firefox local fallback read");
     return new Promise((resolve) => {
       chrome.storage.local.get(['firefox_crypto_session'], async (res: any) => {
         const data = res.firefox_crypto_session;
-        // 60 minutes expiration window for the Firefox local fallback
+        console.log("[Gravity] tryRestoreSession: Firefox data found?", !!data, "Timestamp valid?", data ? (Date.now() - data.timestamp < 60 * 60 * 1000) : false);
         if (data && data.timestamp && Date.now() - data.timestamp < 60 * 60 * 1000) {
           try {
             const importedKey = await window.crypto.subtle.importKey(
@@ -331,16 +336,17 @@ export async function tryRestoreSession(): Promise<boolean> {
             cachedKey = importedKey;
             cachedSalt = new Uint8Array(data.salt);
             
-            // Refresh sliding window timestamp
             data.timestamp = Date.now();
             chrome.storage.local.set({ firefox_crypto_session: data });
 
+            console.log("[Gravity] tryRestoreSession: SUCCESS via Firefox local fallback");
             resolve(true);
           } catch (e) {
+            console.error("[Gravity] tryRestoreSession: Import Key failed", e);
             resolve(false);
           }
         } else {
-          // Expired or missing
+          console.warn("[Gravity] tryRestoreSession: Expired or missing in Firefox local storage");
           chrome.storage.local.remove(['firefox_crypto_session']);
           resolve(false);
         }
