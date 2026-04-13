@@ -56,3 +56,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   return false;
 });
+if (typeof navigator !== "undefined" && navigator.userAgent.includes("Firefox")) {
+  const injectProvider = () => {
+    try {
+      const script = document.createElement("script");
+      script.src = chrome.runtime.getURL("assets/provider.js");
+      script.type = "module";
+      script.onload = () => {
+        console.log("[Gravity] Successfully injected Firefox Web3 Provider");
+        script.remove();
+      };
+      (document.head || document.documentElement).appendChild(script);
+    } catch (e) {
+      console.error("[Gravity] Failed to inject provider for Firefox:", e);
+    }
+  };
+  injectProvider();
+}

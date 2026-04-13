@@ -1008,36 +1008,83 @@ async function unlockVaultWithCachedSession() {
     );
     return JSON.parse(dec.decode(decrypted));
   } catch (e) {
+    console.error("[Gravity] unlockVaultWithCachedSession CRITICAL ERROR:", e);
     return null;
   }
 }
 function clearCryptoCache() {
   cachedKey = null;
   cachedSalt = null;
-  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-    chrome.storage.session.remove("crypto_session");
+  if (typeof chrome !== "undefined" && chrome.storage) {
+    if (chrome.storage.session) {
+      chrome.storage.session.remove("crypto_session");
+    }
+    chrome.storage.local.remove("firefox_crypto_session");
   }
   storageService.removeItem(MOBILE_SESSION_KEY).catch(() => {
   });
 }
 async function persistSession() {
   if (!cachedKey || !cachedSalt) return;
-  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-    const exported = await window.crypto.subtle.exportKey("raw", cachedKey);
-    const saltArr = Array.from(cachedSalt);
-    const keyArr = Array.from(new Uint8Array(exported));
-    chrome.storage.session.set({
-      crypto_session: { key: keyArr, salt: saltArr }
+  const exported = await window.crypto.subtle.exportKey("raw", cachedKey);
+  const saltArr = Array.from(cachedSalt);
+  const keyArr = Array.from(new Uint8Array(exported));
+  const sessionData = { key: keyArr, salt: saltArr, timestamp: Date.now() };
+  if (typeof navigator !== "undefined" && navigator.userAgent.includes("Firefox") && typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    console.log("[Gravity] persistSession: Falling back to Firefox chrome.storage.local with strict JSON");
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ firefox_crypto_session: JSON.stringify(sessionData) }, () => {
+        resolve();
+      });
+    });
+  } else if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
+    console.log("[Gravity] persistSession: Writing to chrome.storage.session");
+    await new Promise((resolve) => {
+      chrome.storage.session.set({ crypto_session: sessionData }, () => resolve());
     });
   } else {
-    const exported = await window.crypto.subtle.exportKey("raw", cachedKey);
-    const saltArr = Array.from(cachedSalt);
-    const keyArr = Array.from(new Uint8Array(exported));
-    await storageService.setItem(MOBILE_SESSION_KEY, JSON.stringify({ key: keyArr, salt: saltArr }));
+    await storageService.setItem(MOBILE_SESSION_KEY, JSON.stringify(sessionData));
   }
 }
 async function tryRestoreSession() {
-  if (cachedKey) return true;
+  if (cachedKey) {
+    console.log("[Gravity] tryRestoreSession: Memory cache matched.");
+    return true;
+  }
+  if (typeof navigator !== "undefined" && navigator.userAgent.includes("Firefox") && typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    console.log("[Gravity] tryRestoreSession: Attempting Firefox local fallback read with strict JSON");
+    return new Promise((resolve) => {
+      chrome.storage.local.get(["firefox_crypto_session"], async (res) => {
+        const rawData = res.firefox_crypto_session;
+        const data = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
+        console.log("[Gravity] tryRestoreSession: Firefox data found?", !!data, "Timestamp valid?", data ? Date.now() - data.timestamp < 60 * 60 * 1e3 : false);
+        if (data && data.timestamp && Date.now() - data.timestamp < 60 * 60 * 1e3) {
+          try {
+            const importedKey = await window.crypto.subtle.importKey(
+              "raw",
+              new Uint8Array(data.key),
+              { name: ALGO, length: 256 },
+              true,
+              ["encrypt", "decrypt"]
+            );
+            cachedKey = importedKey;
+            cachedSalt = new Uint8Array(data.salt);
+            data.timestamp = Date.now();
+            chrome.storage.local.set({ firefox_crypto_session: JSON.stringify(data) });
+            console.log("[Gravity] tryRestoreSession: SUCCESS via Firefox local fallback");
+            resolve(true);
+          } catch (e) {
+            console.error("[Gravity] tryRestoreSession: Import Key failed", e);
+            resolve(false);
+          }
+        } else {
+          console.warn("[Gravity] tryRestoreSession: Expired or missing in Firefox local storage");
+          chrome.storage.local.remove(["firefox_crypto_session"]);
+          resolve(false);
+        }
+      });
+    });
+  }
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
     return new Promise((resolve) => {
       chrome.storage.session.get(["crypto_session"], async (res) => {
@@ -1047,7 +1094,7 @@ async function tryRestoreSession() {
             const importedKey = await window.crypto.subtle.importKey(
               "raw",
               new Uint8Array(key),
-              ALGO,
+              { name: ALGO, length: 256 },
               true,
               ["encrypt", "decrypt"]
             );
@@ -1068,10 +1115,14 @@ async function tryRestoreSession() {
     if (raw) {
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       if (parsed?.key && parsed?.salt) {
+        if (parsed.timestamp && Date.now() - parsed.timestamp > 60 * 60 * 1e3) {
+          storageService.removeItem(MOBILE_SESSION_KEY);
+          return false;
+        }
         const importedKey = await window.crypto.subtle.importKey(
           "raw",
           new Uint8Array(parsed.key),
-          ALGO,
+          { name: ALGO, length: 256 },
           true,
           ["encrypt", "decrypt"]
         );
@@ -17627,15 +17678,17 @@ function AppContent() {
         if (restored) {
           console.log("Gravity: Crypto session restored. Attempting vault unlock.");
           const vault = await unlockVaultWithCachedSession();
-          if (vault && vault.accounts && vault.accounts.length > 0) {
+          if (vault && vault.accounts) {
             setWalletState((prev) => ({ ...prev, accounts: vault.accounts }));
             setIsLocked(false);
             if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
               chrome.storage.session.set({ session_accounts: vault.accounts });
             }
-            setTimeout(fetchBalances$1, 500);
+            if (vault.accounts.length > 0) {
+              setTimeout(fetchBalances$1, 500);
+            }
           } else {
-            console.warn("Gravity: Crypto session existed but vault decryption failed.");
+            console.warn("Gravity: Crypto session existed but vault decryption actually failed.");
             if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
               chrome.storage.session.remove("session_accounts");
             }
