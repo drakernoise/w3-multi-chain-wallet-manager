@@ -14964,8 +14964,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         const response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
+        const customJsonResultPayload = {
+          ...opResult && typeof opResult === "object" ? opResult : {},
+          id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+          txId: response.txId,
+          tx_id: response.txId
+        };
         result = {
-          result: response.txId || opResult,
+          result: customJsonResultPayload,
           txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,

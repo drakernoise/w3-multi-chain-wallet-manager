@@ -300,10 +300,16 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 const response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
                 if (!response.success) throw new Error(response.error);
 
-                // Compatibility mapping (v1.1.3 robust fix)
+                // Hive Engine expects an object result it can decorate with id/tx metadata.
                 const opResult = response.opResult || response.txId;
+                const customJsonResultPayload = {
+                    ...(opResult && typeof opResult === 'object' ? opResult : {}),
+                    id: response.txId || (opResult && typeof opResult === 'object' ? (opResult as any).id : undefined),
+                    txId: response.txId,
+                    tx_id: response.txId
+                };
                 result = {
-                    result: response.txId || opResult,
+                    result: customJsonResultPayload,
                     txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
