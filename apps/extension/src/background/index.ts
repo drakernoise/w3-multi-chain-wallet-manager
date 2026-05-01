@@ -881,6 +881,15 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             }
             : finalResult;
 
+        const customJsonResultPayload = isCustomJson
+            ? {
+                ...(opResult && typeof opResult === 'object' ? opResult : {}),
+                id: response.txId || (opResult && typeof opResult === 'object' ? (opResult as any).id : undefined),
+                txId: response.txId,
+                tx_id: response.txId
+            }
+            : null;
+
         const result = isSignBuffer
             ? {
                 success: true,
@@ -899,7 +908,7 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             }
             : {
                 success: true,
-                result: broadcastResultPayload,
+                result: isCustomJson ? customJsonResultPayload : broadcastResultPayload,
                 txId: response.txId,
                 tx_id: response.txId,
                 transaction: broadcastEnvelope || undefined,

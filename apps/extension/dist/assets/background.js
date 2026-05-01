@@ -664,6 +664,12 @@ async function tryAutoSign(request, sender) {
       op: firstBroadcastOperationName,
       operations: broadcastOperationsList
     } : finalResult;
+    const customJsonResultPayload = isCustomJson ? {
+      ...opResult && typeof opResult === "object" ? opResult : {},
+      id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+      txId: response.txId,
+      tx_id: response.txId
+    } : null;
     const result = isSignBuffer ? {
       success: true,
       result: response.result,
@@ -682,7 +688,7 @@ async function tryAutoSign(request, sender) {
       ...restResponse
     } : {
       success: true,
-      result: broadcastResultPayload,
+      result: isCustomJson ? customJsonResultPayload : broadcastResultPayload,
       txId: response.txId,
       tx_id: response.txId,
       transaction: broadcastEnvelope || void 0,

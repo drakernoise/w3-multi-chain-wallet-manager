@@ -272,8 +272,14 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
+                const customJsonResultPayload = {
+                    ...(opResult && typeof opResult === 'object' ? opResult : {}),
+                    id: response.txId || (opResult && typeof opResult === 'object' ? (opResult as any).id : undefined),
+                    txId: response.txId,
+                    tx_id: response.txId
+                };
                 result = {
-                    result: response.txId || opResult,
+                    result: customJsonResultPayload,
                     txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
