@@ -14997,14 +14997,21 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         );
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
+        const customJsonResultPayload = {
+          ...opResult && typeof opResult === "object" ? opResult : {},
+          id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+          txId: response.txId,
+          tx_id: response.txId
+        };
+        const { result: _ignoredResult, ...restResponse } = response;
         result = {
-          result: response.txId || opResult,
+          result: customJsonResultPayload,
           txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
           opResult,
           message: t("sign.success"),
-          ...response
+          ...restResponse
         };
       } else if (isSignBuffer2) {
         const message = request.params[1];

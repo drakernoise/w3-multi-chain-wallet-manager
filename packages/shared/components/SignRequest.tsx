@@ -339,16 +339,22 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 );
                 if (!response.success) throw new Error(response.error);
 
-                // Compatibility mapping (v1.1.3 robust fix)
                 const opResult = response.opResult || response.txId;
+                const customJsonResultPayload = {
+                    ...(opResult && typeof opResult === 'object' ? opResult : {}),
+                    id: response.txId || (opResult && typeof opResult === 'object' ? (opResult as any).id : undefined),
+                    txId: response.txId,
+                    tx_id: response.txId
+                };
+                const { result: _ignoredResult, ...restResponse } = response as any;
                 result = {
-                    result: response.txId || opResult,
+                    result: customJsonResultPayload,
                     txId: response.txId,
                     tx_id: response.txId,
                     broadcastPayload: opResult,
                     opResult,
                     message: t('sign.success'),
-                    ...response
+                    ...restResponse
                 };
 
             } else if (isSignBuffer) {
