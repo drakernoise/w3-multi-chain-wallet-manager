@@ -27,7 +27,7 @@ export interface SignResponse {
 
 class BridgeService {
     private socket: Socket | null = null;
-    private serverUrl = 'http://136.243.80.162:3030'; // New dedicated bridge server on Hetzner
+    private serverUrl = 'https://chat.gravitywallet.drakernoise.com';
     private sessionId: string | null = null;
     private sharedKey: CryptoKey | null = null;
     private myKeyPair: CryptoKeyPair | null = null;

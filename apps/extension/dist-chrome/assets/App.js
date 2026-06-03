@@ -1665,12 +1665,7 @@ class ChatService {
     try {
       const timestamp = (/* @__PURE__ */ new Date()).toISOString();
       const messageToSign = content + timestamp;
-      const publicKeyHex = localStorage.getItem("gravity_chat_pub");
-      console.log("[SIGN] Public Key (first 20):", publicKeyHex?.substring(0, 20));
-      console.log("[SIGN] Private Key (first 20):", privateKeyHex?.substring(0, 20));
-      console.log("[SIGN] Message to sign:", messageToSign);
       const signature = await this.signChallenge(messageToSign, privateKeyHex);
-      console.log("[SIGN] Signature (first 20):", signature?.substring(0, 20));
       this.socket.emit("send_message", {
         roomId,
         content,
@@ -9427,7 +9422,7 @@ const BiometricSetupModal = ({ accounts, setWalletState, onClose, onComplete }) 
   ] }) });
 };
 
-const BRIDGE_SERVER_URL = "http://136.243.80.162:3030";
+const BRIDGE_SERVER_URL = "https://chat.gravitywallet.drakernoise.com";
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 10;
 class DeviceTransferService {
@@ -14901,15 +14896,6 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       if (!account) {
         throw new Error(t("sign.account_not_found"));
       }
-      console.log("[SignRequest] Account found:", {
-        name: account.name,
-        chain: account.chain,
-        hasActiveKey: !!account.activeKey,
-        activeKeyPrefix: account.activeKey ? account.activeKey.substring(0, 8) + "..." : "NONE",
-        hasPostingKey: !!account.postingKey,
-        postingKeyPrefix: account.postingKey ? account.postingKey.substring(0, 8) + "..." : "NONE",
-        hasMemoKey: !!account.memoKey
-      });
       if (isMultisig && multisigProgress && !multisigProgress.canBroadcast) {
         const msResult = await handleMultisigSign(account);
         showNotification(msResult.message || "Signature collected", "success");
@@ -15017,15 +15003,6 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         const message = request.params[1];
         const type = request.params[2];
         const normalizedType = normalizeKeyType(type);
-        console.log("[SignRequest] signBuffer request:", {
-          chain: account.chain,
-          username: account.name,
-          keyType: type,
-          normalizedKeyType: normalizedType,
-          messageType: typeof message,
-          messageLength: typeof message === "string" ? message.length : "N/A",
-          messagePreview: typeof message === "string" ? message.substring(0, 100) : JSON.stringify(message).substring(0, 100)
-        });
         let keyStr = "";
         if (normalizedType === "posting") keyStr = account.postingKey || "";
         else if (normalizedType === "active") keyStr = account.activeKey || "";
@@ -15042,13 +15019,6 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           }
         }
         const response = signMessage(account.chain, message, keyStr);
-        console.log("[SignRequest] signMessage response:", {
-          success: response.success,
-          error: response.error,
-          resultLength: response.result ? response.result.length : 0,
-          resultPreview: response.result ? response.result.substring(0, 40) + "..." : "NONE",
-          publicKey: response.publicKey
-        });
         if (!response.success) throw new Error(response.error);
         const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
         result = {
@@ -15069,17 +15039,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           message: t("sign.success"),
           ...restResponse
         };
-        console.log("[SignRequest] Final result to return:", {
-          hasResult: !!result.result,
-          hasPublicKey: !!result.publicKey,
-          keys: Object.keys(result)
-        });
       } else if (isBroadcast2) {
         let rawOperations = request.params[1];
         const keyType = request.params[2];
         const originalEnvelope = request._gravityBroadcastEnvelope || (request._gravityOriginalParams && Array.isArray(request._gravityOriginalParams) ? request._gravityOriginalParams[1] : null);
         if (rawOperations && typeof rawOperations === "object" && !Array.isArray(rawOperations)) {
-          console.log("[SignRequest Broadcast] Extracting operations from transaction envelope:", Object.keys(rawOperations));
           rawOperations = rawOperations.operations || rawOperations.tx?.operations || rawOperations.transaction?.operations || rawOperations;
         }
         let operations = (Array.isArray(rawOperations) ? rawOperations : [rawOperations]).map((op) => {
@@ -15134,25 +15098,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (normalizeKeyType(keyType) === "active") key = account.activeKey;
         else if (requiresActiveKey) key = account.activeKey;
         if (!key && account.activeKey) key = account.activeKey;
-        console.log("[SignRequest Broadcast] Key selection:", {
-          keyType,
-          requiresActiveKey,
-          hasActiveKey: !!account.activeKey,
-          hasPostingKey: !!account.postingKey,
-          selectedKeyPrefix: key ? key.substring(0, 10) + "..." : "NONE",
-          operations: operations.map((op) => Array.isArray(op) ? op[0] : op.type)
-        });
         const requiredKeyType = requiresActiveKey ? "Active" : keyType || "Posting";
         if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", requiredKeyType));
         if (requiresActiveKey && key !== account.activeKey && account.activeKey) {
-          console.log("[SignRequest] FORCING Active key for operation requiring active authority");
           key = account.activeKey;
         }
-        console.log("[SignRequest Broadcast] FINAL key being used:", {
-          keyPrefix: key.substring(0, 10) + "...",
-          isActiveKey: key === account.activeKey,
-          requiresActiveKey
-        });
         const response = await broadcastOperations(account.chain, key, operations);
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
@@ -17331,8 +17281,7 @@ function QRCodeSVG(props) {
 class BridgeService {
   constructor() {
     this.socket = null;
-    this.serverUrl = "http://136.243.80.162:3030";
-    // New dedicated bridge server on Hetzner
+    this.serverUrl = "https://chat.gravitywallet.drakernoise.com";
     this.sessionId = null;
     this.sharedKey = null;
     this.myKeyPair = null;

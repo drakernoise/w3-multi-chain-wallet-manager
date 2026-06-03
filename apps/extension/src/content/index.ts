@@ -24,9 +24,6 @@ window.addEventListener('message', (event) => {
         return;
     }
     
-    console.log('[Gravity Content] Received request:', event.data.method, event.data.id);
-    console.log('[Gravity Content] Sending to background...');
-
     const postErrorToPage = (error: string) => {
         window.postMessage({
             type: 'gravity_response',
@@ -48,8 +45,6 @@ window.addEventListener('message', (event) => {
                 postErrorToPage(lastError.message);
                 return;
             }
-
-            console.log('[Gravity Content] Got response from background:', response);
 
             // Only handle immediate responses (like handshake or errors)
             if (response && response.pending !== true) {
@@ -74,9 +69,7 @@ window.addEventListener('message', (event) => {
 
 // Listen for async responses from Background (User Signed/Rejected)
 chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
-    console.log('[Gravity Content] Message from background:', msg.type);
     if (msg.type === 'gravity_response') {
-        console.log('[Gravity Content] Posting response to page:', msg.id);
         window.postMessage(msg, '*');
 
         // Acknowledge receipt to avoid "message port closed before a response was received" error in background
@@ -101,7 +94,6 @@ if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox'))
             // If Vite outputs ES modules with imports, this is required
             script.type = 'module'; 
             script.onload = () => {
-              console.log('[Gravity] Successfully injected Firefox Web3 Provider');
               script.remove(); // Clean up DOM
             };
             (document.head || document.documentElement).appendChild(script);

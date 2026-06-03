@@ -6,7 +6,7 @@ import { storageService } from './storageService';
 
 class SyncService {
     private socket: Socket | null = null;
-    private serverUrl = 'https://gravity-chat-serve.onrender.com';
+    private serverUrl = 'https://chat.gravitywallet.drakernoise.com';
 
     // EXPORT FLOW (Sender)
     public async startExportSession(

@@ -9,7 +9,7 @@ import {
 } from './cryptoService';
 import { SyncPayload } from '../types';
 
-const BRIDGE_SERVER_URL = 'http://136.243.80.162:3030';
+const BRIDGE_SERVER_URL = 'https://chat.gravitywallet.drakernoise.com';
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 10;
 

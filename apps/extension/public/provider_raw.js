@@ -1,8 +1,6 @@
 (function () {
     // Use current origin to allow all dApps to communicate
     const TRUSTED_ORIGIN = window.location.origin;
-    console.log('Gravity: Initializing native provider (Clean JS)...');
-
     class GravityProvider {
         constructor(chainHint = null) {
             this.callbacks = new Map();
@@ -29,7 +27,6 @@
         }
 
         requestHandshake(callback) {
-            console.log('Gravity: requestHandshake called');
             if (callback) callback();
         }
 
@@ -125,8 +122,6 @@
     window.blurt_keychain = blurtProxy;
     window.whalevault = blurtProxy; // Whalevault is often Blurt-related? Or just generic.
 
-    console.log('Gravity: Aliases enforced with Proxy logger.');
-
     // Dispatch Handshake
     // Dispatch Handshake
     const dispatchHandshake = () => {
@@ -136,7 +131,6 @@
         window.dispatchEvent(new CustomEvent('blurt_keychain_handshake', { detail: { keychain: blurtProxy } }));
         window.dispatchEvent(new CustomEvent('whalevault_handshake', { detail: { keychain: blurtProxy } })); // or hive?
 
-        console.log('Gravity: Handshake dispatched.');
     };
 
     dispatchHandshake();
