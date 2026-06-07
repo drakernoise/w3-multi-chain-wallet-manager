@@ -70,8 +70,7 @@ export const CHAIN_CONFIGS: Record<Chain, ChainConfig> = {
         rpcNodes: [
             'https://api.hive.blog',
             'https://api.deathwing.me',
-            'https://hive-api.arcange.eu',
-            'https://api.openhive.network'
+            'https://hive-api.arcange.eu'
         ],
         explorerUrl: {
             transaction: 'https://hivexplorer.com/tx/{tx}',

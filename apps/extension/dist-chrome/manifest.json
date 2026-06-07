@@ -149,7 +149,6 @@
     "https://steemitwallet.com/*",
     "https://steemworld.org/*",
     "https://api.hive.blog/*",
-    "https://api.openhive.network/*",
     "https://anyx.io/*",
     "https://hive-api.arcange.eu/*",
     "https://api.deathwing.me/*",
@@ -165,6 +164,6 @@
     "https://api.blurt.blog/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://chat.gravitywallet.drakernoise.com wss://chat.gravitywallet.drakernoise.com https://api.hive.blog https://api.openhive.network https://anyx.io https://hive-api.arcange.eu https://api.deathwing.me https://techcoderx.com https://api.steemit.com https://api.steem.fans https://api.steememory.com https://rpc.drakernoise.com https://blurt-rpc.saboin.com https://rpc.mahdiyari.info https://hive-api.3speak.tv https://api.justyy.com https://api.blurt.blog"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://chat.gravitywallet.drakernoise.com wss://chat.gravitywallet.drakernoise.com https://api.hive.blog https://anyx.io https://hive-api.arcange.eu https://api.deathwing.me https://techcoderx.com https://api.steemit.com https://api.steem.fans https://api.steememory.com https://rpc.drakernoise.com https://blurt-rpc.saboin.com https://rpc.mahdiyari.info https://hive-api.3speak.tv https://api.justyy.com https://api.blurt.blog"
   }
 }

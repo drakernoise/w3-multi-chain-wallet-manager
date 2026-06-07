@@ -6,7 +6,6 @@ export const HIVE_CANDIDATES = [
     'https://api.deathwing.me',
     'https://hive-api.arcange.eu',
     'https://techcoderx.com',
-    'https://api.openhive.network',
 ];
 
 export const STEEM_CANDIDATES = [
@@ -22,12 +21,22 @@ export const BLURT_CANDIDATES = [
     'https://rpc.mahdiyari.info'
 ];
 
+const DEPRECATED_NODES = new Set([
+    'https://api.openhive.network'
+]);
+
+const normalizeNode = (node: string) => node.replace(/\/+$/, '');
+
 const sanitizeNode = (chain: Chain, node?: string): string | undefined => {
     if (!node) return undefined;
-    if (node.includes('blurt.world')) {
+    const normalized = normalizeNode(node);
+    if (DEPRECATED_NODES.has(normalized)) {
+        return chain === Chain.HIVE ? HIVE_CANDIDATES[0] : undefined;
+    }
+    if (normalized.includes('blurt.world')) {
         return chain === Chain.BLURT ? BLURT_CANDIDATES[0] : undefined;
     }
-    return node;
+    return normalized;
 };
 
 // Active nodes state (in-memory)
@@ -51,15 +60,21 @@ const syncNodesFromStorage = async (): Promise<void> => {
             const result = await chrome.storage.local.get(['gravity_active_nodes']);
             if (result.gravity_active_nodes) {
                 const stored = result.gravity_active_nodes;
-                if (stored.HIVE) activeNodes[Chain.HIVE] = sanitizeNode(Chain.HIVE, stored.HIVE) || activeNodes[Chain.HIVE];
-                if (stored.STEEM) activeNodes[Chain.STEEM] = sanitizeNode(Chain.STEEM, stored.STEEM) || activeNodes[Chain.STEEM];
-                if (stored.BLURT) activeNodes[Chain.BLURT] = sanitizeNode(Chain.BLURT, stored.BLURT) || activeNodes[Chain.BLURT];
-                if (stored.BLURT !== activeNodes[Chain.BLURT]) {
+                const sanitizedNodes = {
+                    HIVE: sanitizeNode(Chain.HIVE, stored.HIVE) || activeNodes[Chain.HIVE],
+                    STEEM: sanitizeNode(Chain.STEEM, stored.STEEM) || activeNodes[Chain.STEEM],
+                    BLURT: sanitizeNode(Chain.BLURT, stored.BLURT) || activeNodes[Chain.BLURT]
+                };
+                activeNodes[Chain.HIVE] = sanitizedNodes.HIVE;
+                activeNodes[Chain.STEEM] = sanitizedNodes.STEEM;
+                activeNodes[Chain.BLURT] = sanitizedNodes.BLURT;
+                if (
+                    stored.HIVE !== sanitizedNodes.HIVE ||
+                    stored.STEEM !== sanitizedNodes.STEEM ||
+                    stored.BLURT !== sanitizedNodes.BLURT
+                ) {
                     await chrome.storage.local.set({
-                        gravity_active_nodes: {
-                            ...stored,
-                            BLURT: activeNodes[Chain.BLURT]
-                        }
+                        gravity_active_nodes: sanitizedNodes
                     });
                 }
                 console.log('[NodeService] Synced nodes from storage:', activeNodes);
@@ -180,7 +195,7 @@ const findBestNode = async (chain: Chain, candidates: string[]) => {
 
 export const getActiveNode = (chain: Chain): string => {
     // Ensure we have a valid URL - never return undefined
-    const node = activeNodes[chain];
+    const node = sanitizeNode(chain, activeNodes[chain]);
     if (!node) {
         // Fallback to defaults if somehow undefined
         const defaults: Record<Chain, string> = {
@@ -200,6 +215,8 @@ export const getActiveNodeAsync = async (chain: Chain): Promise<string> => {
 };
 
 export const updateActiveNode = (chain: Chain, url: string): void => {
-    activeNodes[chain] = url;
-    console.log(`Switched active node for ${chain} to ${url}`);
+    const sanitized = sanitizeNode(chain, url);
+    if (!sanitized) return;
+    activeNodes[chain] = sanitized;
+    console.log(`Switched active node for ${chain} to ${sanitized}`);
 };

@@ -1675,13 +1675,7 @@ export const fetchAccountHistory = async (chain: Chain, username: string, option
             [Chain.STEEM]: STEEM_CANDIDATES,
             [Chain.BLURT]: BLURT_CANDIDATES
         };
-        const nodes = [node, ...candidates[chain].filter((candidate) => candidate !== node)];
-        if (chain !== Chain.HIVE) return nodes;
-        return nodes.sort((a, b) => {
-            const aRateLimited = a.includes('api.openhive.network') ? 1 : 0;
-            const bRateLimited = b.includes('api.openhive.network') ? 1 : 0;
-            return aRateLimited - bRateLimited;
-        });
+        return [node, ...candidates[chain].filter((candidate) => candidate !== node)];
     };
 
     const fetchHistoryPage = async (rpcNode: string, from: number, limit: number) => {

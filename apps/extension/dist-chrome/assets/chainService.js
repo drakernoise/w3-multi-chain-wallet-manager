@@ -70758,8 +70758,7 @@ const HIVE_CANDIDATES = [
   "https://api.hive.blog",
   "https://api.deathwing.me",
   "https://hive-api.arcange.eu",
-  "https://techcoderx.com",
-  "https://api.openhive.network"
+  "https://techcoderx.com"
 ];
 const STEEM_CANDIDATES = [
   "https://api.steemit.com",
@@ -70774,12 +70773,20 @@ const BLURT_CANDIDATES = [
   "https://blurt-rpc.saboin.com",
   "https://rpc.mahdiyari.info"
 ];
+const DEPRECATED_NODES = /* @__PURE__ */ new Set([
+  "https://api.openhive.network"
+]);
+const normalizeNode = (node) => node.replace(/\/+$/, "");
 const sanitizeNode = (chain, node) => {
   if (!node) return void 0;
-  if (node.includes("blurt.world")) {
+  const normalized = normalizeNode(node);
+  if (DEPRECATED_NODES.has(normalized)) {
+    return chain === Chain.HIVE ? HIVE_CANDIDATES[0] : void 0;
+  }
+  if (normalized.includes("blurt.world")) {
     return chain === Chain.BLURT ? BLURT_CANDIDATES[0] : void 0;
   }
-  return node;
+  return normalized;
 };
 let activeNodes = {
   [Chain.HIVE]: HIVE_CANDIDATES[0],
@@ -70795,15 +70802,17 @@ const syncNodesFromStorage = async () => {
       const result = await chrome.storage.local.get(["gravity_active_nodes"]);
       if (result.gravity_active_nodes) {
         const stored = result.gravity_active_nodes;
-        if (stored.HIVE) activeNodes[Chain.HIVE] = sanitizeNode(Chain.HIVE, stored.HIVE) || activeNodes[Chain.HIVE];
-        if (stored.STEEM) activeNodes[Chain.STEEM] = sanitizeNode(Chain.STEEM, stored.STEEM) || activeNodes[Chain.STEEM];
-        if (stored.BLURT) activeNodes[Chain.BLURT] = sanitizeNode(Chain.BLURT, stored.BLURT) || activeNodes[Chain.BLURT];
-        if (stored.BLURT !== activeNodes[Chain.BLURT]) {
+        const sanitizedNodes = {
+          HIVE: sanitizeNode(Chain.HIVE, stored.HIVE) || activeNodes[Chain.HIVE],
+          STEEM: sanitizeNode(Chain.STEEM, stored.STEEM) || activeNodes[Chain.STEEM],
+          BLURT: sanitizeNode(Chain.BLURT, stored.BLURT) || activeNodes[Chain.BLURT]
+        };
+        activeNodes[Chain.HIVE] = sanitizedNodes.HIVE;
+        activeNodes[Chain.STEEM] = sanitizedNodes.STEEM;
+        activeNodes[Chain.BLURT] = sanitizedNodes.BLURT;
+        if (stored.HIVE !== sanitizedNodes.HIVE || stored.STEEM !== sanitizedNodes.STEEM || stored.BLURT !== sanitizedNodes.BLURT) {
           await chrome.storage.local.set({
-            gravity_active_nodes: {
-              ...stored,
-              BLURT: activeNodes[Chain.BLURT]
-            }
+            gravity_active_nodes: sanitizedNodes
           });
         }
         console.log("[NodeService] Synced nodes from storage:", activeNodes);
@@ -70887,7 +70896,7 @@ const findBestNode = async (chain, candidates) => {
   }
 };
 const getActiveNode = (chain) => {
-  const node = activeNodes[chain];
+  const node = sanitizeNode(chain, activeNodes[chain]);
   if (!node) {
     const defaults = {
       [Chain.HIVE]: "https://api.hive.blog",
@@ -70915,8 +70924,7 @@ const CHAIN_CONFIGS = {
     rpcNodes: [
       "https://api.hive.blog",
       "https://api.deathwing.me",
-      "https://hive-api.arcange.eu",
-      "https://api.openhive.network"
+      "https://hive-api.arcange.eu"
     ],
     explorerUrl: {
       transaction: "https://hivexplorer.com/tx/{tx}",
@@ -90263,13 +90271,7 @@ const fetchAccountHistory = async (chain, username, options = {}) => {
       [Chain.STEEM]: STEEM_CANDIDATES,
       [Chain.BLURT]: BLURT_CANDIDATES
     };
-    const nodes = [node, ...candidates[chain].filter((candidate) => candidate !== node)];
-    if (chain !== Chain.HIVE) return nodes;
-    return nodes.sort((a, b) => {
-      const aRateLimited = a.includes("api.openhive.network") ? 1 : 0;
-      const bRateLimited = b.includes("api.openhive.network") ? 1 : 0;
-      return aRateLimited - bRateLimited;
-    });
+    return [node, ...candidates[chain].filter((candidate) => candidate !== node)];
   };
   const fetchHistoryPage = async (rpcNode, from, limit) => {
     const response = await fetch(rpcNode, {
