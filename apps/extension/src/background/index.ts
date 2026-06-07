@@ -63,8 +63,29 @@ async function runBenchmark() {
     }
 }
 
-// Initial benchmark
-runBenchmark();
+async function initializeRpcNodes() {
+    try {
+        const result = await chrome.storage.local.get(['gravity_active_nodes']);
+        const stored = result.gravity_active_nodes || {};
+        const storedHiveNode = String(stored.HIVE || '').replace(/\/+$/, '');
+
+        if (storedHiveNode === 'https://api.openhive.network') {
+            await chrome.storage.local.set({
+                gravity_active_nodes: {
+                    ...stored,
+                    HIVE: 'https://api.hive.blog'
+                }
+            });
+        }
+    } catch (error) {
+        console.warn('[Gravity] Failed to migrate deprecated RPC node:', error);
+    }
+
+    await runBenchmark();
+}
+
+// Sanitize persisted nodes before the initial benchmark can reuse them.
+initializeRpcNodes();
 chrome.alarms.create('rpcBenchmark', { periodInMinutes: 10 });
 
 let unreadCount = 0;
