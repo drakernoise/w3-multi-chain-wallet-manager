@@ -93,8 +93,7 @@ const checkNodeLatency = async (url: string, iterations: number = 3): Promise<nu
                     id: 1
                 }),
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Connection': 'keep-alive'
+                    'Content-Type': 'application/json'
                 },
                 signal: controller.signal
             });

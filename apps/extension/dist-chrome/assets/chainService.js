@@ -70830,8 +70830,7 @@ const checkNodeLatency = async (url, iterations = 3) => {
           id: 1
         }),
         headers: {
-          "Content-Type": "application/json",
-          "Connection": "keep-alive"
+          "Content-Type": "application/json"
         },
         signal: controller.signal
       });
@@ -89035,9 +89034,7 @@ const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
       id: 1
     }),
     headers: {
-      "Content-Type": "application/json",
-      "Connection": "keep-alive"
-      // Hint for connection reuse (browser handles automatically)
+      "Content-Type": "application/json"
     }
   });
   if (!propsResponse.ok) {
@@ -89067,9 +89064,7 @@ const broadcastHiveTransaction = async (nodeUrl, operations, key) => {
       id: 1
     }),
     headers: {
-      "Content-Type": "application/json",
-      "Connection": "keep-alive"
-      // Hint for connection reuse (browser handles automatically)
+      "Content-Type": "application/json"
     }
   });
   if (!broadcastResponse.ok) {
@@ -89106,11 +89101,8 @@ const fetchGlobalProps = async (chain) => {
         id: 1
       }),
       headers: {
-        "Content-Type": "application/json",
-        "Connection": "keep-alive"
-        // Hint to browser for connection reuse
+        "Content-Type": "application/json"
       }
-      // Browser handles keep-alive automatically, but we can hint it
     });
     if (!response.ok) {
       return cached?.data || null;
@@ -89203,8 +89195,7 @@ const fetchCustomJsonEventsForAccounts = async (chain, usernames, expectedId, li
             id: 1
           }),
           headers: {
-            "Content-Type": "application/json",
-            "Connection": "keep-alive"
+            "Content-Type": "application/json"
           }
         });
         if (!response.ok) continue;
@@ -89338,8 +89329,7 @@ const broadcastSignedTransaction = async (chain, signedTransaction) => {
           id: 1
         }),
         headers: {
-          "Content-Type": "application/json",
-          "Connection": "keep-alive"
+          "Content-Type": "application/json"
         }
       });
       if (!response.ok) throw new Error(`Node ${nodeUrl} returned HTTP ${response.status}`);
@@ -89376,8 +89366,7 @@ const broadcastSignedTransaction = async (chain, signedTransaction) => {
           id: 1
         }),
         headers: {
-          "Content-Type": "application/json",
-          "Connection": "keep-alive"
+          "Content-Type": "application/json"
         }
       });
       const json = await response.json();
@@ -89417,9 +89406,7 @@ const fetchBalances = async (chain, username) => {
         id: 1
       }),
       headers: {
-        "Content-Type": "application/json",
-        "Connection": "keep-alive"
-        // Hint for connection reuse
+        "Content-Type": "application/json"
       }
     });
     if (!response.ok) {
@@ -89477,9 +89464,7 @@ const fetchAccountData = async (chain, username) => {
         id: 1
       }),
       headers: {
-        "Content-Type": "application/json",
-        "Connection": "keep-alive"
-        // Hint for connection reuse (browser handles automatically)
+        "Content-Type": "application/json"
       }
     });
     const json = await response.json();
@@ -89721,9 +89706,7 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
       id: 1
     }),
     headers: {
-      "Content-Type": "application/json",
-      "Connection": "keep-alive"
-      // Hint for connection reuse (browser handles automatically)
+      "Content-Type": "application/json"
     }
   });
   const propsJson = await propsResponse.json();
@@ -89828,9 +89811,7 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
       id: 1
     }),
     headers: {
-      "Content-Type": "application/json",
-      "Connection": "keep-alive"
-      // Hint for connection reuse (browser handles automatically)
+      "Content-Type": "application/json"
     }
   });
   const broadcastResult = await broadcastResponse.json();
@@ -89960,9 +89941,7 @@ const checkAccountExists = async (chain, username) => {
         id: 1
       }),
       headers: {
-        "Content-Type": "application/json",
-        "Connection": "keep-alive"
-        // Hint for connection reuse (browser handles automatically)
+        "Content-Type": "application/json"
       }
     });
     const json = await response.json();
@@ -90302,8 +90281,7 @@ const fetchAccountHistory = async (chain, username, options = {}) => {
         id: 1
       }),
       headers: {
-        "Content-Type": "application/json",
-        "Connection": "keep-alive"
+        "Content-Type": "application/json"
       }
     });
     if (response.status === 429) throw new Error(`Node ${rpcNode} rate limited history requests`);

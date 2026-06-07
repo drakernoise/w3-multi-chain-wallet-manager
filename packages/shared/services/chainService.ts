@@ -91,8 +91,7 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
             id: 1
         }),
         headers: {
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+            'Content-Type': 'application/json'
         }
     });
 
@@ -132,8 +131,7 @@ const broadcastHiveTransaction = async (nodeUrl: string, operations: any[], key:
             id: 1
         }),
         headers: {
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+            'Content-Type': 'application/json'
         }
     });
 
@@ -182,10 +180,8 @@ const fetchGlobalProps = async (chain: Chain): Promise<any> => {
                 id: 1
             }),
             headers: {
-                'Content-Type': 'application/json',
-                'Connection': 'keep-alive' // Hint to browser for connection reuse
-            },
-            // Browser handles keep-alive automatically, but we can hint it
+                'Content-Type': 'application/json'
+            }
         });
 
         if (!response.ok) {
@@ -297,8 +293,7 @@ export const fetchCustomJsonEvents = async (
                     id: 1
                 }),
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Connection': 'keep-alive'
+                    'Content-Type': 'application/json'
                 }
             });
 
@@ -371,8 +366,7 @@ export const fetchCustomJsonEventsForAccounts = async (
                         id: 1
                     }),
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Connection': 'keep-alive'
+                        'Content-Type': 'application/json'
                     }
                 });
 
@@ -534,8 +528,7 @@ export const broadcastSignedTransaction = async (
                     id: 1
                 }),
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Connection': 'keep-alive'
+                    'Content-Type': 'application/json'
                 }
             });
 
@@ -575,8 +568,7 @@ export const broadcastSignedTransaction = async (
                     id: 1
                 }),
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Connection': 'keep-alive'
+                    'Content-Type': 'application/json'
                 }
             });
 
@@ -622,8 +614,7 @@ export const fetchBalances = async (chain: Chain, username: string): Promise<{ p
                 id: 1
             }),
             headers: {
-                'Content-Type': 'application/json',
-                'Connection': 'keep-alive' // Hint for connection reuse
+                'Content-Type': 'application/json'
             }
         });
 
@@ -694,8 +685,7 @@ export const fetchAccountData = async (chain: Chain, username: string): Promise<
                 id: 1
             }),
             headers: {
-                'Content-Type': 'application/json',
-                'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+                'Content-Type': 'application/json'
             }
         });
         const json = await response.json();
@@ -995,8 +985,7 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
             id: 1
         }),
         headers: {
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+            'Content-Type': 'application/json'
         }
     });
     const propsJson = await propsResponse.json();
@@ -1132,8 +1121,7 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
             id: 1
         }),
         headers: {
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+            'Content-Type': 'application/json'
         }
     });
 
@@ -1311,8 +1299,7 @@ export const checkAccountExists = async (chain: Chain, username: string): Promis
                 id: 1
             }),
             headers: {
-                'Content-Type': 'application/json',
-                'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+                'Content-Type': 'application/json'
             }
         });
         const json = await response.json();
@@ -1707,8 +1694,7 @@ export const fetchAccountHistory = async (chain: Chain, username: string, option
                 id: 1
             }),
             headers: {
-                'Content-Type': 'application/json',
-                'Connection': 'keep-alive'
+                'Content-Type': 'application/json'
             }
         });
         if (response.status === 429) throw new Error(`Node ${rpcNode} rate limited history requests`);
