@@ -119,13 +119,28 @@ export const HelpView: React.FC = () => {
                 <div className="bg-dark-900 p-3 rounded-lg border border-dark-600">
                     <ul className="space-y-2 text-xs text-slate-400">
                         <li className="flex gap-2 text-slate-300">
-                            <span className="text-yellow-500">⚠</span> {t('help.chat_warning')}
+                            <span className="text-yellow-500 shrink-0 mt-0.5">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86l-7.5 13A1 1 0 003.66 18h16.68a1 1 0 00.87-1.5l-7.5-13a1 1 0 00-1.74 0z" />
+                                </svg>
+                            </span>
+                            {t('help.chat_warning')}
                         </li>
                         <li className="flex gap-2 text-slate-300">
-                            <span className="text-blue-400">ℹ</span> {t('help.chat_cost')}
+                            <span className="text-blue-400 shrink-0 mt-0.5">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 21a9 9 0 100-18 9 9 0 000 18z" />
+                                </svg>
+                            </span>
+                            {t('help.chat_cost')}
                         </li>
                         <li className="flex gap-2">
-                            <span className="text-green-400">✓</span> {t('help.chat_memo_required')}
+                            <span className="text-green-400 shrink-0 mt-0.5">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </span>
+                            {t('help.chat_memo_required')}
                         </li>
                     </ul>
                 </div>

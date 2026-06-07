@@ -892,6 +892,17 @@ async function openPrompt(requestId: string) {
     const width = 450;
     const height = 620;
     try {
+        await chrome.storage.session.set({ gravity_active_request_id: requestId });
+
+        if (chrome.action?.openPopup) {
+            try {
+                await chrome.action.openPopup();
+                return;
+            } catch (popupError) {
+                console.warn("Gravity: action.openPopup failed, falling back to detached request window", popupError);
+            }
+        }
+
         await chrome.windows.create({
             url: `index.html?requestId=${requestId}`,
             type: 'popup',

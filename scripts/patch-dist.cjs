@@ -6,6 +6,33 @@ const folderName = browser === 'dist' ? 'dist' : `dist-${browser}`;
 const extensionDist = path.join(__dirname, `../apps/extension/${folderName}/assets`);
 const polyfillPath = path.join(extensionDist, 'ws-polyfill.js');
 
+const LEGACY_BLURT_ENDPOINTS = [
+    ['https://rpc.blurt.world', 'https://api.blurt.blog'],
+    ['wss://rpc.blurt.world', 'wss://api.blurt.blog'],
+    ['https://test.blurt.world/rpc', 'https://api.blurt.blog']
+];
+
+const replaceLegacyBlurtEndpoints = () => {
+    const files = fs.readdirSync(extensionDist).filter((file) => file.endsWith('.js'));
+    files.forEach((file) => {
+        const filePath = path.join(extensionDist, file);
+        let content = fs.readFileSync(filePath, 'utf8');
+        let changed = false;
+
+        LEGACY_BLURT_ENDPOINTS.forEach(([from, to]) => {
+            if (content.includes(from)) {
+                content = content.split(from).join(to);
+                changed = true;
+            }
+        });
+
+        if (changed) {
+            fs.writeFileSync(filePath, content);
+            console.log(`Replaced legacy Blurt endpoints in ${file}`);
+        }
+    });
+};
+
 const POLYFILL_CODE = `
 (function() {
     // Detect environment
@@ -60,6 +87,8 @@ const POLYFILL_CODE = `
 
 try {
     if (fs.existsSync(extensionDist)) {
+        replaceLegacyBlurtEndpoints();
+
         fs.writeFileSync(polyfillPath, POLYFILL_CODE);
         console.log("Created ws-polyfill.js");
 

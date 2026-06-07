@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Web3 Multi-Chain Wallet",
+  "name": "Gravity Wallet",
   "version": "1.1.2",
-  "description": "A multi-chain (Hive, Steem, Blurt) wallet extension with multisig, bulk transfers, and AI-powered transaction analysis.",
+  "description": "Secure wallet for Blurt, Hive, and Steem with dApp signing, multisig, chat, and device sync.",
   "action": {
     "default_popup": "index.html",
-    "default_title": "Web3 Multi-Chain Wallet",
+    "default_title": "Gravity Wallet",
     "default_icon": {
       "16": "logowallet.png",
       "48": "logowallet.png",
@@ -46,8 +46,11 @@
         "https://inleo.io/*",
         "https://3speak.tv/*",
         "https://blurt.blog/*",
+        "https://twiggy.lat/*",
         "https://blurtwallet.com/*",
         "https://*.blurtwallet.com/*",
+        "https://blurtplugin.online/*",
+        "https://forum.blurt.pl/*",
         "https://beblurt.com/*",
         "https://blurt.one/*",
         "https://steemitwallet.com/*",
@@ -73,8 +76,11 @@
         "https://inleo.io/*",
         "https://3speak.tv/*",
         "https://blurt.blog/*",
+        "https://twiggy.lat/*",
         "https://blurtwallet.com/*",
         "https://*.blurtwallet.com/*",
+        "https://blurtplugin.online/*",
+        "https://forum.blurt.pl/*",
         "https://beblurt.com/*",
         "https://blurt.one/*",
         "https://steemitwallet.com/*",
@@ -107,8 +113,11 @@
         "https://inleo.io/*",
         "https://3speak.tv/*",
         "https://blurt.blog/*",
+        "https://twiggy.lat/*",
         "https://blurtwallet.com/*",
         "https://*.blurtwallet.com/*",
+        "https://blurtplugin.online/*",
+        "https://forum.blurt.pl/*",
         "https://beblurt.com/*",
         "https://blurt.one/*",
         "https://steemitwallet.com/*",
@@ -130,14 +139,17 @@
     "https://inleo.io/*",
     "https://3speak.tv/*",
     "https://blurt.blog/*",
+    "https://twiggy.lat/*",
     "https://blurtwallet.com/*",
     "https://*.blurtwallet.com/*",
+    "https://blurtplugin.online/*",
+    "https://forum.blurt.pl/*",
     "https://beblurt.com/*",
     "https://blurt.one/*",
     "https://steemitwallet.com/*",
     "https://steemworld.org/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://chat.gravitywallet.drakernoise.com wss://chat.gravitywallet.drakernoise.com https://api.hive.blog https://api.openhive.network https://anyx.io https://hive-api.arcange.eu https://api.deathwing.me https://techcoderx.com https://api.steemit.com https://api.steem.fans https://api.steememory.com https://rpc.drakernoise.com https://rpc.blurt.world https://rpc.beblurt.com https://blurt-rpc.saboin.com https://kentzz.blurt.world https://rpc.mahdiyari.info https://hive-api.3speak.tv https://api.justyy.com https://api.blurt.blog"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://chat.gravitywallet.drakernoise.com wss://chat.gravitywallet.drakernoise.com https://api.hive.blog https://api.openhive.network https://anyx.io https://hive-api.arcange.eu https://api.deathwing.me https://techcoderx.com https://api.steemit.com https://api.steem.fans https://api.steememory.com https://rpc.drakernoise.com https://blurt-rpc.saboin.com https://rpc.mahdiyari.info https://hive-api.3speak.tv https://api.justyy.com https://api.blurt.blog"
   }
 }

@@ -83,11 +83,11 @@ if (request.params && typeof request.params === 'object' && !Array.isArray(reque
 
 ### Compatibilidad
 
-- ✅ Twiggy.lat: Ahora funciona correctamente
-- ✅ Gravity Wallet: Mantiene compatibilidad total
-- ✅ Otros dApps: No se ve afectados
-- ✅ Hive Keychain: Compatibilidad mantenida
-- ✅ WhaleVault: Compatibilidad mantenida
+- Twiggy.lat: Ahora funciona correctamente
+- Gravity Wallet: Mantiene compatibilidad total
+- Otros dApps: No se ve afectados
+- Hive Keychain: Compatibilidad mantenida
+- WhaleVault: Compatibilidad mantenida
 
 ## Testing
 
@@ -97,7 +97,7 @@ Para probar la solución:
 2. Iniciar sesión con Gravity Wallet
 3. Escribir un mensaje en cualquier room
 4. Hacer clic en "Enviar"
-5. ✅ El mensaje se envía sin errores
+5. El mensaje se envía sin errores
 
 ## Logs de Depuración
 
@@ -113,9 +113,9 @@ Cuando se aplique la corrección, verá este log en la consola:
 - **Arreglado en:** v1.1.3+
 - **Fecha:** 5 de febrero de 2026
 - **Compatibilidad:** Chrome/Edge, Firefox (cuando esté disponible)
-- **Estado:** ✅ Implementado y compilado
+- **Estado:** Implementado y compilado
 
-## ⚠️ IMPORTANTE: Instrucciones de Actualización
+## IMPORTANTE: Instrucciones de Actualización
 
 **El código está arreglado pero DEBES RECARGAR LA EXTENSIÓN para que funcione.**
 

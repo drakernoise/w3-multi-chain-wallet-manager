@@ -201,7 +201,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         {t('wallet.send')} {selectedAccount.chain}
                     </h2>
-                    <button onClick={onClose} className="text-slate-500 hover:text-white">✕</button>
+                    <button onClick={onClose} className="text-slate-500 hover:text-white" aria-label="Close">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
 
                 <div className="space-y-4 mb-6">
@@ -261,8 +265,8 @@ export const TransferModal: React.FC<TransferModalProps> = ({ account: initialAc
                                 autoComplete="off"
                             />
                             <div className="absolute right-3 top-2.5 text-xs">
-                                {isValidRecipient === true && <span className="text-green-400">✓</span>}
-                                {isValidRecipient === false && <span className="text-red-400 font-bold">✕</span>}
+                                {isValidRecipient === true && <span className="text-green-400 font-bold">OK</span>}
+                                {isValidRecipient === false && <span className="text-red-400 font-bold">X</span>}
                             </div>
 
                             {/* Suggestions Dropdown */}

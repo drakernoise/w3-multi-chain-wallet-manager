@@ -1,33 +1,35 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Account } from '../types';
-import { fetchAccountHistory, HistoryItem } from '../services/chainService';
+import { HistoryItem } from '../services/chainService';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface HistoryModalProps {
     account: Account;
+    history: HistoryItem[];
+    loading: boolean;
+    loadError?: string | null;
+    lastUpdated?: number;
     onClose: () => void;
+    onRefresh?: () => void;
 }
 
-export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) => {
+export const HistoryModal: React.FC<HistoryModalProps> = ({ account, history, loading, loadError, lastUpdated, onClose, onRefresh }) => {
     const { t } = useTranslation();
-    const [history, setHistory] = useState<HistoryItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'received' | 'sent' | 'powerup' | 'powerdown'>('all');
-
-    useEffect(() => {
-        setLoading(true);
-        fetchAccountHistory(account.chain, account.name)
-            .then(data => setHistory(data))
-            .catch(err => console.error(err))
-            .finally(() => setLoading(false));
-    }, [account]);
+    const [filter, setFilter] = useState<'all' | 'received' | 'sent' | 'powerup' | 'powerdown' | 'delegate'>('all');
+    const [showProducerRewards, setShowProducerRewards] = useState(false);
+    const incomingTypes = ['receive', 'powerup_in', 'delegate_in', 'rc_delegate_in', 'savings_in', 'reward', 'producer_reward'];
+    const outgoingTypes = ['send', 'powerup_out', 'powerdown', 'delegate_out', 'undelegate_out', 'rc_delegate_out', 'savings_out', 'savings_cancel'];
+    const isProducerReward = (item: HistoryItem) => item.type === 'producer_reward' || (item.type === 'reward' && item.memo === 'Producer Reward');
+    const hasProducerRewards = history.some(isProducerReward);
 
     const filteredHistory = history.filter(item => {
+        if (isProducerReward(item) && !showProducerRewards) return false;
         if (filter === 'all') return true;
-        if (filter === 'received') return item.type === 'receive';
-        if (filter === 'sent') return item.type === 'send';
+        if (filter === 'received') return incomingTypes.includes(item.type);
+        if (filter === 'sent') return outgoingTypes.includes(item.type);
         if (filter === 'powerup') return item.type === 'powerup_in' || item.type === 'powerup_out';
         if (filter === 'powerdown') return item.type === 'powerdown';
+        if (filter === 'delegate') return item.type === 'delegate_in' || item.type === 'delegate_out' || item.type === 'undelegate_out' || item.type === 'rc_delegate_in' || item.type === 'rc_delegate_out';
         return true;
     });
 
@@ -35,11 +37,23 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
         switch (type) {
             case 'receive':
             case 'powerup_in':
+            case 'savings_in':
                 return 'bg-green-500/10 text-green-400';
             case 'send':
             case 'powerup_out':
             case 'powerdown':
+            case 'delegate_out':
+            case 'undelegate_out':
+            case 'savings_out':
+            case 'savings_cancel':
                 return 'bg-red-500/10 text-red-400';
+            case 'delegate_in':
+            case 'rc_delegate_in':
+            case 'rc_delegate_out':
+                return 'bg-blue-500/10 text-blue-400';
+            case 'reward':
+            case 'producer_reward':
+                return 'bg-amber-500/10 text-amber-400';
             default:
                 return 'bg-slate-500/10 text-slate-400';
         }
@@ -52,9 +66,23 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
             case 'powerup_in': return t('history.type_powerup_in');
             case 'powerup_out': return t('history.type_powerup_out');
             case 'powerdown': return t('history.type_powerdown');
+            case 'delegate_in': return t('history.type_delegate_in');
+            case 'delegate_out': return t('history.type_delegate_out');
+            case 'undelegate_out': return t('history.type_undelegate_out');
+            case 'rc_delegate_in': return t('history.type_rc_delegate_in');
+            case 'rc_delegate_out': return t('history.type_rc_delegate_out');
+            case 'savings_in': return t('history.type_savings_in');
+            case 'savings_out': return t('history.type_savings_out');
+            case 'savings_cancel': return t('history.type_savings_cancel');
+            case 'reward': return t('history.type_reward');
+            case 'producer_reward': return t('history.type_producer_reward');
             default: return type;
         }
     };
+
+    const getHistoryTypeLabel = (item: HistoryItem) => isProducerReward(item)
+        ? t('history.type_producer_reward')
+        : getTypeLabel(item.type);
 
     const getFilterIcon = (type: string) => {
         switch (type) {
@@ -74,17 +102,35 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
                 );
             case 'powerup':
-                // Power Up Icon (Direct Match)
                 return (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    <svg className="w-5 h-5 transition-colors" viewBox="0 0 24 24">
+                        <rect x="3" y="7" width="16" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                        <rect x="5.5" y="9.5" width="10" height="5" rx="1" fill="currentColor" opacity="0.85" />
+                        <rect x="19.5" y="10" width="1.8" height="4" rx="0.8" fill="currentColor" />
+                    </svg>
                 );
             case 'powerdown':
-                // Power Down Icon (Composite: Bolt + X, Direct Match)
                 return (
-                    <div className="relative w-5 h-5 flex items-center justify-center">
-                        <svg className="w-5 h-5 absolute inset-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        <svg className="w-3 h-3 text-red-500 absolute top-0 right-0 bg-dark-800 rounded-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </div>
+                    <svg className="w-5 h-5 transition-colors" viewBox="0 0 24 24">
+                        <rect x="3" y="7" width="16" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                        <rect x="5.5" y="11" width="4" height="3" rx="0.8" fill="currentColor" opacity="0.85" />
+                        <rect x="19.5" y="10" width="1.8" height="4" rx="0.8" fill="currentColor" />
+                    </svg>
+                );
+            case 'delegate':
+                return (
+                    <svg className="w-5 h-5 transition-colors" viewBox="0 0 24 24">
+                        <rect x="4" y="3" width="6" height="14" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                        <rect x="5.5" y="6" width="3" height="8" rx="0.8" fill="currentColor" opacity="0.85" />
+                        <rect x="6" y="1.5" width="2" height="1.5" rx="0.5" fill="currentColor" />
+                        <rect x="14" y="7" width="6" height="14" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                        <rect x="15.5" y="10" width="3" height="8" rx="0.8" fill="currentColor" opacity="0.85" />
+                        <rect x="16" y="5.5" width="2" height="1.5" rx="0.5" fill="currentColor" />
+                        <path d="M10.5 8.5h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        <path d="M13 6.5l2 2-2 2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M14.5 15.5h-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        <path d="M12 13.5l-2 2 2 2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                 );
             default:
                 return null;
@@ -100,9 +146,26 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
                         <h3 className="font-black text-lg text-white tracking-tight">
                             {t('history.title').replace('{user}', account.name)}
                         </h3>
-                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-white transition-colors">
-                            &times;
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {lastUpdated && (
+                                <span className="text-[10px] text-slate-500" title={new Date(lastUpdated).toLocaleString()}>
+                                    {new Date(lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            )}
+                            {onRefresh && (
+                                <button
+                                    onClick={onRefresh}
+                                    disabled={loading}
+                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-blue-400 disabled:opacity-50 transition-colors"
+                                    title={t('wallet.refresh_tooltip')}
+                                >
+                                    <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                </button>
+                            )}
+                            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-white transition-colors">
+                                &times;
+                            </button>
+                        </div>
                     </div>
 
                     {/* Filter Bar */}
@@ -114,7 +177,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
                             </svg>
                         </div>
                         <div className="flex gap-2 flex-1 justify-end">
-                            {['all', 'received', 'sent', 'powerup', 'powerdown'].map((f) => (
+                            {['all', 'received', 'sent', 'powerup', 'powerdown', 'delegate'].map((f) => (
                                 <button
                                     key={f}
                                     onClick={() => setFilter(f as any)}
@@ -129,6 +192,19 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
                             ))}
                         </div>
                     </div>
+                    {hasProducerRewards && (
+                        <div className="px-3 pb-3 bg-dark-900 flex justify-end">
+                            <button
+                                onClick={() => setShowProducerRewards((value) => !value)}
+                                className={`text-[10px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-lg border transition-colors ${showProducerRewards
+                                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                    : 'bg-dark-800 text-slate-500 border-dark-700 hover:text-amber-300 hover:border-amber-500/30'
+                                    }`}
+                            >
+                                {showProducerRewards ? t('history.hide_producer_rewards') : t('history.show_producer_rewards')}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Content Area */}
@@ -137,6 +213,10 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
                         <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-3 mt-8">
                             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                             <span className="text-xs font-bold uppercase tracking-widest opacity-75">{t('history.loading')}</span>
+                        </div>
+                    ) : loadError ? (
+                        <div className="p-4 text-center text-red-300 text-xs bg-red-950/20 m-4 rounded-xl border border-red-500/20">
+                            {loadError}
                         </div>
                     ) : history.length === 0 ? (
                         <div className="p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed">
@@ -148,11 +228,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
                         </div>
                     ) : (
                         <div className="divide-y divide-dark-800/50">
-                            {filteredHistory.map((item, idx) => (
+                            {filteredHistory.map((item, idx) => {
+                                const isIncoming = incomingTypes.includes(item.type);
+                                const amountSign = item.amount ? (isIncoming ? '+' : '-') : '';
+                                return (
                                 <div key={idx} className="p-4 hover:bg-white/[0.02] transition-colors group">
                                     <div className="flex justify-between items-start mb-2">
                                         <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md tracking-wider ${getTypeBadgeClass(item.type)}`}>
-                                            {getTypeLabel(item.type)}
+                                            {getHistoryTypeLabel(item)}
                                         </span>
                                         <span className="text-[10px] font-medium text-slate-600 group-hover:text-slate-500 transition-colors">
                                             {new Date(item.date).toLocaleString()}
@@ -160,14 +243,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
                                     </div>
                                     <div className="flex justify-between items-center mb-2">
                                         <div className="text-xs text-slate-400 font-medium">
-                                            {item.type === 'receive' || item.type === 'powerup_in' ? (
+                                            {isIncoming ? (
                                                 <>{t('history.from')} <span className="text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors">@{item.from}</span></>
                                             ) : (
                                                 <>{t('history.to')} <span className="text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors">@{item.to}</span></>
                                             )}
                                         </div>
-                                        <div className={`font-mono font-black text-sm tracking-tight ${item.type === 'receive' || item.type === 'powerup_in' ? 'text-green-400' : 'text-red-400'}`}>
-                                            {item.type === 'receive' || item.type === 'powerup_in' ? '+' : '-'}{item.amount}
+                                        <div className={`font-mono font-black text-sm tracking-tight ${isIncoming ? 'text-green-400' : 'text-red-400'}`}>
+                                            {amountSign}{item.amount}
                                         </div>
                                     </div>
                                     {item.memo && (
@@ -176,7 +259,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ account, onClose }) 
                                         </div>
                                     )}
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     )}
                 </div>

@@ -1,6 +1,6 @@
 # Gravity Web3 Multi-Chain Wallet
 
-Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **Steem**, and **Blurt** blockchains. It allows you to manage accounts, transfer funds, sign transactions, and interact with Web3 dApps seamlessly.
+Gravity is a secure, non-custodial browser extension wallet for the **Blurt**, **Hive**, and **Steem** blockchains. It allows you to manage accounts, transfer funds, sign transactions, and interact with Web3 dApps seamlessly.
 
 <div align="center">
 
@@ -11,9 +11,9 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 [![Code Scanning](https://img.shields.io/badge/code%20scanning-enabled-success.svg)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/security/code-scanning)
 [![Security Audit](https://img.shields.io/badge/Security_Audit-Passed-green)](docs/SECURITY_REPORT.md)
 
-[![Blurt](https://img.shields.io/badge/Blurt-✓%20Tested-orange.svg)](https://blurt.blog)
-[![Hive](https://img.shields.io/badge/Hive-✓%20Supported-red.svg)](https://hive.io)
-[![Steem](https://img.shields.io/badge/Steem-✓%20Supported-blue.svg)](https://steem.com)
+[![Blurt](https://img.shields.io/badge/Blurt-Tested-orange.svg)](https://blurt.blog)
+[![Hive](https://img.shields.io/badge/Hive-Supported-red.svg)](https://hive.io)
+[![Steem](https://img.shields.io/badge/Steem-Supported-blue.svg)](https://steem.com)
 
 [![GitHub stars](https://img.shields.io/github/stars/drakernoise/w3-multi-chain-wallet-manager?style=social)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/drakernoise/w3-multi-chain-wallet-manager?style=social)](https://github.com/drakernoise/w3-multi-chain-wallet-manager/network/members)
@@ -37,13 +37,13 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 
 ## Features
 
-*   **Multi-Chain Support**: Manage Hive, Steem, and Blurt accounts in one place.
+*   **Multi-Chain Support**: Manage Blurt, Hive, and Steem accounts in one place.
 *   **Non-Custodial**: Your private keys are encrypted and stored locally on your device. They never leave your browser.
 *   **Web3 Integration**: Interact with dApps (like PeakD, Steemit, BeBlurt) using the injected provider (compatible with Hive Keychain API).
 *   **Sleek UI**: Modern, dark-themed interface with real-time feedback.
 *   **Bulk Transfers**: Send funds to multiple recipients in a single transaction.
 *   **Transaction Analysis**: View and analyze your transaction history.
-*   **Secure Messenger**: On-chain chat for Hive, Steem, and Blurt with real-time notifications.
+*   **Secure Messenger**: On-chain chat for Blurt, Hive, and Steem with real-time notifications.
 *   **Secure**:
     *   **Passwordless Flow**: Setup your wallet using Google OAuth or Device local keys (TPM/Secure Enclave).
     *   **2FA Support**: Integration with TOTP apps (Aegis, Google Auth).
@@ -82,7 +82,7 @@ Gravity is a secure, non-custodial browser extension wallet for the **Hive**, **
 ## Usage
 
 1.  **Create Vault**: Set up a master password to encrypt your storage.
-2.  **Import Keys**: Import your Private Active or Posting keys (or Master Password) for your Hive/Steem/Blurt accounts.
+2.  **Import Keys**: Import your Private Active or Posting keys (or Master Password) for your Blurt/Hive/Steem accounts.
 3.  **Transact**: Use the buttons in the wallet to Send or Receive.
 4.  **Connect**: Visit a dApp (e.g., `hive.blog`) and log in using "Keychain" or "Gravity".
 
@@ -113,7 +113,7 @@ Please read our [Security Policy](SECURITY.md) before reporting security issues.
 
 ## Roadmap
 
-- [x] Multi-chain support (Hive, Steem, Blurt)
+- [x] Multi-chain support (Blurt, Hive, Steem)
 - [x] Blurt full compatibility (v1.0.4)
 - [x] Hive full compatibility (v1.0.5)
 - [x] Steem full compatibility (v1.0.5)

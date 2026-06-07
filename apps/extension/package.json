@@ -6,7 +6,7 @@
     "scripts": {
         "dev": "vite",
         "build": "tsc && vite build && node ../../scripts/patch-dist.cjs",
-        "build:chrome": "tsc && vite build --emptyOutDir --outDir dist-chrome && node ../../scripts/patch-dist.cjs chrome && node ../../scripts/patch-manifest.cjs chrome",
+        "build:chrome": "tsc && vite build --emptyOutDir --outDir dist-chrome && node ../../scripts/patch-dist.cjs chrome && node ../../scripts/patch-manifest.cjs chrome && node ../../scripts/prune-extension-dist.cjs chrome",
         "build:firefox": "tsc && vite build --emptyOutDir --outDir dist-firefox && node ../../scripts/patch-dist.cjs firefox && node ../../scripts/patch-manifest.cjs firefox",
         "build:edge": "tsc && vite build --emptyOutDir --outDir dist-edge && node ../../scripts/patch-dist.cjs edge && node ../../scripts/patch-manifest.cjs edge",
         "preview": "vite preview"

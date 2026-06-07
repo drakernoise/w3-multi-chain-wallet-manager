@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Web3 Multi-Chain Wallet",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "A multi-chain (Hive, Steem, Blurt) wallet extension with multisig, bulk transfers, and AI-powered transaction analysis.",
   "action": {
     "default_popup": "index.html",
@@ -18,10 +18,8 @@
     "128": "logowallet.png"
   },
   "background": {
-    "type": "module",
-    "scripts": [
-      "assets/background.js"
-    ]
+    "service_worker": "assets/background.js",
+    "type": "module"
   },
   "permissions": [
     "storage",
@@ -69,11 +67,5 @@
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://chat.gravitywallet.drakernoise.com wss://chat.gravitywallet.drakernoise.com https://gravity-chat-serve.onrender.com wss://gravity-chat-serve.onrender.com http://136.243.80.162:3030 ws://136.243.80.162:3030 https://api.hive.blog https://api.openhive.network https://anyx.io https://hive-api.arcange.eu https://api.deathwing.me https://techcoderx.com https://api.steemit.com https://api.steem.fans https://api.steememory.com https://rpc.drakernoise.com https://rpc.blurt.world https://rpc.beblurt.com https://blurt-rpc.saboin.com https://kentzz.blurt.world https://rpc.mahdiyari.info https://hive-api.3speak.tv https://api.justyy.com https://api.blurt.blog"
-  },
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "gravity@drakernoise.com",
-      "strict_min_version": "109.0"
-    }
   }
 }

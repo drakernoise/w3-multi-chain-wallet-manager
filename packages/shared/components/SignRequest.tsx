@@ -655,8 +655,20 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
 
                 const response = await broadcastOperations(account.chain, account.postingKey || account.activeKey!, [op]);
                 if (!response.success) throw new Error(response.error);
-                // Match Hive Keychain format exactly: only success and result (opResult object)
-                result = { success: true, result: response.opResult || response.txId };
+                const opResult = response.opResult || response.txId;
+                const { success: _success, ...restResponse } = response as any;
+                result = {
+                    success: true,
+                    result: response.txId || opResult,
+                    txId: response.txId,
+                    tx_id: response.txId,
+                    broadcastPayload: opResult,
+                    opResult,
+                    operation: 'comment',
+                    operations: [op],
+                    message: t('sign.success'),
+                    ...restResponse
+                };
             }
 
 

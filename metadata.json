@@ -1,6 +1,6 @@
 {
-  "name": "Web3 Multi-Chain Wallet",
-  "description": "A multi-chain (Hive, Steem, Blurt) wallet extension with multisig, bulk transfers, and AI-powered transaction analysis.",
+  "name": "Gravity Wallet",
+  "description": "Secure wallet for Blurt, Hive, and Steem with dApp signing, multisig, chat, and device sync.",
   "requestFramePermissions": [
     "camera"
   ]

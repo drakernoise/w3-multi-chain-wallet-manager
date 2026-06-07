@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { Component, ReactNode, useState, useEffect, useRef } from 'react';
 import { Account, Chain, ViewState, WalletState, Vault } from '@types';
 import { chatService, ChatMessage } from '@services/chatService';
 import { LockScreen } from '@components/LockScreen';
@@ -23,6 +23,9 @@ import { SyncPayload } from '@types';
 
 import {
   fetchBalances as serviceFetchBalances,
+  fetchAccountHistory,
+  HistoryItem,
+  getHistoryItemKey,
   broadcastTransfer,
   detectWeb3Context
 } from '@services/chainService';
@@ -45,11 +48,45 @@ import { storageService } from '@services/storageService';
 
 declare const chrome: any;
 
+class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: any) {
+    try {
+      localStorage.setItem('gravity_last_runtime_error', JSON.stringify({
+        type: 'react_error',
+        message: error.message,
+        stack: error.stack,
+        componentStack: info?.componentStack,
+        at: new Date().toISOString()
+      }));
+    } catch { }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="h-full bg-dark-900 text-red-300 flex flex-col items-center justify-center p-6 text-center">
+          <h1 className="text-sm font-bold text-red-200 mb-2">Gravity Wallet recovered from an error</h1>
+          <p className="text-xs text-slate-400">{this.state.error.message}</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
     <LanguageProvider>
       <NotificationProvider>
-        <AppContent />
+        <AppErrorBoundary>
+          <AppContent />
+        </AppErrorBoundary>
       </NotificationProvider>
     </LanguageProvider>
   );
@@ -57,6 +94,31 @@ export default function App() {
 
 function AppContent() {
   const { t } = useTranslation();
+  const HISTORY_CACHE_STORAGE_KEY = 'gravity_account_history_cache_v1';
+  const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+  type HistoryCacheEntry = {
+    items: HistoryItem[];
+    updatedAt: number;
+    error?: string | null;
+    partial?: boolean;
+  };
+  type HistoryCache = Record<string, HistoryCacheEntry>;
+
+  const getHistoryCacheKey = (account: Pick<Account, 'chain' | 'name'>) => `${account.chain}:${account.name}`.toLowerCase();
+
+  const getPreferredChain = (accounts: Account[], preferred?: Chain | null): Chain => {
+    if (preferred && accounts.some((account) => account.chain === preferred)) {
+      return preferred;
+    }
+    if (accounts.some((account) => account.chain === Chain.BLURT)) {
+      return Chain.BLURT;
+    }
+    if (accounts.length > 0) {
+      return accounts[0].chain;
+    }
+    return preferred || Chain.BLURT;
+  };
   /* State */
   const [walletState, setWalletState] = useState<WalletState>({
     accounts: [],
@@ -66,7 +128,7 @@ function AppContent() {
     useDeviceAuth: false
   });
 
-  const [activeChain, setActiveChain] = useState<Chain>(Chain.HIVE);
+  const [activeChain, setActiveChain] = useState<Chain>(Chain.BLURT);
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.LANDING);
 
   // Modals / Specific Flow States
@@ -78,6 +140,8 @@ function AppContent() {
   const [isLocked, setIsLocked] = useState(true);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [historyCache, setHistoryCache] = useState<HistoryCache>({});
+  const [historyLoadingKeys, setHistoryLoadingKeys] = useState<Record<string, boolean>>({});
   const [needsSave, setNeedsSave] = useState(false);
 
   const buildBridgeSyncPayload = (accounts: Account[]): SyncPayload => ({
@@ -96,10 +160,74 @@ function AppContent() {
   // Notifications
   const { showNotification } = useNotification();
   const [lockReason, setLockReason] = useState<string | null>(null);
+  const historySyncInFlightRef = useRef<Set<string>>(new Set());
+  const historyCacheRef = useRef<HistoryCache>({});
 
   // Signing Request ID
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showBridge, setShowBridge] = useState(false);
+
+  useEffect(() => {
+    const handleWindowError = (event: ErrorEvent) => {
+      try {
+        localStorage.setItem('gravity_last_runtime_error', JSON.stringify({
+          type: 'error',
+          message: event.message,
+          source: event.filename,
+          line: event.lineno,
+          column: event.colno,
+          at: new Date().toISOString()
+        }));
+      } catch { }
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      try {
+        localStorage.setItem('gravity_last_runtime_error', JSON.stringify({
+          type: 'unhandledrejection',
+          message: String(event.reason),
+          at: new Date().toISOString()
+        }));
+      } catch { }
+    };
+
+    const handleBeforeUnload = () => {
+      try {
+        localStorage.setItem('gravity_last_popup_unload', JSON.stringify({
+          view: currentView,
+          chain: activeChain,
+          overlays: {
+            import: showImport,
+            manage: !!managingAccount,
+            transfer: !!transferAccount,
+            receive: !!receiveAccount,
+            history: !!historyAccount,
+            bridge: showBridge,
+            request: !!requestId
+          },
+          at: new Date().toISOString()
+        }));
+      } catch { }
+    };
+
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [activeChain, currentView, historyAccount, managingAccount, receiveAccount, requestId, showBridge, showImport, transferAccount]);
+
+  const clearTransientOverlays = () => {
+    setManagingAccount(null);
+    setTransferAccount(null);
+    setReceiveAccount(null);
+    setHistoryAccount(null);
+    setShowBridge(false);
+  };
 
   const dedupeAccounts = (accounts: Account[]): Account[] => {
     const byKey = new Map<string, Account>();
@@ -133,10 +261,127 @@ function AppContent() {
     return Array.from(byKey.values());
   };
 
+  const persistHistoryCache = async (nextCache: HistoryCache) => {
+    try {
+      await storageService.setItem(HISTORY_CACHE_STORAGE_KEY, JSON.stringify(nextCache));
+    } catch (error) {
+      console.warn('History cache save failed:', error);
+    }
+  };
+
+  const loadHistoryCache = async () => {
+    try {
+      const raw = await storageService.getItem(HISTORY_CACHE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        historyCacheRef.current = parsed;
+        setHistoryCache(parsed);
+      }
+    } catch (error) {
+      console.warn('History cache load failed:', error);
+    }
+  };
+
+  const updateHistoryCacheEntry = (key: string, entry: HistoryCacheEntry) => {
+    setHistoryCache((prev) => {
+      const next = { ...prev, [key]: entry };
+      historyCacheRef.current = next;
+      persistHistoryCache(next);
+      return next;
+    });
+  };
+
+  const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
+    const byKey = new Map<string, HistoryItem>();
+    [...incoming, ...existing].forEach((item) => {
+      byKey.set(getHistoryItemKey(item), item);
+    });
+
+    return Array.from(byKey.values())
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 250);
+  };
+
+  const refreshAccountHistory = async (account: Account, force = false, partial = false) => {
+    const key = getHistoryCacheKey(account);
+    const cached = historyCacheRef.current[key];
+    const cachedItems = cached?.items || [];
+    const isProducerReward = (item: HistoryItem) => item.type === 'producer_reward' || (item.type === 'reward' && item.memo === 'Producer Reward');
+    const hasVisibleHistory = cachedItems.some((item) => !isProducerReward(item));
+    const cacheIsFresh = cached && hasVisibleHistory && !cached.partial && Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS;
+    const shouldIncremental = hasVisibleHistory && !cached?.partial && !partial && (force || !cacheIsFresh);
+
+    if (!force && cacheIsFresh) return cached.items;
+    if (historySyncInFlightRef.current.has(key)) return cached?.items || [];
+
+    historySyncInFlightRef.current.add(key);
+    setHistoryLoadingKeys((prev) => ({ ...prev, [key]: true }));
+
+    try {
+      const fetchedItems = await fetchAccountHistory(account.chain, account.name, shouldIncremental ? {
+        incremental: true,
+        knownItemKeys: cached.items.map(getHistoryItemKey)
+      } : partial ? {
+        maxPages: 5
+      } : {});
+      const items = shouldIncremental ? mergeHistoryItems(cached.items, fetchedItems) : partial && cachedItems.length > 0 ? mergeHistoryItems(cachedItems, fetchedItems) : fetchedItems;
+      updateHistoryCacheEntry(key, {
+        items,
+        updatedAt: Date.now(),
+        error: null,
+        partial
+      });
+      return items;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      updateHistoryCacheEntry(key, {
+        items: cached?.items || [],
+        updatedAt: cached?.updatedAt || Date.now(),
+        error: message,
+        partial: cached?.partial
+      });
+      return cached?.items || [];
+    } finally {
+      historySyncInFlightRef.current.delete(key);
+      setHistoryLoadingKeys((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+
+  const preloadHistory = async (accounts: Account[], force = false, partial = true) => {
+    for (const account of accounts) {
+      await refreshAccountHistory(account, force, partial);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const req = params.get('requestId');
-    if (req) setRequestId(req);
+    if (req) {
+      setRequestId(req);
+      return;
+    }
+
+    if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+      chrome.storage.session.get(['gravity_active_request_id'], (result: any) => {
+        if (result.gravity_active_request_id) {
+          setRequestId(result.gravity_active_request_id);
+        }
+      });
+
+      const listener = (changes: any, area: string) => {
+        if (area !== 'session' || !changes.gravity_active_request_id) return;
+        setRequestId(changes.gravity_active_request_id.newValue || null);
+      };
+
+      chrome.storage.onChanged.addListener(listener);
+      return () => chrome.storage.onChanged.removeListener(listener);
+    }
   }, []);
 
   useEffect(() => {
@@ -203,6 +448,8 @@ function AppContent() {
     const loadState = async () => {
       console.log("Gravity: loadState started");
       try {
+        await loadHistoryCache();
+
         // Load Vault Metadata
         const vaultData = await getVault();
         console.log("Gravity: getVault result:", !!vaultData);
@@ -223,16 +470,20 @@ function AppContent() {
           console.log("Gravity: Crypto session restored. Attempting vault unlock.");
           const vault = await unlockVaultWithCachedSession();
           if (vault && vault.accounts) {
-            setWalletState(prev => ({ ...prev, accounts: vault.accounts }));
+            const dedupedAccounts = dedupeAccounts(vault.accounts);
+            setWalletState(prev => ({ ...prev, accounts: dedupedAccounts }));
             setIsLocked(false);
             
             // Backward comp: refresh session accounts
             if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
-               chrome.storage.session.set({ session_accounts: vault.accounts });
+               chrome.storage.session.set({ session_accounts: dedupedAccounts });
             }
             // Only fetch balances if there are actually accounts
-            if (vault.accounts.length > 0) {
-              setTimeout(fetchBalances, 500);
+            if (dedupedAccounts.length > 0) {
+              setTimeout(() => {
+                fetchBalances();
+                preloadHistory(dedupedAccounts, false, true);
+              }, 500);
             }
           } else {
             console.warn("Gravity: Crypto session existed but vault decryption actually failed.");
@@ -268,6 +519,9 @@ function AppContent() {
                   useDeviceAuth: result.walletConfig.useDeviceAuth,
                   useTOTP: result.walletConfig.useTOTP
                 }));
+                if (result.walletConfig.lastActiveChain) {
+                  setActiveChain(result.walletConfig.lastActiveChain);
+                }
               }
               resolve();
             });
@@ -296,13 +550,14 @@ function AppContent() {
         useGoogleAuth: walletState.useGoogleAuth,
         useBiometrics: walletState.useBiometrics,
         useDeviceAuth: walletState.useDeviceAuth,
-        useTOTP: walletState.useTOTP
+        useTOTP: walletState.useTOTP,
+        lastActiveChain: activeChain
       };
       if (typeof chrome !== 'undefined' && chrome.storage) {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, activeChain, isDataLoaded]);
 
   useEffect(() => {
     if (!isLocked && walletState.accounts.length > 0) {
@@ -329,7 +584,7 @@ function AppContent() {
   }, [walletState.accounts, isLocked, needsSave, walletState.encryptedMaster]);
 
   // 4. Poll Balances automatically (Safe closure pattern)
-  const fetchBalancesRef = useRef<() => void>();
+  const fetchBalancesRef = useRef<() => Promise<void>>();
   const isRefreshingRef = useRef(false);
   useEffect(() => {
     fetchBalancesRef.current = fetchBalances;
@@ -378,9 +633,15 @@ function AppContent() {
     }
   }, [currentView, activeChain, isLocked, walletState.accounts.length]);
 
+  useEffect(() => {
+    if (isLocked) return;
+    setActiveChain((prev) => getPreferredChain(walletState.accounts, prev));
+  }, [walletState.accounts, isLocked]);
+
   const handleUnlock = (decryptedAccounts: Account[]) => {
     const dedupedAccounts = dedupeAccounts(decryptedAccounts);
     setWalletState(prev => ({ ...prev, accounts: dedupedAccounts }));
+    setActiveChain((prev) => getPreferredChain(dedupedAccounts, prev));
     setIsLocked(false);
 
     // Save to Session
@@ -388,7 +649,10 @@ function AppContent() {
       chrome.storage.session.set({ session_accounts: dedupedAccounts });
     }
 
-    setTimeout(() => fetchBalances(), 500);
+    setTimeout(() => {
+      fetchBalances();
+      preloadHistory(dedupedAccounts, false, true);
+    }, 500);
   };
 
   const handleImport = async (newAccounts: Account[]) => {
@@ -406,6 +670,7 @@ function AppContent() {
     }));
 
     const updatedAccounts = dedupeAccounts([...walletState.accounts, ...withBalance]);
+    setActiveChain((prev) => getPreferredChain(updatedAccounts, prev));
 
     try {
       if (!walletState.encryptedMaster) {
@@ -419,6 +684,7 @@ function AppContent() {
       }
 
       showNotification('Account imported successfully', 'success');
+      preloadHistory(updatedAccounts, false, true);
       setShowImport(false);
     } catch (e) {
       console.error("Import Save Failed:", e);
@@ -471,6 +737,7 @@ function AppContent() {
         await saveVault('cached', { accounts: mergedAccounts, lastUpdated: Date.now() });
       }
       showNotification(`Transfer complete. Added ${added} account${added === 1 ? '' : 's'}.`, 'success');
+      preloadHistory(mergedAccounts, false, true);
     } catch (error) {
       console.error('Device transfer save failed:', error);
       showNotification('The wallet was received but could not be persisted safely.', 'error');
@@ -522,6 +789,7 @@ function AppContent() {
       if (result.success) {
         showNotification(`TX: ${result.txId?.substring(0, 8)}...`, 'success');
         fetchBalances();
+        refreshAccountHistory(fromAcc, true, false);
       } else {
         showNotification(`Failed: ${result.error}`, 'error');
       }
@@ -536,6 +804,32 @@ function AppContent() {
     if (chain === Chain.BLURT && context.includes('blurt')) return true;
     return false;
   };
+
+  const handleChainChange = (chain: Chain) => {
+    clearTransientOverlays();
+    setActiveChain(chain);
+  };
+
+  const handleOpenHistory = (account: Account) => {
+    setHistoryAccount(account);
+    refreshAccountHistory(account, false, false);
+  };
+
+  const handleWalletRefresh = async () => {
+    await fetchBalances();
+    await preloadHistory(walletState.accounts.filter((account) => account.chain === activeChain), true, false);
+  };
+
+  useEffect(() => {
+    if (isLocked || walletState.accounts.length === 0) return;
+    preloadHistory(walletState.accounts, false, true);
+
+    const id = setInterval(() => {
+      preloadHistory(walletState.accounts, false, true);
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(id);
+  }, [isLocked, walletState.accounts.map((account) => `${account.chain}:${account.name}`).sort().join('|')]);
 
   /* Detached Window State */
   const [isDetached, setIsDetached] = useState(false);
@@ -596,15 +890,6 @@ function AppContent() {
         window.removeEventListener('resize', lockSize);
         cancelAnimationFrame(animationFrameId);
       };
-    } else {
-      if (typeof chrome !== 'undefined' && chrome.extension) {
-        const views = chrome.extension.getViews();
-        const detachedView = views.find((v: any) => v.location.href.includes('detached=true'));
-        if (detachedView) {
-          detachedView.focus();
-          window.close();
-        }
-      }
     }
   }, []);
 
@@ -689,7 +974,18 @@ function AppContent() {
 
   // SIGNING REQUEST UI
   if (requestId) {
-    return <SignRequest requestId={requestId} accounts={walletState.accounts} onComplete={() => window.close()} />;
+    return (
+      <SignRequest
+        requestId={requestId}
+        accounts={walletState.accounts}
+        onComplete={() => {
+          if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+            chrome.storage.session.remove('gravity_active_request_id');
+          }
+          window.close();
+        }}
+      />
+    );
   }
 
   return (
@@ -754,7 +1050,7 @@ function AppContent() {
           {currentView === ViewState.LANDING && (
             <Landing
               onSelectChain={(chain: Chain) => {
-                setActiveChain(chain);
+                handleChainChange(chain);
                 setCurrentView(ViewState.WALLET);
               }}
               onManage={() => setCurrentView(ViewState.MANAGE)}
@@ -764,14 +1060,14 @@ function AppContent() {
           {currentView === ViewState.WALLET && (
             <WalletView
               chain={activeChain}
-              onChainChange={setActiveChain}
+              onChainChange={handleChainChange}
               accounts={walletState.accounts.filter(a => a.chain === activeChain)}
               isRefreshing={isRefreshing}
               onManage={(acc: Account) => setManagingAccount(acc)}
               onSend={(acc: Account) => setTransferAccount(acc)}
               onReceive={(acc: Account) => setReceiveAccount(acc)}
-              onHistory={(acc: Account) => setHistoryAccount(acc)}
-              onRefresh={fetchBalances}
+              onHistory={handleOpenHistory}
+              onRefresh={handleWalletRefresh}
               onAddAccount={() => setShowImport(true)}
             />
           )}
@@ -792,7 +1088,7 @@ function AppContent() {
               chain={activeChain}
               accounts={walletState.accounts.filter(a => a.chain === activeChain)}
               refreshBalance={fetchBalances}
-              onChangeChain={setActiveChain}
+              onChangeChain={handleChainChange}
               onAddAccount={() => setShowImport(true)}
             />
           )}
@@ -801,7 +1097,7 @@ function AppContent() {
             <MultiSig
               chain={activeChain}
               accounts={walletState.accounts}
-              onChainChange={setActiveChain}
+              onChainChange={handleChainChange}
             />
           )}
 
@@ -847,6 +1143,11 @@ function AppContent() {
       {historyAccount && (
         <HistoryModal
           account={historyAccount}
+          history={historyCache[getHistoryCacheKey(historyAccount)]?.items || []}
+          loading={!!historyLoadingKeys[getHistoryCacheKey(historyAccount)]}
+          loadError={historyCache[getHistoryCacheKey(historyAccount)]?.error}
+          lastUpdated={historyCache[getHistoryCacheKey(historyAccount)]?.updatedAt}
+          onRefresh={() => refreshAccountHistory(historyAccount, true, false)}
           onClose={() => setHistoryAccount(null)}
         />
       )}

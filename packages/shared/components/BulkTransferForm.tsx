@@ -474,8 +474,8 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                         const isInvalid = validationStatus.invalid.includes(clean);
                                         let color = "bg-slate-700 text-slate-400";
                                         let icon = "";
-                                        if (isValid) { color = "bg-green-900/40 text-green-400 border border-green-500/30"; icon = "✓"; }
-                                        if (isInvalid) { color = "bg-red-900/40 text-red-400 border border-red-500/30"; icon = "✕"; }
+                                        if (isValid) { color = "bg-green-900/40 text-green-400 border border-green-500/30"; icon = "OK"; }
+                                        if (isInvalid) { color = "bg-red-900/40 text-red-400 border border-red-500/30"; icon = "X"; }
                                         return (
                                             <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full ${color} flex items-center gap-1`}>
                                                 {icon} {clean}
@@ -518,8 +518,8 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                                     className={`w-full bg-dark-950 border rounded-lg px-3 py-2 text-xs outline-none text-white placeholder-slate-600 ${isValid ? 'border-green-500/50' : isInvalid ? 'border-red-500/50' : 'border-dark-600'}`}
                                                 />
                                                 <div className="absolute right-2 top-2 text-[10px]">
-                                                    {isValid && <span className="text-green-400">✓</span>}
-                                                    {isInvalid && <span className="text-red-400 font-bold">✕</span>}
+                                                    {isValid && <span className="text-green-400 font-bold">OK</span>}
+                                                    {isInvalid && <span className="text-red-400 font-bold">X</span>}
                                                 </div>
                                             </div>
                                             <div className="w-1/2 relative bg-dark-950 rounded-lg border border-dark-600 flex items-center">
@@ -571,7 +571,9 @@ export const BulkTransferForm: React.FC<BulkTransferFormProps> = ({ chain, accou
                                                 className="text-red-400 hover:text-red-200 hover:bg-red-500/10 rounded w-8 flex items-center justify-center transition-colors"
                                                 title="Remove row"
                                             >
-                                                ✕
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
                                             </button>
                                         </div>
                                         <div className="w-full">

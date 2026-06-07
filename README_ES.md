@@ -1,17 +1,17 @@
 # Gravity Wallet
 
-**La Primera Billetera Web3 Multi-Cadena con IA Integrada para Hive, Steem y Blurt.**
+**La Primera Billetera Web3 Multi-Cadena con IA Integrada para Blurt, Hive y Steem.**
 
 <div align="center">
   <img src="apps/extension/public/logowallet_big.png" alt="Gravity Wallet Banner" width="300" />
 </div>
 
-Gravity Wallet es una extensión de navegador de última generación diseñada para el ecosistema Graphene. No es solo una billetera; es tu copiloto inteligente para la Web3. Con soporte nativo para **Hive**, **Steem** y **Blurt**, Gravity elimina la necesidad de tener múltiples extensiones instaladas.
+Gravity Wallet es una extensión de navegador de última generación diseñada para el ecosistema Graphene. No es solo una billetera; es tu copiloto inteligente para la Web3. Con soporte nativo para **Blurt**, **Hive** y **Steem**, Gravity elimina la necesidad de tener múltiples extensiones instaladas.
 
 ## Características Principales
 
 ### Multi-Cadena Real
-*   Administra tus cuentas de **Hive**, **Steem** y **Blurt** desde una única interfaz unificada.
+*   Administra tus cuentas de **Blurt**, **Hive** y **Steem** desde una única interfaz unificada.
 *   **Detección Inteligente:** La billetera detecta automáticamente en qué dApp estás (ej. PeakD, Steemit, BlurtBlog) y selecciona la cuenta y red correctas por ti.
 
 ### Seguridad de Grado Militar
@@ -24,7 +24,7 @@ Gravity Wallet es una extensión de navegador de última generación diseñada p
 *   **Detección de Fraude:** Alertas inteligentes ante comportamientos sospechosos o transacciones inusuales.
 
 ### Herramientas Avanzadas
-*   **Messenger Seguro:** Chat en cadena para Hive, Steem y Blurt con notificaciones en tiempo real.
+*   **Messenger Seguro:** Chat en cadena para Blurt, Hive y Steem con notificaciones en tiempo real.
 *   **Configuración Sin Contraseña:** Crea tu billetera sin complicaciones usando Google OAuth o llaves de hardware (Device).
 *   **Power Up / Power Down:** Gestiona tu stake directamente desde la extensión.
 *   **Delegaciones:** Delega poder de voto a otros usuarios fácilmente.

@@ -1144,14 +1144,18 @@ const broadcastBlurtTransaction = async (nodeUrl: string, operations: any[], key
         // Enhance error message
         const err = broadcastResult.error;
         let msg = err.message || JSON.stringify(err);
+        const rawData = err.data ? JSON.stringify(err.data) : '';
 
         // Translate obscure node errors to user-friendly messages
         if (msg.includes('unknown key')) {
-            msg = "Account not found or invalid key. Please check the username.";
+            if (rawData.includes('"method":"get_comment"')) {
+                msg = "Parent post or comment not found on the node. The reply target may be invalid or not yet available on this RPC node.";
+            } else {
+                msg = "Unknown key or missing blockchain object in node response.";
+            }
         }
 
-        const data = err.data ? JSON.stringify(err.data) : '';
-        throw new Error(`${msg} ${data}`);
+        throw new Error(`${msg} ${rawData}`);
     }
 
     return {
@@ -1179,7 +1183,7 @@ export const broadcastOperations = async (
         const nodes: Record<Chain, string[]> = {
             [Chain.HIVE]: ['https://api.deathwing.me', 'https://techcoderx.com', 'https://rpc.mahdiyari.info', 'https://hive-api.3speak.tv'],
             [Chain.STEEM]: ['https://api.steemit.com', 'https://api.steem.fans', 'https://api.justyy.com'],
-            [Chain.BLURT]: ['https://rpc.drakernoise.com', 'https://rpc.beblurt.com', 'https://api.blurt.blog']
+            [Chain.BLURT]: ['https://rpc.drakernoise.com', 'https://api.blurt.blog', 'https://blurt-rpc.saboin.com', 'https://rpc.mahdiyari.info']
         };
         return nodes[chain] || [];
     };
@@ -1467,18 +1471,75 @@ export interface HistoryItem {
     to: string;
     amount: string;
     memo: string;
-    type: 'send' | 'receive' | 'powerup_in' | 'powerup_out' | 'powerdown';
+    type: 'send' | 'receive' | 'powerup_in' | 'powerup_out' | 'powerdown' | 'delegate_out' | 'delegate_in' | 'undelegate_out' | 'rc_delegate_out' | 'rc_delegate_in' | 'savings_in' | 'savings_out' | 'savings_cancel' | 'reward' | 'producer_reward';
     txId: string;
 }
 
-export const fetchAccountHistory = async (chain: Chain, username: string): Promise<HistoryItem[]> => {
-    const node = getActiveNode(chain);
+export const getHistoryItemKey = (item: HistoryItem): string => [
+    item.txId || '',
+    item.date || '',
+    item.type || '',
+    item.from || '',
+    item.to || '',
+    item.amount || '',
+    item.memo || ''
+].join('|');
+
+interface FetchAccountHistoryOptions {
+    incremental?: boolean;
+    knownItemKeys?: string[];
+    maxPages?: number;
+}
+
+export const fetchAccountHistory = async (chain: Chain, username: string, options: FetchAccountHistoryOptions = {}): Promise<HistoryItem[]> => {
+    const node = await getActiveNodeAsync(chain);
+    const maxVisibleItems = 50;
+    const minRelevantItems = maxVisibleItems;
+    const knownItemKeys = new Set(options.knownItemKeys || []);
+    const normalizeHistoryEntries = (raw: any): any[] => {
+        if (Array.isArray(raw)) return raw;
+        if (Array.isArray(raw?.history)) return raw.history;
+        if (Array.isArray(raw?.result)) return raw.result;
+        if (Array.isArray(raw?.result?.history)) return raw.result.history;
+        return [];
+    };
+    const normalizeOp = (op: any): [string, any] | null => {
+        if (Array.isArray(op)) return [op[0], op[1] || {}];
+        if (op && typeof op === 'object') {
+            const rawType = op.type || op.operation || op.name;
+            const type = typeof rawType === 'string' ? rawType.replace(/_operation$/, '') : '';
+            return type ? [type, op.value || op.data || op] : null;
+        }
+        return null;
+    };
     const processOp = (op: any, timestamp: string, trx_id: string): HistoryItem | null => {
-        const type = op[0];
-        const data = op[1];
+        const normalizedOp = normalizeOp(op);
+        if (!normalizedOp) return null;
+        const [type, data] = normalizedOp;
+        const compactAmounts = (...amounts: any[]) => amounts
+            .filter((amount) => amount && !String(amount).startsWith('0.000 '))
+            .map(String)
+            .join(' + ');
+
         if (type === 'transfer') {
             if (data.from === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: data.memo, type: 'send', txId: trx_id };
             if (data.to === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: data.memo, type: 'receive', txId: trx_id };
+        }
+        if (type === 'transfer_to_savings' || type === 'transfer_from_savings') {
+            const memo = type === 'transfer_to_savings' ? 'Transfer to Savings' : 'Transfer from Savings';
+            if (data.from === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo, type: 'savings_out', txId: trx_id };
+            if (data.to === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo, type: 'savings_in', txId: trx_id };
+        }
+        if (type === 'cancel_transfer_from_savings' && data.account === username) {
+            return {
+                date: timestamp,
+                from: data.account,
+                to: 'SAVINGS',
+                amount: data.amount || '',
+                memo: `Cancel Savings Transfer${data.request_id !== undefined ? ` #${data.request_id}` : ''}`,
+                type: 'savings_cancel',
+                txId: trx_id
+            };
         }
         if (type === 'transfer_to_vesting') {
             if (data.from === username && data.to === username) return { date: timestamp, from: data.from, to: 'VESTING', amount: data.amount, memo: 'Power Up (Self)', type: 'powerup_out', txId: trx_id };
@@ -1488,65 +1549,212 @@ export const fetchAccountHistory = async (chain: Chain, username: string): Promi
         if (type === 'withdraw_vesting') {
             if (data.account === username) return { date: timestamp, from: data.account, to: 'LIQUID', amount: data.vesting_shares, memo: 'Power Down', type: 'powerdown', txId: trx_id };
         }
+        if (type === 'fill_vesting_withdraw') {
+            if (data.from_account === username) return { date: timestamp, from: data.from_account, to: data.to_account, amount: data.deposited || data.withdrawn, memo: 'Power Down Payment', type: 'powerdown', txId: trx_id };
+            if (data.to_account === username) return { date: timestamp, from: data.from_account, to: data.to_account, amount: data.deposited || data.withdrawn, memo: 'Power Down Received', type: 'powerup_in', txId: trx_id };
+        }
+        if (type === 'delegate_vesting_shares') {
+            const vestingShares = data.vesting_shares || '0.000000 VESTS';
+            const isUndelegate = String(vestingShares).startsWith('0.000000');
+            if (data.delegator === username) {
+                return {
+                    date: timestamp,
+                    from: data.delegator,
+                    to: data.delegatee,
+                    amount: vestingShares,
+                    memo: isUndelegate ? 'Undelegate Power' : 'Delegate Power',
+                    type: isUndelegate ? 'undelegate_out' : 'delegate_out',
+                    txId: trx_id
+                };
+            }
+            if (!isUndelegate && data.delegatee === username) {
+                return {
+                    date: timestamp,
+                    from: data.delegator,
+                    to: data.delegatee,
+                    amount: vestingShares,
+                    memo: 'Power Delegation Received',
+                    type: 'delegate_in',
+                    txId: trx_id
+                };
+            }
+        }
+        if (type === 'return_vesting_delegation' && data.account === username) {
+            return {
+                date: timestamp,
+                from: 'VESTING',
+                to: data.account,
+                amount: data.vesting_shares,
+                memo: 'Delegation Returned',
+                type: 'undelegate_out',
+                txId: trx_id
+            };
+        }
+        if (type === 'delegate_rc') {
+            const amount = data.max_rc !== undefined ? String(data.max_rc) : '';
+            if (data.from === username) {
+                return {
+                    date: timestamp,
+                    from: data.from,
+                    to: Array.isArray(data.delegatees) ? data.delegatees.join(', ') : '',
+                    amount,
+                    memo: amount === '0' ? 'RC Delegation Removed' : 'RC Delegation',
+                    type: 'rc_delegate_out',
+                    txId: trx_id
+                };
+            }
+            if (Array.isArray(data.delegatees) && data.delegatees.includes(username)) {
+                return {
+                    date: timestamp,
+                    from: data.from,
+                    to: username,
+                    amount,
+                    memo: 'RC Delegation Received',
+                    type: 'rc_delegate_in',
+                    txId: trx_id
+                };
+            }
+        }
+        if (type === 'claim_reward_balance' && data.account === username) {
+            return {
+                date: timestamp,
+                from: 'rewards',
+                to: data.account,
+                amount: compactAmounts(data.reward_blurt, data.reward_hive, data.reward_steem, data.reward_hbd, data.reward_sbd, data.reward_vests),
+                memo: 'Claim Rewards',
+                type: 'reward',
+                txId: trx_id
+            };
+        }
+        if (type === 'curation_reward' && data.curator === username) {
+            return { date: timestamp, from: 'rewards', to: data.curator, amount: data.reward, memo: 'Curation Reward', type: 'reward', txId: trx_id };
+        }
+        if ((type === 'author_reward' || type === 'comment_reward') && data.author === username) {
+            return {
+                date: timestamp,
+                from: 'rewards',
+                to: data.author,
+                amount: compactAmounts(data.blurt_payout, data.hive_payout, data.steem_payout, data.hbd_payout, data.sbd_payout, data.vesting_payout),
+                memo: 'Author Reward',
+                type: 'reward',
+                txId: trx_id
+            };
+        }
+        if (type === 'comment_benefactor_reward' && data.benefactor === username) {
+            return { date: timestamp, from: 'rewards', to: data.benefactor, amount: data.reward, memo: 'Benefactor Reward', type: 'reward', txId: trx_id };
+        }
+        if (type === 'producer_reward' && data.producer === username) {
+            return {
+                date: timestamp,
+                from: 'network',
+                to: data.producer,
+                amount: data.vesting_shares,
+                memo: 'Producer Reward',
+                type: 'producer_reward',
+                txId: trx_id
+            };
+        }
         return null;
     };
 
+    const selectVisibleHistory = (allHistory: HistoryItem[]) => {
+        const relevantHistory = allHistory.filter((item) => item.type !== 'reward' && item.type !== 'producer_reward');
+        if (relevantHistory.length > 0) {
+            return relevantHistory.slice(0, maxVisibleItems);
+        }
+
+        return allHistory.slice(0, maxVisibleItems);
+    };
+
+    const buildHistoryItems = (rawHistory: any) => {
+        const entries = normalizeHistoryEntries(rawHistory);
+        return entries
+            .map((h: any) => processOp(h[1]?.op, h[1]?.timestamp, h[1]?.trx_id || h[1]?.trxId || ''))
+            .filter((h: HistoryItem | null): h is HistoryItem => h !== null)
+            .reverse();
+    };
+
+    const processHistoryEntries = (rawHistory: any) => {
+        const allHistory = buildHistoryItems(rawHistory);
+        if (options.incremental && knownItemKeys.size > 0) {
+            return allHistory.filter((item) => !knownItemKeys.has(getHistoryItemKey(item)));
+        }
+        return selectVisibleHistory(allHistory);
+    };
+
+    const getCandidateNodes = () => {
+        const candidates: Record<Chain, string[]> = {
+            [Chain.HIVE]: HIVE_CANDIDATES,
+            [Chain.STEEM]: STEEM_CANDIDATES,
+            [Chain.BLURT]: BLURT_CANDIDATES
+        };
+        const nodes = [node, ...candidates[chain].filter((candidate) => candidate !== node)];
+        if (chain !== Chain.HIVE) return nodes;
+        return nodes.sort((a, b) => {
+            const aRateLimited = a.includes('api.openhive.network') ? 1 : 0;
+            const bRateLimited = b.includes('api.openhive.network') ? 1 : 0;
+            return aRateLimited - bRateLimited;
+        });
+    };
+
+    const fetchHistoryPage = async (rpcNode: string, from: number, limit: number) => {
+        const response = await fetch(rpcNode, {
+            method: 'POST',
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'condenser_api.get_account_history',
+                params: [username, from, limit],
+                id: 1
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+                'Connection': 'keep-alive'
+            }
+        });
+        if (response.status === 429) throw new Error(`Node ${rpcNode} rate limited history requests`);
+        if (!response.ok) throw new Error(`Node ${rpcNode} returned HTTP ${response.status}`);
+        const json = await response.json();
+        if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+        return normalizeHistoryEntries(json);
+    };
+
     try {
-        // Calculate date 30 days ago
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const collected: any[] = [];
+        const pageSize = 100;
+        const maxPages = options.maxPages || (options.incremental ? 5 : chain === Chain.BLURT ? 200 : chain === Chain.HIVE ? 120 : 80);
 
-        if (chain === Chain.HIVE) {
-            // Use native fetch for history in SW
-            const response = await fetch(node, {
-                method: 'POST',
-                body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 1000], id: 1 }),
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
+        for (const rpcNode of getCandidateNodes()) {
+            let from = -1;
+            collected.length = 0;
+
+            try {
+                for (let page = 0; page < maxPages; page += 1) {
+                    const pageEntries = await fetchHistoryPage(rpcNode, from, pageSize);
+                    if (pageEntries.length === 0) break;
+
+                    collected.unshift(...pageEntries);
+                    const allItems = buildHistoryItems(collected);
+                    const reachedKnownItem = options.incremental && knownItemKeys.size > 0 && allItems.some((item) => knownItemKeys.has(getHistoryItemKey(item)));
+                    if (reachedKnownItem) {
+                        return allItems.filter((item) => !knownItemKeys.has(getHistoryItemKey(item)));
+                    }
+
+                    const hasEnoughRelevantItems = allItems.filter((item) => item.type !== 'reward' && item.type !== 'producer_reward').length >= minRelevantItems;
+                    const oldestIndex = Number(pageEntries[0]?.[0]);
+
+                    if (hasEnoughRelevantItems || !Number.isFinite(oldestIndex) || oldestIndex <= 0) {
+                        return selectVisibleHistory(allItems);
+                    }
+
+                    from = oldestIndex - 1;
                 }
-            });
-            const json = await response.json();
-            if (json.result) {
-                const allHistory = json.result
-                    .map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id))
-                    .filter((h: any) => h !== null)
-                    .reverse();
-
-                // Filter to last 30 days
-                return allHistory.filter((item: HistoryItem) => new Date(item.date) >= thirtyDaysAgo);
+            } catch (nodeError) {
+                console.warn(`History node failed for ${chain} at ${rpcNode}:`, nodeError);
+                continue;
             }
-        }
-        if (chain === Chain.STEEM) {
-            const client = new SteemClient(node);
-            const history = await client.database.call('get_account_history', [username, -1, 1000]);
-            const allHistory = history
-                .map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id))
-                .filter((h: any) => h !== null)
-                .reverse();
 
-            // Filter to last 30 days
-            return allHistory.filter((item: HistoryItem) => new Date(item.date) >= thirtyDaysAgo);
-        }
-        if (chain === Chain.BLURT) {
-            const response = await fetch(node, {
-                method: 'POST',
-                body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_account_history', params: [username, -1, 1000], id: 1 }),
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Connection': 'keep-alive' // Hint for connection reuse (browser handles automatically)
-                }
-            });
-            const json = await response.json();
-            if (json.result) {
-                const allHistory = json.result
-                    .map((h: any) => processOp(h[1].op, h[1].timestamp, h[1].trx_id))
-                    .filter((h: any) => h !== null)
-                    .reverse();
-
-                // Filter to last 30 days
-                return allHistory.filter((item: HistoryItem) => new Date(item.date) >= thirtyDaysAgo);
-            }
+            const parsed = processHistoryEntries(collected);
+            if (parsed.length > 0) return parsed;
         }
     } catch (e) { console.error("Fetch History Error:", e); }
     return [];

@@ -145,7 +145,7 @@
 
 <body>
     <div class="container">
-        <h1>🚀 Gravity Wallet Test</h1>
+        <h1>Gravity Wallet Test</h1>
         <p class="subtitle">Test dApp for Mobile Provider</p>
 
         <div class="info-box">
@@ -247,7 +247,7 @@
                 const signature = urlParams.get('signature');
                 resultDiv.style.display = 'block';
                 resultDiv.className = 'result success';
-                resultTitle.textContent = '✅ Transaction Approved!';
+                resultTitle.textContent = 'Transaction Approved';
                 resultContent.innerHTML = `
                     <strong>Signature:</strong><br>
                     ${signature}
@@ -259,7 +259,7 @@
                 const error = urlParams.get('error');
                 resultDiv.style.display = 'block';
                 resultDiv.className = 'result error';
-                resultTitle.textContent = '❌ Transaction Rejected';
+                resultTitle.textContent = 'Transaction Rejected';
                 resultContent.innerHTML = `
                     <strong>Error:</strong><br>
                     ${error || 'User rejected the request'}

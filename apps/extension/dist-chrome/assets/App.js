@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, w as broadcastRCDelegate, x as broadcastRCUndelegate, y as broadcastBulkTransfer, d as broadcastCustomJson, z as fetchCustomJsonEventsForAccounts, A as calculateThresholdProgress, B as getAccountAuthorities, D as createUnsignedTransaction, E as signTransactionEnvelope, F as selectBroadcastSignatures, G as broadcastSignedTransaction, H as indexBrowserExports, I as indexBrowserExports$1, v as validateAccountKeys, J as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, K as fetchBalances, L as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, w as broadcastRCDelegate, x as broadcastRCUndelegate, y as broadcastBulkTransfer, d as broadcastCustomJson, z as fetchCustomJsonEventsForAccounts, A as calculateThresholdProgress, B as getAccountAuthorities, D as createUnsignedTransaction, E as signTransactionEnvelope, F as selectBroadcastSignatures, G as broadcastSignedTransaction, H as indexBrowserExports, I as indexBrowserExports$1, v as validateAccountKeys, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, J as fetchBalances, K as detectWeb3Context, b as benchmarkNodes, L as fetchAccountHistory, M as getHistoryItemKey } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -5937,9 +5937,6 @@ const translations = {
     "wallet.history": "History",
     "wallet.keys": "Keys",
     "wallet.network_label": "Active Network",
-    "bulk.analyze": "Analyze Security",
-    "bulk.analyzing": "Analyzing...",
-    "bulk.success": "Analysis: No risks found.",
     "bulk.switch_network": "Switch Network",
     // Sidebar
     "sidebar.home": "Home",
@@ -5970,7 +5967,7 @@ const translations = {
     "import.select_chain": "Select Chain",
     "import.username": "Username",
     "import.checking": "Checking chain...",
-    "import.found": "✓ Found on Chain",
+    "import.found": "Found on Chain",
     "import.not_found": "Account not found",
     "import.private_keys": "Private Keys (Paste at least one)",
     "import.key_posting": "POSTING KEY",
@@ -6044,7 +6041,7 @@ const translations = {
     "multisig.threshold_label": "Threshold",
     "multisig.authorities_title": "Required Authorities",
     "multisig.you_label": "(YOU)",
-    "multisig.how_it_works": '💡 **How it works:** This account is protected by Multiple Signatures. Each signer has a specific "Weight". Once the total weight reaches the "Threshold" of {threshold}, the transaction can be officially broadcasted to the blockchain.',
+    "multisig.how_it_works": '**How it works:** This account is protected by Multiple Signatures. Each signer has a specific "Weight". Once the total weight reaches the "Threshold" of {threshold}, the transaction can be officially broadcasted to the blockchain.',
     "multisig.success_done": "Transaction Completed!",
     "multisig.reuse": "Reuse",
     "multisig.header_desc": "Build a multisig proposal draft and inspect the live account authority before coordinating signatures.",
@@ -6169,7 +6166,7 @@ const translations = {
     "bulk.success_msg": "Sent {n} transfers successfully. TXID: {txid}...",
     "bulk.error_title": "Error",
     "bulk.error_failed": "Failed to send",
-    "bulk.warn_not_found": "⚠ Warning: {n} username(s) not found on {chain} chain.",
+    "bulk.warn_not_found": "Warning: {n} username(s) not found on {chain} chain.",
     "bulk.error_no_active": "Active key not found for this account.",
     // Lock Screen
     "lock.title": "Welcome Back",
@@ -6281,8 +6278,6 @@ const translations = {
     "import.processing": "Processing...",
     "import.bulk_summary": "Imported {count} accounts.",
     "import.no_valid_accounts": "No valid accounts found in file.",
-    // Security
-    "security.analysis_prompt": "Please analyze this crypto transaction for safety risks in English: ",
     "history.title": "History: {user}",
     "history.loading": "Loading history...",
     "history.empty": "No transfers found in recent history.",
@@ -6296,9 +6291,22 @@ const translations = {
     "history.filter_sent": "Sent",
     "history.filter_powerup": "Power Up",
     "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delegate",
     "history.type_powerup_in": "Received Power",
     "history.type_powerup_out": "Sent Power",
     "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delegation Received",
+    "history.type_delegate_out": "Delegated Power",
+    "history.type_undelegate_out": "Undelegated Power",
+    "history.type_rc_delegate_in": "RC Delegation Received",
+    "history.type_rc_delegate_out": "RC Delegated",
+    "history.type_savings_in": "Savings In",
+    "history.type_savings_out": "Savings Out",
+    "history.type_savings_cancel": "Savings Cancelled",
+    "history.type_reward": "Reward",
+    "history.type_producer_reward": "Producer Reward",
+    "history.show_producer_rewards": "Show producer rewards",
+    "history.hide_producer_rewards": "Hide producer rewards",
     // Sign Request
     "sign.title": "Signature Request",
     "sign.transfer_title": "Transfer Request",
@@ -6529,9 +6537,6 @@ const translations = {
     "wallet.no_accounts_chain": "No hay cuentas añadidas para {chain}",
     "wallet.add_one": "Añadir Cuenta",
     "wallet.network_label": "Red Activa",
-    "bulk.analyze": "Analizar Seguridad",
-    "bulk.analyzing": "Analizando...",
-    "bulk.success": "Análisis: Sin riesgos detectados.",
     "bulk.switch_network": "Cambiar Red",
     // Sidebar
     "sidebar.home": "Inicio",
@@ -6561,7 +6566,7 @@ const translations = {
     "import.select_chain": "Seleccionar Red",
     "import.username": "Usuario",
     "import.checking": "Comprobando red...",
-    "import.found": "✓ Encontrado",
+    "import.found": "Encontrado",
     "import.not_found": "Cuenta no encontrada",
     "import.private_keys": "Llaves Privadas (Pegar al menos una)",
     "import.key_posting": "LLAVE POSTING",
@@ -6635,7 +6640,7 @@ const translations = {
     "multisig.threshold_label": "Umbral",
     "multisig.authorities_title": "Autoridades Requeridas",
     "multisig.you_label": "(TÚ)",
-    "multisig.how_it_works": '💡 **Cómo funciona:** Esta cuenta está protegida por Firmas Múltiples. Cada firmante tiene un "Peso" específico. Una vez que el peso total alcanza el "Umbral" de {threshold}, la transacción puede ser transmitida oficialmente a la blockchain.',
+    "multisig.how_it_works": '**Cómo funciona:** Esta cuenta está protegida por Firmas Múltiples. Cada firmante tiene un "Peso" específico. Una vez que el peso total alcanza el "Umbral" de {threshold}, la transacción puede ser transmitida oficialmente a la blockchain.',
     "multisig.success_done": "¡Transacción Completada!",
     "multisig.reuse": "Reutilizar",
     "multisig.header_desc": "Construye un borrador multisig y revisa la autoridad activa real antes de coordinar las firmas.",
@@ -6760,7 +6765,7 @@ const translations = {
     "bulk.success_msg": "Enviadas {n} transferencias exitosamente. TXID: {txid}...",
     "bulk.error_title": "Error",
     "bulk.error_failed": "Error al enviar",
-    "bulk.warn_not_found": "⚠ Advertencia: {n} usuario(s) no encontrado(s) en la red {chain}.",
+    "bulk.warn_not_found": "Advertencia: {n} usuario(s) no encontrado(s) en la red {chain}.",
     "bulk.error_no_active": "No se encontró llave activa para esta cuenta.",
     // Lock Screen
     "lock.title": "Bienvenido",
@@ -6872,8 +6877,6 @@ const translations = {
     "import.processing": "Procesando...",
     "import.bulk_summary": "Importadas {count} cuentas.",
     "import.no_valid_accounts": "No se encontraron cuentas válidas.",
-    // Security
-    "security.analysis_prompt": "Por favor analiza esta transacción en busca de riesgos en Español: ",
     "history.title": "Historial: {user}",
     "history.loading": "Cargando historial...",
     "history.empty": "No se encontraron transferencias recientes.",
@@ -6887,9 +6890,22 @@ const translations = {
     "history.filter_sent": "Enviados",
     "history.filter_powerup": "Power Up",
     "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delegar",
     "history.type_powerup_in": "Power Recibido",
     "history.type_powerup_out": "Power Enviado",
     "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delegacion recibida",
+    "history.type_delegate_out": "Power delegado",
+    "history.type_undelegate_out": "Delegacion retirada",
+    "history.type_rc_delegate_in": "Delegacion RC recibida",
+    "history.type_rc_delegate_out": "RC delegado",
+    "history.type_savings_in": "Ahorro recibido",
+    "history.type_savings_out": "Ahorro enviado",
+    "history.type_savings_cancel": "Ahorro cancelado",
+    "history.type_reward": "Recompensa",
+    "history.type_producer_reward": "Reward producer",
+    "history.show_producer_rewards": "Mostrar producer rewards",
+    "history.hide_producer_rewards": "Ocultar producer rewards",
     // Sign Request
     "sign.title": "Solicitud de Firma",
     "sign.transfer_title": "Solicitud de Transferencia",
@@ -7118,9 +7134,6 @@ const translations = {
     "wallet.network_label": "Réseau Actif",
     "wallet.no_accounts_chain": "Aucun compte ajouté pour {chain}",
     "wallet.add_one": "Ajouter un compte",
-    "bulk.analyze": "Analyser la sécurité",
-    "bulk.analyzing": "Analyse en cours...",
-    "bulk.success": "Analyse : Aucun risque détecté.",
     "bulk.switch_network": "Changer de réseau",
     // Sidebar
     "sidebar.home": "Accueil",
@@ -7151,7 +7164,7 @@ const translations = {
     "import.select_chain": "Sélectionner Chaîne",
     "import.username": "Nom d'utilisateur",
     "import.checking": "Vérification chaîne...",
-    "import.found": "✓ Trouvé",
+    "import.found": "Trouvé",
     "import.not_found": "Compte non trouvé",
     "import.private_keys": "Clés Privées (Coller au moins une)",
     "import.key_posting": "CLÉ POSTING",
@@ -7258,7 +7271,7 @@ const translations = {
     "bulk.success_msg": "{n} transferts envoyés avec succès. TXID : {txid}...",
     "bulk.error_title": "Erreur",
     "bulk.error_failed": "Échec de l'envoi",
-    "bulk.warn_not_found": "⚠ Attention : {n} utilisateur(s) non trouvé(s) sur la chaîne {chain}.",
+    "bulk.warn_not_found": "Attention : {n} utilisateur(s) non trouvé(s) sur la chaîne {chain}.",
     "bulk.error_no_active": "Clé active non trouvée pour ce compte.",
     // Lock Screen
     "lock.title": "Bon retour",
@@ -7319,8 +7332,6 @@ const translations = {
     "manage.add_posting": "Ajouter Clé Privée Posting",
     "manage.add_active": "Ajouter Clé Privée Active",
     "manage.add_memo": "Ajouter Clé Privée Memo",
-    // Security
-    "security.analysis_prompt": "Veuillez analyser cette transaction crypto pour les risques en Français : ",
     // History
     "history.title": "Historique : {user}",
     "history.loading": "Chargement historique...",
@@ -7329,6 +7340,28 @@ const translations = {
     "history.sent": "Envoyé",
     "history.from": "De",
     "history.to": "À",
+    "history.filter_label": "Filtrer",
+    "history.filter_all": "Tout",
+    "history.filter_received": "Reçu",
+    "history.filter_sent": "Envoyé",
+    "history.filter_powerup": "Power Up",
+    "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delegation",
+    "history.type_powerup_in": "Power recu",
+    "history.type_powerup_out": "Power envoye",
+    "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delegation recue",
+    "history.type_delegate_out": "Power delegue",
+    "history.type_undelegate_out": "Delegation retiree",
+    "history.type_rc_delegate_in": "Delegation RC recue",
+    "history.type_rc_delegate_out": "RC delegue",
+    "history.type_savings_in": "Epargne recue",
+    "history.type_savings_out": "Epargne envoyee",
+    "history.type_savings_cancel": "Epargne annulee",
+    "history.type_reward": "Recompense",
+    "history.type_producer_reward": "Reward producteur",
+    "history.show_producer_rewards": "Afficher rewards producteur",
+    "history.hide_producer_rewards": "Masquer rewards producteur",
     // Sign Request
     "sign.title": "Demande de Signature",
     "sign.transfer_title": "Demande de Transfert",
@@ -7580,9 +7613,6 @@ const translations = {
     "wallet.network_label": "Aktives Netzwerk",
     "wallet.no_accounts_chain": "Keine Konten für {chain} hinzugefügt",
     "wallet.add_one": "Konto hinzufügen",
-    "bulk.analyze": "Sicherheit analysieren",
-    "bulk.analyzing": "Analysiere...",
-    "bulk.success": "Analyse: Keine Risiken gefunden.",
     "bulk.switch_network": "Netzwerk wechseln",
     // Sidebar
     "sidebar.home": "Start",
@@ -7613,7 +7643,7 @@ const translations = {
     "import.select_chain": "Kette wählen",
     "import.username": "Benutzername",
     "import.checking": "Prüfe Kette...",
-    "import.found": "✓ Gefunden",
+    "import.found": "Gefunden",
     "import.not_found": "Konto nicht gefunden",
     "import.private_keys": "Private Schlüssel (Mindestens einen einfügen)",
     "import.key_posting": "POSTING KEY",
@@ -7781,8 +7811,6 @@ const translations = {
     "manage.add_posting": "Posting-Schlüssel hinzufügen",
     "manage.add_active": "Aktiven Schlüssel hinzufügen",
     "manage.add_memo": "Memo-Schlüssel hinzufügen",
-    // Security
-    "security.analysis_prompt": "Bitte analysieren Sie diese Krypto-Transaktion auf Risiken in Deutsch: ",
     // History
     "history.title": "Verlauf: {user}",
     "history.loading": "Lade Verlauf...",
@@ -7791,6 +7819,28 @@ const translations = {
     "history.sent": "Gesendet",
     "history.from": "Von",
     "history.to": "An",
+    "history.filter_label": "Filter",
+    "history.filter_all": "Alle",
+    "history.filter_received": "Empfangen",
+    "history.filter_sent": "Gesendet",
+    "history.filter_powerup": "Power Up",
+    "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delegation",
+    "history.type_powerup_in": "Power erhalten",
+    "history.type_powerup_out": "Power gesendet",
+    "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delegation erhalten",
+    "history.type_delegate_out": "Power delegiert",
+    "history.type_undelegate_out": "Delegation entfernt",
+    "history.type_rc_delegate_in": "RC-Delegation erhalten",
+    "history.type_rc_delegate_out": "RC delegiert",
+    "history.type_savings_in": "Savings empfangen",
+    "history.type_savings_out": "Savings gesendet",
+    "history.type_savings_cancel": "Savings storniert",
+    "history.type_reward": "Belohnung",
+    "history.type_producer_reward": "Producer-Belohnung",
+    "history.show_producer_rewards": "Producer-Rewards anzeigen",
+    "history.hide_producer_rewards": "Producer-Rewards ausblenden",
     // Sign Request
     "sign.title": "Signaturanfrage",
     "sign.transfer_title": "Überweisungsanfrage",
@@ -8042,9 +8092,6 @@ const translations = {
     "wallet.network_label": "Rete Attiva",
     "wallet.no_accounts_chain": "Nessun account aggiunto per {chain}",
     "wallet.add_one": "Aggiungi Account",
-    "bulk.analyze": "Analisi Sicurezza",
-    "bulk.analyzing": "Analisi in corso...",
-    "bulk.success": "Analisi: Nessun rischio rilevato.",
     "bulk.switch_network": "Cambia Rete",
     // Sidebar
     "sidebar.home": "Home",
@@ -8243,8 +8290,6 @@ const translations = {
     "manage.add_posting": "Aggiungi Chiave Privata Posting",
     "manage.add_active": "Aggiungi Chiave Privata Active",
     "manage.add_memo": "Aggiungi Chiave Privata Memo",
-    // Security
-    "security.analysis_prompt": "Per favore analizza questa transazione crypto per rischi in Italiano: ",
     // History
     "history.title": "Cronologia: {user}",
     "history.loading": "Caricamento cronologia...",
@@ -8253,6 +8298,28 @@ const translations = {
     "history.sent": "Inviato",
     "history.from": "Da",
     "history.to": "A",
+    "history.filter_label": "Filtro",
+    "history.filter_all": "Tutto",
+    "history.filter_received": "Ricevuti",
+    "history.filter_sent": "Inviati",
+    "history.filter_powerup": "Power Up",
+    "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delega",
+    "history.type_powerup_in": "Power ricevuto",
+    "history.type_powerup_out": "Power inviato",
+    "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delega ricevuta",
+    "history.type_delegate_out": "Power delegato",
+    "history.type_undelegate_out": "Delega rimossa",
+    "history.type_rc_delegate_in": "Delega RC ricevuta",
+    "history.type_rc_delegate_out": "RC delegato",
+    "history.type_savings_in": "Risparmio ricevuto",
+    "history.type_savings_out": "Risparmio inviato",
+    "history.type_savings_cancel": "Risparmio annullato",
+    "history.type_reward": "Ricompensa",
+    "history.type_producer_reward": "Reward producer",
+    "history.show_producer_rewards": "Mostra reward producer",
+    "history.hide_producer_rewards": "Nascondi reward producer",
     // Sign Request
     "sign.title": "Richiesta Firma",
     "sign.transfer_title": "Richiesta Trasferimento",
@@ -10956,10 +11023,14 @@ const WalletView = ({
             "button",
             {
               onClick: () => openModal("powerup", account),
-              className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-cyan-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
+              className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-green-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
               "aria-label": "Power Up",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 text-slate-400 group-hover/btn:text-cyan-400 transition-colors", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "7", width: "16", height: "10", rx: "2", fill: "none", stroke: "#94a3b8", strokeWidth: "1.8" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "9.5", width: "10", height: "5", rx: "1", fill: "#22c55e", className: "group-hover/btn:fill-green-400" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "19.5", y: "10", width: "1.8", height: "4", rx: "0.8", fill: "#94a3b8" })
+                ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50", children: "Power Up" })
               ]
             }
@@ -10968,12 +11039,13 @@ const WalletView = ({
             "button",
             {
               onClick: () => openModal("powerdown", account),
-              className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-yellow-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
+              className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-red-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
               "aria-label": "Power Down",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative w-5 h-5", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 text-slate-400 group-hover/btn:text-yellow-400 transition-colors absolute inset-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3 text-red-500 group-hover/btn:text-red-400 transition-colors absolute top-0 right-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", strokeWidth: 3, children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }) })
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "7", width: "16", height: "10", rx: "2", fill: "none", stroke: "#94a3b8", strokeWidth: "1.8" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "11", width: "4", height: "3", rx: "0.8", fill: "#ef4444", className: "group-hover/btn:fill-red-400" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "19.5", y: "10", width: "1.8", height: "4", rx: "0.8", fill: "#94a3b8" })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50", children: "Power Down" })
               ]
@@ -10986,7 +11058,18 @@ const WalletView = ({
               className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-pink-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
               "aria-label": "Delegate",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 text-slate-400 group-hover/btn:text-pink-400 transition-colors", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "4", y: "3", width: "6", height: "14", rx: "1.6", fill: "none", stroke: "#94a3b8", strokeWidth: "1.6" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "6", width: "3", height: "8", rx: "0.8", fill: "#22c55e", className: "group-hover/btn:fill-green-400" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "6", y: "1.5", width: "2", height: "1.5", rx: "0.5", fill: "#94a3b8" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "14", y: "7", width: "6", height: "14", rx: "1.6", fill: "none", stroke: "#94a3b8", strokeWidth: "1.6" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "15.5", y: "10", width: "3", height: "8", rx: "0.8", fill: "#22c55e", className: "group-hover/btn:fill-green-400" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "16", y: "5.5", width: "2", height: "1.5", rx: "0.5", fill: "#94a3b8" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M10.5 8.5h4", stroke: "#ec4899", strokeWidth: "1.8", strokeLinecap: "round" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13 6.5l2 2-2 2", fill: "none", stroke: "#ec4899", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14.5 15.5h-4", stroke: "#ec4899", strokeWidth: "1.8", strokeLinecap: "round" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 13.5l-2 2 2 2", fill: "none", stroke: "#ec4899", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" })
+                ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50", children: "Delegate" })
               ]
             }
@@ -11503,11 +11586,11 @@ user3`
               let icon = "";
               if (isValid) {
                 color = "bg-green-900/40 text-green-400 border border-green-500/30";
-                icon = "✓";
+                icon = "OK";
               }
               if (isInvalid) {
                 color = "bg-red-900/40 text-red-400 border border-red-500/30";
-                icon = "✕";
+                icon = "X";
               }
               return /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-[10px] px-2 py-0.5 rounded-full ${color} flex items-center gap-1`, children: [
                 icon,
@@ -11550,8 +11633,8 @@ user3`
                     }
                   ),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute right-2 top-2 text-[10px]", children: [
-                    isValid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400", children: "✓" }),
-                    isInvalid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "✕" })
+                    isValid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400 font-bold", children: "OK" }),
+                    isInvalid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "X" })
                   ] })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-1/2 relative bg-dark-950 rounded-lg border border-dark-600 flex items-center", children: [
@@ -11599,7 +11682,7 @@ user3`
                     onClick: () => removeRow(idx),
                     className: "text-red-400 hover:text-red-200 hover:bg-red-500/10 rounded w-8 flex items-center justify-center transition-colors",
                     title: "Remove row",
-                    children: "✕"
+                    children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
                   }
                 )
               ] }),
@@ -13849,7 +13932,7 @@ const ImportModal = ({ onClose, onImport, initialChain }) => {
   return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto my-auto", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-4", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-bold", children: t("import.title") }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", children: "✕" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", "aria-label": "Close", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-4 mb-5 text-sm border-b border-dark-700", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: `pb-2 border-b-2 px-2 transition-colors ${method === "manual" ? "border-blue-500 text-white font-medium" : "border-transparent text-slate-500"}`, onClick: () => setMethod("manual"), children: t("import.manual") }),
@@ -14053,7 +14136,7 @@ const ManageAccountModal = ({ account, onClose, onSave, onDelete }) => {
           account.chain
         ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", children: "✕" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", "aria-label": "Close", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) })
     ] }),
     !showConfirmDelete ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4 mb-6", children: [
@@ -14309,7 +14392,7 @@ const TransferModal = ({ account: initialAccount, accounts, onClose, onTransfer,
         " ",
         selectedAccount.chain
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", children: "✕" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", "aria-label": "Close", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4 mb-6", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-3 bg-dark-900 rounded-lg border border-dark-700", children: [
@@ -14363,8 +14446,8 @@ const TransferModal = ({ account: initialAccount, accounts, onClose, onTransfer,
             }
           ),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute right-3 top-2.5 text-xs", children: [
-            isValidRecipient === true && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400", children: "✓" }),
-            isValidRecipient === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "✕" })
+            isValidRecipient === true && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400 font-bold", children: "OK" }),
+            isValidRecipient === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "X" })
           ] }),
           showRecent && recentRecipients.length > 0 && !to && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute top-full left-0 right-0 z-50 mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-40 overflow-y-auto custom-scrollbar animate-slide-down", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 py-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-dark-700 bg-dark-900/50", children: t("common.recent_recipients") }),
@@ -14532,32 +14615,45 @@ const ReceiveModal = ({ account: initialAccount, onClose }) => {
   ] }) });
 };
 
-const HistoryModal = ({ account, onClose }) => {
+const HistoryModal = ({ account, history, loading, loadError, lastUpdated, onClose, onRefresh }) => {
   const { t } = useTranslation();
-  const [history, setHistory] = reactExports.useState([]);
-  const [loading, setLoading] = reactExports.useState(true);
   const [filter, setFilter] = reactExports.useState("all");
-  reactExports.useEffect(() => {
-    setLoading(true);
-    fetchAccountHistory(account.chain, account.name).then((data) => setHistory(data)).catch((err) => console.error(err)).finally(() => setLoading(false));
-  }, [account]);
+  const [showProducerRewards, setShowProducerRewards] = reactExports.useState(false);
+  const incomingTypes = ["receive", "powerup_in", "delegate_in", "rc_delegate_in", "savings_in", "reward", "producer_reward"];
+  const outgoingTypes = ["send", "powerup_out", "powerdown", "delegate_out", "undelegate_out", "rc_delegate_out", "savings_out", "savings_cancel"];
+  const isProducerReward = (item) => item.type === "producer_reward" || item.type === "reward" && item.memo === "Producer Reward";
+  const hasProducerRewards = history.some(isProducerReward);
   const filteredHistory = history.filter((item) => {
+    if (isProducerReward(item) && !showProducerRewards) return false;
     if (filter === "all") return true;
-    if (filter === "received") return item.type === "receive";
-    if (filter === "sent") return item.type === "send";
+    if (filter === "received") return incomingTypes.includes(item.type);
+    if (filter === "sent") return outgoingTypes.includes(item.type);
     if (filter === "powerup") return item.type === "powerup_in" || item.type === "powerup_out";
     if (filter === "powerdown") return item.type === "powerdown";
+    if (filter === "delegate") return item.type === "delegate_in" || item.type === "delegate_out" || item.type === "undelegate_out" || item.type === "rc_delegate_in" || item.type === "rc_delegate_out";
     return true;
   });
   const getTypeBadgeClass = (type) => {
     switch (type) {
       case "receive":
       case "powerup_in":
+      case "savings_in":
         return "bg-green-500/10 text-green-400";
       case "send":
       case "powerup_out":
       case "powerdown":
+      case "delegate_out":
+      case "undelegate_out":
+      case "savings_out":
+      case "savings_cancel":
         return "bg-red-500/10 text-red-400";
+      case "delegate_in":
+      case "rc_delegate_in":
+      case "rc_delegate_out":
+        return "bg-blue-500/10 text-blue-400";
+      case "reward":
+      case "producer_reward":
+        return "bg-amber-500/10 text-amber-400";
       default:
         return "bg-slate-500/10 text-slate-400";
     }
@@ -14574,10 +14670,31 @@ const HistoryModal = ({ account, onClose }) => {
         return t("history.type_powerup_out");
       case "powerdown":
         return t("history.type_powerdown");
+      case "delegate_in":
+        return t("history.type_delegate_in");
+      case "delegate_out":
+        return t("history.type_delegate_out");
+      case "undelegate_out":
+        return t("history.type_undelegate_out");
+      case "rc_delegate_in":
+        return t("history.type_rc_delegate_in");
+      case "rc_delegate_out":
+        return t("history.type_rc_delegate_out");
+      case "savings_in":
+        return t("history.type_savings_in");
+      case "savings_out":
+        return t("history.type_savings_out");
+      case "savings_cancel":
+        return t("history.type_savings_cancel");
+      case "reward":
+        return t("history.type_reward");
+      case "producer_reward":
+        return t("history.type_producer_reward");
       default:
         return type;
     }
   };
+  const getHistoryTypeLabel = (item) => isProducerReward(item) ? t("history.type_producer_reward") : getTypeLabel(item.type);
   const getFilterIcon = (type) => {
     switch (type) {
       case "all":
@@ -14587,11 +14704,29 @@ const HistoryModal = ({ account, onClose }) => {
       case "sent":
         return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 10l7-7m0 0l7 7m-7-7v18" }) });
       case "powerup":
-        return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) });
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "7", width: "16", height: "10", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "9.5", width: "10", height: "5", rx: "1", fill: "currentColor", opacity: "0.85" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "19.5", y: "10", width: "1.8", height: "4", rx: "0.8", fill: "currentColor" })
+        ] });
       case "powerdown":
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative w-5 h-5 flex items-center justify-center", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 absolute inset-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3 text-red-500 absolute top-0 right-0 bg-dark-800 rounded-full", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", strokeWidth: 3, children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }) })
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "7", width: "16", height: "10", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "11", width: "4", height: "3", rx: "0.8", fill: "currentColor", opacity: "0.85" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "19.5", y: "10", width: "1.8", height: "4", rx: "0.8", fill: "currentColor" })
+        ] });
+      case "delegate":
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "4", y: "3", width: "6", height: "14", rx: "1.6", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "6", width: "3", height: "8", rx: "0.8", fill: "currentColor", opacity: "0.85" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "6", y: "1.5", width: "2", height: "1.5", rx: "0.5", fill: "currentColor" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "14", y: "7", width: "6", height: "14", rx: "1.6", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "15.5", y: "10", width: "3", height: "8", rx: "0.8", fill: "currentColor", opacity: "0.85" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "16", y: "5.5", width: "2", height: "1.5", rx: "0.5", fill: "currentColor" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M10.5 8.5h4", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13 6.5l2 2-2 2", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14.5 15.5h-4", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 13.5l-2 2 2 2", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" })
         ] });
       default:
         return null;
@@ -14601,11 +14736,24 @@ const HistoryModal = ({ account, onClose }) => {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border-b border-dark-600", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 flex justify-between items-center bg-dark-700/30", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "font-black text-lg text-white tracking-tight", children: t("history.title").replace("{user}", account.name) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-white transition-colors", children: "×" })
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+          lastUpdated && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-slate-500", title: new Date(lastUpdated).toLocaleString(), children: new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }),
+          onRefresh && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              onClick: onRefresh,
+              disabled: loading,
+              className: "w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-blue-400 disabled:opacity-50 transition-colors",
+              title: t("wallet.refresh_tooltip"),
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: `w-4 h-4 ${loading ? "animate-spin" : ""}`, fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" }) })
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-white transition-colors", children: "×" })
+        ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-3 py-2 bg-dark-900 flex items-center gap-2 overflow-x-auto no-scrollbar justify-between", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-blue-500 shrink-0 flex items-center mr-2", title: t("history.filter_label"), children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { fillRule: "evenodd", d: "M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z", clipRule: "evenodd" }) }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-2 flex-1 justify-end", children: ["all", "received", "sent", "powerup", "powerdown"].map((f) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-2 flex-1 justify-end", children: ["all", "received", "sent", "powerup", "powerdown", "delegate"].map((f) => /* @__PURE__ */ jsxRuntimeExports.jsx(
           "button",
           {
             onClick: () => setFilter(f),
@@ -14615,39 +14763,51 @@ const HistoryModal = ({ account, onClose }) => {
           },
           f
         )) })
-      ] })
+      ] }),
+      hasProducerRewards && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 pb-3 bg-dark-900 flex justify-end", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => setShowProducerRewards((value) => !value),
+          className: `text-[10px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-lg border transition-colors ${showProducerRewards ? "bg-amber-500/10 text-amber-300 border-amber-500/30" : "bg-dark-800 text-slate-500 border-dark-700 hover:text-amber-300 hover:border-amber-500/30"}`,
+          children: showProducerRewards ? t("history.hide_producer_rewards") : t("history.show_producer_rewards")
+        }
+      ) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto custom-scrollbar bg-dark-900/40", children: loading ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-8 text-center text-slate-500 flex flex-col items-center gap-3 mt-8", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-bold uppercase tracking-widest opacity-75", children: t("history.loading") })
-    ] }) : history.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : filteredHistory.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "divide-y divide-dark-800/50", children: filteredHistory.map((item, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 hover:bg-white/[0.02] transition-colors group", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-start mb-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[9px] font-black uppercase px-2 py-1 rounded-md tracking-wider ${getTypeBadgeClass(item.type)}`, children: getTypeLabel(item.type) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] font-medium text-slate-600 group-hover:text-slate-500 transition-colors", children: new Date(item.date).toLocaleString() })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 font-medium", children: item.type === "receive" || item.type === "powerup_in" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-          t("history.from"),
-          " ",
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
-            "@",
-            item.from
+    ] }) : loadError ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-4 text-center text-red-300 text-xs bg-red-950/20 m-4 rounded-xl border border-red-500/20", children: loadError }) : history.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : filteredHistory.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "divide-y divide-dark-800/50", children: filteredHistory.map((item, idx) => {
+      const isIncoming = incomingTypes.includes(item.type);
+      const amountSign = item.amount ? isIncoming ? "+" : "-" : "";
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 hover:bg-white/[0.02] transition-colors group", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-start mb-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[9px] font-black uppercase px-2 py-1 rounded-md tracking-wider ${getTypeBadgeClass(item.type)}`, children: getHistoryTypeLabel(item) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] font-medium text-slate-600 group-hover:text-slate-500 transition-colors", children: new Date(item.date).toLocaleString() })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 font-medium", children: isIncoming ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            t("history.from"),
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
+              "@",
+              item.from
+            ] })
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            t("history.to"),
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
+              "@",
+              item.to
+            ] })
+          ] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `font-mono font-black text-sm tracking-tight ${isIncoming ? "text-green-400" : "text-red-400"}`, children: [
+            amountSign,
+            item.amount
           ] })
-        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-          t("history.to"),
-          " ",
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
-            "@",
-            item.to
-          ] })
-        ] }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `font-mono font-black text-sm tracking-tight ${item.type === "receive" || item.type === "powerup_in" ? "text-green-400" : "text-red-400"}`, children: [
-          item.type === "receive" || item.type === "powerup_in" ? "+" : "-",
-          item.amount
-        ] })
-      ] }),
-      item.memo && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 bg-dark-800 p-2.5 rounded-lg border border-dark-700/50 break-all font-medium leading-relaxed shadow-inner", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "opacity-75", children: item.memo }) })
-    ] }, idx)) }) })
+        ] }),
+        item.memo && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 bg-dark-800 p-2.5 rounded-lg border border-dark-700/50 break-all font-medium leading-relaxed shadow-inner", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "opacity-75", children: item.memo }) })
+      ] }, idx);
+    }) }) })
   ] }) });
 };
 
@@ -15243,7 +15403,20 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         });
         const response = await broadcastOperations(account.chain, account.postingKey || account.activeKey, [op]);
         if (!response.success) throw new Error(response.error);
-        result = { success: true, result: response.opResult || response.txId };
+        const opResult = response.opResult || response.txId;
+        const { success: _success, ...restResponse } = response;
+        result = {
+          success: true,
+          result: response.txId || opResult,
+          txId: response.txId,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          opResult,
+          operation: "comment",
+          operations: [op],
+          message: t("sign.success"),
+          ...restResponse
+        };
       }
       notifyBackground(result, null);
     } catch (e) {
@@ -15639,18 +15812,15 @@ const HelpView = () => {
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-300 mb-2", children: t("help.chat_desc") }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-dark-900 p-3 rounded-lg border border-dark-600", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("ul", { className: "space-y-2 text-xs text-slate-400", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex gap-2 text-slate-300", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-yellow-500", children: "⚠" }),
-          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-yellow-500 shrink-0 mt-0.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v4m0 4h.01M10.29 3.86l-7.5 13A1 1 0 003.66 18h16.68a1 1 0 00.87-1.5l-7.5-13a1 1 0 00-1.74 0z" }) }) }),
           t("help.chat_warning")
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex gap-2 text-slate-300", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-400", children: "ℹ" }),
-          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-400 shrink-0 mt-0.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 16h-1v-4h-1m1-4h.01M12 21a9 9 0 100-18 9 9 0 000 18z" }) }) }),
           t("help.chat_cost")
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex gap-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400", children: "✓" }),
-          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400 shrink-0 mt-0.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }) }) }),
           t("help.chat_memo_required")
         ] })
       ] }) })
@@ -17509,11 +17679,53 @@ const BridgeModal = ({ onClose, onSync }) => {
   ] }) });
 };
 
+class AppErrorBoundary extends reactExports.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    try {
+      localStorage.setItem("gravity_last_runtime_error", JSON.stringify({
+        type: "react_error",
+        message: error.message,
+        stack: error.stack,
+        componentStack: info?.componentStack,
+        at: (/* @__PURE__ */ new Date()).toISOString()
+      }));
+    } catch {
+    }
+  }
+  render() {
+    if (this.state.error) {
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full bg-dark-900 text-red-300 flex flex-col items-center justify-center p-6 text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-sm font-bold text-red-200 mb-2", children: "Gravity Wallet recovered from an error" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400", children: this.state.error.message })
+      ] });
+    }
+    return this.props.children;
+  }
+}
 function App() {
-  return /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(NotificationProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(AppContent, {}) }) });
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(NotificationProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(AppErrorBoundary, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(AppContent, {}) }) }) });
 }
 function AppContent() {
   const { t } = useTranslation();
+  const HISTORY_CACHE_STORAGE_KEY = "gravity_account_history_cache_v1";
+  const HISTORY_CACHE_TTL_MS = 5 * 60 * 1e3;
+  const getHistoryCacheKey = (account) => `${account.chain}:${account.name}`.toLowerCase();
+  const getPreferredChain = (accounts, preferred) => {
+    if (preferred && accounts.some((account) => account.chain === preferred)) {
+      return preferred;
+    }
+    if (accounts.some((account) => account.chain === Chain.BLURT)) {
+      return Chain.BLURT;
+    }
+    if (accounts.length > 0) {
+      return accounts[0].chain;
+    }
+    return preferred || Chain.BLURT;
+  };
   const [walletState, setWalletState] = reactExports.useState({
     accounts: [],
     encryptedMaster: false,
@@ -17521,7 +17733,7 @@ function AppContent() {
     useBiometrics: false,
     useDeviceAuth: false
   });
-  const [activeChain, setActiveChain] = reactExports.useState(Chain.HIVE);
+  const [activeChain, setActiveChain] = reactExports.useState(Chain.BLURT);
   const [currentView, setCurrentView] = reactExports.useState(ViewState.LANDING);
   const [showImport, setShowImport] = reactExports.useState(false);
   const [managingAccount, setManagingAccount] = reactExports.useState(null);
@@ -17531,6 +17743,8 @@ function AppContent() {
   const [isLocked, setIsLocked] = reactExports.useState(true);
   const [isDataLoaded, setIsDataLoaded] = reactExports.useState(false);
   const [isRefreshing, setIsRefreshing] = reactExports.useState(false);
+  const [historyCache, setHistoryCache] = reactExports.useState({});
+  const [historyLoadingKeys, setHistoryLoadingKeys] = reactExports.useState({});
   const [needsSave, setNeedsSave] = reactExports.useState(false);
   const buildBridgeSyncPayload = (accounts) => ({
     timestamp: Date.now(),
@@ -17546,8 +17760,69 @@ function AppContent() {
   const [web3Context, setWeb3Context] = reactExports.useState(null);
   const { showNotification } = useNotification();
   const [lockReason, setLockReason] = reactExports.useState(null);
+  const historySyncInFlightRef = reactExports.useRef(/* @__PURE__ */ new Set());
+  const historyCacheRef = reactExports.useRef({});
   const [requestId, setRequestId] = reactExports.useState(null);
   const [showBridge, setShowBridge] = reactExports.useState(false);
+  reactExports.useEffect(() => {
+    const handleWindowError = (event) => {
+      try {
+        localStorage.setItem("gravity_last_runtime_error", JSON.stringify({
+          type: "error",
+          message: event.message,
+          source: event.filename,
+          line: event.lineno,
+          column: event.colno,
+          at: (/* @__PURE__ */ new Date()).toISOString()
+        }));
+      } catch {
+      }
+    };
+    const handleUnhandledRejection = (event) => {
+      try {
+        localStorage.setItem("gravity_last_runtime_error", JSON.stringify({
+          type: "unhandledrejection",
+          message: String(event.reason),
+          at: (/* @__PURE__ */ new Date()).toISOString()
+        }));
+      } catch {
+      }
+    };
+    const handleBeforeUnload = () => {
+      try {
+        localStorage.setItem("gravity_last_popup_unload", JSON.stringify({
+          view: currentView,
+          chain: activeChain,
+          overlays: {
+            import: showImport,
+            manage: !!managingAccount,
+            transfer: !!transferAccount,
+            receive: !!receiveAccount,
+            history: !!historyAccount,
+            bridge: showBridge,
+            request: !!requestId
+          },
+          at: (/* @__PURE__ */ new Date()).toISOString()
+        }));
+      } catch {
+      }
+    };
+    window.addEventListener("error", handleWindowError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("error", handleWindowError);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [activeChain, currentView, historyAccount, managingAccount, receiveAccount, requestId, showBridge, showImport, transferAccount]);
+  const clearTransientOverlays = () => {
+    setManagingAccount(null);
+    setTransferAccount(null);
+    setReceiveAccount(null);
+    setHistoryAccount(null);
+    setShowBridge(false);
+  };
   const dedupeAccounts = (accounts) => {
     const byKey = /* @__PURE__ */ new Map();
     for (const account of accounts) {
@@ -17574,10 +17849,112 @@ function AppContent() {
     }
     return Array.from(byKey.values());
   };
+  const persistHistoryCache = async (nextCache) => {
+    try {
+      await storageService.setItem(HISTORY_CACHE_STORAGE_KEY, JSON.stringify(nextCache));
+    } catch (error) {
+      console.warn("History cache save failed:", error);
+    }
+  };
+  const loadHistoryCache = async () => {
+    try {
+      const raw = await storageService.getItem(HISTORY_CACHE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        historyCacheRef.current = parsed;
+        setHistoryCache(parsed);
+      }
+    } catch (error) {
+      console.warn("History cache load failed:", error);
+    }
+  };
+  const updateHistoryCacheEntry = (key, entry) => {
+    setHistoryCache((prev) => {
+      const next = { ...prev, [key]: entry };
+      historyCacheRef.current = next;
+      persistHistoryCache(next);
+      return next;
+    });
+  };
+  const mergeHistoryItems = (existing, incoming) => {
+    const byKey = /* @__PURE__ */ new Map();
+    [...incoming, ...existing].forEach((item) => {
+      byKey.set(getHistoryItemKey(item), item);
+    });
+    return Array.from(byKey.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 250);
+  };
+  const refreshAccountHistory = async (account, force = false, partial = false) => {
+    const key = getHistoryCacheKey(account);
+    const cached = historyCacheRef.current[key];
+    const cachedItems = cached?.items || [];
+    const isProducerReward = (item) => item.type === "producer_reward" || item.type === "reward" && item.memo === "Producer Reward";
+    const hasVisibleHistory = cachedItems.some((item) => !isProducerReward(item));
+    const cacheIsFresh = cached && hasVisibleHistory && !cached.partial && Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS;
+    const shouldIncremental = hasVisibleHistory && !cached?.partial && !partial && (force || !cacheIsFresh);
+    if (!force && cacheIsFresh) return cached.items;
+    if (historySyncInFlightRef.current.has(key)) return cached?.items || [];
+    historySyncInFlightRef.current.add(key);
+    setHistoryLoadingKeys((prev) => ({ ...prev, [key]: true }));
+    try {
+      const fetchedItems = await fetchAccountHistory(account.chain, account.name, shouldIncremental ? {
+        incremental: true,
+        knownItemKeys: cached.items.map(getHistoryItemKey)
+      } : partial ? {
+        maxPages: 5
+      } : {});
+      const items = shouldIncremental ? mergeHistoryItems(cached.items, fetchedItems) : partial && cachedItems.length > 0 ? mergeHistoryItems(cachedItems, fetchedItems) : fetchedItems;
+      updateHistoryCacheEntry(key, {
+        items,
+        updatedAt: Date.now(),
+        error: null,
+        partial
+      });
+      return items;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      updateHistoryCacheEntry(key, {
+        items: cached?.items || [],
+        updatedAt: cached?.updatedAt || Date.now(),
+        error: message,
+        partial: cached?.partial
+      });
+      return cached?.items || [];
+    } finally {
+      historySyncInFlightRef.current.delete(key);
+      setHistoryLoadingKeys((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+  const preloadHistory = async (accounts, force = false, partial = true) => {
+    for (const account of accounts) {
+      await refreshAccountHistory(account, force, partial);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  };
   reactExports.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const req = params.get("requestId");
-    if (req) setRequestId(req);
+    if (req) {
+      setRequestId(req);
+      return;
+    }
+    if (typeof chrome !== "undefined" && chrome.storage?.session) {
+      chrome.storage.session.get(["gravity_active_request_id"], (result) => {
+        if (result.gravity_active_request_id) {
+          setRequestId(result.gravity_active_request_id);
+        }
+      });
+      const listener = (changes, area) => {
+        if (area !== "session" || !changes.gravity_active_request_id) return;
+        setRequestId(changes.gravity_active_request_id.newValue || null);
+      };
+      chrome.storage.onChanged.addListener(listener);
+      return () => chrome.storage.onChanged.removeListener(listener);
+    }
   }, []);
   reactExports.useEffect(() => {
     const handleOpenBridge = () => setShowBridge(true);
@@ -17629,6 +18006,7 @@ function AppContent() {
     const loadState = async () => {
       console.log("Gravity: loadState started");
       try {
+        await loadHistoryCache();
         const vaultData = await getVault();
         console.log("Gravity: getVault result:", !!vaultData);
         if (vaultData) {
@@ -17647,13 +18025,17 @@ function AppContent() {
           console.log("Gravity: Crypto session restored. Attempting vault unlock.");
           const vault = await unlockVaultWithCachedSession();
           if (vault && vault.accounts) {
-            setWalletState((prev) => ({ ...prev, accounts: vault.accounts }));
+            const dedupedAccounts = dedupeAccounts(vault.accounts);
+            setWalletState((prev) => ({ ...prev, accounts: dedupedAccounts }));
             setIsLocked(false);
             if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-              chrome.storage.session.set({ session_accounts: vault.accounts });
+              chrome.storage.session.set({ session_accounts: dedupedAccounts });
             }
-            if (vault.accounts.length > 0) {
-              setTimeout(fetchBalances$1, 500);
+            if (dedupedAccounts.length > 0) {
+              setTimeout(() => {
+                fetchBalances$1();
+                preloadHistory(dedupedAccounts, false, true);
+              }, 500);
             }
           } else {
             console.warn("Gravity: Crypto session existed but vault decryption actually failed.");
@@ -17686,6 +18068,9 @@ function AppContent() {
                   useDeviceAuth: result.walletConfig.useDeviceAuth,
                   useTOTP: result.walletConfig.useTOTP
                 }));
+                if (result.walletConfig.lastActiveChain) {
+                  setActiveChain(result.walletConfig.lastActiveChain);
+                }
               }
               resolve();
             });
@@ -17710,13 +18095,14 @@ function AppContent() {
         useGoogleAuth: walletState.useGoogleAuth,
         useBiometrics: walletState.useBiometrics,
         useDeviceAuth: walletState.useDeviceAuth,
-        useTOTP: walletState.useTOTP
+        useTOTP: walletState.useTOTP,
+        lastActiveChain: activeChain
       };
       if (typeof chrome !== "undefined" && chrome.storage) {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, activeChain, isDataLoaded]);
   reactExports.useEffect(() => {
     if (!isLocked && walletState.accounts.length > 0) {
       const dedupedAccounts = dedupeAccounts(walletState.accounts);
@@ -17778,14 +18164,22 @@ function AppContent() {
       fetchBalances$1();
     }
   }, [currentView, activeChain, isLocked, walletState.accounts.length]);
+  reactExports.useEffect(() => {
+    if (isLocked) return;
+    setActiveChain((prev) => getPreferredChain(walletState.accounts, prev));
+  }, [walletState.accounts, isLocked]);
   const handleUnlock = (decryptedAccounts) => {
     const dedupedAccounts = dedupeAccounts(decryptedAccounts);
     setWalletState((prev) => ({ ...prev, accounts: dedupedAccounts }));
+    setActiveChain((prev) => getPreferredChain(dedupedAccounts, prev));
     setIsLocked(false);
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
       chrome.storage.session.set({ session_accounts: dedupedAccounts });
     }
-    setTimeout(() => fetchBalances$1(), 500);
+    setTimeout(() => {
+      fetchBalances$1();
+      preloadHistory(dedupedAccounts, false, true);
+    }, 500);
   };
   const handleImport = async (newAccounts) => {
     const withBalance = await Promise.all(newAccounts.map(async (acc) => {
@@ -17801,6 +18195,7 @@ function AppContent() {
       };
     }));
     const updatedAccounts = dedupeAccounts([...walletState.accounts, ...withBalance]);
+    setActiveChain((prev) => getPreferredChain(updatedAccounts, prev));
     try {
       if (!walletState.encryptedMaster) {
         await enablePasswordless(updatedAccounts);
@@ -17810,6 +18205,7 @@ function AppContent() {
         setWalletState((prev) => ({ ...prev, accounts: updatedAccounts }));
       }
       showNotification("Account imported successfully", "success");
+      preloadHistory(updatedAccounts, false, true);
       setShowImport(false);
     } catch (e) {
       console.error("Import Save Failed:", e);
@@ -17855,6 +18251,7 @@ function AppContent() {
         await saveVault("cached", { accounts: mergedAccounts, lastUpdated: Date.now() });
       }
       showNotification(`Transfer complete. Added ${added} account${added === 1 ? "" : "s"}.`, "success");
+      preloadHistory(mergedAccounts, false, true);
     } catch (error) {
       console.error("Device transfer save failed:", error);
       showNotification("The wallet was received but could not be persisted safely.", "error");
@@ -17899,6 +18296,7 @@ function AppContent() {
       if (result.success) {
         showNotification(`TX: ${result.txId?.substring(0, 8)}...`, "success");
         fetchBalances$1();
+        refreshAccountHistory(fromAcc, true, false);
       } else {
         showNotification(`Failed: ${result.error}`, "error");
       }
@@ -17912,6 +18310,26 @@ function AppContent() {
     if (chain === Chain.BLURT && context.includes("blurt")) return true;
     return false;
   };
+  const handleChainChange = (chain) => {
+    clearTransientOverlays();
+    setActiveChain(chain);
+  };
+  const handleOpenHistory = (account) => {
+    setHistoryAccount(account);
+    refreshAccountHistory(account, false, false);
+  };
+  const handleWalletRefresh = async () => {
+    await fetchBalances$1();
+    await preloadHistory(walletState.accounts.filter((account) => account.chain === activeChain), true, false);
+  };
+  reactExports.useEffect(() => {
+    if (isLocked || walletState.accounts.length === 0) return;
+    preloadHistory(walletState.accounts, false, true);
+    const id = setInterval(() => {
+      preloadHistory(walletState.accounts, false, true);
+    }, 10 * 60 * 1e3);
+    return () => clearInterval(id);
+  }, [isLocked, walletState.accounts.map((account) => `${account.chain}:${account.name}`).sort().join("|")]);
   const [isDetached, setIsDetached] = reactExports.useState(false);
   reactExports.useEffect(() => {
     const isDetachedMode = typeof window !== "undefined" && window.location.search.includes("detached=true");
@@ -17967,15 +18385,6 @@ function AppContent() {
         window.removeEventListener("resize", lockSize);
         cancelAnimationFrame(animationFrameId);
       };
-    } else {
-      if (typeof chrome !== "undefined" && chrome.extension) {
-        const views = chrome.extension.getViews();
-        const detachedView = views.find((v) => v.location.href.includes("detached=true"));
-        if (detachedView) {
-          detachedView.focus();
-          window.close();
-        }
-      }
     }
   }, []);
   const handleToggleDetach = () => {
@@ -18050,7 +18459,19 @@ function AppContent() {
     );
   }
   if (requestId) {
-    return /* @__PURE__ */ jsxRuntimeExports.jsx(SignRequest, { requestId, accounts: walletState.accounts, onComplete: () => window.close() });
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SignRequest,
+      {
+        requestId,
+        accounts: walletState.accounts,
+        onComplete: () => {
+          if (typeof chrome !== "undefined" && chrome.storage?.session) {
+            chrome.storage.session.remove("gravity_active_request_id");
+          }
+          window.close();
+        }
+      }
+    );
   }
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex h-full w-full bg-dark-900 text-slate-200 font-sans overflow-hidden", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -18107,7 +18528,7 @@ function AppContent() {
           Landing,
           {
             onSelectChain: (chain) => {
-              setActiveChain(chain);
+              handleChainChange(chain);
               setCurrentView(ViewState.WALLET);
             },
             onManage: () => setCurrentView(ViewState.MANAGE)
@@ -18117,14 +18538,14 @@ function AppContent() {
           WalletView,
           {
             chain: activeChain,
-            onChainChange: setActiveChain,
+            onChainChange: handleChainChange,
             accounts: walletState.accounts.filter((a) => a.chain === activeChain),
             isRefreshing,
             onManage: (acc) => setManagingAccount(acc),
             onSend: (acc) => setTransferAccount(acc),
             onReceive: (acc) => setReceiveAccount(acc),
-            onHistory: (acc) => setHistoryAccount(acc),
-            onRefresh: fetchBalances$1,
+            onHistory: handleOpenHistory,
+            onRefresh: handleWalletRefresh,
             onAddAccount: () => setShowImport(true)
           }
         ),
@@ -18145,7 +18566,7 @@ function AppContent() {
             chain: activeChain,
             accounts: walletState.accounts.filter((a) => a.chain === activeChain),
             refreshBalance: fetchBalances$1,
-            onChangeChain: setActiveChain,
+            onChangeChain: handleChainChange,
             onAddAccount: () => setShowImport(true)
           }
         ),
@@ -18154,7 +18575,7 @@ function AppContent() {
           {
             chain: activeChain,
             accounts: walletState.accounts,
-            onChainChange: setActiveChain
+            onChainChange: handleChainChange
           }
         ),
         currentView === ViewState.HELP && /* @__PURE__ */ jsxRuntimeExports.jsx(HelpView, {}),
@@ -18197,6 +18618,11 @@ function AppContent() {
       HistoryModal,
       {
         account: historyAccount,
+        history: historyCache[getHistoryCacheKey(historyAccount)]?.items || [],
+        loading: !!historyLoadingKeys[getHistoryCacheKey(historyAccount)],
+        loadError: historyCache[getHistoryCacheKey(historyAccount)]?.error,
+        lastUpdated: historyCache[getHistoryCacheKey(historyAccount)]?.updatedAt,
+        onRefresh: () => refreshAccountHistory(historyAccount, true, false),
         onClose: () => setHistoryAccount(null)
       }
     ),

@@ -70369,10 +70369,10 @@ var indexBrowserExports = requireIndexBrowser();
 
 const HIVE_CANDIDATES = [
   "https://api.hive.blog",
-  "https://api.openhive.network",
+  "https://api.deathwing.me",
   "https://hive-api.arcange.eu",
   "https://techcoderx.com",
-  "https://api.deathwing.me"
+  "https://api.openhive.network"
 ];
 const STEEM_CANDIDATES = [
   "https://api.steemit.com",
@@ -70382,13 +70382,18 @@ const STEEM_CANDIDATES = [
 const BLURT_CANDIDATES = [
   "https://rpc.drakernoise.com",
   // Primary node (user's own node)
-  "https://rpc.beblurt.com",
+  "https://api.blurt.blog",
   // Fallback nodes
   "https://blurt-rpc.saboin.com",
-  "https://api.blurt.blog",
-  "https://rpc.blurt.world"
-  // Last resort fallback
+  "https://rpc.mahdiyari.info"
 ];
+const sanitizeNode = (chain, node) => {
+  if (!node) return void 0;
+  if (node.includes("blurt.world")) {
+    return chain === Chain.BLURT ? BLURT_CANDIDATES[0] : void 0;
+  }
+  return node;
+};
 let activeNodes = {
   [Chain.HIVE]: HIVE_CANDIDATES[0],
   [Chain.STEEM]: STEEM_CANDIDATES[0],
@@ -70403,9 +70408,17 @@ const syncNodesFromStorage = async () => {
       const result = await chrome.storage.local.get(["gravity_active_nodes"]);
       if (result.gravity_active_nodes) {
         const stored = result.gravity_active_nodes;
-        if (stored.HIVE) activeNodes[Chain.HIVE] = stored.HIVE;
-        if (stored.STEEM) activeNodes[Chain.STEEM] = stored.STEEM;
-        if (stored.BLURT) activeNodes[Chain.BLURT] = stored.BLURT;
+        if (stored.HIVE) activeNodes[Chain.HIVE] = sanitizeNode(Chain.HIVE, stored.HIVE) || activeNodes[Chain.HIVE];
+        if (stored.STEEM) activeNodes[Chain.STEEM] = sanitizeNode(Chain.STEEM, stored.STEEM) || activeNodes[Chain.STEEM];
+        if (stored.BLURT) activeNodes[Chain.BLURT] = sanitizeNode(Chain.BLURT, stored.BLURT) || activeNodes[Chain.BLURT];
+        if (stored.BLURT !== activeNodes[Chain.BLURT]) {
+          await chrome.storage.local.set({
+            gravity_active_nodes: {
+              ...stored,
+              BLURT: activeNodes[Chain.BLURT]
+            }
+          });
+        }
         console.log("[NodeService] Synced nodes from storage:", activeNodes);
       }
     }
@@ -70542,10 +70555,9 @@ const CHAIN_CONFIGS = {
     chainId: "cd8d90f29ae273abec3eaa7731e25934c63eb654d55080caff2ebb7f5df6381f",
     rpcNodes: [
       "https://rpc.drakernoise.com",
-      "https://rpc.beblurt.com",
-      "https://blurt-rpc.saboin.com",
       "https://api.blurt.blog",
-      "https://rpc.blurt.world"
+      "https://blurt-rpc.saboin.com",
+      "https://rpc.mahdiyari.info"
     ],
     explorerUrl: {
       transaction: "https://blocks.blurtwallet.com/#/tx/{tx}",
@@ -76793,11 +76805,11 @@ function requireEach () {
 }
 
 const transport = "http";
-const websocket = "wss://rpc.blurt.world";
-const uri = "https://rpc.blurt.world";
-const url = "https://rpc.blurt.world";
-const dev_uri = "https://test.blurt.world/rpc";
-const stage_uri = "https://test.blurt.world/rpc";
+const websocket = "wss://api.blurt.blog";
+const uri = "https://api.blurt.blog";
+const url = "https://api.blurt.blog";
+const dev_uri = "https://api.blurt.blog";
+const stage_uri = "https://api.blurt.blog";
 const address_prefix = "BLT";
 const chain_id = "cd8d90f29ae273abec3eaa7731e25934c63eb654d55080caff2ebb7f5df6381f";
 const alternative_api_endpoints = ["https://blurt-rpc.saboin.com","https://rpc.nerdtopia.de"];
@@ -87221,7 +87233,7 @@ function requireApi () {
 		        _this.error_threshold = 3;
 		        _this.alternative_api_endpoints = [
 		        // Should be pulling from config?
-		        "https://rpc.blurt.world", "https://rpc.blurt.world"];
+		        "https://api.blurt.blog", "https://api.blurt.blog"];
 		        _methods2.default.forEach(function (method) {
 		            var methodName = method.method_name || (0, _utils.camelCase)(method.method);
 		            var methodParams = method.params || [];
@@ -89439,11 +89451,15 @@ const broadcastBlurtTransaction = async (nodeUrl, operations, key) => {
     console.error("FULL RPC ERROR:", JSON.stringify(broadcastResult.error, null, 2));
     const err = broadcastResult.error;
     let msg = err.message || JSON.stringify(err);
+    const rawData = err.data ? JSON.stringify(err.data) : "";
     if (msg.includes("unknown key")) {
-      msg = "Account not found or invalid key. Please check the username.";
+      if (rawData.includes('"method":"get_comment"')) {
+        msg = "Parent post or comment not found on the node. The reply target may be invalid or not yet available on this RPC node.";
+      } else {
+        msg = "Unknown key or missing blockchain object in node response.";
+      }
     }
-    const data = err.data ? JSON.stringify(err.data) : "";
-    throw new Error(`${msg} ${data}`);
+    throw new Error(`${msg} ${rawData}`);
   }
   return {
     ...broadcastResult.result,
@@ -89460,7 +89476,7 @@ const broadcastOperations = async (chain, activeKey, operations) => {
     const nodes = {
       [Chain.HIVE]: ["https://api.deathwing.me", "https://techcoderx.com", "https://rpc.mahdiyari.info", "https://hive-api.3speak.tv"],
       [Chain.STEEM]: ["https://api.steemit.com", "https://api.steem.fans", "https://api.justyy.com"],
-      [Chain.BLURT]: ["https://rpc.drakernoise.com", "https://rpc.beblurt.com", "https://api.blurt.blog"]
+      [Chain.BLURT]: ["https://rpc.drakernoise.com", "https://api.blurt.blog", "https://blurt-rpc.saboin.com", "https://rpc.mahdiyari.info"]
     };
     return nodes[chain2] || [];
   };
@@ -89687,14 +89703,60 @@ const broadcastRCUndelegate = async (chain, username, activeKey, delegatee) => {
   }];
   return broadcastOperations(chain, activeKey, [op]);
 };
-const fetchAccountHistory = async (chain, username) => {
-  const node = getActiveNode(chain);
+const getHistoryItemKey = (item) => [
+  item.txId || "",
+  item.date || "",
+  item.type || "",
+  item.from || "",
+  item.to || "",
+  item.amount || "",
+  item.memo || ""
+].join("|");
+const fetchAccountHistory = async (chain, username, options = {}) => {
+  const node = await getActiveNodeAsync(chain);
+  const maxVisibleItems = 50;
+  const minRelevantItems = maxVisibleItems;
+  const knownItemKeys = new Set(options.knownItemKeys || []);
+  const normalizeHistoryEntries = (raw) => {
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.history)) return raw.history;
+    if (Array.isArray(raw?.result)) return raw.result;
+    if (Array.isArray(raw?.result?.history)) return raw.result.history;
+    return [];
+  };
+  const normalizeOp = (op) => {
+    if (Array.isArray(op)) return [op[0], op[1] || {}];
+    if (op && typeof op === "object") {
+      const rawType = op.type || op.operation || op.name;
+      const type = typeof rawType === "string" ? rawType.replace(/_operation$/, "") : "";
+      return type ? [type, op.value || op.data || op] : null;
+    }
+    return null;
+  };
   const processOp = (op, timestamp, trx_id) => {
-    const type = op[0];
-    const data = op[1];
+    const normalizedOp = normalizeOp(op);
+    if (!normalizedOp) return null;
+    const [type, data] = normalizedOp;
+    const compactAmounts = (...amounts) => amounts.filter((amount) => amount && !String(amount).startsWith("0.000 ")).map(String).join(" + ");
     if (type === "transfer") {
       if (data.from === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: data.memo, type: "send", txId: trx_id };
       if (data.to === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo: data.memo, type: "receive", txId: trx_id };
+    }
+    if (type === "transfer_to_savings" || type === "transfer_from_savings") {
+      const memo = type === "transfer_to_savings" ? "Transfer to Savings" : "Transfer from Savings";
+      if (data.from === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo, type: "savings_out", txId: trx_id };
+      if (data.to === username) return { date: timestamp, from: data.from, to: data.to, amount: data.amount, memo, type: "savings_in", txId: trx_id };
+    }
+    if (type === "cancel_transfer_from_savings" && data.account === username) {
+      return {
+        date: timestamp,
+        from: data.account,
+        to: "SAVINGS",
+        amount: data.amount || "",
+        memo: `Cancel Savings Transfer${data.request_id !== void 0 ? ` #${data.request_id}` : ""}`,
+        type: "savings_cancel",
+        txId: trx_id
+      };
     }
     if (type === "transfer_to_vesting") {
       if (data.from === username && data.to === username) return { date: timestamp, from: data.from, to: "VESTING", amount: data.amount, memo: "Power Up (Self)", type: "powerup_out", txId: trx_id };
@@ -89704,48 +89766,195 @@ const fetchAccountHistory = async (chain, username) => {
     if (type === "withdraw_vesting") {
       if (data.account === username) return { date: timestamp, from: data.account, to: "LIQUID", amount: data.vesting_shares, memo: "Power Down", type: "powerdown", txId: trx_id };
     }
+    if (type === "fill_vesting_withdraw") {
+      if (data.from_account === username) return { date: timestamp, from: data.from_account, to: data.to_account, amount: data.deposited || data.withdrawn, memo: "Power Down Payment", type: "powerdown", txId: trx_id };
+      if (data.to_account === username) return { date: timestamp, from: data.from_account, to: data.to_account, amount: data.deposited || data.withdrawn, memo: "Power Down Received", type: "powerup_in", txId: trx_id };
+    }
+    if (type === "delegate_vesting_shares") {
+      const vestingShares = data.vesting_shares || "0.000000 VESTS";
+      const isUndelegate = String(vestingShares).startsWith("0.000000");
+      if (data.delegator === username) {
+        return {
+          date: timestamp,
+          from: data.delegator,
+          to: data.delegatee,
+          amount: vestingShares,
+          memo: isUndelegate ? "Undelegate Power" : "Delegate Power",
+          type: isUndelegate ? "undelegate_out" : "delegate_out",
+          txId: trx_id
+        };
+      }
+      if (!isUndelegate && data.delegatee === username) {
+        return {
+          date: timestamp,
+          from: data.delegator,
+          to: data.delegatee,
+          amount: vestingShares,
+          memo: "Power Delegation Received",
+          type: "delegate_in",
+          txId: trx_id
+        };
+      }
+    }
+    if (type === "return_vesting_delegation" && data.account === username) {
+      return {
+        date: timestamp,
+        from: "VESTING",
+        to: data.account,
+        amount: data.vesting_shares,
+        memo: "Delegation Returned",
+        type: "undelegate_out",
+        txId: trx_id
+      };
+    }
+    if (type === "delegate_rc") {
+      const amount = data.max_rc !== void 0 ? String(data.max_rc) : "";
+      if (data.from === username) {
+        return {
+          date: timestamp,
+          from: data.from,
+          to: Array.isArray(data.delegatees) ? data.delegatees.join(", ") : "",
+          amount,
+          memo: amount === "0" ? "RC Delegation Removed" : "RC Delegation",
+          type: "rc_delegate_out",
+          txId: trx_id
+        };
+      }
+      if (Array.isArray(data.delegatees) && data.delegatees.includes(username)) {
+        return {
+          date: timestamp,
+          from: data.from,
+          to: username,
+          amount,
+          memo: "RC Delegation Received",
+          type: "rc_delegate_in",
+          txId: trx_id
+        };
+      }
+    }
+    if (type === "claim_reward_balance" && data.account === username) {
+      return {
+        date: timestamp,
+        from: "rewards",
+        to: data.account,
+        amount: compactAmounts(data.reward_blurt, data.reward_hive, data.reward_steem, data.reward_hbd, data.reward_sbd, data.reward_vests),
+        memo: "Claim Rewards",
+        type: "reward",
+        txId: trx_id
+      };
+    }
+    if (type === "curation_reward" && data.curator === username) {
+      return { date: timestamp, from: "rewards", to: data.curator, amount: data.reward, memo: "Curation Reward", type: "reward", txId: trx_id };
+    }
+    if ((type === "author_reward" || type === "comment_reward") && data.author === username) {
+      return {
+        date: timestamp,
+        from: "rewards",
+        to: data.author,
+        amount: compactAmounts(data.blurt_payout, data.hive_payout, data.steem_payout, data.hbd_payout, data.sbd_payout, data.vesting_payout),
+        memo: "Author Reward",
+        type: "reward",
+        txId: trx_id
+      };
+    }
+    if (type === "comment_benefactor_reward" && data.benefactor === username) {
+      return { date: timestamp, from: "rewards", to: data.benefactor, amount: data.reward, memo: "Benefactor Reward", type: "reward", txId: trx_id };
+    }
+    if (type === "producer_reward" && data.producer === username) {
+      return {
+        date: timestamp,
+        from: "network",
+        to: data.producer,
+        amount: data.vesting_shares,
+        memo: "Producer Reward",
+        type: "producer_reward",
+        txId: trx_id
+      };
+    }
     return null;
   };
+  const selectVisibleHistory = (allHistory) => {
+    const relevantHistory = allHistory.filter((item) => item.type !== "reward" && item.type !== "producer_reward");
+    if (relevantHistory.length > 0) {
+      return relevantHistory.slice(0, maxVisibleItems);
+    }
+    return allHistory.slice(0, maxVisibleItems);
+  };
+  const buildHistoryItems = (rawHistory) => {
+    const entries = normalizeHistoryEntries(rawHistory);
+    return entries.map((h) => processOp(h[1]?.op, h[1]?.timestamp, h[1]?.trx_id || h[1]?.trxId || "")).filter((h) => h !== null).reverse();
+  };
+  const processHistoryEntries = (rawHistory) => {
+    const allHistory = buildHistoryItems(rawHistory);
+    if (options.incremental && knownItemKeys.size > 0) {
+      return allHistory.filter((item) => !knownItemKeys.has(getHistoryItemKey(item)));
+    }
+    return selectVisibleHistory(allHistory);
+  };
+  const getCandidateNodes = () => {
+    const candidates = {
+      [Chain.HIVE]: HIVE_CANDIDATES,
+      [Chain.STEEM]: STEEM_CANDIDATES,
+      [Chain.BLURT]: BLURT_CANDIDATES
+    };
+    const nodes = [node, ...candidates[chain].filter((candidate) => candidate !== node)];
+    if (chain !== Chain.HIVE) return nodes;
+    return nodes.sort((a, b) => {
+      const aRateLimited = a.includes("api.openhive.network") ? 1 : 0;
+      const bRateLimited = b.includes("api.openhive.network") ? 1 : 0;
+      return aRateLimited - bRateLimited;
+    });
+  };
+  const fetchHistoryPage = async (rpcNode, from, limit) => {
+    const response = await fetch(rpcNode, {
+      method: "POST",
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "condenser_api.get_account_history",
+        params: [username, from, limit],
+        id: 1
+      }),
+      headers: {
+        "Content-Type": "application/json",
+        "Connection": "keep-alive"
+      }
+    });
+    if (response.status === 429) throw new Error(`Node ${rpcNode} rate limited history requests`);
+    if (!response.ok) throw new Error(`Node ${rpcNode} returned HTTP ${response.status}`);
+    const json = await response.json();
+    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+    return normalizeHistoryEntries(json);
+  };
   try {
-    const thirtyDaysAgo = /* @__PURE__ */ new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    if (chain === Chain.HIVE) {
-      const response = await fetch(node, {
-        method: "POST",
-        body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_account_history", params: [username, -1, 1e3], id: 1 }),
-        headers: {
-          "Content-Type": "application/json",
-          "Connection": "keep-alive"
-          // Hint for connection reuse (browser handles automatically)
+    const collected = [];
+    const pageSize = 100;
+    const maxPages = options.maxPages || (options.incremental ? 5 : chain === Chain.BLURT ? 200 : chain === Chain.HIVE ? 120 : 80);
+    for (const rpcNode of getCandidateNodes()) {
+      let from = -1;
+      collected.length = 0;
+      try {
+        for (let page = 0; page < maxPages; page += 1) {
+          const pageEntries = await fetchHistoryPage(rpcNode, from, pageSize);
+          if (pageEntries.length === 0) break;
+          collected.unshift(...pageEntries);
+          const allItems = buildHistoryItems(collected);
+          const reachedKnownItem = options.incremental && knownItemKeys.size > 0 && allItems.some((item) => knownItemKeys.has(getHistoryItemKey(item)));
+          if (reachedKnownItem) {
+            return allItems.filter((item) => !knownItemKeys.has(getHistoryItemKey(item)));
+          }
+          const hasEnoughRelevantItems = allItems.filter((item) => item.type !== "reward" && item.type !== "producer_reward").length >= minRelevantItems;
+          const oldestIndex = Number(pageEntries[0]?.[0]);
+          if (hasEnoughRelevantItems || !Number.isFinite(oldestIndex) || oldestIndex <= 0) {
+            return selectVisibleHistory(allItems);
+          }
+          from = oldestIndex - 1;
         }
-      });
-      const json = await response.json();
-      if (json.result) {
-        const allHistory = json.result.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
-        return allHistory.filter((item) => new Date(item.date) >= thirtyDaysAgo);
+      } catch (nodeError) {
+        console.warn(`History node failed for ${chain} at ${rpcNode}:`, nodeError);
+        continue;
       }
-    }
-    if (chain === Chain.STEEM) {
-      const client = new indexBrowserExports.Client(node);
-      const history = await client.database.call("get_account_history", [username, -1, 1e3]);
-      const allHistory = history.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
-      return allHistory.filter((item) => new Date(item.date) >= thirtyDaysAgo);
-    }
-    if (chain === Chain.BLURT) {
-      const response = await fetch(node, {
-        method: "POST",
-        body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_account_history", params: [username, -1, 1e3], id: 1 }),
-        headers: {
-          "Content-Type": "application/json",
-          "Connection": "keep-alive"
-          // Hint for connection reuse (browser handles automatically)
-        }
-      });
-      const json = await response.json();
-      if (json.result) {
-        const allHistory = json.result.map((h) => processOp(h[1].op, h[1].timestamp, h[1].trx_id)).filter((h) => h !== null).reverse();
-        return allHistory.filter((item) => new Date(item.date) >= thirtyDaysAgo);
-      }
+      const parsed = processHistoryEntries(collected);
+      if (parsed.length > 0) return parsed;
     }
   } catch (e) {
     console.error("Fetch History Error:", e);
@@ -89865,4 +90074,4 @@ const decodeMemo = async (chain, _username, encodedMemo, key) => {
   }
 };
 
-export { calculateThresholdProgress as A, getAccountAuthorities as B, Chain as C, createUnsignedTransaction as D, signTransactionEnvelope as E, selectBroadcastSignatures as F, broadcastSignedTransaction as G, indexBrowserExports$1 as H, indexBrowserExports as I, fetchAccountHistory as J, fetchBalances as K, detectWeb3Context as L, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, validateAccountKeys as v, broadcastRCDelegate as w, broadcastRCUndelegate as x, broadcastBulkTransfer as y, fetchCustomJsonEventsForAccounts as z };
+export { calculateThresholdProgress as A, getAccountAuthorities as B, Chain as C, createUnsignedTransaction as D, signTransactionEnvelope as E, selectBroadcastSignatures as F, broadcastSignedTransaction as G, indexBrowserExports$1 as H, indexBrowserExports as I, fetchBalances as J, detectWeb3Context as K, fetchAccountHistory as L, getHistoryItemKey as M, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, validateAccountKeys as v, broadcastRCDelegate as w, broadcastRCUndelegate as x, broadcastBulkTransfer as y, fetchCustomJsonEventsForAccounts as z };

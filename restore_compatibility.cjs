@@ -7,7 +7,7 @@ const ACTIVE_KEY = env.match(/BLURT_ACTIVE_KEY=(.*)/)[1].trim();
 const ACCOUNT = 'drakernoise';
 
 if (!ACTIVE_KEY) {
-    console.error('❌ Missing BLURT_ACTIVE_KEY');
+    console.error('Missing BLURT_ACTIVE_KEY');
     process.exit(1);
 }
 
@@ -17,12 +17,12 @@ blurt.config.set('chain_id', 'cd8d90f29ae273abec3eaa7731e25934c63eb654d55080caff
 
 const nodes = [
     'https://blurt-rpc.saboin.com',
-    'https://rpc.blurt.world',
-    'https://rpc.beblurt.com'
+    'https://api.blurt.blog',
+    'https://rpc.mahdiyari.info'
 ];
 
 async function main() {
-    console.log('🔄 Attempting to restore witness compatibility (STEEM symbol)...');
+    console.log('Attempting to restore witness compatibility (STEEM symbol)...');
 
     const props = {
         account_creation_fee: '3.000 STEEM',
@@ -30,7 +30,7 @@ async function main() {
     };
 
     for (const node of nodes) {
-        console.log(`📡 Trying node: ${node}`);
+        console.log(`Trying node: ${node}`);
         blurt.api.setOptions({ url: node });
 
         try {
@@ -42,10 +42,10 @@ async function main() {
                 props,
                 '0.000 STEEM'
             );
-            console.log('✅ Success:', result);
+            console.log('Success:', result);
             return;
         } catch (err) {
-            console.error(`❌ Error on node ${node}:`, err.message || err);
+            console.error(`Error on node ${node}:`, err.message || err);
         }
     }
 }

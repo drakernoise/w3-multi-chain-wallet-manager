@@ -194,7 +194,11 @@ export const ImportModal: React.FC<ImportModalProps> = ({ onClose, onImport, ini
       <div className="bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto my-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">{t('import.title')}</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-slate-500 hover:text-white" aria-label="Close">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <div className="flex gap-4 mb-5 text-sm border-b border-dark-700">

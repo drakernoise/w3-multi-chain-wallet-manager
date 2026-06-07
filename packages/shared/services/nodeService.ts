@@ -3,10 +3,10 @@ import { Chain } from '../types';
 // Candidate Nodes
 export const HIVE_CANDIDATES = [
     'https://api.hive.blog',
-    'https://api.openhive.network',
+    'https://api.deathwing.me',
     'https://hive-api.arcange.eu',
     'https://techcoderx.com',
-    'https://api.deathwing.me',
+    'https://api.openhive.network',
 ];
 
 export const STEEM_CANDIDATES = [
@@ -17,11 +17,18 @@ export const STEEM_CANDIDATES = [
 
 export const BLURT_CANDIDATES = [
     'https://rpc.drakernoise.com', // Primary node (user's own node)
-    'https://rpc.beblurt.com',     // Fallback nodes
+    'https://api.blurt.blog',      // Fallback nodes
     'https://blurt-rpc.saboin.com',
-    'https://api.blurt.blog',
-    'https://rpc.blurt.world'      // Last resort fallback
+    'https://rpc.mahdiyari.info'
 ];
+
+const sanitizeNode = (chain: Chain, node?: string): string | undefined => {
+    if (!node) return undefined;
+    if (node.includes('blurt.world')) {
+        return chain === Chain.BLURT ? BLURT_CANDIDATES[0] : undefined;
+    }
+    return node;
+};
 
 // Active nodes state (in-memory)
 // Defaulting to the first one until benchmarked
@@ -44,9 +51,17 @@ const syncNodesFromStorage = async (): Promise<void> => {
             const result = await chrome.storage.local.get(['gravity_active_nodes']);
             if (result.gravity_active_nodes) {
                 const stored = result.gravity_active_nodes;
-                if (stored.HIVE) activeNodes[Chain.HIVE] = stored.HIVE;
-                if (stored.STEEM) activeNodes[Chain.STEEM] = stored.STEEM;
-                if (stored.BLURT) activeNodes[Chain.BLURT] = stored.BLURT;
+                if (stored.HIVE) activeNodes[Chain.HIVE] = sanitizeNode(Chain.HIVE, stored.HIVE) || activeNodes[Chain.HIVE];
+                if (stored.STEEM) activeNodes[Chain.STEEM] = sanitizeNode(Chain.STEEM, stored.STEEM) || activeNodes[Chain.STEEM];
+                if (stored.BLURT) activeNodes[Chain.BLURT] = sanitizeNode(Chain.BLURT, stored.BLURT) || activeNodes[Chain.BLURT];
+                if (stored.BLURT !== activeNodes[Chain.BLURT]) {
+                    await chrome.storage.local.set({
+                        gravity_active_nodes: {
+                            ...stored,
+                            BLURT: activeNodes[Chain.BLURT]
+                        }
+                    });
+                }
                 console.log('[NodeService] Synced nodes from storage:', activeNodes);
             }
         }

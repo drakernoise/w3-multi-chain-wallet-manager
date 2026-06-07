@@ -6,7 +6,7 @@ const ACTIVE_KEY = env.match(/BLURT_ACTIVE_KEY=(.*)/)[1].trim();
 const ACCOUNT = 'drakernoise';
 
 if (!ACTIVE_KEY) {
-    console.error('❌ Missing BLURT_ACTIVE_KEY');
+    console.error('Missing BLURT_ACTIVE_KEY');
     process.exit(1);
 }
 
@@ -31,9 +31,9 @@ async function main() {
             props,
             '0.000 BLURT'
         );
-        console.log('✅ Success: Witness disabled.', result);
+        console.log('Success: Witness disabled.', result);
     } catch (err) {
-        console.error('❌ Error:', err);
+        console.error('Error:', err);
     }
 }
 

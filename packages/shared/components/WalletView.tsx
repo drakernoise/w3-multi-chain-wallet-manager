@@ -219,10 +219,14 @@ export const WalletView: React.FC<WalletViewProps> = ({
                     {/* Power Up */}
                     <button
                       onClick={() => openModal('powerup', account)}
-                      className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-cyan-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                      className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-green-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
                       aria-label="Power Up"
                     >
-                      <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      <svg className="w-5 h-5 transition-colors" viewBox="0 0 24 24">
+                        <rect x="3" y="7" width="16" height="10" rx="2" fill="none" stroke="#94a3b8" strokeWidth="1.8" />
+                        <rect x="5.5" y="9.5" width="10" height="5" rx="1" fill="#22c55e" className="group-hover/btn:fill-green-400" />
+                        <rect x="19.5" y="10" width="1.8" height="4" rx="0.8" fill="#94a3b8" />
+                      </svg>
                       <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
                         Power Up
                       </span>
@@ -230,13 +234,14 @@ export const WalletView: React.FC<WalletViewProps> = ({
                     {/* Power Down */}
                     <button
                       onClick={() => openModal('powerdown', account)}
-                      className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-yellow-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
+                      className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-red-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
                       aria-label="Power Down"
                     >
-                      <div className="relative w-5 h-5">
-                        <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-yellow-400 transition-colors absolute inset-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        <svg className="w-3 h-3 text-red-500 group-hover/btn:text-red-400 transition-colors absolute top-0 right-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                      </div>
+                      <svg className="w-5 h-5 transition-colors" viewBox="0 0 24 24">
+                        <rect x="3" y="7" width="16" height="10" rx="2" fill="none" stroke="#94a3b8" strokeWidth="1.8" />
+                        <rect x="5.5" y="11" width="4" height="3" rx="0.8" fill="#ef4444" className="group-hover/btn:fill-red-400" />
+                        <rect x="19.5" y="10" width="1.8" height="4" rx="0.8" fill="#94a3b8" />
+                      </svg>
                       <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
                         Power Down
                       </span>
@@ -247,7 +252,18 @@ export const WalletView: React.FC<WalletViewProps> = ({
                       className="relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-pink-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn"
                       aria-label="Delegate"
                     >
-                      <svg className="w-5 h-5 text-slate-400 group-hover/btn:text-pink-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                      <svg className="w-5 h-5 transition-colors" viewBox="0 0 24 24">
+                        <rect x="4" y="3" width="6" height="14" rx="1.6" fill="none" stroke="#94a3b8" strokeWidth="1.6" />
+                        <rect x="5.5" y="6" width="3" height="8" rx="0.8" fill="#22c55e" className="group-hover/btn:fill-green-400" />
+                        <rect x="6" y="1.5" width="2" height="1.5" rx="0.5" fill="#94a3b8" />
+                        <rect x="14" y="7" width="6" height="14" rx="1.6" fill="none" stroke="#94a3b8" strokeWidth="1.6" />
+                        <rect x="15.5" y="10" width="3" height="8" rx="0.8" fill="#22c55e" className="group-hover/btn:fill-green-400" />
+                        <rect x="16" y="5.5" width="2" height="1.5" rx="0.5" fill="#94a3b8" />
+                        <path d="M10.5 8.5h4" stroke="#ec4899" strokeWidth="1.8" strokeLinecap="round" />
+                        <path d="M13 6.5l2 2-2 2" fill="none" stroke="#ec4899" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M14.5 15.5h-4" stroke="#ec4899" strokeWidth="1.8" strokeLinecap="round" />
+                        <path d="M12 13.5l-2 2 2 2" fill="none" stroke="#ec4899" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                       <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50">
                         Delegate
                       </span>

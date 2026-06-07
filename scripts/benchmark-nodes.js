@@ -20,9 +20,9 @@ const nodes = {
     ],
     BLURT: [
         'https://rpc.drakernoise.com',
-        'https://rpc.beblurt.com',
+        'https://api.blurt.blog',
         'https://blurt-rpc.saboin.com',
-        'https://rpc.blurt.world',
+        'https://rpc.mahdiyari.info',
     ]
 };
 
@@ -90,7 +90,7 @@ const benchmarkChain = async (chainName, urls) => {
     
     results.forEach((result, index) => {
         const rank = index + 1;
-        const status = result.latency !== null ? '✓' : '✗';
+        const status = result.latency !== null ? 'OK' : 'FAIL';
         const latencyStr = result.latency !== null 
             ? `${result.latency}ms` 
             : 'FAILED';
@@ -105,22 +105,22 @@ const benchmarkChain = async (chainName, urls) => {
     const fastest = successful[0];
     
     if (fastest) {
-        console.log(`\n🏆 Fastest node: ${fastest.url} (${fastest.latency}ms)`);
-        console.log(`📊 Success rate: ${successful.length}/${urls.length} (${Math.round(successful.length/urls.length*100)}%)`);
-        
+        console.log(`\nFastest node: ${fastest.url} (${fastest.latency}ms)`);
+        console.log(`Success rate: ${successful.length}/${urls.length} (${Math.round(successful.length/urls.length*100)}%)`);
+
         if (successful.length > 1) {
             const avgLatency = successful.reduce((sum, r) => sum + r.latency, 0) / successful.length;
-            console.log(`📈 Average latency (successful): ${Math.round(avgLatency)}ms`);
+            console.log(`Average latency (successful): ${Math.round(avgLatency)}ms`);
         }
     } else {
-        console.log(`\n❌ All nodes failed for ${chainName}`);
+        console.log(`\nAll nodes failed for ${chainName}`);
     }
 
     return { chainName, results, fastest: fastest || null, successRate: successful.length / urls.length };
 };
 
 const main = async () => {
-    console.log('\n🔍 Node Benchmark Report');
+    console.log('\nNode Benchmark Report');
     console.log('Generated:', new Date().toISOString());
     console.log('\nThis script tests all configured RPC nodes for each blockchain.');
 
@@ -142,7 +142,7 @@ const main = async () => {
             console.log(`  Recommended: ${fastest.url} (${fastest.latency}ms)`);
             console.log(`  Success rate: ${Math.round(successRate * 100)}%`);
         } else {
-            console.log(`  ⚠️  No working nodes found`);
+            console.log(`  Warning: No working nodes found`);
         }
     });
 

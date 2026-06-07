@@ -508,6 +508,9 @@ video {
 .visible {
   visibility: visible;
 }
+.static {
+  position: static;
+}
 .fixed {
   position: fixed;
 }
@@ -1396,6 +1399,9 @@ video {
 .border-amber-500\/20 {
   border-color: rgb(245 158 11 / 0.2);
 }
+.border-amber-500\/30 {
+  border-color: rgb(245 158 11 / 0.3);
+}
 .border-blue-400\/50 {
   border-color: rgb(96 165 250 / 0.5);
 }
@@ -1802,6 +1808,9 @@ video {
 .bg-red-900\/40 {
   background-color: rgb(127 29 29 / 0.4);
 }
+.bg-red-950\/20 {
+  background-color: rgb(69 10 10 / 0.2);
+}
 .bg-rose-500\/10 {
   background-color: rgb(244 63 94 / 0.1);
 }
@@ -2052,6 +2061,9 @@ video {
 .pb-2 {
   padding-bottom: 0.5rem;
 }
+.pb-3 {
+  padding-bottom: 0.75rem;
+}
 .pb-4 {
   padding-bottom: 1rem;
 }
@@ -2256,6 +2268,10 @@ video {
 }
 .tracking-widest {
   letter-spacing: 0.1em;
+}
+.text-amber-300 {
+  --tw-text-opacity: 1;
+  color: rgb(252 211 77 / var(--tw-text-opacity, 1));
 }
 .text-amber-400 {
   --tw-text-opacity: 1;
@@ -2703,6 +2719,10 @@ body,
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
 
+.hover\:border-amber-500\/30:hover {
+  border-color: rgb(245 158 11 / 0.3);
+}
+
 .hover\:border-blue-500:hover {
   --tw-border-opacity: 1;
   border-color: rgb(59 130 246 / var(--tw-border-opacity, 1));
@@ -2714,10 +2734,6 @@ body,
 
 .hover\:border-blurt\/50:hover {
   border-color: rgb(240 95 34 / 0.5);
-}
-
-.hover\:border-cyan-500\/50:hover {
-  border-color: rgb(6 182 212 / 0.5);
 }
 
 .hover\:border-dark-600:hover {
@@ -2768,12 +2784,12 @@ body,
   border-color: rgb(239 68 68 / var(--tw-border-opacity, 1));
 }
 
-.hover\:border-steem\/50:hover {
-  border-color: rgb(26 80 153 / 0.5);
+.hover\:border-red-500\/50:hover {
+  border-color: rgb(239 68 68 / 0.5);
 }
 
-.hover\:border-yellow-500\/50:hover {
-  border-color: rgb(234 179 8 / 0.5);
+.hover\:border-steem\/50:hover {
+  border-color: rgb(26 80 153 / 0.5);
 }
 
 .hover\:bg-blue-500:hover {
@@ -2938,6 +2954,11 @@ body,
 
 .hover\:to-indigo-500:hover {
   --tw-gradient-to: #6366f1 var(--tw-gradient-to-position);
+}
+
+.hover\:text-amber-300:hover {
+  --tw-text-opacity: 1;
+  color: rgb(252 211 77 / var(--tw-text-opacity, 1));
 }
 
 .hover\:text-blue-400:hover {
@@ -3134,14 +3155,17 @@ body,
   background-color: rgb(244 63 94 / 0.2);
 }
 
+.group\/btn:hover .group-hover\/btn\:fill-green-400 {
+  fill: #4ade80;
+}
+
+.group\/btn:hover .group-hover\/btn\:fill-red-400 {
+  fill: #f87171;
+}
+
 .group\/btn:hover .group-hover\/btn\:text-blue-400 {
   --tw-text-opacity: 1;
   color: rgb(96 165 250 / var(--tw-text-opacity, 1));
-}
-
-.group\/btn:hover .group-hover\/btn\:text-cyan-400 {
-  --tw-text-opacity: 1;
-  color: rgb(34 211 238 / var(--tw-text-opacity, 1));
 }
 
 .group\/btn:hover .group-hover\/btn\:text-emerald-400 {
@@ -3164,29 +3188,14 @@ body,
   color: rgb(251 146 60 / var(--tw-text-opacity, 1));
 }
 
-.group\/btn:hover .group-hover\/btn\:text-pink-400 {
-  --tw-text-opacity: 1;
-  color: rgb(244 114 182 / var(--tw-text-opacity, 1));
-}
-
 .group\/btn:hover .group-hover\/btn\:text-purple-400 {
   --tw-text-opacity: 1;
   color: rgb(192 132 252 / var(--tw-text-opacity, 1));
 }
 
-.group\/btn:hover .group-hover\/btn\:text-red-400 {
-  --tw-text-opacity: 1;
-  color: rgb(248 113 113 / var(--tw-text-opacity, 1));
-}
-
 .group\/btn:hover .group-hover\/btn\:text-white {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
-}
-
-.group\/btn:hover .group-hover\/btn\:text-yellow-400 {
-  --tw-text-opacity: 1;
-  color: rgb(250 204 21 / var(--tw-text-opacity, 1));
 }
 
 .group:hover .group-hover\:text-blurt {

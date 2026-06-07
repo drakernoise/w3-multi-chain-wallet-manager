@@ -4,7 +4,7 @@
 
 Si aún ves el error React #31 en twiggy.lat es porque **la extensión compilada no ha sido cargada en tu navegador**.
 
-## ✅ Solución: Recargar la Extensión
+## Solución: Recargar la Extensión
 
 ### Opción 1: Recargar Extensión en Chrome/Edge (RECOMENDADO)
 
@@ -19,7 +19,7 @@ Si aún ves el error React #31 en twiggy.lat es porque **la extensión compilada
 
 5. **Vuelve a twiggy.lat** y recarga la página (`F5` o `Ctrl+Shift+R`)
 
-6. **Intenta enviar un mensaje** - debería funcionar ahora ✅
+6. **Intenta enviar un mensaje** - debería funcionar ahora
 
 ### Opción 2: Desinstalar y Reinstalar
 
@@ -51,15 +51,15 @@ Si compilaste la extensión tú mismo:
 2. **Busca en la consola** estos logs cuando intentes enviar:
    ```
    [Gravity] Received request - Method: requestBroadcast, Params type: object
-   [Compatibility] ⚠️ DETECTED TWIGGY.LAT FORMAT! Converting...
-   [Compatibility] ✓ Normalized params: ["unknown_broadcast_user", [...], ""]
+   [Compatibility] DETECTED TWIGGY.LAT FORMAT! Converting...
+   [Compatibility] Normalized params: ["unknown_broadcast_user", [...], ""]
    ```
 
-3. **Si VES estos logs** = La corrección está activa ✅
+3. **Si VES estos logs** = La corrección está activa
 
 4. **Si NO los ves** = La extensión aún no se recargó. Repite el proceso de recarga.
 
-## 🎯 Testing Manual
+## Testing Manual
 
 Una vez recargues:
 
@@ -68,9 +68,9 @@ Una vez recargues:
 3. Escribe un mensaje simple como: "Test message"
 4. Haz clic en enviar
 5. **Resultado esperado:**
-   - ✅ El mensaje se envía sin errores
-   - ✅ Ves los logs `[Compatibility]` en la consola
-   - ✅ No hay React error #31
+   - El mensaje se envía sin errores
+   - Ves los logs `[Compatibility]` en la consola
+   - No hay React error #31
 
 ## 🐛 Si Aún Hay Problemas
 
@@ -90,7 +90,7 @@ Si después de recargar AÚN ves el error:
    - Especifica tu versión de Chrome/Edge
    - Menciona si es extensión de Web Store o compilada localmente
 
-## 📝 Cambios Técnicos en v1.1.3+
+## Cambios Técnicos en v1.1.3+
 
 La extensión ahora incluye un **normalizador automático de parámetros** que:
 
@@ -105,7 +105,7 @@ La extensión ahora incluye un **normalizador automático de parámetros** que:
 |------|--------|-----------|
 | 1 | Recarga la extensión (chrome://extensions) | Extensión actualizada |
 | 2 | Recarga twiggy.lat (F5) | Página con nueva extensión |
-| 3 | Intenta enviar mensaje | ✅ Funciona sin errores |
+| 3 | Intenta enviar mensaje | Funciona sin errores |
 | 4 | Verifica consola (F12) | Ver logs `[Compatibility]` |
 
 ¡Listo! 🎉
