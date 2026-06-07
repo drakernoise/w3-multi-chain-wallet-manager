@@ -5,9 +5,20 @@ import { LanguageProvider } from '@contexts/LanguageContext'
 import { NotificationProvider } from '@contexts/NotificationContext'
 import { LockScreen } from '@components/LockScreen'
 import { bridgeService, SignRequest, SignResponse } from '@services/bridgeService'
-import { broadcastTransfer, broadcastOperations, broadcastVote, broadcastCustomJson, signMessage, fetchBalances } from '@services/chainService'
+import {
+  broadcastTransfer,
+  broadcastOperations,
+  broadcastVote,
+  broadcastCustomJson,
+  signMessage,
+  fetchBalances,
+  fetchAccountHistory,
+  getHistoryItemKey,
+  HistoryItem
+} from '@services/chainService'
 import { ensureMobileInternalKey, getVault, saveVault, tryRestoreSession, unlockVaultWithCachedSession } from '@services/cryptoService'
 import { chatService } from '@services/chatService'
+import { storageService } from '@services/storageService'
 import { mobileProvider, SignRequest as MobileSignRequest } from './services/mobileProvider'
 import { SignRequestModal } from './components/SignRequestModal'
 import { PermissionsManager } from './components/PermissionsManager'
@@ -240,6 +251,17 @@ function App() {
 }
 
 function MobileContent() {
+  const HISTORY_CACHE_STORAGE_KEY = 'gravity_account_history_cache_v1'
+  const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000
+
+  type HistoryCacheEntry = {
+    items: HistoryItem[]
+    updatedAt: number
+    error?: string | null
+    partial?: boolean
+  }
+  type HistoryCache = Record<string, HistoryCacheEntry>
+
   const [isLocked, setIsLocked] = useState(true)
   const [walletState, setWalletState] = useState<WalletState>({
     accounts: [],
@@ -276,6 +298,9 @@ function MobileContent() {
 
   const [activeModal, setActiveModal] = useState<'transfer' | 'receive' | 'history' | 'import' | 'manage' | null>(null)
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
+  const [historyCache, setHistoryCache] = useState<HistoryCache>({})
+  const [historyLoadingKeys, setHistoryLoadingKeys] = useState<Record<string, boolean>>({})
+  const [historyCacheLoaded, setHistoryCacheLoaded] = useState(false)
 
   // QR & PIN Pairing State
   const [isScanning, setIsScanning] = useState(false)
@@ -284,6 +309,107 @@ function MobileContent() {
   const [pinValue, setPinValue] = useState('')
   const [isRefreshingWallets, setIsRefreshingWallets] = useState(false)
   const accountsRef = useRef<Account[]>([])
+  const historyCacheRef = useRef<HistoryCache>({})
+  const historySyncInFlightRef = useRef<Set<string>>(new Set())
+
+  const getHistoryCacheKey = (account: Pick<Account, 'chain' | 'name'>) =>
+    `${account.chain}:${account.name}`.toLowerCase()
+
+  const persistHistoryCache = async (nextCache: HistoryCache) => {
+    try {
+      await storageService.setItem(HISTORY_CACHE_STORAGE_KEY, JSON.stringify(nextCache))
+    } catch (error) {
+      console.warn('[Mobile] History cache save failed:', error)
+    }
+  }
+
+  const updateHistoryCacheEntry = (key: string, entry: HistoryCacheEntry) => {
+    setHistoryCache(prev => {
+      const next = { ...prev, [key]: entry }
+      historyCacheRef.current = next
+      persistHistoryCache(next)
+      return next
+    })
+  }
+
+  const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
+    const byKey = new Map<string, HistoryItem>()
+    ;[...incoming, ...existing].forEach(item => {
+      byKey.set(getHistoryItemKey(item), item)
+    })
+
+    return Array.from(byKey.values())
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 250)
+  }
+
+  const refreshAccountHistory = async (account: Account, force = false, partial = false) => {
+    const key = getHistoryCacheKey(account)
+    const cached = historyCacheRef.current[key]
+    const cachedItems = cached?.items || []
+    const isProducerReward = (item: HistoryItem) =>
+      item.type === 'producer_reward' || (item.type === 'reward' && item.memo === 'Producer Reward')
+    const hasVisibleHistory = cachedItems.some(item => !isProducerReward(item))
+    const cacheIsFresh = !!cached &&
+      hasVisibleHistory &&
+      !cached.partial &&
+      Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS
+    const shouldIncremental = hasVisibleHistory && !cached?.partial && !partial && (force || !cacheIsFresh)
+
+    if (!force && cacheIsFresh) return cachedItems
+    if (historySyncInFlightRef.current.has(key)) return cachedItems
+
+    historySyncInFlightRef.current.add(key)
+    setHistoryLoadingKeys(prev => ({ ...prev, [key]: true }))
+
+    try {
+      const fetchedItems = await fetchAccountHistory(
+        account.chain,
+        account.name,
+        shouldIncremental
+          ? { incremental: true, knownItemKeys: cachedItems.map(getHistoryItemKey) }
+          : partial
+            ? { maxPages: 5 }
+            : {}
+      )
+      const items = shouldIncremental
+        ? mergeHistoryItems(cachedItems, fetchedItems)
+        : partial && cachedItems.length > 0
+          ? mergeHistoryItems(cachedItems, fetchedItems)
+          : fetchedItems
+
+      updateHistoryCacheEntry(key, {
+        items,
+        updatedAt: Date.now(),
+        error: null,
+        partial
+      })
+      return items
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      updateHistoryCacheEntry(key, {
+        items: cachedItems,
+        updatedAt: cached?.updatedAt || Date.now(),
+        error: message,
+        partial: cached?.partial
+      })
+      return cachedItems
+    } finally {
+      historySyncInFlightRef.current.delete(key)
+      setHistoryLoadingKeys(prev => {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      })
+    }
+  }
+
+  const preloadHistory = async (accounts: Account[]) => {
+    for (const account of accounts) {
+      await refreshAccountHistory(account, false, true)
+      await new Promise(resolve => setTimeout(resolve, 150))
+    }
+  }
 
   const persistAccountsVault = async (accounts: Account[]) => {
     const vault: Vault = { accounts, lastUpdated: Date.now() }
@@ -302,6 +428,32 @@ function MobileContent() {
   useEffect(() => {
     accountsRef.current = walletState.accounts
   }, [walletState.accounts])
+
+  useEffect(() => {
+    const loadHistoryCache = async () => {
+      try {
+        const raw = await storageService.getItem(HISTORY_CACHE_STORAGE_KEY)
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (parsed && typeof parsed === 'object') {
+            historyCacheRef.current = parsed
+            setHistoryCache(parsed)
+          }
+        }
+      } catch (error) {
+        console.warn('[Mobile] History cache load failed:', error)
+      } finally {
+        setHistoryCacheLoaded(true)
+      }
+    }
+
+    loadHistoryCache()
+  }, [])
+
+  useEffect(() => {
+    if (isLocked || !historyCacheLoaded || walletState.accounts.length === 0) return
+    preloadHistory(walletState.accounts)
+  }, [historyCacheLoaded, isLocked, walletState.accounts])
 
   useEffect(() => {
     // 1. Initialize Services
@@ -1227,7 +1379,11 @@ function MobileContent() {
             onManage={(acc) => { setSelectedAccount(acc); setActiveModal('manage'); }}
             onSend={(acc) => { setSelectedAccount(acc); setActiveModal('transfer'); }}
             onReceive={(acc) => { setSelectedAccount(acc); setActiveModal('receive'); }}
-            onHistory={(acc) => { setSelectedAccount(acc); setActiveModal('history'); }}
+            onHistory={(acc) => {
+              setSelectedAccount(acc)
+              setActiveModal('history')
+              refreshAccountHistory(acc, false, false)
+            }}
             onRefresh={handleRefresh}
             onAddAccount={() => setActiveModal('import')}
           />
@@ -1429,6 +1585,11 @@ function MobileContent() {
       {activeModal === 'history' && selectedAccount && (
         <HistoryModal
           account={selectedAccount}
+          history={historyCache[getHistoryCacheKey(selectedAccount)]?.items || []}
+          loading={!!historyLoadingKeys[getHistoryCacheKey(selectedAccount)]}
+          loadError={historyCache[getHistoryCacheKey(selectedAccount)]?.error}
+          lastUpdated={historyCache[getHistoryCacheKey(selectedAccount)]?.updatedAt}
+          onRefresh={() => refreshAccountHistory(selectedAccount, true, false)}
           onClose={() => setActiveModal(null)}
         />
       )}

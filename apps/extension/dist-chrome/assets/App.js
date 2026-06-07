@@ -2214,9 +2214,9 @@ var hasRequiredCore;
 function requireCore () {
 	if (hasRequiredCore) return core;
 	hasRequiredCore = 1;
-	(function (exports$1) {
+	(function (exports) {
 
-		Object.defineProperty(exports$1, '__esModule', { value: true });
+		Object.defineProperty(exports, '__esModule', { value: true });
 
 		function objectValues(value) {
 		  return Object.keys(value).map(key => value[key]);
@@ -2225,21 +2225,21 @@ function requireCore () {
 		  HashAlgorithms["SHA1"] = "sha1";
 		  HashAlgorithms["SHA256"] = "sha256";
 		  HashAlgorithms["SHA512"] = "sha512";
-		})(exports$1.HashAlgorithms || (exports$1.HashAlgorithms = {}));
-		const HASH_ALGORITHMS = objectValues(exports$1.HashAlgorithms);
+		})(exports.HashAlgorithms || (exports.HashAlgorithms = {}));
+		const HASH_ALGORITHMS = objectValues(exports.HashAlgorithms);
 		(function (KeyEncodings) {
 		  KeyEncodings["ASCII"] = "ascii";
 		  KeyEncodings["BASE64"] = "base64";
 		  KeyEncodings["HEX"] = "hex";
 		  KeyEncodings["LATIN1"] = "latin1";
 		  KeyEncodings["UTF8"] = "utf8";
-		})(exports$1.KeyEncodings || (exports$1.KeyEncodings = {}));
-		const KEY_ENCODINGS = objectValues(exports$1.KeyEncodings);
+		})(exports.KeyEncodings || (exports.KeyEncodings = {}));
+		const KEY_ENCODINGS = objectValues(exports.KeyEncodings);
 		(function (Strategy) {
 		  Strategy["HOTP"] = "hotp";
 		  Strategy["TOTP"] = "totp";
-		})(exports$1.Strategy || (exports$1.Strategy = {}));
-		const STRATEGY = objectValues(exports$1.Strategy);
+		})(exports.Strategy || (exports.Strategy = {}));
+		const STRATEGY = objectValues(exports.Strategy);
 		const createDigestPlaceholder = () => {
 		  throw new Error('Please provide an options.createDigest implementation.');
 		};
@@ -2335,11 +2335,11 @@ function requireCore () {
 		};
 		function hotpDefaultOptions() {
 		  const options = {
-		    algorithm: exports$1.HashAlgorithms.SHA1,
+		    algorithm: exports.HashAlgorithms.SHA1,
 		    createHmacKey: hotpCreateHmacKey,
 		    createDigest: createDigestPlaceholder,
 		    digits: 6,
-		    encoding: exports$1.KeyEncodings.ASCII
+		    encoding: exports.KeyEncodings.ASCII
 		  };
 		  return options;
 		}
@@ -2381,7 +2381,7 @@ function requireCore () {
 		  return keyuri({
 		    algorithm: options.algorithm,
 		    digits: options.digits,
-		    type: exports$1.Strategy.HOTP,
+		    type: exports.Strategy.HOTP,
 		    accountName,
 		    counter,
 		    issuer,
@@ -2445,11 +2445,11 @@ function requireCore () {
 		};
 		const totpCreateHmacKey = (algorithm, secret, encoding) => {
 		  switch (algorithm) {
-		    case exports$1.HashAlgorithms.SHA1:
+		    case exports.HashAlgorithms.SHA1:
 		      return totpPadSecret(secret, encoding, 20);
-		    case exports$1.HashAlgorithms.SHA256:
+		    case exports.HashAlgorithms.SHA256:
 		      return totpPadSecret(secret, encoding, 32);
-		    case exports$1.HashAlgorithms.SHA512:
+		    case exports.HashAlgorithms.SHA512:
 		      return totpPadSecret(secret, encoding, 64);
 		    default:
 		      throw new Error(`Expecting algorithm to be one of ${HASH_ALGORITHMS.join(', ')}. Received ${algorithm}.`);
@@ -2457,11 +2457,11 @@ function requireCore () {
 		};
 		function totpDefaultOptions() {
 		  const options = {
-		    algorithm: exports$1.HashAlgorithms.SHA1,
+		    algorithm: exports.HashAlgorithms.SHA1,
 		    createDigest: createDigestPlaceholder,
 		    createHmacKey: totpCreateHmacKey,
 		    digits: 6,
-		    encoding: exports$1.KeyEncodings.ASCII,
+		    encoding: exports.KeyEncodings.ASCII,
 		    epoch: Date.now(),
 		    step: 30,
 		    window: 0
@@ -2544,7 +2544,7 @@ function requireCore () {
 		    algorithm: options.algorithm,
 		    digits: options.digits,
 		    step: options.step,
-		    type: exports$1.Strategy.TOTP,
+		    type: exports.Strategy.TOTP,
 		    accountName,
 		    issuer,
 		    secret
@@ -2597,11 +2597,11 @@ function requireCore () {
 		}
 		function authenticatorDefaultOptions() {
 		  const options = {
-		    algorithm: exports$1.HashAlgorithms.SHA1,
+		    algorithm: exports.HashAlgorithms.SHA1,
 		    createDigest: createDigestPlaceholder,
 		    createHmacKey: totpCreateHmacKey,
 		    digits: 6,
-		    encoding: exports$1.KeyEncodings.HEX,
+		    encoding: exports.KeyEncodings.HEX,
 		    epoch: Date.now(),
 		    step: 30,
 		    window: 0
@@ -2655,49 +2655,49 @@ function requireCore () {
 		  }
 		}
 
-		exports$1.Authenticator = Authenticator;
-		exports$1.HASH_ALGORITHMS = HASH_ALGORITHMS;
-		exports$1.HOTP = HOTP;
-		exports$1.KEY_ENCODINGS = KEY_ENCODINGS;
-		exports$1.OTP = OTP;
-		exports$1.STRATEGY = STRATEGY;
-		exports$1.TOTP = TOTP;
-		exports$1.authenticatorCheckWithWindow = authenticatorCheckWithWindow;
-		exports$1.authenticatorDecoder = authenticatorDecoder;
-		exports$1.authenticatorDefaultOptions = authenticatorDefaultOptions;
-		exports$1.authenticatorEncoder = authenticatorEncoder;
-		exports$1.authenticatorGenerateSecret = authenticatorGenerateSecret;
-		exports$1.authenticatorOptionValidator = authenticatorOptionValidator;
-		exports$1.authenticatorOptions = authenticatorOptions;
-		exports$1.authenticatorToken = authenticatorToken;
-		exports$1.createDigestPlaceholder = createDigestPlaceholder;
-		exports$1.hotpCheck = hotpCheck;
-		exports$1.hotpCounter = hotpCounter;
-		exports$1.hotpCreateHmacKey = hotpCreateHmacKey;
-		exports$1.hotpDefaultOptions = hotpDefaultOptions;
-		exports$1.hotpDigestToToken = hotpDigestToToken;
-		exports$1.hotpKeyuri = hotpKeyuri;
-		exports$1.hotpOptions = hotpOptions;
-		exports$1.hotpOptionsValidator = hotpOptionsValidator;
-		exports$1.hotpToken = hotpToken;
-		exports$1.isTokenValid = isTokenValid;
-		exports$1.keyuri = keyuri;
-		exports$1.objectValues = objectValues;
-		exports$1.padStart = padStart;
-		exports$1.totpCheck = totpCheck;
-		exports$1.totpCheckByEpoch = totpCheckByEpoch;
-		exports$1.totpCheckWithWindow = totpCheckWithWindow;
-		exports$1.totpCounter = totpCounter;
-		exports$1.totpCreateHmacKey = totpCreateHmacKey;
-		exports$1.totpDefaultOptions = totpDefaultOptions;
-		exports$1.totpEpochAvailable = totpEpochAvailable;
-		exports$1.totpKeyuri = totpKeyuri;
-		exports$1.totpOptions = totpOptions;
-		exports$1.totpOptionsValidator = totpOptionsValidator;
-		exports$1.totpPadSecret = totpPadSecret;
-		exports$1.totpTimeRemaining = totpTimeRemaining;
-		exports$1.totpTimeUsed = totpTimeUsed;
-		exports$1.totpToken = totpToken; 
+		exports.Authenticator = Authenticator;
+		exports.HASH_ALGORITHMS = HASH_ALGORITHMS;
+		exports.HOTP = HOTP;
+		exports.KEY_ENCODINGS = KEY_ENCODINGS;
+		exports.OTP = OTP;
+		exports.STRATEGY = STRATEGY;
+		exports.TOTP = TOTP;
+		exports.authenticatorCheckWithWindow = authenticatorCheckWithWindow;
+		exports.authenticatorDecoder = authenticatorDecoder;
+		exports.authenticatorDefaultOptions = authenticatorDefaultOptions;
+		exports.authenticatorEncoder = authenticatorEncoder;
+		exports.authenticatorGenerateSecret = authenticatorGenerateSecret;
+		exports.authenticatorOptionValidator = authenticatorOptionValidator;
+		exports.authenticatorOptions = authenticatorOptions;
+		exports.authenticatorToken = authenticatorToken;
+		exports.createDigestPlaceholder = createDigestPlaceholder;
+		exports.hotpCheck = hotpCheck;
+		exports.hotpCounter = hotpCounter;
+		exports.hotpCreateHmacKey = hotpCreateHmacKey;
+		exports.hotpDefaultOptions = hotpDefaultOptions;
+		exports.hotpDigestToToken = hotpDigestToToken;
+		exports.hotpKeyuri = hotpKeyuri;
+		exports.hotpOptions = hotpOptions;
+		exports.hotpOptionsValidator = hotpOptionsValidator;
+		exports.hotpToken = hotpToken;
+		exports.isTokenValid = isTokenValid;
+		exports.keyuri = keyuri;
+		exports.objectValues = objectValues;
+		exports.padStart = padStart;
+		exports.totpCheck = totpCheck;
+		exports.totpCheckByEpoch = totpCheckByEpoch;
+		exports.totpCheckWithWindow = totpCheckWithWindow;
+		exports.totpCounter = totpCounter;
+		exports.totpCreateHmacKey = totpCreateHmacKey;
+		exports.totpDefaultOptions = totpDefaultOptions;
+		exports.totpEpochAvailable = totpEpochAvailable;
+		exports.totpKeyuri = totpKeyuri;
+		exports.totpOptions = totpOptions;
+		exports.totpOptionsValidator = totpOptionsValidator;
+		exports.totpPadSecret = totpPadSecret;
+		exports.totpTimeRemaining = totpTimeRemaining;
+		exports.totpTimeUsed = totpTimeUsed;
+		exports.totpToken = totpToken; 
 	} (core));
 	return core;
 }
@@ -2754,16 +2754,16 @@ var hasRequiredOtplib;
 function requireOtplib () {
 	if (hasRequiredOtplib) return otplib;
 	hasRequiredOtplib = 1;
-	(function (exports$1) {
+	(function (exports) {
 
-		Object.defineProperty(exports$1, '__esModule', { value: true });
+		Object.defineProperty(exports, '__esModule', { value: true });
 
 		var presetDefault = requirePresetDefault();
 
 
 
 		Object.keys(presetDefault).forEach(function (k) {
-			if (k !== 'default') Object.defineProperty(exports$1, k, {
+			if (k !== 'default') Object.defineProperty(exports, k, {
 				enumerable: true,
 				get: function () {
 					return presetDefault[k];
@@ -2876,11 +2876,11 @@ var hasRequiredErrorCorrectionLevel;
 function requireErrorCorrectionLevel () {
 	if (hasRequiredErrorCorrectionLevel) return errorCorrectionLevel;
 	hasRequiredErrorCorrectionLevel = 1;
-	(function (exports$1) {
-		exports$1.L = { bit: 1 };
-		exports$1.M = { bit: 0 };
-		exports$1.Q = { bit: 3 };
-		exports$1.H = { bit: 2 };
+	(function (exports) {
+		exports.L = { bit: 1 };
+		exports.M = { bit: 0 };
+		exports.Q = { bit: 3 };
+		exports.H = { bit: 2 };
 
 		function fromString (string) {
 		  if (typeof string !== 'string') {
@@ -2892,32 +2892,32 @@ function requireErrorCorrectionLevel () {
 		  switch (lcStr) {
 		    case 'l':
 		    case 'low':
-		      return exports$1.L
+		      return exports.L
 
 		    case 'm':
 		    case 'medium':
-		      return exports$1.M
+		      return exports.M
 
 		    case 'q':
 		    case 'quartile':
-		      return exports$1.Q
+		      return exports.Q
 
 		    case 'h':
 		    case 'high':
-		      return exports$1.H
+		      return exports.H
 
 		    default:
 		      throw new Error('Unknown EC Level: ' + string)
 		  }
 		}
 
-		exports$1.isValid = function isValid (level) {
+		exports.isValid = function isValid (level) {
 		  return level && typeof level.bit !== 'undefined' &&
 		    level.bit >= 0 && level.bit < 4
 		};
 
-		exports$1.from = function from (value, defaultValue) {
-		  if (exports$1.isValid(value)) {
+		exports.from = function from (value, defaultValue) {
+		  if (exports.isValid(value)) {
 		    return value
 		  }
 
@@ -3069,7 +3069,7 @@ var hasRequiredAlignmentPattern;
 function requireAlignmentPattern () {
 	if (hasRequiredAlignmentPattern) return alignmentPattern;
 	hasRequiredAlignmentPattern = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const getSymbolSize = requireUtils$1().getSymbolSize;
 
 		/**
@@ -3086,7 +3086,7 @@ function requireAlignmentPattern () {
 		 * @param  {Number} version QR Code version
 		 * @return {Array}          Array of coordinate
 		 */
-		exports$1.getRowColCoords = function getRowColCoords (version) {
+		exports.getRowColCoords = function getRowColCoords (version) {
 		  if (version === 1) return []
 
 		  const posCount = Math.floor(version / 7) + 2;
@@ -3123,9 +3123,9 @@ function requireAlignmentPattern () {
 		 * @param  {Number} version QR Code version
 		 * @return {Array}          Array of coordinates
 		 */
-		exports$1.getPositions = function getPositions (version) {
+		exports.getPositions = function getPositions (version) {
 		  const coords = [];
-		  const pos = exports$1.getRowColCoords(version);
+		  const pos = exports.getRowColCoords(version);
 		  const posLength = pos.length;
 
 		  for (let i = 0; i < posLength; i++) {
@@ -3191,8 +3191,8 @@ var hasRequiredMaskPattern;
 function requireMaskPattern () {
 	if (hasRequiredMaskPattern) return maskPattern;
 	hasRequiredMaskPattern = 1;
-	(function (exports$1) {
-		exports$1.Patterns = {
+	(function (exports) {
+		exports.Patterns = {
 		  PATTERN000: 0,
 		  PATTERN001: 1,
 		  PATTERN010: 2,
@@ -3220,7 +3220,7 @@ function requireMaskPattern () {
 		 * @param  {Number}  mask    Mask pattern
 		 * @return {Boolean}         true if valid, false otherwise
 		 */
-		exports$1.isValid = function isValid (mask) {
+		exports.isValid = function isValid (mask) {
 		  return mask != null && mask !== '' && !isNaN(mask) && mask >= 0 && mask <= 7
 		};
 
@@ -3231,8 +3231,8 @@ function requireMaskPattern () {
 		 * @param  {Number|String} value        Mask pattern value
 		 * @return {Number}                     Valid mask pattern or undefined
 		 */
-		exports$1.from = function from (value) {
-		  return exports$1.isValid(value) ? parseInt(value, 10) : undefined
+		exports.from = function from (value) {
+		  return exports.isValid(value) ? parseInt(value, 10) : undefined
 		};
 
 		/**
@@ -3242,7 +3242,7 @@ function requireMaskPattern () {
 		* Points: N1 + i
 		* i is the amount by which the number of adjacent modules of the same color exceeds 5
 		*/
-		exports$1.getPenaltyN1 = function getPenaltyN1 (data) {
+		exports.getPenaltyN1 = function getPenaltyN1 (data) {
 		  const size = data.size;
 		  let points = 0;
 		  let sameCountCol = 0;
@@ -3286,7 +3286,7 @@ function requireMaskPattern () {
 		 *
 		 * Points: N2 * (m - 1) * (n - 1)
 		 */
-		exports$1.getPenaltyN2 = function getPenaltyN2 (data) {
+		exports.getPenaltyN2 = function getPenaltyN2 (data) {
 		  const size = data.size;
 		  let points = 0;
 
@@ -3310,7 +3310,7 @@ function requireMaskPattern () {
 		 *
 		 * Points: N3 * number of pattern found
 		 */
-		exports$1.getPenaltyN3 = function getPenaltyN3 (data) {
+		exports.getPenaltyN3 = function getPenaltyN3 (data) {
 		  const size = data.size;
 		  let points = 0;
 		  let bitsCol = 0;
@@ -3338,7 +3338,7 @@ function requireMaskPattern () {
 		 * k is the rating of the deviation of the proportion of dark modules
 		 * in the symbol from 50% in steps of 5%
 		 */
-		exports$1.getPenaltyN4 = function getPenaltyN4 (data) {
+		exports.getPenaltyN4 = function getPenaltyN4 (data) {
 		  let darkCount = 0;
 		  const modulesCount = data.data.length;
 
@@ -3359,14 +3359,14 @@ function requireMaskPattern () {
 		 */
 		function getMaskAt (maskPattern, i, j) {
 		  switch (maskPattern) {
-		    case exports$1.Patterns.PATTERN000: return (i + j) % 2 === 0
-		    case exports$1.Patterns.PATTERN001: return i % 2 === 0
-		    case exports$1.Patterns.PATTERN010: return j % 3 === 0
-		    case exports$1.Patterns.PATTERN011: return (i + j) % 3 === 0
-		    case exports$1.Patterns.PATTERN100: return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0
-		    case exports$1.Patterns.PATTERN101: return (i * j) % 2 + (i * j) % 3 === 0
-		    case exports$1.Patterns.PATTERN110: return ((i * j) % 2 + (i * j) % 3) % 2 === 0
-		    case exports$1.Patterns.PATTERN111: return ((i * j) % 3 + (i + j) % 2) % 2 === 0
+		    case exports.Patterns.PATTERN000: return (i + j) % 2 === 0
+		    case exports.Patterns.PATTERN001: return i % 2 === 0
+		    case exports.Patterns.PATTERN010: return j % 3 === 0
+		    case exports.Patterns.PATTERN011: return (i + j) % 3 === 0
+		    case exports.Patterns.PATTERN100: return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0
+		    case exports.Patterns.PATTERN101: return (i * j) % 2 + (i * j) % 3 === 0
+		    case exports.Patterns.PATTERN110: return ((i * j) % 2 + (i * j) % 3) % 2 === 0
+		    case exports.Patterns.PATTERN111: return ((i * j) % 3 + (i + j) % 2) % 2 === 0
 
 		    default: throw new Error('bad maskPattern:' + maskPattern)
 		  }
@@ -3378,7 +3378,7 @@ function requireMaskPattern () {
 		 * @param  {Number}    pattern Pattern reference number
 		 * @param  {BitMatrix} data    BitMatrix data
 		 */
-		exports$1.applyMask = function applyMask (pattern, data) {
+		exports.applyMask = function applyMask (pattern, data) {
 		  const size = data.size;
 
 		  for (let col = 0; col < size; col++) {
@@ -3395,24 +3395,24 @@ function requireMaskPattern () {
 		 * @param  {BitMatrix} data
 		 * @return {Number} Mask pattern reference number
 		 */
-		exports$1.getBestMask = function getBestMask (data, setupFormatFunc) {
-		  const numPatterns = Object.keys(exports$1.Patterns).length;
+		exports.getBestMask = function getBestMask (data, setupFormatFunc) {
+		  const numPatterns = Object.keys(exports.Patterns).length;
 		  let bestPattern = 0;
 		  let lowerPenalty = Infinity;
 
 		  for (let p = 0; p < numPatterns; p++) {
 		    setupFormatFunc(p);
-		    exports$1.applyMask(p, data);
+		    exports.applyMask(p, data);
 
 		    // Calculate penalty
 		    const penalty =
-		      exports$1.getPenaltyN1(data) +
-		      exports$1.getPenaltyN2(data) +
-		      exports$1.getPenaltyN3(data) +
-		      exports$1.getPenaltyN4(data);
+		      exports.getPenaltyN1(data) +
+		      exports.getPenaltyN2(data) +
+		      exports.getPenaltyN3(data) +
+		      exports.getPenaltyN4(data);
 
 		    // Undo previously applied mask
-		    exports$1.applyMask(p, data);
+		    exports.applyMask(p, data);
 
 		    if (penalty < lowerPenalty) {
 		      lowerPenalty = penalty;
@@ -3657,7 +3657,7 @@ var hasRequiredPolynomial;
 function requirePolynomial () {
 	if (hasRequiredPolynomial) return polynomial;
 	hasRequiredPolynomial = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const GF = requireGaloisField();
 
 		/**
@@ -3667,7 +3667,7 @@ function requirePolynomial () {
 		 * @param  {Uint8Array} p2 Polynomial
 		 * @return {Uint8Array}    Product of p1 and p2
 		 */
-		exports$1.mul = function mul (p1, p2) {
+		exports.mul = function mul (p1, p2) {
 		  const coeff = new Uint8Array(p1.length + p2.length - 1);
 
 		  for (let i = 0; i < p1.length; i++) {
@@ -3686,7 +3686,7 @@ function requirePolynomial () {
 		 * @param  {Uint8Array} divisor  Polynomial
 		 * @return {Uint8Array}          Remainder
 		 */
-		exports$1.mod = function mod (divident, divisor) {
+		exports.mod = function mod (divident, divisor) {
 		  let result = new Uint8Array(divident);
 
 		  while ((result.length - divisor.length) >= 0) {
@@ -3712,10 +3712,10 @@ function requirePolynomial () {
 		 * @param  {Number} degree Degree of the generator polynomial
 		 * @return {Uint8Array}    Buffer containing polynomial coefficients
 		 */
-		exports$1.generateECPolynomial = function generateECPolynomial (degree) {
+		exports.generateECPolynomial = function generateECPolynomial (degree) {
 		  let poly = new Uint8Array([1]);
 		  for (let i = 0; i < degree; i++) {
-		    poly = exports$1.mul(poly, new Uint8Array([1, GF.exp(i)]));
+		    poly = exports.mul(poly, new Uint8Array([1, GF.exp(i)]));
 		  }
 
 		  return poly
@@ -3859,7 +3859,7 @@ var hasRequiredMode;
 function requireMode () {
 	if (hasRequiredMode) return mode;
 	hasRequiredMode = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const VersionCheck = requireVersionCheck();
 		const Regex = requireRegex();
 
@@ -3870,7 +3870,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.NUMERIC = {
+		exports.NUMERIC = {
 		  id: 'Numeric',
 		  bit: 1 << 0,
 		  ccBits: [10, 12, 14]
@@ -3885,7 +3885,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.ALPHANUMERIC = {
+		exports.ALPHANUMERIC = {
 		  id: 'Alphanumeric',
 		  bit: 1 << 1,
 		  ccBits: [9, 11, 13]
@@ -3896,7 +3896,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.BYTE = {
+		exports.BYTE = {
 		  id: 'Byte',
 		  bit: 1 << 2,
 		  ccBits: [8, 16, 16]
@@ -3911,7 +3911,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.KANJI = {
+		exports.KANJI = {
 		  id: 'Kanji',
 		  bit: 1 << 3,
 		  ccBits: [8, 10, 12]
@@ -3923,7 +3923,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.MIXED = {
+		exports.MIXED = {
 		  bit: -1
 		};
 
@@ -3935,7 +3935,7 @@ function requireMode () {
 		 * @param  {Number} version QR Code version
 		 * @return {Number}         Number of bits
 		 */
-		exports$1.getCharCountIndicator = function getCharCountIndicator (mode, version) {
+		exports.getCharCountIndicator = function getCharCountIndicator (mode, version) {
 		  if (!mode.ccBits) throw new Error('Invalid mode: ' + mode)
 
 		  if (!VersionCheck.isValid(version)) {
@@ -3953,11 +3953,11 @@ function requireMode () {
 		 * @param  {String} dataStr Input data string
 		 * @return {Mode}           Best mode
 		 */
-		exports$1.getBestModeForData = function getBestModeForData (dataStr) {
-		  if (Regex.testNumeric(dataStr)) return exports$1.NUMERIC
-		  else if (Regex.testAlphanumeric(dataStr)) return exports$1.ALPHANUMERIC
-		  else if (Regex.testKanji(dataStr)) return exports$1.KANJI
-		  else return exports$1.BYTE
+		exports.getBestModeForData = function getBestModeForData (dataStr) {
+		  if (Regex.testNumeric(dataStr)) return exports.NUMERIC
+		  else if (Regex.testAlphanumeric(dataStr)) return exports.ALPHANUMERIC
+		  else if (Regex.testKanji(dataStr)) return exports.KANJI
+		  else return exports.BYTE
 		};
 
 		/**
@@ -3966,7 +3966,7 @@ function requireMode () {
 		 * @param {Mode} mode Mode object
 		 * @returns {String}  Mode name
 		 */
-		exports$1.toString = function toString (mode) {
+		exports.toString = function toString (mode) {
 		  if (mode && mode.id) return mode.id
 		  throw new Error('Invalid mode')
 		};
@@ -3977,7 +3977,7 @@ function requireMode () {
 		 * @param   {Mode}    mode Mode object
 		 * @returns {Boolean} True if valid mode, false otherwise
 		 */
-		exports$1.isValid = function isValid (mode) {
+		exports.isValid = function isValid (mode) {
 		  return mode && mode.bit && mode.ccBits
 		};
 
@@ -3996,13 +3996,13 @@ function requireMode () {
 
 		  switch (lcStr) {
 		    case 'numeric':
-		      return exports$1.NUMERIC
+		      return exports.NUMERIC
 		    case 'alphanumeric':
-		      return exports$1.ALPHANUMERIC
+		      return exports.ALPHANUMERIC
 		    case 'kanji':
-		      return exports$1.KANJI
+		      return exports.KANJI
 		    case 'byte':
-		      return exports$1.BYTE
+		      return exports.BYTE
 		    default:
 		      throw new Error('Unknown mode: ' + string)
 		  }
@@ -4016,8 +4016,8 @@ function requireMode () {
 		 * @param  {Mode}        defaultValue Fallback value
 		 * @return {Mode}                     Encoding mode
 		 */
-		exports$1.from = function from (value, defaultValue) {
-		  if (exports$1.isValid(value)) {
+		exports.from = function from (value, defaultValue) {
+		  if (exports.isValid(value)) {
 		    return value
 		  }
 
@@ -4036,7 +4036,7 @@ var hasRequiredVersion;
 function requireVersion () {
 	if (hasRequiredVersion) return version;
 	hasRequiredVersion = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const Utils = requireUtils$1();
 		const ECCode = requireErrorCorrectionCode();
 		const ECLevel = requireErrorCorrectionLevel();
@@ -4049,7 +4049,7 @@ function requireVersion () {
 
 		function getBestVersionForDataLength (mode, length, errorCorrectionLevel) {
 		  for (let currentVersion = 1; currentVersion <= 40; currentVersion++) {
-		    if (length <= exports$1.getCapacity(currentVersion, errorCorrectionLevel, mode)) {
+		    if (length <= exports.getCapacity(currentVersion, errorCorrectionLevel, mode)) {
 		      return currentVersion
 		    }
 		  }
@@ -4076,7 +4076,7 @@ function requireVersion () {
 		function getBestVersionForMixedData (segments, errorCorrectionLevel) {
 		  for (let currentVersion = 1; currentVersion <= 40; currentVersion++) {
 		    const length = getTotalBitsFromDataArray(segments, currentVersion);
-		    if (length <= exports$1.getCapacity(currentVersion, errorCorrectionLevel, Mode.MIXED)) {
+		    if (length <= exports.getCapacity(currentVersion, errorCorrectionLevel, Mode.MIXED)) {
 		      return currentVersion
 		    }
 		  }
@@ -4092,7 +4092,7 @@ function requireVersion () {
 		 * @param  {Number}        defaultValue Fallback value
 		 * @return {Number}                     QR Code version number
 		 */
-		exports$1.from = function from (value, defaultValue) {
+		exports.from = function from (value, defaultValue) {
 		  if (VersionCheck.isValid(value)) {
 		    return parseInt(value, 10)
 		  }
@@ -4109,7 +4109,7 @@ function requireVersion () {
 		 * @param  {Mode}   mode                 Data mode
 		 * @return {Number}                      Quantity of storable data
 		 */
-		exports$1.getCapacity = function getCapacity (version, errorCorrectionLevel, mode) {
+		exports.getCapacity = function getCapacity (version, errorCorrectionLevel, mode) {
 		  if (!VersionCheck.isValid(version)) {
 		    throw new Error('Invalid QR Code version')
 		  }
@@ -4155,7 +4155,7 @@ function requireVersion () {
 		 * @param  {Mode} mode                       Data mode
 		 * @return {Number}                          QR Code version
 		 */
-		exports$1.getBestVersionForData = function getBestVersionForData (data, errorCorrectionLevel) {
+		exports.getBestVersionForData = function getBestVersionForData (data, errorCorrectionLevel) {
 		  let seg;
 
 		  const ecl = ECLevel.from(errorCorrectionLevel, ECLevel.M);
@@ -4187,7 +4187,7 @@ function requireVersion () {
 		 * @param  {Number} version QR Code version
 		 * @return {Number}         Encoded version info bits
 		 */
-		exports$1.getEncodedBits = function getEncodedBits (version) {
+		exports.getEncodedBits = function getEncodedBits (version) {
 		  if (!VersionCheck.isValid(version) || version < 7) {
 		    throw new Error('Invalid QR Code version')
 		  }
@@ -4647,7 +4647,7 @@ var hasRequiredSegments;
 function requireSegments () {
 	if (hasRequiredSegments) return segments;
 	hasRequiredSegments = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const Mode = requireMode();
 		const NumericData = requireNumericData();
 		const AlphanumericData = requireAlphanumericData();
@@ -4928,7 +4928,7 @@ function requireSegments () {
 		 * @param  {Array} array Array of objects with segments data
 		 * @return {Array}       Array of Segments
 		 */
-		exports$1.fromArray = function fromArray (array) {
+		exports.fromArray = function fromArray (array) {
 		  return array.reduce(function (acc, seg) {
 		    if (typeof seg === 'string') {
 		      acc.push(buildSingleSegment(seg, null));
@@ -4948,7 +4948,7 @@ function requireSegments () {
 		 * @param  {Number} version QR Code version
 		 * @return {Array}          Array of segments
 		 */
-		exports$1.fromString = function fromString (data, version) {
+		exports.fromString = function fromString (data, version) {
 		  const segs = getSegmentsFromString(data, Utils.isKanjiModeEnabled());
 
 		  const nodes = buildNodes(segs);
@@ -4960,7 +4960,7 @@ function requireSegments () {
 		    optimizedSegs.push(graph.table[path[i]].node);
 		  }
 
-		  return exports$1.fromArray(mergeSegments(optimizedSegs))
+		  return exports.fromArray(mergeSegments(optimizedSegs))
 		};
 
 		/**
@@ -4973,8 +4973,8 @@ function requireSegments () {
 		 * @param  {string} data Input string
 		 * @return {Array}       Array of segments
 		 */
-		exports$1.rawSplit = function rawSplit (data) {
-		  return exports$1.fromArray(
+		exports.rawSplit = function rawSplit (data) {
+		  return exports.fromArray(
 		    getSegmentsFromString(data, Utils.isKanjiModeEnabled())
 		  )
 		}; 
@@ -5494,7 +5494,7 @@ var hasRequiredUtils;
 function requireUtils () {
 	if (hasRequiredUtils) return utils;
 	hasRequiredUtils = 1;
-	(function (exports$1) {
+	(function (exports) {
 		function hex2rgba (hex) {
 		  if (typeof hex === 'number') {
 		    hex = hex.toString();
@@ -5530,7 +5530,7 @@ function requireUtils () {
 		  }
 		}
 
-		exports$1.getOptions = function getOptions (options) {
+		exports.getOptions = function getOptions (options) {
 		  if (!options) options = {};
 		  if (!options.color) options.color = {};
 
@@ -5556,21 +5556,21 @@ function requireUtils () {
 		  }
 		};
 
-		exports$1.getScale = function getScale (qrSize, opts) {
+		exports.getScale = function getScale (qrSize, opts) {
 		  return opts.width && opts.width >= qrSize + opts.margin * 2
 		    ? opts.width / (qrSize + opts.margin * 2)
 		    : opts.scale
 		};
 
-		exports$1.getImageWidth = function getImageWidth (qrSize, opts) {
-		  const scale = exports$1.getScale(qrSize, opts);
+		exports.getImageWidth = function getImageWidth (qrSize, opts) {
+		  const scale = exports.getScale(qrSize, opts);
 		  return Math.floor((qrSize + opts.margin * 2) * scale)
 		};
 
-		exports$1.qrToImageData = function qrToImageData (imgData, qr, opts) {
+		exports.qrToImageData = function qrToImageData (imgData, qr, opts) {
 		  const size = qr.modules.size;
 		  const data = qr.modules.data;
-		  const scale = exports$1.getScale(size, opts);
+		  const scale = exports.getScale(size, opts);
 		  const symbolSize = Math.floor((size + opts.margin * 2) * scale);
 		  const scaledMargin = opts.margin * scale;
 		  const palette = [opts.color.light, opts.color.dark];
@@ -5603,7 +5603,7 @@ var hasRequiredCanvas;
 function requireCanvas () {
 	if (hasRequiredCanvas) return canvas;
 	hasRequiredCanvas = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const Utils = requireUtils();
 
 		function clearCanvas (ctx, canvas, size) {
@@ -5624,7 +5624,7 @@ function requireCanvas () {
 		  }
 		}
 
-		exports$1.render = function render (qrData, canvas, options) {
+		exports.render = function render (qrData, canvas, options) {
 		  let opts = options;
 		  let canvasEl = canvas;
 
@@ -5650,7 +5650,7 @@ function requireCanvas () {
 		  return canvasEl
 		};
 
-		exports$1.renderToDataURL = function renderToDataURL (qrData, canvas, options) {
+		exports.renderToDataURL = function renderToDataURL (qrData, canvas, options) {
 		  let opts = options;
 
 		  if (typeof opts === 'undefined' && (!canvas || !canvas.getContext)) {
@@ -5660,7 +5660,7 @@ function requireCanvas () {
 
 		  if (!opts) opts = {};
 
-		  const canvasEl = exports$1.render(qrData, canvas, opts);
+		  const canvasEl = exports.render(qrData, canvas, opts);
 
 		  const type = opts.type || 'image/png';
 		  const rendererOpts = opts.rendererOpts || {};
