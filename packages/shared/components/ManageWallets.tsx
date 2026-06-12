@@ -3,8 +3,7 @@ import { Account, Chain, WalletState } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 import { TOTPSetupModal } from './TOTPSetupModal';
 import { BiometricSetupModal } from './BiometricSetupModal';
-import { SyncExportModal } from './SyncExportModal';
-import { SyncImportModal } from './SyncImportModal';
+import { WalletTransferModal } from './WalletTransferModal';
 import { SyncPayload } from '../types';
 
 interface ManageWalletsProps {
@@ -20,8 +19,7 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
   const { t } = useTranslation();
   const [showTOTP, setShowTOTP] = useState(false);
   const [showBio, setShowBio] = useState(false);
-  const [showSyncExport, setShowSyncExport] = useState(false);
-  const [showSyncImport, setShowSyncImport] = useState(false);
+  const [showWalletTransfer, setShowWalletTransfer] = useState(false);
   const chainCounts = {
     hive: accounts.filter((account) => account.chain === Chain.HIVE).length,
     blurt: accounts.filter((account) => account.chain === Chain.BLURT).length,
@@ -84,24 +82,18 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
         <div className="pt-2 border-t border-dark-700 space-y-3">
         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">{t('pair.section_title')}</h3>
         <p className="text-[10px] text-slate-500 -mt-1 mb-2">{t('pair.section_subtitle')}</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div>
           <button
-            onClick={() => setShowSyncExport(true)}
-            className="bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group"
+            onClick={() => setShowWalletTransfer(true)}
+            className="w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all group text-left"
           >
             <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h11m0 0l-4-4m4 4l-4 4M16 17H5m0 0l4 4m-4-4l4-4" /></svg>
             </div>
-            <span className="font-bold text-xs">{t('pair.send_cta')}</span>
-          </button>
-          <button
-            onClick={() => setShowSyncImport(true)}
-            className="bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group"
-          >
-            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            <div>
+              <div className="font-bold text-xs">{t('pair.transfer_cta')}</div>
+              <div className="text-[10px] text-slate-500 mt-1">{t('pair.transfer_cta_hint')}</div>
             </div>
-            <span className="font-bold text-xs">{t('pair.receive_cta')}</span>
           </button>
         </div>
 
@@ -175,17 +167,11 @@ export const ManageWallets: React.FC<ManageWalletsProps> = ({ accounts, walletSt
         />
       )}
 
-      {showSyncExport && (
-        <SyncExportModal
+      {showWalletTransfer && (
+        <WalletTransferModal
           accounts={accounts}
           walletConfig={walletState}
-          onClose={() => setShowSyncExport(false)}
-        />
-      )}
-
-      {showSyncImport && (
-        <SyncImportModal
-          onClose={() => setShowSyncImport(false)}
+          onClose={() => setShowWalletTransfer(false)}
           onImport={onSyncImport}
         />
       )}

@@ -10,7 +10,7 @@ interface SyncExportModalProps {
     onClose: () => void;
 }
 
-type ExportStatus = 'idle' | 'connecting' | 'paired' | 'sending' | 'sent' | 'error';
+type ExportStatus = 'idle' | 'connecting' | 'paired' | 'sending' | 'delivered' | 'sent' | 'error';
 
 export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, walletConfig, onClose }) => {
     const { t } = useTranslation();
@@ -22,6 +22,8 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
         deviceTransferService.onStatusChange((nextStatus, detail) => {
             if (nextStatus === 'connecting' || nextStatus === 'waiting') setStatus('connecting');
             if (nextStatus === 'paired') setStatus('paired');
+            if (nextStatus === 'sending') setStatus('sending');
+            if (nextStatus === 'delivered') setStatus('delivered');
             if (nextStatus === 'transferred') setStatus('sent');
             if (nextStatus === 'error') {
                 setStatus('error');
@@ -166,6 +168,12 @@ export const SyncExportModal: React.FC<SyncExportModalProps> = ({ accounts, wall
                     {status === 'sending' && (
                         <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
                             {t('pair.sending')}
+                        </div>
+                    )}
+
+                    {status === 'delivered' && (
+                        <div className="w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700">
+                            {t('pair.waiting_import_confirmation')}
                         </div>
                     )}
 

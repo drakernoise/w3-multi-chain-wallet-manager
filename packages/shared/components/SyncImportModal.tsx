@@ -44,12 +44,18 @@ export const SyncImportModal: React.FC<SyncImportModalProps> = ({ onClose, onImp
                 setPairCode(code);
                 setStatus('waiting');
 
-                const payload = await deviceTransferService.waitForIncomingPayload();
+                const transfer = await deviceTransferService.waitForIncomingPayload();
                 if (!mounted) return;
                 setStatus('importing');
-                await onImportRef.current(payload);
+                try {
+                    await onImportRef.current(transfer.payload);
+                    transfer.confirmImported();
+                } catch (importError: any) {
+                    transfer.rejectImport(importError?.message || t('pair.receive_error'));
+                    throw importError;
+                }
                 if (!mounted) return;
-                setSuccessMsg(t('pair.receive_success_message', { count: payload.accounts.length }));
+                setSuccessMsg(t('pair.receive_success_message', { count: transfer.payload.accounts.length }));
                 setStatus('done');
             } catch (e: any) {
                 if (!mounted) return;

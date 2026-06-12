@@ -10,8 +10,6 @@ window.addEventListener("message", (event) => {
   if (event.data.type !== "gravity_request") {
     return;
   }
-  console.log("[Gravity Content] Received request:", event.data.method, event.data.id);
-  console.log("[Gravity Content] Sending to background...");
   const postErrorToPage = (error) => {
     window.postMessage({
       type: "gravity_response",
@@ -30,7 +28,6 @@ window.addEventListener("message", (event) => {
         postErrorToPage(lastError.message);
         return;
       }
-      console.log("[Gravity Content] Got response from background:", response);
       if (response && response.pending !== true) {
         window.postMessage({
           type: "gravity_response",
@@ -46,9 +43,7 @@ window.addEventListener("message", (event) => {
   }
 });
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  console.log("[Gravity Content] Message from background:", msg.type);
   if (msg.type === "gravity_response") {
-    console.log("[Gravity Content] Posting response to page:", msg.id);
     window.postMessage(msg, "*");
     if (typeof sendResponse === "function") {
       sendResponse({ ack: true });
@@ -63,7 +58,6 @@ if (typeof navigator !== "undefined" && navigator.userAgent.includes("Firefox"))
       script.src = chrome.runtime.getURL("assets/provider.js");
       script.type = "module";
       script.onload = () => {
-        console.log("[Gravity] Successfully injected Firefox Web3 Provider");
         script.remove();
       };
       (document.head || document.documentElement).appendChild(script);

@@ -319,7 +319,7 @@ function createPacketDecoderStream(maxPayload, binaryType) {
         },
     });
 }
-const protocol$1 = 4;
+const protocol = 4;
 
 /**
  * Initialize a new `Emitter`.
@@ -923,8 +923,8 @@ class BaseXHR extends Polling {
     /**
      * Sends data.
      *
-     * @param {String} data to send.
-     * @param {Function} called upon flush.
+     * @param {String} data - data to send.
+     * @param {Function} fn - called upon flush.
      * @private
      */
     doWrite(data, fn) {
@@ -1589,7 +1589,7 @@ class SocketWithoutUpgrade extends Emitter {
     createTransport(name) {
         const query = Object.assign({}, this.opts.query);
         // append engine.io protocol identifier
-        query.EIO = protocol$1;
+        query.EIO = protocol;
         // transport name
         query.transport = name;
         // session id if we already have one
@@ -1837,7 +1837,7 @@ class SocketWithoutUpgrade extends Emitter {
     /**
      * Sends a packet.
      *
-     * @param {String} type: packet type.
+     * @param {String} type - packet type.
      * @param {String} data.
      * @param {Object} options.
      * @param {Function} fn - callback function.
@@ -1964,7 +1964,7 @@ class SocketWithoutUpgrade extends Emitter {
         }
     }
 }
-SocketWithoutUpgrade.protocol = protocol$1;
+SocketWithoutUpgrade.protocol = protocol;
 /**
  * This class provides a WebSocket-like interface to connect to an Engine.IO server. The connection will be established
  * with one of the available low-level transports, like HTTP long-polling, WebSocket or WebTransport.
@@ -2358,12 +2358,6 @@ const RESERVED_EVENTS$1 = [
     "newListener", // used by the Node.js EventEmitter
     "removeListener", // used by the Node.js EventEmitter
 ];
-/**
- * Protocol version.
- *
- * @public
- */
-const protocol = 5;
 var PacketType;
 (function (PacketType) {
     PacketType[PacketType["CONNECT"] = 0] = "CONNECT";
@@ -2454,12 +2448,13 @@ class Encoder {
 class Decoder extends Emitter {
     /**
      * Decoder constructor
-     *
-     * @param {function} reviver - custom reviver to pass down to JSON.stringify
      */
-    constructor(reviver) {
+    constructor(opts) {
         super();
-        this.reviver = reviver;
+        this.opts = Object.assign({
+            reviver: undefined,
+            maxAttachments: 10,
+        }, typeof opts === "function" ? { reviver: opts } : opts);
     }
     /**
      * Decodes an encoded packet string into packet JSON.
@@ -2530,7 +2525,14 @@ class Decoder extends Emitter {
             if (buf != Number(buf) || str.charAt(i) !== "-") {
                 throw new Error("Illegal attachments");
             }
-            p.attachments = Number(buf);
+            const n = Number(buf);
+            if (!isInteger(n) || n < 0) {
+                throw new Error("Illegal attachments");
+            }
+            else if (n > this.opts.maxAttachments) {
+                throw new Error("too many attachments");
+            }
+            p.attachments = n;
         }
         // look up namespace (if any)
         if ("/" === str.charAt(i + 1)) {
@@ -2576,7 +2578,7 @@ class Decoder extends Emitter {
     }
     tryParse(str) {
         try {
-            return JSON.parse(str, this.reviver);
+            return JSON.parse(str, this.opts.reviver);
         }
         catch (e) {
             return false;
@@ -2651,9 +2653,6 @@ class BinaryReconstructor {
         this.buffers = [];
     }
 }
-function isNamespaceValid(nsp) {
-    return typeof nsp === "string";
-}
 // see https://caniuse.com/mdn-javascript_builtins_number_isinteger
 const isInteger = Number.isInteger ||
     function (value) {
@@ -2661,45 +2660,16 @@ const isInteger = Number.isInteger ||
             isFinite(value) &&
             Math.floor(value) === value);
     };
-function isAckIdValid(id) {
-    return id === undefined || isInteger(id);
-}
 // see https://stackoverflow.com/questions/8511281/check-if-a-value-is-an-object-in-javascript
 function isObject(value) {
     return Object.prototype.toString.call(value) === "[object Object]";
-}
-function isDataValid(type, payload) {
-    switch (type) {
-        case PacketType.CONNECT:
-            return payload === undefined || isObject(payload);
-        case PacketType.DISCONNECT:
-            return payload === undefined;
-        case PacketType.EVENT:
-            return (Array.isArray(payload) &&
-                (typeof payload[0] === "number" ||
-                    (typeof payload[0] === "string" &&
-                        RESERVED_EVENTS$1.indexOf(payload[0]) === -1)));
-        case PacketType.ACK:
-            return Array.isArray(payload);
-        case PacketType.CONNECT_ERROR:
-            return typeof payload === "string" || isObject(payload);
-        default:
-            return false;
-    }
-}
-function isPacketValid(packet) {
-    return (isNamespaceValid(packet.nsp) &&
-        isAckIdValid(packet.id) &&
-        isDataValid(packet.type, packet.data));
 }
 
 const parser = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
     __proto__: null,
     Decoder,
     Encoder,
-    get PacketType () { return PacketType; },
-    isPacketValid,
-    protocol
+    get PacketType () { return PacketType; }
 }, Symbol.toStringTag, { value: 'Module' }));
 
 function on(obj, ev, fn) {

@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, w as broadcastRCDelegate, x as broadcastRCUndelegate, y as broadcastBulkTransfer, d as broadcastCustomJson, z as fetchCustomJsonEventsForAccounts, A as calculateThresholdProgress, B as getAccountAuthorities, D as createUnsignedTransaction, E as signTransactionEnvelope, F as selectBroadcastSignatures, G as broadcastSignedTransaction, H as indexBrowserExports, I as indexBrowserExports$1, v as validateAccountKeys, J as fetchAccountHistory, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, K as fetchBalances, L as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, w as broadcastRCDelegate, x as broadcastRCUndelegate, y as broadcastBulkTransfer, d as broadcastCustomJson, z as fetchCustomJsonEventsForAccounts, A as calculateThresholdProgress, B as getAccountAuthorities, D as createUnsignedTransaction, E as signTransactionEnvelope, F as selectBroadcastSignatures, G as broadcastSignedTransaction, H as indexBrowserExports, I as indexBrowserExports$1, v as validateAccountKeys, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, J as fetchBalances, K as detectWeb3Context, b as benchmarkNodes, L as fetchAccountHistory, M as getHistoryItemKey } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -1665,12 +1665,7 @@ class ChatService {
     try {
       const timestamp = (/* @__PURE__ */ new Date()).toISOString();
       const messageToSign = content + timestamp;
-      const publicKeyHex = localStorage.getItem("gravity_chat_pub");
-      console.log("[SIGN] Public Key (first 20):", publicKeyHex?.substring(0, 20));
-      console.log("[SIGN] Private Key (first 20):", privateKeyHex?.substring(0, 20));
-      console.log("[SIGN] Message to sign:", messageToSign);
       const signature = await this.signChallenge(messageToSign, privateKeyHex);
-      console.log("[SIGN] Signature (first 20):", signature?.substring(0, 20));
       this.socket.emit("send_message", {
         roomId,
         content,
@@ -2219,9 +2214,9 @@ var hasRequiredCore;
 function requireCore () {
 	if (hasRequiredCore) return core;
 	hasRequiredCore = 1;
-	(function (exports$1) {
+	(function (exports) {
 
-		Object.defineProperty(exports$1, '__esModule', { value: true });
+		Object.defineProperty(exports, '__esModule', { value: true });
 
 		function objectValues(value) {
 		  return Object.keys(value).map(key => value[key]);
@@ -2230,21 +2225,21 @@ function requireCore () {
 		  HashAlgorithms["SHA1"] = "sha1";
 		  HashAlgorithms["SHA256"] = "sha256";
 		  HashAlgorithms["SHA512"] = "sha512";
-		})(exports$1.HashAlgorithms || (exports$1.HashAlgorithms = {}));
-		const HASH_ALGORITHMS = objectValues(exports$1.HashAlgorithms);
+		})(exports.HashAlgorithms || (exports.HashAlgorithms = {}));
+		const HASH_ALGORITHMS = objectValues(exports.HashAlgorithms);
 		(function (KeyEncodings) {
 		  KeyEncodings["ASCII"] = "ascii";
 		  KeyEncodings["BASE64"] = "base64";
 		  KeyEncodings["HEX"] = "hex";
 		  KeyEncodings["LATIN1"] = "latin1";
 		  KeyEncodings["UTF8"] = "utf8";
-		})(exports$1.KeyEncodings || (exports$1.KeyEncodings = {}));
-		const KEY_ENCODINGS = objectValues(exports$1.KeyEncodings);
+		})(exports.KeyEncodings || (exports.KeyEncodings = {}));
+		const KEY_ENCODINGS = objectValues(exports.KeyEncodings);
 		(function (Strategy) {
 		  Strategy["HOTP"] = "hotp";
 		  Strategy["TOTP"] = "totp";
-		})(exports$1.Strategy || (exports$1.Strategy = {}));
-		const STRATEGY = objectValues(exports$1.Strategy);
+		})(exports.Strategy || (exports.Strategy = {}));
+		const STRATEGY = objectValues(exports.Strategy);
 		const createDigestPlaceholder = () => {
 		  throw new Error('Please provide an options.createDigest implementation.');
 		};
@@ -2340,11 +2335,11 @@ function requireCore () {
 		};
 		function hotpDefaultOptions() {
 		  const options = {
-		    algorithm: exports$1.HashAlgorithms.SHA1,
+		    algorithm: exports.HashAlgorithms.SHA1,
 		    createHmacKey: hotpCreateHmacKey,
 		    createDigest: createDigestPlaceholder,
 		    digits: 6,
-		    encoding: exports$1.KeyEncodings.ASCII
+		    encoding: exports.KeyEncodings.ASCII
 		  };
 		  return options;
 		}
@@ -2386,7 +2381,7 @@ function requireCore () {
 		  return keyuri({
 		    algorithm: options.algorithm,
 		    digits: options.digits,
-		    type: exports$1.Strategy.HOTP,
+		    type: exports.Strategy.HOTP,
 		    accountName,
 		    counter,
 		    issuer,
@@ -2450,11 +2445,11 @@ function requireCore () {
 		};
 		const totpCreateHmacKey = (algorithm, secret, encoding) => {
 		  switch (algorithm) {
-		    case exports$1.HashAlgorithms.SHA1:
+		    case exports.HashAlgorithms.SHA1:
 		      return totpPadSecret(secret, encoding, 20);
-		    case exports$1.HashAlgorithms.SHA256:
+		    case exports.HashAlgorithms.SHA256:
 		      return totpPadSecret(secret, encoding, 32);
-		    case exports$1.HashAlgorithms.SHA512:
+		    case exports.HashAlgorithms.SHA512:
 		      return totpPadSecret(secret, encoding, 64);
 		    default:
 		      throw new Error(`Expecting algorithm to be one of ${HASH_ALGORITHMS.join(', ')}. Received ${algorithm}.`);
@@ -2462,11 +2457,11 @@ function requireCore () {
 		};
 		function totpDefaultOptions() {
 		  const options = {
-		    algorithm: exports$1.HashAlgorithms.SHA1,
+		    algorithm: exports.HashAlgorithms.SHA1,
 		    createDigest: createDigestPlaceholder,
 		    createHmacKey: totpCreateHmacKey,
 		    digits: 6,
-		    encoding: exports$1.KeyEncodings.ASCII,
+		    encoding: exports.KeyEncodings.ASCII,
 		    epoch: Date.now(),
 		    step: 30,
 		    window: 0
@@ -2549,7 +2544,7 @@ function requireCore () {
 		    algorithm: options.algorithm,
 		    digits: options.digits,
 		    step: options.step,
-		    type: exports$1.Strategy.TOTP,
+		    type: exports.Strategy.TOTP,
 		    accountName,
 		    issuer,
 		    secret
@@ -2602,11 +2597,11 @@ function requireCore () {
 		}
 		function authenticatorDefaultOptions() {
 		  const options = {
-		    algorithm: exports$1.HashAlgorithms.SHA1,
+		    algorithm: exports.HashAlgorithms.SHA1,
 		    createDigest: createDigestPlaceholder,
 		    createHmacKey: totpCreateHmacKey,
 		    digits: 6,
-		    encoding: exports$1.KeyEncodings.HEX,
+		    encoding: exports.KeyEncodings.HEX,
 		    epoch: Date.now(),
 		    step: 30,
 		    window: 0
@@ -2660,49 +2655,49 @@ function requireCore () {
 		  }
 		}
 
-		exports$1.Authenticator = Authenticator;
-		exports$1.HASH_ALGORITHMS = HASH_ALGORITHMS;
-		exports$1.HOTP = HOTP;
-		exports$1.KEY_ENCODINGS = KEY_ENCODINGS;
-		exports$1.OTP = OTP;
-		exports$1.STRATEGY = STRATEGY;
-		exports$1.TOTP = TOTP;
-		exports$1.authenticatorCheckWithWindow = authenticatorCheckWithWindow;
-		exports$1.authenticatorDecoder = authenticatorDecoder;
-		exports$1.authenticatorDefaultOptions = authenticatorDefaultOptions;
-		exports$1.authenticatorEncoder = authenticatorEncoder;
-		exports$1.authenticatorGenerateSecret = authenticatorGenerateSecret;
-		exports$1.authenticatorOptionValidator = authenticatorOptionValidator;
-		exports$1.authenticatorOptions = authenticatorOptions;
-		exports$1.authenticatorToken = authenticatorToken;
-		exports$1.createDigestPlaceholder = createDigestPlaceholder;
-		exports$1.hotpCheck = hotpCheck;
-		exports$1.hotpCounter = hotpCounter;
-		exports$1.hotpCreateHmacKey = hotpCreateHmacKey;
-		exports$1.hotpDefaultOptions = hotpDefaultOptions;
-		exports$1.hotpDigestToToken = hotpDigestToToken;
-		exports$1.hotpKeyuri = hotpKeyuri;
-		exports$1.hotpOptions = hotpOptions;
-		exports$1.hotpOptionsValidator = hotpOptionsValidator;
-		exports$1.hotpToken = hotpToken;
-		exports$1.isTokenValid = isTokenValid;
-		exports$1.keyuri = keyuri;
-		exports$1.objectValues = objectValues;
-		exports$1.padStart = padStart;
-		exports$1.totpCheck = totpCheck;
-		exports$1.totpCheckByEpoch = totpCheckByEpoch;
-		exports$1.totpCheckWithWindow = totpCheckWithWindow;
-		exports$1.totpCounter = totpCounter;
-		exports$1.totpCreateHmacKey = totpCreateHmacKey;
-		exports$1.totpDefaultOptions = totpDefaultOptions;
-		exports$1.totpEpochAvailable = totpEpochAvailable;
-		exports$1.totpKeyuri = totpKeyuri;
-		exports$1.totpOptions = totpOptions;
-		exports$1.totpOptionsValidator = totpOptionsValidator;
-		exports$1.totpPadSecret = totpPadSecret;
-		exports$1.totpTimeRemaining = totpTimeRemaining;
-		exports$1.totpTimeUsed = totpTimeUsed;
-		exports$1.totpToken = totpToken; 
+		exports.Authenticator = Authenticator;
+		exports.HASH_ALGORITHMS = HASH_ALGORITHMS;
+		exports.HOTP = HOTP;
+		exports.KEY_ENCODINGS = KEY_ENCODINGS;
+		exports.OTP = OTP;
+		exports.STRATEGY = STRATEGY;
+		exports.TOTP = TOTP;
+		exports.authenticatorCheckWithWindow = authenticatorCheckWithWindow;
+		exports.authenticatorDecoder = authenticatorDecoder;
+		exports.authenticatorDefaultOptions = authenticatorDefaultOptions;
+		exports.authenticatorEncoder = authenticatorEncoder;
+		exports.authenticatorGenerateSecret = authenticatorGenerateSecret;
+		exports.authenticatorOptionValidator = authenticatorOptionValidator;
+		exports.authenticatorOptions = authenticatorOptions;
+		exports.authenticatorToken = authenticatorToken;
+		exports.createDigestPlaceholder = createDigestPlaceholder;
+		exports.hotpCheck = hotpCheck;
+		exports.hotpCounter = hotpCounter;
+		exports.hotpCreateHmacKey = hotpCreateHmacKey;
+		exports.hotpDefaultOptions = hotpDefaultOptions;
+		exports.hotpDigestToToken = hotpDigestToToken;
+		exports.hotpKeyuri = hotpKeyuri;
+		exports.hotpOptions = hotpOptions;
+		exports.hotpOptionsValidator = hotpOptionsValidator;
+		exports.hotpToken = hotpToken;
+		exports.isTokenValid = isTokenValid;
+		exports.keyuri = keyuri;
+		exports.objectValues = objectValues;
+		exports.padStart = padStart;
+		exports.totpCheck = totpCheck;
+		exports.totpCheckByEpoch = totpCheckByEpoch;
+		exports.totpCheckWithWindow = totpCheckWithWindow;
+		exports.totpCounter = totpCounter;
+		exports.totpCreateHmacKey = totpCreateHmacKey;
+		exports.totpDefaultOptions = totpDefaultOptions;
+		exports.totpEpochAvailable = totpEpochAvailable;
+		exports.totpKeyuri = totpKeyuri;
+		exports.totpOptions = totpOptions;
+		exports.totpOptionsValidator = totpOptionsValidator;
+		exports.totpPadSecret = totpPadSecret;
+		exports.totpTimeRemaining = totpTimeRemaining;
+		exports.totpTimeUsed = totpTimeUsed;
+		exports.totpToken = totpToken; 
 	} (core));
 	return core;
 }
@@ -2759,16 +2754,16 @@ var hasRequiredOtplib;
 function requireOtplib () {
 	if (hasRequiredOtplib) return otplib;
 	hasRequiredOtplib = 1;
-	(function (exports$1) {
+	(function (exports) {
 
-		Object.defineProperty(exports$1, '__esModule', { value: true });
+		Object.defineProperty(exports, '__esModule', { value: true });
 
 		var presetDefault = requirePresetDefault();
 
 
 
 		Object.keys(presetDefault).forEach(function (k) {
-			if (k !== 'default') Object.defineProperty(exports$1, k, {
+			if (k !== 'default') Object.defineProperty(exports, k, {
 				enumerable: true,
 				get: function () {
 					return presetDefault[k];
@@ -2881,11 +2876,11 @@ var hasRequiredErrorCorrectionLevel;
 function requireErrorCorrectionLevel () {
 	if (hasRequiredErrorCorrectionLevel) return errorCorrectionLevel;
 	hasRequiredErrorCorrectionLevel = 1;
-	(function (exports$1) {
-		exports$1.L = { bit: 1 };
-		exports$1.M = { bit: 0 };
-		exports$1.Q = { bit: 3 };
-		exports$1.H = { bit: 2 };
+	(function (exports) {
+		exports.L = { bit: 1 };
+		exports.M = { bit: 0 };
+		exports.Q = { bit: 3 };
+		exports.H = { bit: 2 };
 
 		function fromString (string) {
 		  if (typeof string !== 'string') {
@@ -2897,32 +2892,32 @@ function requireErrorCorrectionLevel () {
 		  switch (lcStr) {
 		    case 'l':
 		    case 'low':
-		      return exports$1.L
+		      return exports.L
 
 		    case 'm':
 		    case 'medium':
-		      return exports$1.M
+		      return exports.M
 
 		    case 'q':
 		    case 'quartile':
-		      return exports$1.Q
+		      return exports.Q
 
 		    case 'h':
 		    case 'high':
-		      return exports$1.H
+		      return exports.H
 
 		    default:
 		      throw new Error('Unknown EC Level: ' + string)
 		  }
 		}
 
-		exports$1.isValid = function isValid (level) {
+		exports.isValid = function isValid (level) {
 		  return level && typeof level.bit !== 'undefined' &&
 		    level.bit >= 0 && level.bit < 4
 		};
 
-		exports$1.from = function from (value, defaultValue) {
-		  if (exports$1.isValid(value)) {
+		exports.from = function from (value, defaultValue) {
+		  if (exports.isValid(value)) {
 		    return value
 		  }
 
@@ -3074,7 +3069,7 @@ var hasRequiredAlignmentPattern;
 function requireAlignmentPattern () {
 	if (hasRequiredAlignmentPattern) return alignmentPattern;
 	hasRequiredAlignmentPattern = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const getSymbolSize = requireUtils$1().getSymbolSize;
 
 		/**
@@ -3091,7 +3086,7 @@ function requireAlignmentPattern () {
 		 * @param  {Number} version QR Code version
 		 * @return {Array}          Array of coordinate
 		 */
-		exports$1.getRowColCoords = function getRowColCoords (version) {
+		exports.getRowColCoords = function getRowColCoords (version) {
 		  if (version === 1) return []
 
 		  const posCount = Math.floor(version / 7) + 2;
@@ -3128,9 +3123,9 @@ function requireAlignmentPattern () {
 		 * @param  {Number} version QR Code version
 		 * @return {Array}          Array of coordinates
 		 */
-		exports$1.getPositions = function getPositions (version) {
+		exports.getPositions = function getPositions (version) {
 		  const coords = [];
-		  const pos = exports$1.getRowColCoords(version);
+		  const pos = exports.getRowColCoords(version);
 		  const posLength = pos.length;
 
 		  for (let i = 0; i < posLength; i++) {
@@ -3196,8 +3191,8 @@ var hasRequiredMaskPattern;
 function requireMaskPattern () {
 	if (hasRequiredMaskPattern) return maskPattern;
 	hasRequiredMaskPattern = 1;
-	(function (exports$1) {
-		exports$1.Patterns = {
+	(function (exports) {
+		exports.Patterns = {
 		  PATTERN000: 0,
 		  PATTERN001: 1,
 		  PATTERN010: 2,
@@ -3225,7 +3220,7 @@ function requireMaskPattern () {
 		 * @param  {Number}  mask    Mask pattern
 		 * @return {Boolean}         true if valid, false otherwise
 		 */
-		exports$1.isValid = function isValid (mask) {
+		exports.isValid = function isValid (mask) {
 		  return mask != null && mask !== '' && !isNaN(mask) && mask >= 0 && mask <= 7
 		};
 
@@ -3236,8 +3231,8 @@ function requireMaskPattern () {
 		 * @param  {Number|String} value        Mask pattern value
 		 * @return {Number}                     Valid mask pattern or undefined
 		 */
-		exports$1.from = function from (value) {
-		  return exports$1.isValid(value) ? parseInt(value, 10) : undefined
+		exports.from = function from (value) {
+		  return exports.isValid(value) ? parseInt(value, 10) : undefined
 		};
 
 		/**
@@ -3247,7 +3242,7 @@ function requireMaskPattern () {
 		* Points: N1 + i
 		* i is the amount by which the number of adjacent modules of the same color exceeds 5
 		*/
-		exports$1.getPenaltyN1 = function getPenaltyN1 (data) {
+		exports.getPenaltyN1 = function getPenaltyN1 (data) {
 		  const size = data.size;
 		  let points = 0;
 		  let sameCountCol = 0;
@@ -3291,7 +3286,7 @@ function requireMaskPattern () {
 		 *
 		 * Points: N2 * (m - 1) * (n - 1)
 		 */
-		exports$1.getPenaltyN2 = function getPenaltyN2 (data) {
+		exports.getPenaltyN2 = function getPenaltyN2 (data) {
 		  const size = data.size;
 		  let points = 0;
 
@@ -3315,7 +3310,7 @@ function requireMaskPattern () {
 		 *
 		 * Points: N3 * number of pattern found
 		 */
-		exports$1.getPenaltyN3 = function getPenaltyN3 (data) {
+		exports.getPenaltyN3 = function getPenaltyN3 (data) {
 		  const size = data.size;
 		  let points = 0;
 		  let bitsCol = 0;
@@ -3343,7 +3338,7 @@ function requireMaskPattern () {
 		 * k is the rating of the deviation of the proportion of dark modules
 		 * in the symbol from 50% in steps of 5%
 		 */
-		exports$1.getPenaltyN4 = function getPenaltyN4 (data) {
+		exports.getPenaltyN4 = function getPenaltyN4 (data) {
 		  let darkCount = 0;
 		  const modulesCount = data.data.length;
 
@@ -3364,14 +3359,14 @@ function requireMaskPattern () {
 		 */
 		function getMaskAt (maskPattern, i, j) {
 		  switch (maskPattern) {
-		    case exports$1.Patterns.PATTERN000: return (i + j) % 2 === 0
-		    case exports$1.Patterns.PATTERN001: return i % 2 === 0
-		    case exports$1.Patterns.PATTERN010: return j % 3 === 0
-		    case exports$1.Patterns.PATTERN011: return (i + j) % 3 === 0
-		    case exports$1.Patterns.PATTERN100: return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0
-		    case exports$1.Patterns.PATTERN101: return (i * j) % 2 + (i * j) % 3 === 0
-		    case exports$1.Patterns.PATTERN110: return ((i * j) % 2 + (i * j) % 3) % 2 === 0
-		    case exports$1.Patterns.PATTERN111: return ((i * j) % 3 + (i + j) % 2) % 2 === 0
+		    case exports.Patterns.PATTERN000: return (i + j) % 2 === 0
+		    case exports.Patterns.PATTERN001: return i % 2 === 0
+		    case exports.Patterns.PATTERN010: return j % 3 === 0
+		    case exports.Patterns.PATTERN011: return (i + j) % 3 === 0
+		    case exports.Patterns.PATTERN100: return (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0
+		    case exports.Patterns.PATTERN101: return (i * j) % 2 + (i * j) % 3 === 0
+		    case exports.Patterns.PATTERN110: return ((i * j) % 2 + (i * j) % 3) % 2 === 0
+		    case exports.Patterns.PATTERN111: return ((i * j) % 3 + (i + j) % 2) % 2 === 0
 
 		    default: throw new Error('bad maskPattern:' + maskPattern)
 		  }
@@ -3383,7 +3378,7 @@ function requireMaskPattern () {
 		 * @param  {Number}    pattern Pattern reference number
 		 * @param  {BitMatrix} data    BitMatrix data
 		 */
-		exports$1.applyMask = function applyMask (pattern, data) {
+		exports.applyMask = function applyMask (pattern, data) {
 		  const size = data.size;
 
 		  for (let col = 0; col < size; col++) {
@@ -3400,24 +3395,24 @@ function requireMaskPattern () {
 		 * @param  {BitMatrix} data
 		 * @return {Number} Mask pattern reference number
 		 */
-		exports$1.getBestMask = function getBestMask (data, setupFormatFunc) {
-		  const numPatterns = Object.keys(exports$1.Patterns).length;
+		exports.getBestMask = function getBestMask (data, setupFormatFunc) {
+		  const numPatterns = Object.keys(exports.Patterns).length;
 		  let bestPattern = 0;
 		  let lowerPenalty = Infinity;
 
 		  for (let p = 0; p < numPatterns; p++) {
 		    setupFormatFunc(p);
-		    exports$1.applyMask(p, data);
+		    exports.applyMask(p, data);
 
 		    // Calculate penalty
 		    const penalty =
-		      exports$1.getPenaltyN1(data) +
-		      exports$1.getPenaltyN2(data) +
-		      exports$1.getPenaltyN3(data) +
-		      exports$1.getPenaltyN4(data);
+		      exports.getPenaltyN1(data) +
+		      exports.getPenaltyN2(data) +
+		      exports.getPenaltyN3(data) +
+		      exports.getPenaltyN4(data);
 
 		    // Undo previously applied mask
-		    exports$1.applyMask(p, data);
+		    exports.applyMask(p, data);
 
 		    if (penalty < lowerPenalty) {
 		      lowerPenalty = penalty;
@@ -3662,7 +3657,7 @@ var hasRequiredPolynomial;
 function requirePolynomial () {
 	if (hasRequiredPolynomial) return polynomial;
 	hasRequiredPolynomial = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const GF = requireGaloisField();
 
 		/**
@@ -3672,7 +3667,7 @@ function requirePolynomial () {
 		 * @param  {Uint8Array} p2 Polynomial
 		 * @return {Uint8Array}    Product of p1 and p2
 		 */
-		exports$1.mul = function mul (p1, p2) {
+		exports.mul = function mul (p1, p2) {
 		  const coeff = new Uint8Array(p1.length + p2.length - 1);
 
 		  for (let i = 0; i < p1.length; i++) {
@@ -3691,7 +3686,7 @@ function requirePolynomial () {
 		 * @param  {Uint8Array} divisor  Polynomial
 		 * @return {Uint8Array}          Remainder
 		 */
-		exports$1.mod = function mod (divident, divisor) {
+		exports.mod = function mod (divident, divisor) {
 		  let result = new Uint8Array(divident);
 
 		  while ((result.length - divisor.length) >= 0) {
@@ -3717,10 +3712,10 @@ function requirePolynomial () {
 		 * @param  {Number} degree Degree of the generator polynomial
 		 * @return {Uint8Array}    Buffer containing polynomial coefficients
 		 */
-		exports$1.generateECPolynomial = function generateECPolynomial (degree) {
+		exports.generateECPolynomial = function generateECPolynomial (degree) {
 		  let poly = new Uint8Array([1]);
 		  for (let i = 0; i < degree; i++) {
-		    poly = exports$1.mul(poly, new Uint8Array([1, GF.exp(i)]));
+		    poly = exports.mul(poly, new Uint8Array([1, GF.exp(i)]));
 		  }
 
 		  return poly
@@ -3864,7 +3859,7 @@ var hasRequiredMode;
 function requireMode () {
 	if (hasRequiredMode) return mode;
 	hasRequiredMode = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const VersionCheck = requireVersionCheck();
 		const Regex = requireRegex();
 
@@ -3875,7 +3870,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.NUMERIC = {
+		exports.NUMERIC = {
 		  id: 'Numeric',
 		  bit: 1 << 0,
 		  ccBits: [10, 12, 14]
@@ -3890,7 +3885,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.ALPHANUMERIC = {
+		exports.ALPHANUMERIC = {
 		  id: 'Alphanumeric',
 		  bit: 1 << 1,
 		  ccBits: [9, 11, 13]
@@ -3901,7 +3896,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.BYTE = {
+		exports.BYTE = {
 		  id: 'Byte',
 		  bit: 1 << 2,
 		  ccBits: [8, 16, 16]
@@ -3916,7 +3911,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.KANJI = {
+		exports.KANJI = {
 		  id: 'Kanji',
 		  bit: 1 << 3,
 		  ccBits: [8, 10, 12]
@@ -3928,7 +3923,7 @@ function requireMode () {
 		 *
 		 * @type {Object}
 		 */
-		exports$1.MIXED = {
+		exports.MIXED = {
 		  bit: -1
 		};
 
@@ -3940,7 +3935,7 @@ function requireMode () {
 		 * @param  {Number} version QR Code version
 		 * @return {Number}         Number of bits
 		 */
-		exports$1.getCharCountIndicator = function getCharCountIndicator (mode, version) {
+		exports.getCharCountIndicator = function getCharCountIndicator (mode, version) {
 		  if (!mode.ccBits) throw new Error('Invalid mode: ' + mode)
 
 		  if (!VersionCheck.isValid(version)) {
@@ -3958,11 +3953,11 @@ function requireMode () {
 		 * @param  {String} dataStr Input data string
 		 * @return {Mode}           Best mode
 		 */
-		exports$1.getBestModeForData = function getBestModeForData (dataStr) {
-		  if (Regex.testNumeric(dataStr)) return exports$1.NUMERIC
-		  else if (Regex.testAlphanumeric(dataStr)) return exports$1.ALPHANUMERIC
-		  else if (Regex.testKanji(dataStr)) return exports$1.KANJI
-		  else return exports$1.BYTE
+		exports.getBestModeForData = function getBestModeForData (dataStr) {
+		  if (Regex.testNumeric(dataStr)) return exports.NUMERIC
+		  else if (Regex.testAlphanumeric(dataStr)) return exports.ALPHANUMERIC
+		  else if (Regex.testKanji(dataStr)) return exports.KANJI
+		  else return exports.BYTE
 		};
 
 		/**
@@ -3971,7 +3966,7 @@ function requireMode () {
 		 * @param {Mode} mode Mode object
 		 * @returns {String}  Mode name
 		 */
-		exports$1.toString = function toString (mode) {
+		exports.toString = function toString (mode) {
 		  if (mode && mode.id) return mode.id
 		  throw new Error('Invalid mode')
 		};
@@ -3982,7 +3977,7 @@ function requireMode () {
 		 * @param   {Mode}    mode Mode object
 		 * @returns {Boolean} True if valid mode, false otherwise
 		 */
-		exports$1.isValid = function isValid (mode) {
+		exports.isValid = function isValid (mode) {
 		  return mode && mode.bit && mode.ccBits
 		};
 
@@ -4001,13 +3996,13 @@ function requireMode () {
 
 		  switch (lcStr) {
 		    case 'numeric':
-		      return exports$1.NUMERIC
+		      return exports.NUMERIC
 		    case 'alphanumeric':
-		      return exports$1.ALPHANUMERIC
+		      return exports.ALPHANUMERIC
 		    case 'kanji':
-		      return exports$1.KANJI
+		      return exports.KANJI
 		    case 'byte':
-		      return exports$1.BYTE
+		      return exports.BYTE
 		    default:
 		      throw new Error('Unknown mode: ' + string)
 		  }
@@ -4021,8 +4016,8 @@ function requireMode () {
 		 * @param  {Mode}        defaultValue Fallback value
 		 * @return {Mode}                     Encoding mode
 		 */
-		exports$1.from = function from (value, defaultValue) {
-		  if (exports$1.isValid(value)) {
+		exports.from = function from (value, defaultValue) {
+		  if (exports.isValid(value)) {
 		    return value
 		  }
 
@@ -4041,7 +4036,7 @@ var hasRequiredVersion;
 function requireVersion () {
 	if (hasRequiredVersion) return version;
 	hasRequiredVersion = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const Utils = requireUtils$1();
 		const ECCode = requireErrorCorrectionCode();
 		const ECLevel = requireErrorCorrectionLevel();
@@ -4054,7 +4049,7 @@ function requireVersion () {
 
 		function getBestVersionForDataLength (mode, length, errorCorrectionLevel) {
 		  for (let currentVersion = 1; currentVersion <= 40; currentVersion++) {
-		    if (length <= exports$1.getCapacity(currentVersion, errorCorrectionLevel, mode)) {
+		    if (length <= exports.getCapacity(currentVersion, errorCorrectionLevel, mode)) {
 		      return currentVersion
 		    }
 		  }
@@ -4081,7 +4076,7 @@ function requireVersion () {
 		function getBestVersionForMixedData (segments, errorCorrectionLevel) {
 		  for (let currentVersion = 1; currentVersion <= 40; currentVersion++) {
 		    const length = getTotalBitsFromDataArray(segments, currentVersion);
-		    if (length <= exports$1.getCapacity(currentVersion, errorCorrectionLevel, Mode.MIXED)) {
+		    if (length <= exports.getCapacity(currentVersion, errorCorrectionLevel, Mode.MIXED)) {
 		      return currentVersion
 		    }
 		  }
@@ -4097,7 +4092,7 @@ function requireVersion () {
 		 * @param  {Number}        defaultValue Fallback value
 		 * @return {Number}                     QR Code version number
 		 */
-		exports$1.from = function from (value, defaultValue) {
+		exports.from = function from (value, defaultValue) {
 		  if (VersionCheck.isValid(value)) {
 		    return parseInt(value, 10)
 		  }
@@ -4114,7 +4109,7 @@ function requireVersion () {
 		 * @param  {Mode}   mode                 Data mode
 		 * @return {Number}                      Quantity of storable data
 		 */
-		exports$1.getCapacity = function getCapacity (version, errorCorrectionLevel, mode) {
+		exports.getCapacity = function getCapacity (version, errorCorrectionLevel, mode) {
 		  if (!VersionCheck.isValid(version)) {
 		    throw new Error('Invalid QR Code version')
 		  }
@@ -4160,7 +4155,7 @@ function requireVersion () {
 		 * @param  {Mode} mode                       Data mode
 		 * @return {Number}                          QR Code version
 		 */
-		exports$1.getBestVersionForData = function getBestVersionForData (data, errorCorrectionLevel) {
+		exports.getBestVersionForData = function getBestVersionForData (data, errorCorrectionLevel) {
 		  let seg;
 
 		  const ecl = ECLevel.from(errorCorrectionLevel, ECLevel.M);
@@ -4192,7 +4187,7 @@ function requireVersion () {
 		 * @param  {Number} version QR Code version
 		 * @return {Number}         Encoded version info bits
 		 */
-		exports$1.getEncodedBits = function getEncodedBits (version) {
+		exports.getEncodedBits = function getEncodedBits (version) {
 		  if (!VersionCheck.isValid(version) || version < 7) {
 		    throw new Error('Invalid QR Code version')
 		  }
@@ -4652,7 +4647,7 @@ var hasRequiredSegments;
 function requireSegments () {
 	if (hasRequiredSegments) return segments;
 	hasRequiredSegments = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const Mode = requireMode();
 		const NumericData = requireNumericData();
 		const AlphanumericData = requireAlphanumericData();
@@ -4933,7 +4928,7 @@ function requireSegments () {
 		 * @param  {Array} array Array of objects with segments data
 		 * @return {Array}       Array of Segments
 		 */
-		exports$1.fromArray = function fromArray (array) {
+		exports.fromArray = function fromArray (array) {
 		  return array.reduce(function (acc, seg) {
 		    if (typeof seg === 'string') {
 		      acc.push(buildSingleSegment(seg, null));
@@ -4953,7 +4948,7 @@ function requireSegments () {
 		 * @param  {Number} version QR Code version
 		 * @return {Array}          Array of segments
 		 */
-		exports$1.fromString = function fromString (data, version) {
+		exports.fromString = function fromString (data, version) {
 		  const segs = getSegmentsFromString(data, Utils.isKanjiModeEnabled());
 
 		  const nodes = buildNodes(segs);
@@ -4965,7 +4960,7 @@ function requireSegments () {
 		    optimizedSegs.push(graph.table[path[i]].node);
 		  }
 
-		  return exports$1.fromArray(mergeSegments(optimizedSegs))
+		  return exports.fromArray(mergeSegments(optimizedSegs))
 		};
 
 		/**
@@ -4978,8 +4973,8 @@ function requireSegments () {
 		 * @param  {string} data Input string
 		 * @return {Array}       Array of segments
 		 */
-		exports$1.rawSplit = function rawSplit (data) {
-		  return exports$1.fromArray(
+		exports.rawSplit = function rawSplit (data) {
+		  return exports.fromArray(
 		    getSegmentsFromString(data, Utils.isKanjiModeEnabled())
 		  )
 		}; 
@@ -5499,7 +5494,7 @@ var hasRequiredUtils;
 function requireUtils () {
 	if (hasRequiredUtils) return utils;
 	hasRequiredUtils = 1;
-	(function (exports$1) {
+	(function (exports) {
 		function hex2rgba (hex) {
 		  if (typeof hex === 'number') {
 		    hex = hex.toString();
@@ -5535,7 +5530,7 @@ function requireUtils () {
 		  }
 		}
 
-		exports$1.getOptions = function getOptions (options) {
+		exports.getOptions = function getOptions (options) {
 		  if (!options) options = {};
 		  if (!options.color) options.color = {};
 
@@ -5561,21 +5556,21 @@ function requireUtils () {
 		  }
 		};
 
-		exports$1.getScale = function getScale (qrSize, opts) {
+		exports.getScale = function getScale (qrSize, opts) {
 		  return opts.width && opts.width >= qrSize + opts.margin * 2
 		    ? opts.width / (qrSize + opts.margin * 2)
 		    : opts.scale
 		};
 
-		exports$1.getImageWidth = function getImageWidth (qrSize, opts) {
-		  const scale = exports$1.getScale(qrSize, opts);
+		exports.getImageWidth = function getImageWidth (qrSize, opts) {
+		  const scale = exports.getScale(qrSize, opts);
 		  return Math.floor((qrSize + opts.margin * 2) * scale)
 		};
 
-		exports$1.qrToImageData = function qrToImageData (imgData, qr, opts) {
+		exports.qrToImageData = function qrToImageData (imgData, qr, opts) {
 		  const size = qr.modules.size;
 		  const data = qr.modules.data;
-		  const scale = exports$1.getScale(size, opts);
+		  const scale = exports.getScale(size, opts);
 		  const symbolSize = Math.floor((size + opts.margin * 2) * scale);
 		  const scaledMargin = opts.margin * scale;
 		  const palette = [opts.color.light, opts.color.dark];
@@ -5608,7 +5603,7 @@ var hasRequiredCanvas;
 function requireCanvas () {
 	if (hasRequiredCanvas) return canvas;
 	hasRequiredCanvas = 1;
-	(function (exports$1) {
+	(function (exports) {
 		const Utils = requireUtils();
 
 		function clearCanvas (ctx, canvas, size) {
@@ -5629,7 +5624,7 @@ function requireCanvas () {
 		  }
 		}
 
-		exports$1.render = function render (qrData, canvas, options) {
+		exports.render = function render (qrData, canvas, options) {
 		  let opts = options;
 		  let canvasEl = canvas;
 
@@ -5655,7 +5650,7 @@ function requireCanvas () {
 		  return canvasEl
 		};
 
-		exports$1.renderToDataURL = function renderToDataURL (qrData, canvas, options) {
+		exports.renderToDataURL = function renderToDataURL (qrData, canvas, options) {
 		  let opts = options;
 
 		  if (typeof opts === 'undefined' && (!canvas || !canvas.getContext)) {
@@ -5665,7 +5660,7 @@ function requireCanvas () {
 
 		  if (!opts) opts = {};
 
-		  const canvasEl = exports$1.render(qrData, canvas, opts);
+		  const canvasEl = exports.render(qrData, canvas, opts);
 
 		  const type = opts.type || 'image/png';
 		  const rendererOpts = opts.rendererOpts || {};
@@ -5942,9 +5937,6 @@ const translations = {
     "wallet.history": "History",
     "wallet.keys": "Keys",
     "wallet.network_label": "Active Network",
-    "bulk.analyze": "Analyze Security",
-    "bulk.analyzing": "Analyzing...",
-    "bulk.success": "Analysis: No risks found.",
     "bulk.switch_network": "Switch Network",
     // Sidebar
     "sidebar.home": "Home",
@@ -5975,7 +5967,7 @@ const translations = {
     "import.select_chain": "Select Chain",
     "import.username": "Username",
     "import.checking": "Checking chain...",
-    "import.found": "✓ Found on Chain",
+    "import.found": "Found on Chain",
     "import.not_found": "Account not found",
     "import.private_keys": "Private Keys (Paste at least one)",
     "import.key_posting": "POSTING KEY",
@@ -5996,8 +5988,16 @@ const translations = {
     "settings.change_password": "Change Access Password",
     "settings.biometrics": "Use Biometrics",
     "settings.reset": "Reset Wallet",
-    "pair.section_title": "Pair Another Device",
-    "pair.section_subtitle": "On the new device, generate a receive code. On the current device, enter that code and approve the encrypted transfer.",
+    "pair.section_title": "Secure Wallet Transfer",
+    "pair.section_subtitle": "Move your encrypted wallet to another device without exposing its private keys.",
+    "pair.transfer_cta": "Transfer Wallet",
+    "pair.transfer_cta_hint": "Send or receive on another device",
+    "pair.choose_title": "Transfer Wallet",
+    "pair.choose_subtitle": "Choose what this device should do.",
+    "pair.role_send": "Send from this device",
+    "pair.role_send_hint": "This device already contains the wallet",
+    "pair.role_receive": "Receive on this device",
+    "pair.role_receive_hint": "This is the destination device",
     "pair.send_cta": "Send To New Device",
     "pair.receive_cta": "Get Receive Code",
     "pair.step_badge_send": "Step 2 of 2",
@@ -6025,8 +6025,9 @@ const translations = {
     "pair.waiting_handshake": "Waiting for secure handshake...",
     "pair.approve_and_send": "Approve and Send",
     "pair.sending": "Encrypting and sending wallet...",
+    "pair.waiting_import_confirmation": "Wallet delivered. Waiting for the destination to finish importing...",
     "pair.send_complete": "Transfer Complete",
-    "pair.send_complete_subtitle": "The destination device can import the wallet now.",
+    "pair.send_complete_subtitle": "The destination device confirmed the wallet import.",
     "pair.connect_error": "Unable to pair with target device",
     "pair.send_error": "Unable to send encrypted wallet",
     "pair.e2ee_notice": "This device never exposes the private data in plain text.",
@@ -6049,7 +6050,7 @@ const translations = {
     "multisig.threshold_label": "Threshold",
     "multisig.authorities_title": "Required Authorities",
     "multisig.you_label": "(YOU)",
-    "multisig.how_it_works": '💡 **How it works:** This account is protected by Multiple Signatures. Each signer has a specific "Weight". Once the total weight reaches the "Threshold" of {threshold}, the transaction can be officially broadcasted to the blockchain.',
+    "multisig.how_it_works": '**How it works:** This account is protected by Multiple Signatures. Each signer has a specific "Weight". Once the total weight reaches the "Threshold" of {threshold}, the transaction can be officially broadcasted to the blockchain.',
     "multisig.success_done": "Transaction Completed!",
     "multisig.reuse": "Reuse",
     "multisig.header_desc": "Build a multisig proposal draft and inspect the live account authority before coordinating signatures.",
@@ -6174,7 +6175,7 @@ const translations = {
     "bulk.success_msg": "Sent {n} transfers successfully. TXID: {txid}...",
     "bulk.error_title": "Error",
     "bulk.error_failed": "Failed to send",
-    "bulk.warn_not_found": "⚠ Warning: {n} username(s) not found on {chain} chain.",
+    "bulk.warn_not_found": "Warning: {n} username(s) not found on {chain} chain.",
     "bulk.error_no_active": "Active key not found for this account.",
     // Lock Screen
     "lock.title": "Welcome Back",
@@ -6286,8 +6287,6 @@ const translations = {
     "import.processing": "Processing...",
     "import.bulk_summary": "Imported {count} accounts.",
     "import.no_valid_accounts": "No valid accounts found in file.",
-    // Security
-    "security.analysis_prompt": "Please analyze this crypto transaction for safety risks in English: ",
     "history.title": "History: {user}",
     "history.loading": "Loading history...",
     "history.empty": "No transfers found in recent history.",
@@ -6301,9 +6300,22 @@ const translations = {
     "history.filter_sent": "Sent",
     "history.filter_powerup": "Power Up",
     "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delegate",
     "history.type_powerup_in": "Received Power",
     "history.type_powerup_out": "Sent Power",
     "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delegation Received",
+    "history.type_delegate_out": "Delegated Power",
+    "history.type_undelegate_out": "Undelegated Power",
+    "history.type_rc_delegate_in": "RC Delegation Received",
+    "history.type_rc_delegate_out": "RC Delegated",
+    "history.type_savings_in": "Savings In",
+    "history.type_savings_out": "Savings Out",
+    "history.type_savings_cancel": "Savings Cancelled",
+    "history.type_reward": "Reward",
+    "history.type_producer_reward": "Producer Reward",
+    "history.show_producer_rewards": "Show producer rewards",
+    "history.hide_producer_rewards": "Hide producer rewards",
     // Sign Request
     "sign.title": "Signature Request",
     "sign.transfer_title": "Transfer Request",
@@ -6534,9 +6546,6 @@ const translations = {
     "wallet.no_accounts_chain": "No hay cuentas añadidas para {chain}",
     "wallet.add_one": "Añadir Cuenta",
     "wallet.network_label": "Red Activa",
-    "bulk.analyze": "Analizar Seguridad",
-    "bulk.analyzing": "Analizando...",
-    "bulk.success": "Análisis: Sin riesgos detectados.",
     "bulk.switch_network": "Cambiar Red",
     // Sidebar
     "sidebar.home": "Inicio",
@@ -6566,7 +6575,7 @@ const translations = {
     "import.select_chain": "Seleccionar Red",
     "import.username": "Usuario",
     "import.checking": "Comprobando red...",
-    "import.found": "✓ Encontrado",
+    "import.found": "Encontrado",
     "import.not_found": "Cuenta no encontrada",
     "import.private_keys": "Llaves Privadas (Pegar al menos una)",
     "import.key_posting": "LLAVE POSTING",
@@ -6587,8 +6596,16 @@ const translations = {
     "settings.change_password": "Cambiar Contraseña",
     "settings.biometrics": "Usar Biometría",
     "settings.reset": "Reiniciar Billetera",
-    "pair.section_title": "Emparejar Otro Equipo",
-    "pair.section_subtitle": "En el equipo nuevo, genera un código de recepción. En el equipo actual, introduce ese código y aprueba la transferencia cifrada.",
+    "pair.section_title": "Transferencia Segura de Cartera",
+    "pair.section_subtitle": "Traslada tu cartera cifrada a otro equipo sin exponer sus claves privadas.",
+    "pair.transfer_cta": "Transferir Cartera",
+    "pair.transfer_cta_hint": "Enviar o recibir en otro equipo",
+    "pair.choose_title": "Transferir Cartera",
+    "pair.choose_subtitle": "Elige qué debe hacer este equipo.",
+    "pair.role_send": "Enviar desde este equipo",
+    "pair.role_send_hint": "Este equipo ya contiene la cartera",
+    "pair.role_receive": "Recibir en este equipo",
+    "pair.role_receive_hint": "Este es el equipo de destino",
     "pair.send_cta": "Enviar Al Equipo Nuevo",
     "pair.receive_cta": "Obtener Código",
     "pair.step_badge_send": "Paso 2 de 2",
@@ -6616,8 +6633,9 @@ const translations = {
     "pair.waiting_handshake": "Esperando handshake seguro...",
     "pair.approve_and_send": "Aprobar y Enviar",
     "pair.sending": "Cifrando y enviando cartera...",
+    "pair.waiting_import_confirmation": "Cartera entregada. Esperando a que el destino termine de importarla...",
     "pair.send_complete": "Transferencia Completa",
-    "pair.send_complete_subtitle": "El equipo de destino ya puede importar la cartera.",
+    "pair.send_complete_subtitle": "El equipo de destino confirmó la importación de la cartera.",
     "pair.connect_error": "No se pudo emparejar con el equipo de destino",
     "pair.send_error": "No se pudo enviar la cartera cifrada",
     "pair.e2ee_notice": "Este equipo nunca expone los datos privados en texto plano.",
@@ -6640,7 +6658,7 @@ const translations = {
     "multisig.threshold_label": "Umbral",
     "multisig.authorities_title": "Autoridades Requeridas",
     "multisig.you_label": "(TÚ)",
-    "multisig.how_it_works": '💡 **Cómo funciona:** Esta cuenta está protegida por Firmas Múltiples. Cada firmante tiene un "Peso" específico. Una vez que el peso total alcanza el "Umbral" de {threshold}, la transacción puede ser transmitida oficialmente a la blockchain.',
+    "multisig.how_it_works": '**Cómo funciona:** Esta cuenta está protegida por Firmas Múltiples. Cada firmante tiene un "Peso" específico. Una vez que el peso total alcanza el "Umbral" de {threshold}, la transacción puede ser transmitida oficialmente a la blockchain.',
     "multisig.success_done": "¡Transacción Completada!",
     "multisig.reuse": "Reutilizar",
     "multisig.header_desc": "Construye un borrador multisig y revisa la autoridad activa real antes de coordinar las firmas.",
@@ -6765,7 +6783,7 @@ const translations = {
     "bulk.success_msg": "Enviadas {n} transferencias exitosamente. TXID: {txid}...",
     "bulk.error_title": "Error",
     "bulk.error_failed": "Error al enviar",
-    "bulk.warn_not_found": "⚠ Advertencia: {n} usuario(s) no encontrado(s) en la red {chain}.",
+    "bulk.warn_not_found": "Advertencia: {n} usuario(s) no encontrado(s) en la red {chain}.",
     "bulk.error_no_active": "No se encontró llave activa para esta cuenta.",
     // Lock Screen
     "lock.title": "Bienvenido",
@@ -6877,8 +6895,6 @@ const translations = {
     "import.processing": "Procesando...",
     "import.bulk_summary": "Importadas {count} cuentas.",
     "import.no_valid_accounts": "No se encontraron cuentas válidas.",
-    // Security
-    "security.analysis_prompt": "Por favor analiza esta transacción en busca de riesgos en Español: ",
     "history.title": "Historial: {user}",
     "history.loading": "Cargando historial...",
     "history.empty": "No se encontraron transferencias recientes.",
@@ -6892,9 +6908,22 @@ const translations = {
     "history.filter_sent": "Enviados",
     "history.filter_powerup": "Power Up",
     "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delegar",
     "history.type_powerup_in": "Power Recibido",
     "history.type_powerup_out": "Power Enviado",
     "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delegacion recibida",
+    "history.type_delegate_out": "Power delegado",
+    "history.type_undelegate_out": "Delegacion retirada",
+    "history.type_rc_delegate_in": "Delegacion RC recibida",
+    "history.type_rc_delegate_out": "RC delegado",
+    "history.type_savings_in": "Ahorro recibido",
+    "history.type_savings_out": "Ahorro enviado",
+    "history.type_savings_cancel": "Ahorro cancelado",
+    "history.type_reward": "Recompensa",
+    "history.type_producer_reward": "Reward producer",
+    "history.show_producer_rewards": "Mostrar producer rewards",
+    "history.hide_producer_rewards": "Ocultar producer rewards",
     // Sign Request
     "sign.title": "Solicitud de Firma",
     "sign.transfer_title": "Solicitud de Transferencia",
@@ -7123,9 +7152,6 @@ const translations = {
     "wallet.network_label": "Réseau Actif",
     "wallet.no_accounts_chain": "Aucun compte ajouté pour {chain}",
     "wallet.add_one": "Ajouter un compte",
-    "bulk.analyze": "Analyser la sécurité",
-    "bulk.analyzing": "Analyse en cours...",
-    "bulk.success": "Analyse : Aucun risque détecté.",
     "bulk.switch_network": "Changer de réseau",
     // Sidebar
     "sidebar.home": "Accueil",
@@ -7156,7 +7182,7 @@ const translations = {
     "import.select_chain": "Sélectionner Chaîne",
     "import.username": "Nom d'utilisateur",
     "import.checking": "Vérification chaîne...",
-    "import.found": "✓ Trouvé",
+    "import.found": "Trouvé",
     "import.not_found": "Compte non trouvé",
     "import.private_keys": "Clés Privées (Coller au moins une)",
     "import.key_posting": "CLÉ POSTING",
@@ -7190,8 +7216,16 @@ const translations = {
     "settings.change_password": "Changer Mot de Passe",
     "settings.biometrics": "Utiliser Biométrie",
     "settings.reset": "Réinitialiser Portefeuille",
-    "pair.section_title": "Associer un Autre Appareil",
-    "pair.section_subtitle": "Sur le nouvel appareil, générez un code de réception. Sur l'appareil actuel, saisissez ce code et approuvez le transfert chiffré.",
+    "pair.section_title": "Transfert Sécurisé du Portefeuille",
+    "pair.section_subtitle": "Transférez votre portefeuille chiffré vers un autre appareil sans exposer ses clés privées.",
+    "pair.transfer_cta": "Transférer le Portefeuille",
+    "pair.transfer_cta_hint": "Envoyer ou recevoir sur un autre appareil",
+    "pair.choose_title": "Transférer le Portefeuille",
+    "pair.choose_subtitle": "Choisissez le rôle de cet appareil.",
+    "pair.role_send": "Envoyer depuis cet appareil",
+    "pair.role_send_hint": "Cet appareil contient déjà le portefeuille",
+    "pair.role_receive": "Recevoir sur cet appareil",
+    "pair.role_receive_hint": "Ceci est l'appareil de destination",
     "pair.send_cta": "Envoyer Vers le Nouvel Appareil",
     "pair.receive_cta": "Obtenir le Code",
     "pair.step_badge_send": "Étape 2 sur 2",
@@ -7219,8 +7253,9 @@ const translations = {
     "pair.waiting_handshake": "En attente du handshake sécurisé...",
     "pair.approve_and_send": "Approuver et Envoyer",
     "pair.sending": "Chiffrement et envoi du portefeuille...",
+    "pair.waiting_import_confirmation": "Portefeuille livré. En attente de la confirmation d'importation...",
     "pair.send_complete": "Transfert Terminé",
-    "pair.send_complete_subtitle": "L'appareil de destination peut maintenant importer le portefeuille.",
+    "pair.send_complete_subtitle": "L'appareil de destination a confirmé l'importation.",
     "pair.connect_error": "Impossible d'associer l'appareil cible",
     "pair.send_error": "Impossible d'envoyer le portefeuille chiffré",
     "pair.e2ee_notice": "Cet appareil n'expose jamais les données privées en clair.",
@@ -7263,7 +7298,7 @@ const translations = {
     "bulk.success_msg": "{n} transferts envoyés avec succès. TXID : {txid}...",
     "bulk.error_title": "Erreur",
     "bulk.error_failed": "Échec de l'envoi",
-    "bulk.warn_not_found": "⚠ Attention : {n} utilisateur(s) non trouvé(s) sur la chaîne {chain}.",
+    "bulk.warn_not_found": "Attention : {n} utilisateur(s) non trouvé(s) sur la chaîne {chain}.",
     "bulk.error_no_active": "Clé active non trouvée pour ce compte.",
     // Lock Screen
     "lock.title": "Bon retour",
@@ -7324,8 +7359,6 @@ const translations = {
     "manage.add_posting": "Ajouter Clé Privée Posting",
     "manage.add_active": "Ajouter Clé Privée Active",
     "manage.add_memo": "Ajouter Clé Privée Memo",
-    // Security
-    "security.analysis_prompt": "Veuillez analyser cette transaction crypto pour les risques en Français : ",
     // History
     "history.title": "Historique : {user}",
     "history.loading": "Chargement historique...",
@@ -7334,6 +7367,28 @@ const translations = {
     "history.sent": "Envoyé",
     "history.from": "De",
     "history.to": "À",
+    "history.filter_label": "Filtrer",
+    "history.filter_all": "Tout",
+    "history.filter_received": "Reçu",
+    "history.filter_sent": "Envoyé",
+    "history.filter_powerup": "Power Up",
+    "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delegation",
+    "history.type_powerup_in": "Power recu",
+    "history.type_powerup_out": "Power envoye",
+    "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delegation recue",
+    "history.type_delegate_out": "Power delegue",
+    "history.type_undelegate_out": "Delegation retiree",
+    "history.type_rc_delegate_in": "Delegation RC recue",
+    "history.type_rc_delegate_out": "RC delegue",
+    "history.type_savings_in": "Epargne recue",
+    "history.type_savings_out": "Epargne envoyee",
+    "history.type_savings_cancel": "Epargne annulee",
+    "history.type_reward": "Recompense",
+    "history.type_producer_reward": "Reward producteur",
+    "history.show_producer_rewards": "Afficher rewards producteur",
+    "history.hide_producer_rewards": "Masquer rewards producteur",
     // Sign Request
     "sign.title": "Demande de Signature",
     "sign.transfer_title": "Demande de Transfert",
@@ -7585,9 +7640,6 @@ const translations = {
     "wallet.network_label": "Aktives Netzwerk",
     "wallet.no_accounts_chain": "Keine Konten für {chain} hinzugefügt",
     "wallet.add_one": "Konto hinzufügen",
-    "bulk.analyze": "Sicherheit analysieren",
-    "bulk.analyzing": "Analysiere...",
-    "bulk.success": "Analyse: Keine Risiken gefunden.",
     "bulk.switch_network": "Netzwerk wechseln",
     // Sidebar
     "sidebar.home": "Start",
@@ -7618,7 +7670,7 @@ const translations = {
     "import.select_chain": "Kette wählen",
     "import.username": "Benutzername",
     "import.checking": "Prüfe Kette...",
-    "import.found": "✓ Gefunden",
+    "import.found": "Gefunden",
     "import.not_found": "Konto nicht gefunden",
     "import.private_keys": "Private Schlüssel (Mindestens einen einfügen)",
     "import.key_posting": "POSTING KEY",
@@ -7652,8 +7704,16 @@ const translations = {
     "settings.change_password": "Passwort ändern",
     "settings.biometrics": "Biometrie verwenden",
     "settings.reset": "Wallet zurücksetzen",
-    "pair.section_title": "Weiteres Gerät Koppeln",
-    "pair.section_subtitle": "Erzeuge auf dem neuen Gerät einen Empfangscode. Gib diesen Code auf dem aktuellen Gerät ein und bestätige die verschlüsselte Übertragung.",
+    "pair.section_title": "Sichere Wallet-Übertragung",
+    "pair.section_subtitle": "Übertrage deine verschlüsselte Wallet auf ein anderes Gerät, ohne private Schlüssel offenzulegen.",
+    "pair.transfer_cta": "Wallet Übertragen",
+    "pair.transfer_cta_hint": "Auf einem anderen Gerät senden oder empfangen",
+    "pair.choose_title": "Wallet Übertragen",
+    "pair.choose_subtitle": "Wähle die Aufgabe dieses Geräts.",
+    "pair.role_send": "Von diesem Gerät senden",
+    "pair.role_send_hint": "Dieses Gerät enthält bereits die Wallet",
+    "pair.role_receive": "Auf diesem Gerät empfangen",
+    "pair.role_receive_hint": "Dies ist das Zielgerät",
     "pair.send_cta": "An Neues Gerät Senden",
     "pair.receive_cta": "Empfangscode Anzeigen",
     "pair.step_badge_send": "Schritt 2 von 2",
@@ -7681,8 +7741,9 @@ const translations = {
     "pair.waiting_handshake": "Warte auf sicheren Handshake...",
     "pair.approve_and_send": "Bestätigen und Senden",
     "pair.sending": "Wallet wird verschlüsselt und gesendet...",
+    "pair.waiting_import_confirmation": "Wallet zugestellt. Warte auf die Importbestätigung des Zielgeräts...",
     "pair.send_complete": "Übertragung Abgeschlossen",
-    "pair.send_complete_subtitle": "Das Zielgerät kann die Wallet jetzt importieren.",
+    "pair.send_complete_subtitle": "Das Zielgerät hat den Wallet-Import bestätigt.",
     "pair.connect_error": "Kopplung mit dem Zielgerät nicht möglich",
     "pair.send_error": "Die verschlüsselte Wallet konnte nicht gesendet werden",
     "pair.e2ee_notice": "Dieses Gerät legt private Daten niemals im Klartext offen.",
@@ -7786,8 +7847,6 @@ const translations = {
     "manage.add_posting": "Posting-Schlüssel hinzufügen",
     "manage.add_active": "Aktiven Schlüssel hinzufügen",
     "manage.add_memo": "Memo-Schlüssel hinzufügen",
-    // Security
-    "security.analysis_prompt": "Bitte analysieren Sie diese Krypto-Transaktion auf Risiken in Deutsch: ",
     // History
     "history.title": "Verlauf: {user}",
     "history.loading": "Lade Verlauf...",
@@ -7796,6 +7855,28 @@ const translations = {
     "history.sent": "Gesendet",
     "history.from": "Von",
     "history.to": "An",
+    "history.filter_label": "Filter",
+    "history.filter_all": "Alle",
+    "history.filter_received": "Empfangen",
+    "history.filter_sent": "Gesendet",
+    "history.filter_powerup": "Power Up",
+    "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delegation",
+    "history.type_powerup_in": "Power erhalten",
+    "history.type_powerup_out": "Power gesendet",
+    "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delegation erhalten",
+    "history.type_delegate_out": "Power delegiert",
+    "history.type_undelegate_out": "Delegation entfernt",
+    "history.type_rc_delegate_in": "RC-Delegation erhalten",
+    "history.type_rc_delegate_out": "RC delegiert",
+    "history.type_savings_in": "Savings empfangen",
+    "history.type_savings_out": "Savings gesendet",
+    "history.type_savings_cancel": "Savings storniert",
+    "history.type_reward": "Belohnung",
+    "history.type_producer_reward": "Producer-Belohnung",
+    "history.show_producer_rewards": "Producer-Rewards anzeigen",
+    "history.hide_producer_rewards": "Producer-Rewards ausblenden",
     // Sign Request
     "sign.title": "Signaturanfrage",
     "sign.transfer_title": "Überweisungsanfrage",
@@ -8047,9 +8128,6 @@ const translations = {
     "wallet.network_label": "Rete Attiva",
     "wallet.no_accounts_chain": "Nessun account aggiunto per {chain}",
     "wallet.add_one": "Aggiungi Account",
-    "bulk.analyze": "Analisi Sicurezza",
-    "bulk.analyzing": "Analisi in corso...",
-    "bulk.success": "Analisi: Nessun rischio rilevato.",
     "bulk.switch_network": "Cambia Rete",
     // Sidebar
     "sidebar.home": "Home",
@@ -8114,8 +8192,16 @@ const translations = {
     "settings.change_password": "Cambia Password",
     "settings.biometrics": "Usa Biometria",
     "settings.reset": "Reimposta Wallet",
-    "pair.section_title": "Abbina un Altro Dispositivo",
-    "pair.section_subtitle": "Sul nuovo dispositivo genera un codice di ricezione. Sul dispositivo attuale inserisci quel codice e approva il trasferimento cifrato.",
+    "pair.section_title": "Trasferimento Sicuro del Wallet",
+    "pair.section_subtitle": "Trasferisci il wallet cifrato su un altro dispositivo senza esporre le chiavi private.",
+    "pair.transfer_cta": "Trasferisci Wallet",
+    "pair.transfer_cta_hint": "Invia o ricevi su un altro dispositivo",
+    "pair.choose_title": "Trasferisci Wallet",
+    "pair.choose_subtitle": "Scegli cosa deve fare questo dispositivo.",
+    "pair.role_send": "Invia da questo dispositivo",
+    "pair.role_send_hint": "Questo dispositivo contiene già il wallet",
+    "pair.role_receive": "Ricevi su questo dispositivo",
+    "pair.role_receive_hint": "Questo è il dispositivo di destinazione",
     "pair.send_cta": "Invia al Nuovo Dispositivo",
     "pair.receive_cta": "Ottieni Codice",
     "pair.step_badge_send": "Passo 2 di 2",
@@ -8143,8 +8229,9 @@ const translations = {
     "pair.waiting_handshake": "In attesa dell'handshake sicuro...",
     "pair.approve_and_send": "Approva e Invia",
     "pair.sending": "Cifratura e invio del wallet...",
+    "pair.waiting_import_confirmation": "Wallet consegnato. In attesa della conferma di importazione...",
     "pair.send_complete": "Trasferimento Completato",
-    "pair.send_complete_subtitle": "Il dispositivo di destinazione ora può importare il wallet.",
+    "pair.send_complete_subtitle": "Il dispositivo di destinazione ha confermato l'importazione.",
     "pair.connect_error": "Impossibile abbinare il dispositivo di destinazione",
     "pair.send_error": "Impossibile inviare il wallet cifrato",
     "pair.e2ee_notice": "Questo dispositivo non espone mai i dati privati in chiaro.",
@@ -8248,8 +8335,6 @@ const translations = {
     "manage.add_posting": "Aggiungi Chiave Privata Posting",
     "manage.add_active": "Aggiungi Chiave Privata Active",
     "manage.add_memo": "Aggiungi Chiave Privata Memo",
-    // Security
-    "security.analysis_prompt": "Per favore analizza questa transazione crypto per rischi in Italiano: ",
     // History
     "history.title": "Cronologia: {user}",
     "history.loading": "Caricamento cronologia...",
@@ -8258,6 +8343,28 @@ const translations = {
     "history.sent": "Inviato",
     "history.from": "Da",
     "history.to": "A",
+    "history.filter_label": "Filtro",
+    "history.filter_all": "Tutto",
+    "history.filter_received": "Ricevuti",
+    "history.filter_sent": "Inviati",
+    "history.filter_powerup": "Power Up",
+    "history.filter_powerdown": "Power Down",
+    "history.filter_delegate": "Delega",
+    "history.type_powerup_in": "Power ricevuto",
+    "history.type_powerup_out": "Power inviato",
+    "history.type_powerdown": "Power Down",
+    "history.type_delegate_in": "Delega ricevuta",
+    "history.type_delegate_out": "Power delegato",
+    "history.type_undelegate_out": "Delega rimossa",
+    "history.type_rc_delegate_in": "Delega RC ricevuta",
+    "history.type_rc_delegate_out": "RC delegato",
+    "history.type_savings_in": "Risparmio ricevuto",
+    "history.type_savings_out": "Risparmio inviato",
+    "history.type_savings_cancel": "Risparmio annullato",
+    "history.type_reward": "Ricompensa",
+    "history.type_producer_reward": "Reward producer",
+    "history.show_producer_rewards": "Mostra reward producer",
+    "history.hide_producer_rewards": "Nascondi reward producer",
     // Sign Request
     "sign.title": "Richiesta Firma",
     "sign.transfer_title": "Richiesta Trasferimento",
@@ -9427,17 +9534,28 @@ const BiometricSetupModal = ({ accounts, setWalletState, onClose, onComplete }) 
   ] }) });
 };
 
-const BRIDGE_SERVER_URL = "http://136.243.80.162:3030";
+const BRIDGE_SERVER_URL = "https://chat.gravitywallet.drakernoise.com";
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 10;
 class DeviceTransferService {
   constructor() {
     this.socket = null;
     this.sessionId = null;
+    this.role = null;
     this.sharedKey = null;
     this.myKeyPair = null;
     this.myPublicKeyB64 = null;
     this.incomingPayloadResolver = null;
+    this.queuedIncomingTransfer = null;
+    this.pendingIncomingTransferId = null;
+    this.completedIncomingTransferId = null;
+    this.pendingTransferId = null;
+    this.pendingEncryptedPayload = null;
+    this.pendingTransferResolver = null;
+    this.pendingTransferRejecter = null;
+    this.retryTimer = null;
+    this.transferTimeout = null;
+    this.payloadReceived = false;
     this.statusListener = null;
     this.hasEchoedPublicKey = false;
   }
@@ -9471,7 +9589,12 @@ class DeviceTransferService {
       timeout: 1e4
     });
     this.socket.on("connect", () => {
-      this.emitStatus(this.sharedKey ? "paired" : "connecting");
+      this.emitJoin();
+      if (this.pendingTransferId) {
+        this.emitStatus(this.payloadReceived ? "delivered" : "sending");
+      } else {
+        this.emitStatus(this.sharedKey ? "paired" : this.role === "destination" ? "waiting" : "connecting");
+      }
     });
     this.socket.on("connect_error", (err) => {
       this.emitStatus("error", err.message || "Connection error");
@@ -9480,6 +9603,9 @@ class DeviceTransferService {
       if (reason !== "io client disconnect") {
         this.emitStatus("error", `Disconnected: ${reason}`);
       }
+    });
+    this.socket.on("bridge_session_error", (data) => {
+      this.emitStatus("error", data?.error || "Unable to join transfer session");
     });
     this.socket.on("bridge_signer_ready", async (data) => {
       if (!this.myKeyPair || !data?.publicKey) return;
@@ -9490,46 +9616,91 @@ class DeviceTransferService {
           this.hasEchoedPublicKey = true;
           this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: this.myPublicKeyB64 });
         }
-        this.emitStatus("paired");
+        if (this.pendingEncryptedPayload && !this.payloadReceived) {
+          this.emitStatus("sending");
+          this.emitPendingPayload();
+        } else {
+          this.emitStatus("paired");
+        }
       } catch (error) {
         this.emitStatus("error", error?.message || "Handshake failed");
       }
     });
     this.socket.on("bridge_sync_accounts", async (data) => {
-      if (!this.sharedKey || !data?.encrypted) return;
+      if (!this.sharedKey || !data?.encrypted || !data?.transferId) return;
+      if (this.completedIncomingTransferId === data.transferId) {
+        this.emitTransferAck(data.transferId, "imported");
+        return;
+      }
+      if (this.pendingIncomingTransferId === data.transferId) {
+        this.emitTransferAck(data.transferId, "received");
+        return;
+      }
       try {
         const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
         const payload = JSON.parse(decrypted);
-        this.emitStatus("transferred");
-        this.incomingPayloadResolver?.(payload);
-        this.incomingPayloadResolver = null;
+        this.pendingIncomingTransferId = data.transferId;
+        this.emitTransferAck(data.transferId, "received");
+        const transfer = {
+          payload,
+          confirmImported: () => this.finishIncomingTransfer(data.transferId, "imported"),
+          rejectImport: (message) => this.finishIncomingTransfer(data.transferId, "failed", message)
+        };
+        if (this.incomingPayloadResolver) {
+          this.incomingPayloadResolver(transfer);
+          this.incomingPayloadResolver = null;
+        } else {
+          this.queuedIncomingTransfer = transfer;
+        }
       } catch (error) {
+        this.emitTransferAck(data.transferId, "failed", error?.message || "Unable to decrypt wallet");
         this.emitStatus("error", error?.message || "Import failed");
+      }
+    });
+    this.socket.on("bridge_sync_ack", (data) => {
+      if (!data?.transferId || data.transferId !== this.pendingTransferId) return;
+      if (data.phase === "received") {
+        this.payloadReceived = true;
+        this.emitStatus("delivered");
+        return;
+      }
+      if (data.phase === "imported") {
+        this.finishOutgoingTransfer();
+        return;
+      }
+      if (data.phase === "failed") {
+        this.failOutgoingTransfer(data.error || "The destination device could not import the wallet");
       }
     });
   }
   async startReceiveSession() {
     this.disconnect();
-    this.ensureSocket();
     this.sessionId = this.createSessionCode();
+    this.role = "destination";
     this.myKeyPair = await generateEncryptionKeys();
     this.sharedKey = null;
     this.hasEchoedPublicKey = false;
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
     this.myPublicKeyB64 = myPubB64;
     this.emitStatus("waiting");
-    this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
+    this.ensureSocket();
+    this.emitJoin();
     return { code: this.formatCode(this.sessionId) };
   }
   async waitForIncomingPayload(timeoutMs = 5 * 60 * 1e3) {
+    if (this.queuedIncomingTransfer) {
+      const transfer = this.queuedIncomingTransfer;
+      this.queuedIncomingTransfer = null;
+      return transfer;
+    }
     return new Promise((resolve, reject) => {
       const timeoutId = window.setTimeout(() => {
         this.incomingPayloadResolver = null;
         reject(new Error("Transfer timed out"));
       }, timeoutMs);
-      this.incomingPayloadResolver = (payload) => {
+      this.incomingPayloadResolver = (transfer) => {
         clearTimeout(timeoutId);
-        resolve(payload);
+        resolve(transfer);
       };
     });
   }
@@ -9539,14 +9710,15 @@ class DeviceTransferService {
       throw new Error("Invalid transfer code");
     }
     this.disconnect();
-    this.ensureSocket();
     this.sessionId = code;
+    this.role = "source";
     this.myKeyPair = await generateEncryptionKeys();
     this.sharedKey = null;
     this.hasEchoedPublicKey = false;
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
     this.myPublicKeyB64 = myPubB64;
     this.emitStatus("connecting");
+    this.ensureSocket();
     const pairedPromise = new Promise((resolve, reject) => {
       const timeoutId = window.setTimeout(() => {
         reject(new Error("Target device did not respond in time"));
@@ -9565,28 +9737,116 @@ class DeviceTransferService {
         }
       };
     });
-    this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
+    this.emitJoin();
     await pairedPromise;
   }
-  async sendPayload(payload) {
+  async sendPayload(payload, timeoutMs = 9e4) {
     if (!this.socket || !this.sharedKey || !this.sessionId) {
       throw new Error("Transfer session not ready");
     }
-    const encrypted = await encryptMessage(JSON.stringify(payload), this.sharedKey);
-    this.socket.emit("bridge_sync_accounts", { sessionId: this.sessionId, encrypted });
+    this.clearOutgoingTransfer();
+    this.pendingTransferId = window.crypto.randomUUID();
+    this.pendingEncryptedPayload = await encryptMessage(JSON.stringify(payload), this.sharedKey);
+    this.payloadReceived = false;
+    this.emitStatus("sending");
+    return new Promise((resolve, reject) => {
+      this.pendingTransferResolver = resolve;
+      this.pendingTransferRejecter = reject;
+      this.transferTimeout = window.setTimeout(() => {
+        this.failOutgoingTransfer(
+          this.payloadReceived ? "The destination received the wallet but did not confirm the import" : "The destination device did not receive the wallet in time"
+        );
+      }, timeoutMs);
+      this.emitPendingPayload();
+      this.retryTimer = window.setInterval(() => {
+        this.emitPendingPayload();
+      }, 2500);
+    });
+  }
+  emitJoin() {
+    if (!this.socket?.connected || !this.sessionId || !this.myPublicKeyB64) return;
+    this.socket.emit("bridge_join", {
+      sessionId: this.sessionId,
+      publicKey: this.myPublicKeyB64,
+      role: this.role ? `device-transfer-${this.role}` : void 0
+    }, (response) => {
+      if (response && response.success === false) {
+        this.emitStatus("error", response.error || "Unable to join transfer session");
+      }
+    });
+  }
+  emitPendingPayload() {
+    if (!this.socket?.connected || !this.sessionId || !this.pendingTransferId || !this.pendingEncryptedPayload) return;
+    this.socket.emit("bridge_sync_accounts", {
+      sessionId: this.sessionId,
+      transferId: this.pendingTransferId,
+      encrypted: this.pendingEncryptedPayload
+    });
+  }
+  emitTransferAck(transferId, phase, error) {
+    if (!this.socket?.connected || !this.sessionId) return;
+    this.socket.emit("bridge_sync_ack", { sessionId: this.sessionId, transferId, phase, error });
+  }
+  finishIncomingTransfer(transferId, phase, error) {
+    if (this.pendingIncomingTransferId !== transferId) return;
+    this.emitTransferAck(transferId, phase, error);
+    if (phase === "imported") {
+      this.completedIncomingTransferId = transferId;
+      this.emitStatus("transferred");
+    } else {
+      this.emitStatus("error", error || "Wallet import failed");
+    }
+    this.pendingIncomingTransferId = null;
+  }
+  finishOutgoingTransfer() {
+    const resolve = this.pendingTransferResolver;
+    this.clearOutgoingTransfer();
     this.emitStatus("transferred");
+    resolve?.();
+  }
+  failOutgoingTransfer(message) {
+    const reject = this.pendingTransferRejecter;
+    this.clearOutgoingTransfer();
+    this.emitStatus("error", message);
+    reject?.(new Error(message));
+  }
+  clearRetryTimer() {
+    if (this.retryTimer !== null) {
+      window.clearInterval(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+  clearOutgoingTransfer() {
+    this.clearRetryTimer();
+    if (this.transferTimeout !== null) {
+      window.clearTimeout(this.transferTimeout);
+      this.transferTimeout = null;
+    }
+    this.pendingTransferId = null;
+    this.pendingEncryptedPayload = null;
+    this.pendingTransferResolver = null;
+    this.pendingTransferRejecter = null;
+    this.payloadReceived = false;
   }
   disconnect() {
+    if (this.pendingTransferRejecter) {
+      this.pendingTransferRejecter(new Error("Transfer cancelled"));
+    }
+    this.clearOutgoingTransfer();
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
     this.sessionId = null;
+    this.role = null;
     this.sharedKey = null;
     this.myKeyPair = null;
     this.myPublicKeyB64 = null;
     this.hasEchoedPublicKey = false;
     this.incomingPayloadResolver = null;
+    this.queuedIncomingTransfer = null;
+    this.pendingIncomingTransferId = null;
+    this.completedIncomingTransferId = null;
     this.emitStatus("idle");
   }
 }
@@ -9601,6 +9861,8 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
     deviceTransferService.onStatusChange((nextStatus, detail) => {
       if (nextStatus === "connecting" || nextStatus === "waiting") setStatus("connecting");
       if (nextStatus === "paired") setStatus("paired");
+      if (nextStatus === "sending") setStatus("sending");
+      if (nextStatus === "delivered") setStatus("delivered");
       if (nextStatus === "transferred") setStatus("sent");
       if (nextStatus === "error") {
         setStatus("error");
@@ -9723,6 +9985,7 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
         }
       ),
       status === "sending" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.sending") }),
+      status === "delivered" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.waiting_import_confirmation") }),
       status === "sent" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: t("pair.send_complete") }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 mt-1", children: t("pair.send_complete_subtitle") })
@@ -9761,12 +10024,18 @@ const SyncImportModal = ({ onClose, onImport }) => {
         if (!mounted) return;
         setPairCode(code);
         setStatus("waiting");
-        const payload = await deviceTransferService.waitForIncomingPayload();
+        const transfer = await deviceTransferService.waitForIncomingPayload();
         if (!mounted) return;
         setStatus("importing");
-        await onImportRef.current(payload);
+        try {
+          await onImportRef.current(transfer.payload);
+          transfer.confirmImported();
+        } catch (importError) {
+          transfer.rejectImport(importError?.message || t("pair.receive_error"));
+          throw importError;
+        }
         if (!mounted) return;
-        setSuccessMsg(t("pair.receive_success_message", { count: payload.accounts.length }));
+        setSuccessMsg(t("pair.receive_success_message", { count: transfer.payload.accounts.length }));
         setStatus("done");
       } catch (e) {
         if (!mounted) return;
@@ -9835,12 +10104,63 @@ const SyncImportModal = ({ onClose, onImport }) => {
   ] }) });
 };
 
+const WalletTransferModal = ({
+  accounts,
+  walletConfig,
+  onClose,
+  onImport
+}) => {
+  const { t } = useTranslation();
+  const [role, setRole] = reactExports.useState(null);
+  if (role === "send") {
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(SyncExportModal, { accounts, walletConfig, onClose });
+  }
+  if (role === "receive") {
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(SyncImportModal, { onClose, onImport });
+  }
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "absolute top-4 right-4 text-slate-400 hover:text-white", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: t("pair.choose_title") }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: t("pair.choose_subtitle") }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => setRole("send"),
+          disabled: accounts.length === 0,
+          className: "w-full bg-dark-900 hover:bg-dark-700 disabled:opacity-40 disabled:hover:bg-dark-900 border border-dark-600 p-4 rounded-2xl flex items-center gap-4 text-left transition-colors",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 16V4m0 0L8 8m4-4l4 4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" }) }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm text-white", children: t("pair.role_send") }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: t("pair.role_send_hint") })
+            ] })
+          ]
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => setRole("receive"),
+          className: "w-full bg-dark-900 hover:bg-dark-700 border border-dark-600 p-4 rounded-2xl flex items-center gap-4 text-left transition-colors",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 4v12m0 0l-4-4m4 4l4-4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" }) }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm text-white", children: t("pair.role_receive") }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: t("pair.role_receive_hint") })
+            ] })
+          ]
+        }
+      )
+    ] })
+  ] }) });
+};
+
 const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport, onSyncImport }) => {
   const { t } = useTranslation();
   const [showTOTP, setShowTOTP] = reactExports.useState(false);
   const [showBio, setShowBio] = reactExports.useState(false);
-  const [showSyncExport, setShowSyncExport] = reactExports.useState(false);
-  const [showSyncImport, setShowSyncImport] = reactExports.useState(false);
+  const [showWalletTransfer, setShowWalletTransfer] = reactExports.useState(false);
   const chainCounts = {
     hive: accounts.filter((account) => account.chain === Chain.HIVE).length,
     blurt: accounts.filter((account) => account.chain === Chain.BLURT).length,
@@ -9899,30 +10219,20 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 border-t border-dark-700 space-y-3", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: t("pair.section_title") }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 -mt-1 mb-2", children: t("pair.section_subtitle") }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              onClick: () => setShowSyncExport(true),
-              className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" }) }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: t("pair.send_cta") })
-              ]
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              onClick: () => setShowSyncImport(true),
-              className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }) }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: t("pair.receive_cta") })
-              ]
-            }
-          )
-        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => setShowWalletTransfer(true),
+            className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all group text-left",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 7h11m0 0l-4-4m4 4l-4 4M16 17H5m0 0l4 4m-4-4l4-4" }) }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-xs", children: t("pair.transfer_cta") }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: t("pair.transfer_cta_hint") })
+              ] })
+            ]
+          }
+        ) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1 mt-4", children: "Security" }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
           "button",
@@ -9989,18 +10299,12 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
         onComplete: () => setShowBio(false)
       }
     ),
-    showSyncExport && /* @__PURE__ */ jsxRuntimeExports.jsx(
-      SyncExportModal,
+    showWalletTransfer && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      WalletTransferModal,
       {
         accounts,
         walletConfig: walletState,
-        onClose: () => setShowSyncExport(false)
-      }
-    ),
-    showSyncImport && /* @__PURE__ */ jsxRuntimeExports.jsx(
-      SyncImportModal,
-      {
-        onClose: () => setShowSyncImport(false),
+        onClose: () => setShowWalletTransfer(false),
         onImport: onSyncImport
       }
     )
@@ -10961,10 +11265,14 @@ const WalletView = ({
             "button",
             {
               onClick: () => openModal("powerup", account),
-              className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-cyan-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
+              className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-green-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
               "aria-label": "Power Up",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 text-slate-400 group-hover/btn:text-cyan-400 transition-colors", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "7", width: "16", height: "10", rx: "2", fill: "none", stroke: "#94a3b8", strokeWidth: "1.8" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "9.5", width: "10", height: "5", rx: "1", fill: "#22c55e", className: "group-hover/btn:fill-green-400" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "19.5", y: "10", width: "1.8", height: "4", rx: "0.8", fill: "#94a3b8" })
+                ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50", children: "Power Up" })
               ]
             }
@@ -10973,12 +11281,13 @@ const WalletView = ({
             "button",
             {
               onClick: () => openModal("powerdown", account),
-              className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-yellow-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
+              className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-red-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
               "aria-label": "Power Down",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative w-5 h-5", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 text-slate-400 group-hover/btn:text-yellow-400 transition-colors absolute inset-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3 text-red-500 group-hover/btn:text-red-400 transition-colors absolute top-0 right-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", strokeWidth: 3, children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }) })
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "7", width: "16", height: "10", rx: "2", fill: "none", stroke: "#94a3b8", strokeWidth: "1.8" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "11", width: "4", height: "3", rx: "0.8", fill: "#ef4444", className: "group-hover/btn:fill-red-400" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "19.5", y: "10", width: "1.8", height: "4", rx: "0.8", fill: "#94a3b8" })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50", children: "Power Down" })
               ]
@@ -10991,7 +11300,18 @@ const WalletView = ({
               className: "relative bg-dark-700/50 hover:bg-dark-600 border border-dark-600 hover:border-pink-500/50 h-10 rounded-lg transition-all flex items-center justify-center group/btn",
               "aria-label": "Delegate",
               children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 text-slate-400 group-hover/btn:text-pink-400 transition-colors", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "4", y: "3", width: "6", height: "14", rx: "1.6", fill: "none", stroke: "#94a3b8", strokeWidth: "1.6" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "6", width: "3", height: "8", rx: "0.8", fill: "#22c55e", className: "group-hover/btn:fill-green-400" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "6", y: "1.5", width: "2", height: "1.5", rx: "0.5", fill: "#94a3b8" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "14", y: "7", width: "6", height: "14", rx: "1.6", fill: "none", stroke: "#94a3b8", strokeWidth: "1.6" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "15.5", y: "10", width: "3", height: "8", rx: "0.8", fill: "#22c55e", className: "group-hover/btn:fill-green-400" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "16", y: "5.5", width: "2", height: "1.5", rx: "0.5", fill: "#94a3b8" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M10.5 8.5h4", stroke: "#ec4899", strokeWidth: "1.8", strokeLinecap: "round" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13 6.5l2 2-2 2", fill: "none", stroke: "#ec4899", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14.5 15.5h-4", stroke: "#ec4899", strokeWidth: "1.8", strokeLinecap: "round" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 13.5l-2 2 2 2", fill: "none", stroke: "#ec4899", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" })
+                ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap backdrop-blur-sm shadow-xl z-50", children: "Delegate" })
               ]
             }
@@ -11508,11 +11828,11 @@ user3`
               let icon = "";
               if (isValid) {
                 color = "bg-green-900/40 text-green-400 border border-green-500/30";
-                icon = "✓";
+                icon = "OK";
               }
               if (isInvalid) {
                 color = "bg-red-900/40 text-red-400 border border-red-500/30";
-                icon = "✕";
+                icon = "X";
               }
               return /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: `text-[10px] px-2 py-0.5 rounded-full ${color} flex items-center gap-1`, children: [
                 icon,
@@ -11555,8 +11875,8 @@ user3`
                     }
                   ),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute right-2 top-2 text-[10px]", children: [
-                    isValid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400", children: "✓" }),
-                    isInvalid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "✕" })
+                    isValid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400 font-bold", children: "OK" }),
+                    isInvalid && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "X" })
                   ] })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-1/2 relative bg-dark-950 rounded-lg border border-dark-600 flex items-center", children: [
@@ -11604,7 +11924,7 @@ user3`
                     onClick: () => removeRow(idx),
                     className: "text-red-400 hover:text-red-200 hover:bg-red-500/10 rounded w-8 flex items-center justify-center transition-colors",
                     title: "Remove row",
-                    children: "✕"
+                    children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-4 h-4", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) })
                   }
                 )
               ] }),
@@ -13854,7 +14174,7 @@ const ImportModal = ({ onClose, onImport, initialChain }) => {
   return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 w-full max-w-sm rounded-xl border border-dark-600 p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto my-auto", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-4", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-bold", children: t("import.title") }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", children: "✕" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", "aria-label": "Close", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-4 mb-5 text-sm border-b border-dark-700", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: `pb-2 border-b-2 px-2 transition-colors ${method === "manual" ? "border-blue-500 text-white font-medium" : "border-transparent text-slate-500"}`, onClick: () => setMethod("manual"), children: t("import.manual") }),
@@ -14058,7 +14378,7 @@ const ManageAccountModal = ({ account, onClose, onSave, onDelete }) => {
           account.chain
         ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", children: "✕" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", "aria-label": "Close", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) })
     ] }),
     !showConfirmDelete ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4 mb-6", children: [
@@ -14314,7 +14634,7 @@ const TransferModal = ({ account: initialAccount, accounts, onClose, onTransfer,
         " ",
         selectedAccount.chain
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", children: "✕" })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "text-slate-500 hover:text-white", "aria-label": "Close", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4 mb-6", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-3 bg-dark-900 rounded-lg border border-dark-700", children: [
@@ -14368,8 +14688,8 @@ const TransferModal = ({ account: initialAccount, accounts, onClose, onTransfer,
             }
           ),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute right-3 top-2.5 text-xs", children: [
-            isValidRecipient === true && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400", children: "✓" }),
-            isValidRecipient === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "✕" })
+            isValidRecipient === true && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400 font-bold", children: "OK" }),
+            isValidRecipient === false && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-red-400 font-bold", children: "X" })
           ] }),
           showRecent && recentRecipients.length > 0 && !to && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute top-full left-0 right-0 z-50 mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-40 overflow-y-auto custom-scrollbar animate-slide-down", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 py-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider border-b border-dark-700 bg-dark-900/50", children: t("common.recent_recipients") }),
@@ -14537,32 +14857,45 @@ const ReceiveModal = ({ account: initialAccount, onClose }) => {
   ] }) });
 };
 
-const HistoryModal = ({ account, onClose }) => {
+const HistoryModal = ({ account, history, loading, loadError, lastUpdated, onClose, onRefresh }) => {
   const { t } = useTranslation();
-  const [history, setHistory] = reactExports.useState([]);
-  const [loading, setLoading] = reactExports.useState(true);
   const [filter, setFilter] = reactExports.useState("all");
-  reactExports.useEffect(() => {
-    setLoading(true);
-    fetchAccountHistory(account.chain, account.name).then((data) => setHistory(data)).catch((err) => console.error(err)).finally(() => setLoading(false));
-  }, [account]);
+  const [showProducerRewards, setShowProducerRewards] = reactExports.useState(false);
+  const incomingTypes = ["receive", "powerup_in", "delegate_in", "rc_delegate_in", "savings_in", "reward", "producer_reward"];
+  const outgoingTypes = ["send", "powerup_out", "powerdown", "delegate_out", "undelegate_out", "rc_delegate_out", "savings_out", "savings_cancel"];
+  const isProducerReward = (item) => item.type === "producer_reward" || item.type === "reward" && item.memo === "Producer Reward";
+  const hasProducerRewards = history.some(isProducerReward);
   const filteredHistory = history.filter((item) => {
+    if (isProducerReward(item) && !showProducerRewards) return false;
     if (filter === "all") return true;
-    if (filter === "received") return item.type === "receive";
-    if (filter === "sent") return item.type === "send";
+    if (filter === "received") return incomingTypes.includes(item.type);
+    if (filter === "sent") return outgoingTypes.includes(item.type);
     if (filter === "powerup") return item.type === "powerup_in" || item.type === "powerup_out";
     if (filter === "powerdown") return item.type === "powerdown";
+    if (filter === "delegate") return item.type === "delegate_in" || item.type === "delegate_out" || item.type === "undelegate_out" || item.type === "rc_delegate_in" || item.type === "rc_delegate_out";
     return true;
   });
   const getTypeBadgeClass = (type) => {
     switch (type) {
       case "receive":
       case "powerup_in":
+      case "savings_in":
         return "bg-green-500/10 text-green-400";
       case "send":
       case "powerup_out":
       case "powerdown":
+      case "delegate_out":
+      case "undelegate_out":
+      case "savings_out":
+      case "savings_cancel":
         return "bg-red-500/10 text-red-400";
+      case "delegate_in":
+      case "rc_delegate_in":
+      case "rc_delegate_out":
+        return "bg-blue-500/10 text-blue-400";
+      case "reward":
+      case "producer_reward":
+        return "bg-amber-500/10 text-amber-400";
       default:
         return "bg-slate-500/10 text-slate-400";
     }
@@ -14579,10 +14912,31 @@ const HistoryModal = ({ account, onClose }) => {
         return t("history.type_powerup_out");
       case "powerdown":
         return t("history.type_powerdown");
+      case "delegate_in":
+        return t("history.type_delegate_in");
+      case "delegate_out":
+        return t("history.type_delegate_out");
+      case "undelegate_out":
+        return t("history.type_undelegate_out");
+      case "rc_delegate_in":
+        return t("history.type_rc_delegate_in");
+      case "rc_delegate_out":
+        return t("history.type_rc_delegate_out");
+      case "savings_in":
+        return t("history.type_savings_in");
+      case "savings_out":
+        return t("history.type_savings_out");
+      case "savings_cancel":
+        return t("history.type_savings_cancel");
+      case "reward":
+        return t("history.type_reward");
+      case "producer_reward":
+        return t("history.type_producer_reward");
       default:
         return type;
     }
   };
+  const getHistoryTypeLabel = (item) => isProducerReward(item) ? t("history.type_producer_reward") : getTypeLabel(item.type);
   const getFilterIcon = (type) => {
     switch (type) {
       case "all":
@@ -14592,11 +14946,29 @@ const HistoryModal = ({ account, onClose }) => {
       case "sent":
         return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 10l7-7m0 0l7 7m-7-7v18" }) });
       case "powerup":
-        return /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) });
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "7", width: "16", height: "10", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "9.5", width: "10", height: "5", rx: "1", fill: "currentColor", opacity: "0.85" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "19.5", y: "10", width: "1.8", height: "4", rx: "0.8", fill: "currentColor" })
+        ] });
       case "powerdown":
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative w-5 h-5 flex items-center justify-center", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5 absolute inset-0", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3 text-red-500 absolute top-0 right-0 bg-dark-800 rounded-full", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", strokeWidth: 3, children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }) })
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "7", width: "16", height: "10", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "11", width: "4", height: "3", rx: "0.8", fill: "currentColor", opacity: "0.85" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "19.5", y: "10", width: "1.8", height: "4", rx: "0.8", fill: "currentColor" })
+        ] });
+      case "delegate":
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "w-5 h-5 transition-colors", viewBox: "0 0 24 24", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "4", y: "3", width: "6", height: "14", rx: "1.6", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "5.5", y: "6", width: "3", height: "8", rx: "0.8", fill: "currentColor", opacity: "0.85" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "6", y: "1.5", width: "2", height: "1.5", rx: "0.5", fill: "currentColor" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "14", y: "7", width: "6", height: "14", rx: "1.6", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "15.5", y: "10", width: "3", height: "8", rx: "0.8", fill: "currentColor", opacity: "0.85" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "16", y: "5.5", width: "2", height: "1.5", rx: "0.5", fill: "currentColor" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M10.5 8.5h4", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13 6.5l2 2-2 2", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14.5 15.5h-4", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 13.5l-2 2 2 2", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" })
         ] });
       default:
         return null;
@@ -14606,11 +14978,24 @@ const HistoryModal = ({ account, onClose }) => {
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border-b border-dark-600", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 flex justify-between items-center bg-dark-700/30", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "font-black text-lg text-white tracking-tight", children: t("history.title").replace("{user}", account.name) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-white transition-colors", children: "×" })
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+          lastUpdated && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-slate-500", title: new Date(lastUpdated).toLocaleString(), children: new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }),
+          onRefresh && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              onClick: onRefresh,
+              disabled: loading,
+              className: "w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-blue-400 disabled:opacity-50 transition-colors",
+              title: t("wallet.refresh_tooltip"),
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: `w-4 h-4 ${loading ? "animate-spin" : ""}`, fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" }) })
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "w-8 h-8 flex items-center justify-center rounded-full bg-dark-700 text-slate-400 hover:text-white transition-colors", children: "×" })
+        ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-3 py-2 bg-dark-900 flex items-center gap-2 overflow-x-auto no-scrollbar justify-between", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-blue-500 shrink-0 flex items-center mr-2", title: t("history.filter_label"), children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { fillRule: "evenodd", d: "M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z", clipRule: "evenodd" }) }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-2 flex-1 justify-end", children: ["all", "received", "sent", "powerup", "powerdown"].map((f) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-2 flex-1 justify-end", children: ["all", "received", "sent", "powerup", "powerdown", "delegate"].map((f) => /* @__PURE__ */ jsxRuntimeExports.jsx(
           "button",
           {
             onClick: () => setFilter(f),
@@ -14620,39 +15005,51 @@ const HistoryModal = ({ account, onClose }) => {
           },
           f
         )) })
-      ] })
+      ] }),
+      hasProducerRewards && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-3 pb-3 bg-dark-900 flex justify-end", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+        "button",
+        {
+          onClick: () => setShowProducerRewards((value) => !value),
+          className: `text-[10px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-lg border transition-colors ${showProducerRewards ? "bg-amber-500/10 text-amber-300 border-amber-500/30" : "bg-dark-800 text-slate-500 border-dark-700 hover:text-amber-300 hover:border-amber-500/30"}`,
+          children: showProducerRewards ? t("history.hide_producer_rewards") : t("history.show_producer_rewards")
+        }
+      ) })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto custom-scrollbar bg-dark-900/40", children: loading ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-8 text-center text-slate-500 flex flex-col items-center gap-3 mt-8", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-bold uppercase tracking-widest opacity-75", children: t("history.loading") })
-    ] }) : history.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : filteredHistory.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "divide-y divide-dark-800/50", children: filteredHistory.map((item, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 hover:bg-white/[0.02] transition-colors group", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-start mb-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[9px] font-black uppercase px-2 py-1 rounded-md tracking-wider ${getTypeBadgeClass(item.type)}`, children: getTypeLabel(item.type) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] font-medium text-slate-600 group-hover:text-slate-500 transition-colors", children: new Date(item.date).toLocaleString() })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-2", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 font-medium", children: item.type === "receive" || item.type === "powerup_in" ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-          t("history.from"),
-          " ",
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
-            "@",
-            item.from
+    ] }) : loadError ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-4 text-center text-red-300 text-xs bg-red-950/20 m-4 rounded-xl border border-red-500/20", children: loadError }) : history.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : filteredHistory.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-12 text-center text-slate-600 font-bold text-sm bg-dark-900/50 m-4 rounded-xl border border-dark-800 border-dashed", children: t("history.empty") }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "divide-y divide-dark-800/50", children: filteredHistory.map((item, idx) => {
+      const isIncoming = incomingTypes.includes(item.type);
+      const amountSign = item.amount ? isIncoming ? "+" : "-" : "";
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 hover:bg-white/[0.02] transition-colors group", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-start mb-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[9px] font-black uppercase px-2 py-1 rounded-md tracking-wider ${getTypeBadgeClass(item.type)}`, children: getHistoryTypeLabel(item) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] font-medium text-slate-600 group-hover:text-slate-500 transition-colors", children: new Date(item.date).toLocaleString() })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center mb-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-xs text-slate-400 font-medium", children: isIncoming ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            t("history.from"),
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
+              "@",
+              item.from
+            ] })
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            t("history.to"),
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
+              "@",
+              item.to
+            ] })
+          ] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `font-mono font-black text-sm tracking-tight ${isIncoming ? "text-green-400" : "text-red-400"}`, children: [
+            amountSign,
+            item.amount
           ] })
-        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-          t("history.to"),
-          " ",
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-slate-200 font-bold hover:text-blue-400 cursor-pointer transition-colors", children: [
-            "@",
-            item.to
-          ] })
-        ] }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `font-mono font-black text-sm tracking-tight ${item.type === "receive" || item.type === "powerup_in" ? "text-green-400" : "text-red-400"}`, children: [
-          item.type === "receive" || item.type === "powerup_in" ? "+" : "-",
-          item.amount
-        ] })
-      ] }),
-      item.memo && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 bg-dark-800 p-2.5 rounded-lg border border-dark-700/50 break-all font-medium leading-relaxed shadow-inner", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "opacity-75", children: item.memo }) })
-    ] }, idx)) }) })
+        ] }),
+        item.memo && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 bg-dark-800 p-2.5 rounded-lg border border-dark-700/50 break-all font-medium leading-relaxed shadow-inner", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "opacity-75", children: item.memo }) })
+      ] }, idx);
+    }) }) })
   ] }) });
 };
 
@@ -14901,15 +15298,6 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       if (!account) {
         throw new Error(t("sign.account_not_found"));
       }
-      console.log("[SignRequest] Account found:", {
-        name: account.name,
-        chain: account.chain,
-        hasActiveKey: !!account.activeKey,
-        activeKeyPrefix: account.activeKey ? account.activeKey.substring(0, 8) + "..." : "NONE",
-        hasPostingKey: !!account.postingKey,
-        postingKeyPrefix: account.postingKey ? account.postingKey.substring(0, 8) + "..." : "NONE",
-        hasMemoKey: !!account.memoKey
-      });
       if (isMultisig && multisigProgress && !multisigProgress.canBroadcast) {
         const msResult = await handleMultisigSign(account);
         showNotification(msResult.message || "Signature collected", "success");
@@ -14940,8 +15328,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         const response = await broadcastTransfer(account.chain, account.name, account.activeKey, to, amount, memo);
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
+        const customJsonResultPayload = {
+          ...opResult && typeof opResult === "object" ? opResult : {},
+          id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+          txId: response.txId,
+          tx_id: response.txId
+        };
         result = {
-          result: response.txId || opResult,
+          result: customJsonResultPayload,
           txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
@@ -14958,8 +15352,14 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         const response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
+        const customJsonResultPayload = {
+          ...opResult && typeof opResult === "object" ? opResult : {},
+          id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+          txId: response.txId,
+          tx_id: response.txId
+        };
         result = {
-          result: response.txId || opResult,
+          result: customJsonResultPayload,
           txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
@@ -14985,28 +15385,26 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         );
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
+        const customJsonResultPayload = {
+          ...opResult && typeof opResult === "object" ? opResult : {},
+          id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+          txId: response.txId,
+          tx_id: response.txId
+        };
+        const { result: _ignoredResult, ...restResponse } = response;
         result = {
-          result: response.txId || opResult,
+          result: customJsonResultPayload,
           txId: response.txId,
           tx_id: response.txId,
           broadcastPayload: opResult,
           opResult,
           message: t("sign.success"),
-          ...response
+          ...restResponse
         };
       } else if (isSignBuffer2) {
         const message = request.params[1];
         const type = request.params[2];
         const normalizedType = normalizeKeyType(type);
-        console.log("[SignRequest] signBuffer request:", {
-          chain: account.chain,
-          username: account.name,
-          keyType: type,
-          normalizedKeyType: normalizedType,
-          messageType: typeof message,
-          messageLength: typeof message === "string" ? message.length : "N/A",
-          messagePreview: typeof message === "string" ? message.substring(0, 100) : JSON.stringify(message).substring(0, 100)
-        });
         let keyStr = "";
         if (normalizedType === "posting") keyStr = account.postingKey || "";
         else if (normalizedType === "active") keyStr = account.activeKey || "";
@@ -15023,13 +15421,6 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           }
         }
         const response = signMessage(account.chain, message, keyStr);
-        console.log("[SignRequest] signMessage response:", {
-          success: response.success,
-          error: response.error,
-          resultLength: response.result ? response.result.length : 0,
-          resultPreview: response.result ? response.result.substring(0, 40) + "..." : "NONE",
-          publicKey: response.publicKey
-        });
         if (!response.success) throw new Error(response.error);
         const { success: _s, result: _r, publicKey: _pk, ...restResponse } = response;
         result = {
@@ -15050,17 +15441,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           message: t("sign.success"),
           ...restResponse
         };
-        console.log("[SignRequest] Final result to return:", {
-          hasResult: !!result.result,
-          hasPublicKey: !!result.publicKey,
-          keys: Object.keys(result)
-        });
       } else if (isBroadcast2) {
         let rawOperations = request.params[1];
         const keyType = request.params[2];
         const originalEnvelope = request._gravityBroadcastEnvelope || (request._gravityOriginalParams && Array.isArray(request._gravityOriginalParams) ? request._gravityOriginalParams[1] : null);
         if (rawOperations && typeof rawOperations === "object" && !Array.isArray(rawOperations)) {
-          console.log("[SignRequest Broadcast] Extracting operations from transaction envelope:", Object.keys(rawOperations));
           rawOperations = rawOperations.operations || rawOperations.tx?.operations || rawOperations.transaction?.operations || rawOperations;
         }
         let operations = (Array.isArray(rawOperations) ? rawOperations : [rawOperations]).map((op) => {
@@ -15115,25 +15500,11 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         if (normalizeKeyType(keyType) === "active") key = account.activeKey;
         else if (requiresActiveKey) key = account.activeKey;
         if (!key && account.activeKey) key = account.activeKey;
-        console.log("[SignRequest Broadcast] Key selection:", {
-          keyType,
-          requiresActiveKey,
-          hasActiveKey: !!account.activeKey,
-          hasPostingKey: !!account.postingKey,
-          selectedKeyPrefix: key ? key.substring(0, 10) + "..." : "NONE",
-          operations: operations.map((op) => Array.isArray(op) ? op[0] : op.type)
-        });
         const requiredKeyType = requiresActiveKey ? "Active" : keyType || "Posting";
         if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", requiredKeyType));
         if (requiresActiveKey && key !== account.activeKey && account.activeKey) {
-          console.log("[SignRequest] FORCING Active key for operation requiring active authority");
           key = account.activeKey;
         }
-        console.log("[SignRequest Broadcast] FINAL key being used:", {
-          keyPrefix: key.substring(0, 10) + "...",
-          isActiveKey: key === account.activeKey,
-          requiresActiveKey
-        });
         const response = await broadcastOperations(account.chain, key, operations);
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
@@ -15274,7 +15645,20 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         });
         const response = await broadcastOperations(account.chain, account.postingKey || account.activeKey, [op]);
         if (!response.success) throw new Error(response.error);
-        result = { success: true, result: response.opResult || response.txId };
+        const opResult = response.opResult || response.txId;
+        const { success: _success, ...restResponse } = response;
+        result = {
+          success: true,
+          result: response.txId || opResult,
+          txId: response.txId,
+          tx_id: response.txId,
+          broadcastPayload: opResult,
+          opResult,
+          operation: "comment",
+          operations: [op],
+          message: t("sign.success"),
+          ...restResponse
+        };
       }
       notifyBackground(result, null);
     } catch (e) {
@@ -15670,18 +16054,15 @@ const HelpView = () => {
       /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-300 mb-2", children: t("help.chat_desc") }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-dark-900 p-3 rounded-lg border border-dark-600", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("ul", { className: "space-y-2 text-xs text-slate-400", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex gap-2 text-slate-300", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-yellow-500", children: "⚠" }),
-          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-yellow-500 shrink-0 mt-0.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v4m0 4h.01M10.29 3.86l-7.5 13A1 1 0 003.66 18h16.68a1 1 0 00.87-1.5l-7.5-13a1 1 0 00-1.74 0z" }) }) }),
           t("help.chat_warning")
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex gap-2 text-slate-300", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-400", children: "ℹ" }),
-          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-400 shrink-0 mt-0.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 16h-1v-4h-1m1-4h.01M12 21a9 9 0 100-18 9 9 0 000 18z" }) }) }),
           t("help.chat_cost")
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { className: "flex gap-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400", children: "✓" }),
-          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-green-400 shrink-0 mt-0.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }) }) }),
           t("help.chat_memo_required")
         ] })
       ] }) })
@@ -17312,8 +17693,7 @@ function QRCodeSVG(props) {
 class BridgeService {
   constructor() {
     this.socket = null;
-    this.serverUrl = "http://136.243.80.162:3030";
-    // New dedicated bridge server on Hetzner
+    this.serverUrl = "https://chat.gravitywallet.drakernoise.com";
     this.sessionId = null;
     this.sharedKey = null;
     this.myKeyPair = null;
@@ -17541,11 +17921,53 @@ const BridgeModal = ({ onClose, onSync }) => {
   ] }) });
 };
 
+class AppErrorBoundary extends reactExports.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    try {
+      localStorage.setItem("gravity_last_runtime_error", JSON.stringify({
+        type: "react_error",
+        message: error.message,
+        stack: error.stack,
+        componentStack: info?.componentStack,
+        at: (/* @__PURE__ */ new Date()).toISOString()
+      }));
+    } catch {
+    }
+  }
+  render() {
+    if (this.state.error) {
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full bg-dark-900 text-red-300 flex flex-col items-center justify-center p-6 text-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-sm font-bold text-red-200 mb-2", children: "Gravity Wallet recovered from an error" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400", children: this.state.error.message })
+      ] });
+    }
+    return this.props.children;
+  }
+}
 function App() {
-  return /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(NotificationProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(AppContent, {}) }) });
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(LanguageProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(NotificationProvider, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(AppErrorBoundary, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(AppContent, {}) }) }) });
 }
 function AppContent() {
   const { t } = useTranslation();
+  const HISTORY_CACHE_STORAGE_KEY = "gravity_account_history_cache_v1";
+  const HISTORY_CACHE_TTL_MS = 5 * 60 * 1e3;
+  const getHistoryCacheKey = (account) => `${account.chain}:${account.name}`.toLowerCase();
+  const getPreferredChain = (accounts, preferred) => {
+    if (preferred && accounts.some((account) => account.chain === preferred)) {
+      return preferred;
+    }
+    if (accounts.some((account) => account.chain === Chain.BLURT)) {
+      return Chain.BLURT;
+    }
+    if (accounts.length > 0) {
+      return accounts[0].chain;
+    }
+    return preferred || Chain.BLURT;
+  };
   const [walletState, setWalletState] = reactExports.useState({
     accounts: [],
     encryptedMaster: false,
@@ -17553,7 +17975,7 @@ function AppContent() {
     useBiometrics: false,
     useDeviceAuth: false
   });
-  const [activeChain, setActiveChain] = reactExports.useState(Chain.HIVE);
+  const [activeChain, setActiveChain] = reactExports.useState(Chain.BLURT);
   const [currentView, setCurrentView] = reactExports.useState(ViewState.LANDING);
   const [showImport, setShowImport] = reactExports.useState(false);
   const [managingAccount, setManagingAccount] = reactExports.useState(null);
@@ -17563,6 +17985,8 @@ function AppContent() {
   const [isLocked, setIsLocked] = reactExports.useState(true);
   const [isDataLoaded, setIsDataLoaded] = reactExports.useState(false);
   const [isRefreshing, setIsRefreshing] = reactExports.useState(false);
+  const [historyCache, setHistoryCache] = reactExports.useState({});
+  const [historyLoadingKeys, setHistoryLoadingKeys] = reactExports.useState({});
   const [needsSave, setNeedsSave] = reactExports.useState(false);
   const buildBridgeSyncPayload = (accounts) => ({
     timestamp: Date.now(),
@@ -17578,8 +18002,69 @@ function AppContent() {
   const [web3Context, setWeb3Context] = reactExports.useState(null);
   const { showNotification } = useNotification();
   const [lockReason, setLockReason] = reactExports.useState(null);
+  const historySyncInFlightRef = reactExports.useRef(/* @__PURE__ */ new Set());
+  const historyCacheRef = reactExports.useRef({});
   const [requestId, setRequestId] = reactExports.useState(null);
   const [showBridge, setShowBridge] = reactExports.useState(false);
+  reactExports.useEffect(() => {
+    const handleWindowError = (event) => {
+      try {
+        localStorage.setItem("gravity_last_runtime_error", JSON.stringify({
+          type: "error",
+          message: event.message,
+          source: event.filename,
+          line: event.lineno,
+          column: event.colno,
+          at: (/* @__PURE__ */ new Date()).toISOString()
+        }));
+      } catch {
+      }
+    };
+    const handleUnhandledRejection = (event) => {
+      try {
+        localStorage.setItem("gravity_last_runtime_error", JSON.stringify({
+          type: "unhandledrejection",
+          message: String(event.reason),
+          at: (/* @__PURE__ */ new Date()).toISOString()
+        }));
+      } catch {
+      }
+    };
+    const handleBeforeUnload = () => {
+      try {
+        localStorage.setItem("gravity_last_popup_unload", JSON.stringify({
+          view: currentView,
+          chain: activeChain,
+          overlays: {
+            import: showImport,
+            manage: !!managingAccount,
+            transfer: !!transferAccount,
+            receive: !!receiveAccount,
+            history: !!historyAccount,
+            bridge: showBridge,
+            request: !!requestId
+          },
+          at: (/* @__PURE__ */ new Date()).toISOString()
+        }));
+      } catch {
+      }
+    };
+    window.addEventListener("error", handleWindowError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("error", handleWindowError);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [activeChain, currentView, historyAccount, managingAccount, receiveAccount, requestId, showBridge, showImport, transferAccount]);
+  const clearTransientOverlays = () => {
+    setManagingAccount(null);
+    setTransferAccount(null);
+    setReceiveAccount(null);
+    setHistoryAccount(null);
+    setShowBridge(false);
+  };
   const dedupeAccounts = (accounts) => {
     const byKey = /* @__PURE__ */ new Map();
     for (const account of accounts) {
@@ -17606,10 +18091,112 @@ function AppContent() {
     }
     return Array.from(byKey.values());
   };
+  const persistHistoryCache = async (nextCache) => {
+    try {
+      await storageService.setItem(HISTORY_CACHE_STORAGE_KEY, JSON.stringify(nextCache));
+    } catch (error) {
+      console.warn("History cache save failed:", error);
+    }
+  };
+  const loadHistoryCache = async () => {
+    try {
+      const raw = await storageService.getItem(HISTORY_CACHE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        historyCacheRef.current = parsed;
+        setHistoryCache(parsed);
+      }
+    } catch (error) {
+      console.warn("History cache load failed:", error);
+    }
+  };
+  const updateHistoryCacheEntry = (key, entry) => {
+    setHistoryCache((prev) => {
+      const next = { ...prev, [key]: entry };
+      historyCacheRef.current = next;
+      persistHistoryCache(next);
+      return next;
+    });
+  };
+  const mergeHistoryItems = (existing, incoming) => {
+    const byKey = /* @__PURE__ */ new Map();
+    [...incoming, ...existing].forEach((item) => {
+      byKey.set(getHistoryItemKey(item), item);
+    });
+    return Array.from(byKey.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 250);
+  };
+  const refreshAccountHistory = async (account, force = false, partial = false) => {
+    const key = getHistoryCacheKey(account);
+    const cached = historyCacheRef.current[key];
+    const cachedItems = cached?.items || [];
+    const isProducerReward = (item) => item.type === "producer_reward" || item.type === "reward" && item.memo === "Producer Reward";
+    const hasVisibleHistory = cachedItems.some((item) => !isProducerReward(item));
+    const cacheIsFresh = cached && hasVisibleHistory && !cached.partial && Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS;
+    const shouldIncremental = hasVisibleHistory && !cached?.partial && !partial && (force || !cacheIsFresh);
+    if (!force && cacheIsFresh) return cached.items;
+    if (historySyncInFlightRef.current.has(key)) return cached?.items || [];
+    historySyncInFlightRef.current.add(key);
+    setHistoryLoadingKeys((prev) => ({ ...prev, [key]: true }));
+    try {
+      const fetchedItems = await fetchAccountHistory(account.chain, account.name, shouldIncremental ? {
+        incremental: true,
+        knownItemKeys: cached.items.map(getHistoryItemKey)
+      } : partial ? {
+        maxPages: 5
+      } : {});
+      const items = shouldIncremental ? mergeHistoryItems(cached.items, fetchedItems) : partial && cachedItems.length > 0 ? mergeHistoryItems(cachedItems, fetchedItems) : fetchedItems;
+      updateHistoryCacheEntry(key, {
+        items,
+        updatedAt: Date.now(),
+        error: null,
+        partial
+      });
+      return items;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      updateHistoryCacheEntry(key, {
+        items: cached?.items || [],
+        updatedAt: cached?.updatedAt || Date.now(),
+        error: message,
+        partial: cached?.partial
+      });
+      return cached?.items || [];
+    } finally {
+      historySyncInFlightRef.current.delete(key);
+      setHistoryLoadingKeys((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+  const preloadHistory = async (accounts, force = false, partial = true) => {
+    for (const account of accounts) {
+      await refreshAccountHistory(account, force, partial);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  };
   reactExports.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const req = params.get("requestId");
-    if (req) setRequestId(req);
+    if (req) {
+      setRequestId(req);
+      return;
+    }
+    if (typeof chrome !== "undefined" && chrome.storage?.session) {
+      chrome.storage.session.get(["gravity_active_request_id"], (result) => {
+        if (result.gravity_active_request_id) {
+          setRequestId(result.gravity_active_request_id);
+        }
+      });
+      const listener = (changes, area) => {
+        if (area !== "session" || !changes.gravity_active_request_id) return;
+        setRequestId(changes.gravity_active_request_id.newValue || null);
+      };
+      chrome.storage.onChanged.addListener(listener);
+      return () => chrome.storage.onChanged.removeListener(listener);
+    }
   }, []);
   reactExports.useEffect(() => {
     const handleOpenBridge = () => setShowBridge(true);
@@ -17661,6 +18248,7 @@ function AppContent() {
     const loadState = async () => {
       console.log("Gravity: loadState started");
       try {
+        await loadHistoryCache();
         const vaultData = await getVault();
         console.log("Gravity: getVault result:", !!vaultData);
         if (vaultData) {
@@ -17679,13 +18267,17 @@ function AppContent() {
           console.log("Gravity: Crypto session restored. Attempting vault unlock.");
           const vault = await unlockVaultWithCachedSession();
           if (vault && vault.accounts) {
-            setWalletState((prev) => ({ ...prev, accounts: vault.accounts }));
+            const dedupedAccounts = dedupeAccounts(vault.accounts);
+            setWalletState((prev) => ({ ...prev, accounts: dedupedAccounts }));
             setIsLocked(false);
             if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
-              chrome.storage.session.set({ session_accounts: vault.accounts });
+              chrome.storage.session.set({ session_accounts: dedupedAccounts });
             }
-            if (vault.accounts.length > 0) {
-              setTimeout(fetchBalances$1, 500);
+            if (dedupedAccounts.length > 0) {
+              setTimeout(() => {
+                fetchBalances$1();
+                preloadHistory(dedupedAccounts, false, true);
+              }, 500);
             }
           } else {
             console.warn("Gravity: Crypto session existed but vault decryption actually failed.");
@@ -17718,6 +18310,9 @@ function AppContent() {
                   useDeviceAuth: result.walletConfig.useDeviceAuth,
                   useTOTP: result.walletConfig.useTOTP
                 }));
+                if (result.walletConfig.lastActiveChain) {
+                  setActiveChain(result.walletConfig.lastActiveChain);
+                }
               }
               resolve();
             });
@@ -17742,13 +18337,14 @@ function AppContent() {
         useGoogleAuth: walletState.useGoogleAuth,
         useBiometrics: walletState.useBiometrics,
         useDeviceAuth: walletState.useDeviceAuth,
-        useTOTP: walletState.useTOTP
+        useTOTP: walletState.useTOTP,
+        lastActiveChain: activeChain
       };
       if (typeof chrome !== "undefined" && chrome.storage) {
         chrome.storage.local.set({ walletConfig: config });
       }
     }
-  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, isDataLoaded]);
+  }, [walletState.encryptedMaster, walletState.useGoogleAuth, walletState.useBiometrics, walletState.useDeviceAuth, walletState.useTOTP, activeChain, isDataLoaded]);
   reactExports.useEffect(() => {
     if (!isLocked && walletState.accounts.length > 0) {
       const dedupedAccounts = dedupeAccounts(walletState.accounts);
@@ -17810,14 +18406,22 @@ function AppContent() {
       fetchBalances$1();
     }
   }, [currentView, activeChain, isLocked, walletState.accounts.length]);
+  reactExports.useEffect(() => {
+    if (isLocked) return;
+    setActiveChain((prev) => getPreferredChain(walletState.accounts, prev));
+  }, [walletState.accounts, isLocked]);
   const handleUnlock = (decryptedAccounts) => {
     const dedupedAccounts = dedupeAccounts(decryptedAccounts);
     setWalletState((prev) => ({ ...prev, accounts: dedupedAccounts }));
+    setActiveChain((prev) => getPreferredChain(dedupedAccounts, prev));
     setIsLocked(false);
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.session) {
       chrome.storage.session.set({ session_accounts: dedupedAccounts });
     }
-    setTimeout(() => fetchBalances$1(), 500);
+    setTimeout(() => {
+      fetchBalances$1();
+      preloadHistory(dedupedAccounts, false, true);
+    }, 500);
   };
   const handleImport = async (newAccounts) => {
     const withBalance = await Promise.all(newAccounts.map(async (acc) => {
@@ -17833,6 +18437,7 @@ function AppContent() {
       };
     }));
     const updatedAccounts = dedupeAccounts([...walletState.accounts, ...withBalance]);
+    setActiveChain((prev) => getPreferredChain(updatedAccounts, prev));
     try {
       if (!walletState.encryptedMaster) {
         await enablePasswordless(updatedAccounts);
@@ -17842,6 +18447,7 @@ function AppContent() {
         setWalletState((prev) => ({ ...prev, accounts: updatedAccounts }));
       }
       showNotification("Account imported successfully", "success");
+      preloadHistory(updatedAccounts, false, true);
       setShowImport(false);
     } catch (e) {
       console.error("Import Save Failed:", e);
@@ -17887,6 +18493,7 @@ function AppContent() {
         await saveVault("cached", { accounts: mergedAccounts, lastUpdated: Date.now() });
       }
       showNotification(`Transfer complete. Added ${added} account${added === 1 ? "" : "s"}.`, "success");
+      preloadHistory(mergedAccounts, false, true);
     } catch (error) {
       console.error("Device transfer save failed:", error);
       showNotification("The wallet was received but could not be persisted safely.", "error");
@@ -17931,6 +18538,7 @@ function AppContent() {
       if (result.success) {
         showNotification(`TX: ${result.txId?.substring(0, 8)}...`, "success");
         fetchBalances$1();
+        refreshAccountHistory(fromAcc, true, false);
       } else {
         showNotification(`Failed: ${result.error}`, "error");
       }
@@ -17944,6 +18552,26 @@ function AppContent() {
     if (chain === Chain.BLURT && context.includes("blurt")) return true;
     return false;
   };
+  const handleChainChange = (chain) => {
+    clearTransientOverlays();
+    setActiveChain(chain);
+  };
+  const handleOpenHistory = (account) => {
+    setHistoryAccount(account);
+    refreshAccountHistory(account, false, false);
+  };
+  const handleWalletRefresh = async () => {
+    await fetchBalances$1();
+    await preloadHistory(walletState.accounts.filter((account) => account.chain === activeChain), true, false);
+  };
+  reactExports.useEffect(() => {
+    if (isLocked || walletState.accounts.length === 0) return;
+    preloadHistory(walletState.accounts, false, true);
+    const id = setInterval(() => {
+      preloadHistory(walletState.accounts, false, true);
+    }, 10 * 60 * 1e3);
+    return () => clearInterval(id);
+  }, [isLocked, walletState.accounts.map((account) => `${account.chain}:${account.name}`).sort().join("|")]);
   const [isDetached, setIsDetached] = reactExports.useState(false);
   reactExports.useEffect(() => {
     const isDetachedMode = typeof window !== "undefined" && window.location.search.includes("detached=true");
@@ -17999,15 +18627,6 @@ function AppContent() {
         window.removeEventListener("resize", lockSize);
         cancelAnimationFrame(animationFrameId);
       };
-    } else {
-      if (typeof chrome !== "undefined" && chrome.extension) {
-        const views = chrome.extension.getViews();
-        const detachedView = views.find((v) => v.location.href.includes("detached=true"));
-        if (detachedView) {
-          detachedView.focus();
-          window.close();
-        }
-      }
     }
   }, []);
   const handleToggleDetach = () => {
@@ -18082,7 +18701,19 @@ function AppContent() {
     );
   }
   if (requestId) {
-    return /* @__PURE__ */ jsxRuntimeExports.jsx(SignRequest, { requestId, accounts: walletState.accounts, onComplete: () => window.close() });
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(
+      SignRequest,
+      {
+        requestId,
+        accounts: walletState.accounts,
+        onComplete: () => {
+          if (typeof chrome !== "undefined" && chrome.storage?.session) {
+            chrome.storage.session.remove("gravity_active_request_id");
+          }
+          window.close();
+        }
+      }
+    );
   }
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex h-full w-full bg-dark-900 text-slate-200 font-sans overflow-hidden", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -18139,7 +18770,7 @@ function AppContent() {
           Landing,
           {
             onSelectChain: (chain) => {
-              setActiveChain(chain);
+              handleChainChange(chain);
               setCurrentView(ViewState.WALLET);
             },
             onManage: () => setCurrentView(ViewState.MANAGE)
@@ -18149,14 +18780,14 @@ function AppContent() {
           WalletView,
           {
             chain: activeChain,
-            onChainChange: setActiveChain,
+            onChainChange: handleChainChange,
             accounts: walletState.accounts.filter((a) => a.chain === activeChain),
             isRefreshing,
             onManage: (acc) => setManagingAccount(acc),
             onSend: (acc) => setTransferAccount(acc),
             onReceive: (acc) => setReceiveAccount(acc),
-            onHistory: (acc) => setHistoryAccount(acc),
-            onRefresh: fetchBalances$1,
+            onHistory: handleOpenHistory,
+            onRefresh: handleWalletRefresh,
             onAddAccount: () => setShowImport(true)
           }
         ),
@@ -18177,7 +18808,7 @@ function AppContent() {
             chain: activeChain,
             accounts: walletState.accounts.filter((a) => a.chain === activeChain),
             refreshBalance: fetchBalances$1,
-            onChangeChain: setActiveChain,
+            onChangeChain: handleChainChange,
             onAddAccount: () => setShowImport(true)
           }
         ),
@@ -18186,7 +18817,7 @@ function AppContent() {
           {
             chain: activeChain,
             accounts: walletState.accounts,
-            onChainChange: setActiveChain
+            onChainChange: handleChainChange
           }
         ),
         currentView === ViewState.HELP && /* @__PURE__ */ jsxRuntimeExports.jsx(HelpView, {}),
@@ -18229,6 +18860,11 @@ function AppContent() {
       HistoryModal,
       {
         account: historyAccount,
+        history: historyCache[getHistoryCacheKey(historyAccount)]?.items || [],
+        loading: !!historyLoadingKeys[getHistoryCacheKey(historyAccount)],
+        loadError: historyCache[getHistoryCacheKey(historyAccount)]?.error,
+        lastUpdated: historyCache[getHistoryCacheKey(historyAccount)]?.updatedAt,
+        onRefresh: () => refreshAccountHistory(historyAccount, true, false),
         onClose: () => setHistoryAccount(null)
       }
     ),

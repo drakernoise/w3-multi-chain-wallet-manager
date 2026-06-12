@@ -282,7 +282,7 @@ ieee754.write = function (buffer, value, offset, isLE, mLen, nBytes) {
  * @license  MIT
  */
 
-(function (exports$1) {
+(function (exports) {
 
 	const base64 = base64Js;
 	const ieee754$1 = ieee754;
@@ -291,12 +291,12 @@ ieee754.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 	    ? Symbol['for']('nodejs.util.inspect.custom') // eslint-disable-line dot-notation
 	    : null;
 
-	exports$1.Buffer = Buffer;
-	exports$1.SlowBuffer = SlowBuffer;
-	exports$1.INSPECT_MAX_BYTES = 50;
+	exports.Buffer = Buffer;
+	exports.SlowBuffer = SlowBuffer;
+	exports.INSPECT_MAX_BYTES = 50;
 
 	const K_MAX_LENGTH = 0x7fffffff;
-	exports$1.kMaxLength = K_MAX_LENGTH;
+	exports.kMaxLength = K_MAX_LENGTH;
 	const { Uint8Array: GlobalUint8Array, ArrayBuffer: GlobalArrayBuffer, SharedArrayBuffer: GlobalSharedArrayBuffer } = globalThis;
 
 	/**
@@ -893,7 +893,7 @@ ieee754.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 
 	Buffer.prototype.inspect = function inspect () {
 	  let str = '';
-	  const max = exports$1.INSPECT_MAX_BYTES;
+	  const max = exports.INSPECT_MAX_BYTES;
 	  str = this.toString('hex', 0, max).replace(/(.{2})/g, '$1 ').trim();
 	  if (this.length > max) str += ' ... ';
 	  return '<Buffer ' + str + '>'

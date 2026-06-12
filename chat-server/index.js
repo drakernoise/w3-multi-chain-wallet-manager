@@ -189,6 +189,7 @@ function saveData() {
 loadData();
 
 const connectedSockets = {}; // socketId -> userId
+const bridgeParticipants = new Map(); // sessionId -> Map(socketId, { publicKey, role })
 const authChallenges = {}; // socketId -> { challenge, timestamp }
 const registrationRateLimit = {}; // IP -> timestamp
 const lastMessageTime = {}; // userId -> timestamp
@@ -1111,23 +1112,53 @@ io.on('connection', (socket) => {
 
     // --- 4. Cross-Device Sync Bridge (Ephemeral) ---
     // Allows secure, direct, encrypted communication between two devices sharing a QR code session.
-    socket.on('bridge_join', (data) => {
-        const { sessionId, publicKey } = data;
-        if (!sessionId || typeof sessionId !== 'string') return;
+    socket.on('bridge_join', (data = {}, acknowledge) => {
+        const { sessionId, publicKey, role } = data;
+        if (!sessionId || typeof sessionId !== 'string') {
+            if (typeof acknowledge === 'function') acknowledge({ success: false, error: 'Invalid bridge session' });
+            return;
+        }
 
         const bridgeRoom = `sync-bridge:${sessionId}`;
         const room = io.sockets.adapter.rooms.get(bridgeRoom);
         const memberCount = room ? room.size : 0;
+        let participants = bridgeParticipants.get(sessionId);
+        if (!participants) {
+            participants = new Map();
+            bridgeParticipants.set(sessionId, participants);
+        }
+
+        if (typeof role === 'string' && role.startsWith('device-transfer-')) {
+            const conflictingPeer = Array.from(participants.entries()).find(([socketId, peer]) =>
+                socketId !== socket.id && peer.role === role
+            );
+            if (conflictingPeer) {
+                const error = 'This transfer role is already connected';
+                socket.emit('bridge_session_error', { error });
+                if (typeof acknowledge === 'function') acknowledge({ success: false, error });
+                return;
+            }
+        }
 
         console.log(`[BRIDGE] Socket ${socket.id} joining bridge ${sessionId}. Current members: ${memberCount}. Data:`, JSON.stringify(data));
         socket.join(bridgeRoom);
 
         if (publicKey) {
+            for (const [peerSocketId, peer] of participants.entries()) {
+                if (peerSocketId !== socket.id && peer.publicKey) {
+                    socket.emit('bridge_signer_ready', { publicKey: peer.publicKey, role: peer.role });
+                }
+            }
+            participants.set(socket.id, { publicKey, role });
             socket.to(bridgeRoom).emit('bridge_signer_ready', { publicKey });
             console.log(`[BRIDGE] Relay publicKey from ${socket.id} to room ${sessionId}`);
         } else {
             console.log(`[BRIDGE] Socket ${socket.id} joined as receiver (no publicKey)`);
         }
+
+        if (!socket.data.bridgeSessionIds) socket.data.bridgeSessionIds = new Set();
+        socket.data.bridgeSessionIds.add(sessionId);
+        if (typeof acknowledge === 'function') acknowledge({ success: true, peers: participants.size - 1 });
     });
 
     socket.on('bridge_request', (data) => {
@@ -1153,13 +1184,27 @@ io.on('connection', (socket) => {
     });
 
     socket.on('bridge_sync_accounts', (data) => {
-        const { sessionId, encrypted } = data;
+        const { sessionId, encrypted, transferId } = data;
         if (!sessionId) return;
-        socket.to(`sync-bridge:${sessionId}`).emit('bridge_sync_accounts', { encrypted });
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_sync_accounts', { encrypted, transferId });
         console.log(`[BRIDGE] Accounts sync forwarded in ${sessionId}`);
     });
 
+    socket.on('bridge_sync_ack', (data) => {
+        const { sessionId, transferId, phase, error } = data;
+        if (!sessionId || !transferId || !phase) return;
+        socket.to(`sync-bridge:${sessionId}`).emit('bridge_sync_ack', { transferId, phase, error });
+        console.log(`[BRIDGE] Accounts sync acknowledgement ${phase} forwarded in ${sessionId}`);
+    });
+
     socket.on('disconnect', () => {
+        if (socket.data.bridgeSessionIds) {
+            for (const sessionId of socket.data.bridgeSessionIds) {
+                const participants = bridgeParticipants.get(sessionId);
+                participants?.delete(socket.id);
+                if (participants?.size === 0) bridgeParticipants.delete(sessionId);
+            }
+        }
         delete connectedSockets[socket.id];
     });
 });

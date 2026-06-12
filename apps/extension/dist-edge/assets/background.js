@@ -54,12 +54,29 @@ async function runBenchmark() {
       activeNodes[chain] = getActiveNode(chain);
     }
     await chrome.storage.local.set({ gravity_active_nodes: activeNodes });
-    console.log("[Gravity] RPC Benchmark complete and stored:", activeNodes);
   } catch (e) {
     console.error("[Gravity] RPC Benchmark failed:", e);
   }
 }
-runBenchmark();
+async function initializeRpcNodes() {
+  try {
+    const result = await chrome.storage.local.get(["gravity_active_nodes"]);
+    const stored = result.gravity_active_nodes || {};
+    const storedHiveNode = String(stored.HIVE || "").replace(/\/+$/, "");
+    if (storedHiveNode === "https://api.openhive.network") {
+      await chrome.storage.local.set({
+        gravity_active_nodes: {
+          ...stored,
+          HIVE: "https://api.hive.blog"
+        }
+      });
+    }
+  } catch (error) {
+    console.warn("[Gravity] Failed to migrate deprecated RPC node:", error);
+  }
+  await runBenchmark();
+}
+initializeRpcNodes();
 chrome.alarms.create("rpcBenchmark", { periodInMinutes: 10 });
 let unreadCount = 0;
 function detectChainFromUrl(url = "") {
@@ -111,9 +128,7 @@ async function resolveBestAccountForRequest(accounts, username, detectedChain, n
 }
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request) return false;
-  console.log("[Gravity Background] onMessage received:", request.type, request.method || "");
   if (request.type === "gravity_request") {
-    console.log("[Gravity Background] Received request:", request.method, "from:", sender.origin || sender.url);
     const originalParams = Array.isArray(request.params) ? request.params.map((param) => param && typeof param === "object" ? { ...param } : param) : request.params;
     if (typeof request.method !== "string" || request.method.length > 64) {
       console.warn("Gravity: Rejected invalid method (length/type)", request.method);
@@ -174,7 +189,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const params = request.params;
       const first = params[0];
       if (typeof first === "string" && first.includes(".")) {
-        console.log(`[Gravity] Detected domain as first parameter in ${request.method}, normalizing...`);
         if (params.length > 2) {
           request.params = params.slice(1);
         }
@@ -193,9 +207,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
     const requestId = request.params?.requestId || request.id || Date.now().toString();
-    console.log("[Gravity Background] Request ID:", requestId, "Checking whitelist...");
     tryAutoSign(request, sender).then((autoResult) => {
-      console.log("[Gravity Background] tryAutoSign result:", autoResult ? "auto-signed" : "needs user prompt");
       if (autoResult) {
         try {
           sendResponse(autoResult);
@@ -204,7 +216,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       } else {
         const chainHint = detectChainFromUrl(sender.url || sender.tab?.url);
-        console.log("[Gravity Background] Chain hint:", chainHint, "Tab ID:", sender.tab?.id);
         const normalizedRequest = { ...request, _gravityOriginalParams: originalParams };
         const reqData = {
           data: normalizedRequest,
@@ -219,7 +230,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             console.error("[Gravity] Session storage set failed:", lastError);
             return;
           }
-          console.log("[Gravity Background] Request stored, opening prompt...");
           openPrompt(requestId);
           try {
             sendResponse({ success: true, pending: true, note: "User prompt opened" });
@@ -462,20 +472,13 @@ async function tryAutoSign(request, sender) {
       const targetChain = request.requestChain || account.chain;
       const useLegacySigner = url.includes("tribaldex") || url.includes("hive-engine");
       response = await signMessage(targetChain, message, keyStr, useLegacySigner);
-      console.log("[AutoSign] signMessage response:", response);
-      console.log("[AutoSign] Chain:", targetChain, "Message length:", typeof message === "string" ? message.length : "non-string");
     } else if (isBroadcast) {
       let operations = request.params[1];
       const keyType = request.params[2];
-      console.log("[Broadcast] Full request.params:", JSON.stringify(request.params, null, 2));
-      console.log("[Broadcast] Account used:", { name: account.name, chain: account.chain });
       if (operations && typeof operations === "object" && !Array.isArray(operations)) {
-        console.error("[Broadcast] WARNING: Detected non-array operations object:", Object.keys(operations));
         if (operations.operations) {
           operations = operations.operations;
-          console.error("[Broadcast] SUCCESS: Extracted operations array from object");
         } else {
-          console.error("[Broadcast] ERROR: operations object has no .operations property!");
           return { success: false, error: "Invalid broadcast format: operations is not an array" };
         }
       }
@@ -518,24 +521,10 @@ async function tryAutoSign(request, sender) {
       });
       let keyStr = "";
       const normalizedKeyType = (keyType || "").toLowerCase();
-      console.log("[Broadcast] Key selection debug:", {
-        keyType,
-        normalizedKeyType,
-        requiresActiveKey,
-        hasActiveKey: !!account.activeKey,
-        activeKeyPrefix: account.activeKey ? account.activeKey.substring(0, 10) + "..." : "NONE",
-        hasPostingKey: !!account.postingKey,
-        chain: account.chain,
-        username: account.name
-      });
       if (normalizedKeyType === "posting") keyStr = account.postingKey || "";
       else if (normalizedKeyType === "active") keyStr = account.activeKey || "";
       else if (requiresActiveKey) keyStr = account.activeKey || "";
       else keyStr = account.activeKey || "";
-      console.log("[Broadcast] Selected key prefix:", keyStr ? keyStr.substring(0, 10) + "..." : "EMPTY");
-      if (requiresActiveKey && keyStr !== account.activeKey) {
-        console.log("[Background] Auto-selecting Active key for operation requiring active authority");
-      }
       if (!keyStr) {
         const requiredType = requiresActiveKey ? "Active" : keyType || "Active";
         return { success: false, error: `${requiredType} key required for broadcast operation` };
@@ -664,6 +653,12 @@ async function tryAutoSign(request, sender) {
       op: firstBroadcastOperationName,
       operations: broadcastOperationsList
     } : finalResult;
+    const customJsonResultPayload = isCustomJson ? {
+      ...opResult && typeof opResult === "object" ? opResult : {},
+      id: response.txId || (opResult && typeof opResult === "object" ? opResult.id : void 0),
+      txId: response.txId,
+      tx_id: response.txId
+    } : null;
     const result = isSignBuffer ? {
       success: true,
       result: response.result,
@@ -682,7 +677,7 @@ async function tryAutoSign(request, sender) {
       ...restResponse
     } : {
       success: true,
-      result: broadcastResultPayload,
+      result: isCustomJson ? customJsonResultPayload : broadcastResultPayload,
       txId: response.txId,
       tx_id: response.txId,
       transaction: broadcastEnvelope || void 0,
@@ -693,7 +688,6 @@ async function tryAutoSign(request, sender) {
       message: "Signed successfully",
       ...restResponse
     };
-    console.log("[AutoSign] Final result to send:", result);
     return result;
   } catch (e) {
     console.error("Auto-sign failed:", e);
@@ -704,6 +698,15 @@ async function openPrompt(requestId) {
   const width = 450;
   const height = 620;
   try {
+    await chrome.storage.session.set({ gravity_active_request_id: requestId });
+    if (chrome.action?.openPopup) {
+      try {
+        await chrome.action.openPopup();
+        return;
+      } catch (popupError) {
+        console.warn("Gravity: action.openPopup failed, falling back to detached request window", popupError);
+      }
+    }
     await chrome.windows.create({
       url: `index.html?requestId=${requestId}`,
       type: "popup",
@@ -737,7 +740,6 @@ async function getExistingSubscription() {
   }
 }
 async function manualPushSubscribe() {
-  console.log("Gravity: [Background] Starting Push Subscription sequence...");
   try {
     const reg = self.registration;
     if (!reg || !reg.pushManager) {
@@ -745,15 +747,12 @@ async function manualPushSubscribe() {
     }
     let sub = await reg.pushManager.getSubscription();
     if (sub) {
-      console.log("Gravity: [Background] Found existing subscription");
       return sub;
     }
-    console.log("Gravity: [Background] Requesting new subscription...");
     sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     });
-    console.log("Gravity: [Background] Subscription SUCCESS:", JSON.stringify(sub));
     await chrome.storage.local.set({ gravity_push_sub: JSON.stringify(sub) });
     return sub;
   } catch (e) {
@@ -762,7 +761,6 @@ async function manualPushSubscribe() {
   }
 }
 self.addEventListener("push", (event) => {
-  console.log("Gravity: Push Event Received");
   let data = {};
   try {
     data = event.data ? event.data.json() : {};

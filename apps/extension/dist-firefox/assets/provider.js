@@ -97,14 +97,6 @@ if (!window._gravityProvider) {
         if (event.source !== window) return;
         const data = event.data;
         if (data?.type === PROVIDER_CONFIG.responseType) {
-          console.log("[Gravity Provider] Received response:", {
-            id: data.id,
-            success: data.response?.success,
-            hasResult: !!data.response?.result,
-            hasPublicKey: !!data.response?.publicKey,
-            responseKeys: data.response ? Object.keys(data.response) : [],
-            response: data.response
-          });
           const callback = this.callbacks.get(data.id);
           if (callback && typeof callback === "function") {
             callback(data.response);
@@ -134,7 +126,6 @@ if (!window._gravityProvider) {
      */
     send(method, params, callback) {
       const id = this.generateId();
-      console.log("[Gravity Provider] Sending request:", method, id);
       const sendMessage = () => {
         window.postMessage({
           type: PROVIDER_CONFIG.messageType,

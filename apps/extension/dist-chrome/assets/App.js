@@ -5988,8 +5988,16 @@ const translations = {
     "settings.change_password": "Change Access Password",
     "settings.biometrics": "Use Biometrics",
     "settings.reset": "Reset Wallet",
-    "pair.section_title": "Pair Another Device",
-    "pair.section_subtitle": "On the new device, generate a receive code. On the current device, enter that code and approve the encrypted transfer.",
+    "pair.section_title": "Secure Wallet Transfer",
+    "pair.section_subtitle": "Move your encrypted wallet to another device without exposing its private keys.",
+    "pair.transfer_cta": "Transfer Wallet",
+    "pair.transfer_cta_hint": "Send or receive on another device",
+    "pair.choose_title": "Transfer Wallet",
+    "pair.choose_subtitle": "Choose what this device should do.",
+    "pair.role_send": "Send from this device",
+    "pair.role_send_hint": "This device already contains the wallet",
+    "pair.role_receive": "Receive on this device",
+    "pair.role_receive_hint": "This is the destination device",
     "pair.send_cta": "Send To New Device",
     "pair.receive_cta": "Get Receive Code",
     "pair.step_badge_send": "Step 2 of 2",
@@ -6017,8 +6025,9 @@ const translations = {
     "pair.waiting_handshake": "Waiting for secure handshake...",
     "pair.approve_and_send": "Approve and Send",
     "pair.sending": "Encrypting and sending wallet...",
+    "pair.waiting_import_confirmation": "Wallet delivered. Waiting for the destination to finish importing...",
     "pair.send_complete": "Transfer Complete",
-    "pair.send_complete_subtitle": "The destination device can import the wallet now.",
+    "pair.send_complete_subtitle": "The destination device confirmed the wallet import.",
     "pair.connect_error": "Unable to pair with target device",
     "pair.send_error": "Unable to send encrypted wallet",
     "pair.e2ee_notice": "This device never exposes the private data in plain text.",
@@ -6587,8 +6596,16 @@ const translations = {
     "settings.change_password": "Cambiar Contraseña",
     "settings.biometrics": "Usar Biometría",
     "settings.reset": "Reiniciar Billetera",
-    "pair.section_title": "Emparejar Otro Equipo",
-    "pair.section_subtitle": "En el equipo nuevo, genera un código de recepción. En el equipo actual, introduce ese código y aprueba la transferencia cifrada.",
+    "pair.section_title": "Transferencia Segura de Cartera",
+    "pair.section_subtitle": "Traslada tu cartera cifrada a otro equipo sin exponer sus claves privadas.",
+    "pair.transfer_cta": "Transferir Cartera",
+    "pair.transfer_cta_hint": "Enviar o recibir en otro equipo",
+    "pair.choose_title": "Transferir Cartera",
+    "pair.choose_subtitle": "Elige qué debe hacer este equipo.",
+    "pair.role_send": "Enviar desde este equipo",
+    "pair.role_send_hint": "Este equipo ya contiene la cartera",
+    "pair.role_receive": "Recibir en este equipo",
+    "pair.role_receive_hint": "Este es el equipo de destino",
     "pair.send_cta": "Enviar Al Equipo Nuevo",
     "pair.receive_cta": "Obtener Código",
     "pair.step_badge_send": "Paso 2 de 2",
@@ -6616,8 +6633,9 @@ const translations = {
     "pair.waiting_handshake": "Esperando handshake seguro...",
     "pair.approve_and_send": "Aprobar y Enviar",
     "pair.sending": "Cifrando y enviando cartera...",
+    "pair.waiting_import_confirmation": "Cartera entregada. Esperando a que el destino termine de importarla...",
     "pair.send_complete": "Transferencia Completa",
-    "pair.send_complete_subtitle": "El equipo de destino ya puede importar la cartera.",
+    "pair.send_complete_subtitle": "El equipo de destino confirmó la importación de la cartera.",
     "pair.connect_error": "No se pudo emparejar con el equipo de destino",
     "pair.send_error": "No se pudo enviar la cartera cifrada",
     "pair.e2ee_notice": "Este equipo nunca expone los datos privados en texto plano.",
@@ -7198,8 +7216,16 @@ const translations = {
     "settings.change_password": "Changer Mot de Passe",
     "settings.biometrics": "Utiliser Biométrie",
     "settings.reset": "Réinitialiser Portefeuille",
-    "pair.section_title": "Associer un Autre Appareil",
-    "pair.section_subtitle": "Sur le nouvel appareil, générez un code de réception. Sur l'appareil actuel, saisissez ce code et approuvez le transfert chiffré.",
+    "pair.section_title": "Transfert Sécurisé du Portefeuille",
+    "pair.section_subtitle": "Transférez votre portefeuille chiffré vers un autre appareil sans exposer ses clés privées.",
+    "pair.transfer_cta": "Transférer le Portefeuille",
+    "pair.transfer_cta_hint": "Envoyer ou recevoir sur un autre appareil",
+    "pair.choose_title": "Transférer le Portefeuille",
+    "pair.choose_subtitle": "Choisissez le rôle de cet appareil.",
+    "pair.role_send": "Envoyer depuis cet appareil",
+    "pair.role_send_hint": "Cet appareil contient déjà le portefeuille",
+    "pair.role_receive": "Recevoir sur cet appareil",
+    "pair.role_receive_hint": "Ceci est l'appareil de destination",
     "pair.send_cta": "Envoyer Vers le Nouvel Appareil",
     "pair.receive_cta": "Obtenir le Code",
     "pair.step_badge_send": "Étape 2 sur 2",
@@ -7227,8 +7253,9 @@ const translations = {
     "pair.waiting_handshake": "En attente du handshake sécurisé...",
     "pair.approve_and_send": "Approuver et Envoyer",
     "pair.sending": "Chiffrement et envoi du portefeuille...",
+    "pair.waiting_import_confirmation": "Portefeuille livré. En attente de la confirmation d'importation...",
     "pair.send_complete": "Transfert Terminé",
-    "pair.send_complete_subtitle": "L'appareil de destination peut maintenant importer le portefeuille.",
+    "pair.send_complete_subtitle": "L'appareil de destination a confirmé l'importation.",
     "pair.connect_error": "Impossible d'associer l'appareil cible",
     "pair.send_error": "Impossible d'envoyer le portefeuille chiffré",
     "pair.e2ee_notice": "Cet appareil n'expose jamais les données privées en clair.",
@@ -7677,8 +7704,16 @@ const translations = {
     "settings.change_password": "Passwort ändern",
     "settings.biometrics": "Biometrie verwenden",
     "settings.reset": "Wallet zurücksetzen",
-    "pair.section_title": "Weiteres Gerät Koppeln",
-    "pair.section_subtitle": "Erzeuge auf dem neuen Gerät einen Empfangscode. Gib diesen Code auf dem aktuellen Gerät ein und bestätige die verschlüsselte Übertragung.",
+    "pair.section_title": "Sichere Wallet-Übertragung",
+    "pair.section_subtitle": "Übertrage deine verschlüsselte Wallet auf ein anderes Gerät, ohne private Schlüssel offenzulegen.",
+    "pair.transfer_cta": "Wallet Übertragen",
+    "pair.transfer_cta_hint": "Auf einem anderen Gerät senden oder empfangen",
+    "pair.choose_title": "Wallet Übertragen",
+    "pair.choose_subtitle": "Wähle die Aufgabe dieses Geräts.",
+    "pair.role_send": "Von diesem Gerät senden",
+    "pair.role_send_hint": "Dieses Gerät enthält bereits die Wallet",
+    "pair.role_receive": "Auf diesem Gerät empfangen",
+    "pair.role_receive_hint": "Dies ist das Zielgerät",
     "pair.send_cta": "An Neues Gerät Senden",
     "pair.receive_cta": "Empfangscode Anzeigen",
     "pair.step_badge_send": "Schritt 2 von 2",
@@ -7706,8 +7741,9 @@ const translations = {
     "pair.waiting_handshake": "Warte auf sicheren Handshake...",
     "pair.approve_and_send": "Bestätigen und Senden",
     "pair.sending": "Wallet wird verschlüsselt und gesendet...",
+    "pair.waiting_import_confirmation": "Wallet zugestellt. Warte auf die Importbestätigung des Zielgeräts...",
     "pair.send_complete": "Übertragung Abgeschlossen",
-    "pair.send_complete_subtitle": "Das Zielgerät kann die Wallet jetzt importieren.",
+    "pair.send_complete_subtitle": "Das Zielgerät hat den Wallet-Import bestätigt.",
     "pair.connect_error": "Kopplung mit dem Zielgerät nicht möglich",
     "pair.send_error": "Die verschlüsselte Wallet konnte nicht gesendet werden",
     "pair.e2ee_notice": "Dieses Gerät legt private Daten niemals im Klartext offen.",
@@ -8156,8 +8192,16 @@ const translations = {
     "settings.change_password": "Cambia Password",
     "settings.biometrics": "Usa Biometria",
     "settings.reset": "Reimposta Wallet",
-    "pair.section_title": "Abbina un Altro Dispositivo",
-    "pair.section_subtitle": "Sul nuovo dispositivo genera un codice di ricezione. Sul dispositivo attuale inserisci quel codice e approva il trasferimento cifrato.",
+    "pair.section_title": "Trasferimento Sicuro del Wallet",
+    "pair.section_subtitle": "Trasferisci il wallet cifrato su un altro dispositivo senza esporre le chiavi private.",
+    "pair.transfer_cta": "Trasferisci Wallet",
+    "pair.transfer_cta_hint": "Invia o ricevi su un altro dispositivo",
+    "pair.choose_title": "Trasferisci Wallet",
+    "pair.choose_subtitle": "Scegli cosa deve fare questo dispositivo.",
+    "pair.role_send": "Invia da questo dispositivo",
+    "pair.role_send_hint": "Questo dispositivo contiene già il wallet",
+    "pair.role_receive": "Ricevi su questo dispositivo",
+    "pair.role_receive_hint": "Questo è il dispositivo di destinazione",
     "pair.send_cta": "Invia al Nuovo Dispositivo",
     "pair.receive_cta": "Ottieni Codice",
     "pair.step_badge_send": "Passo 2 di 2",
@@ -8185,8 +8229,9 @@ const translations = {
     "pair.waiting_handshake": "In attesa dell'handshake sicuro...",
     "pair.approve_and_send": "Approva e Invia",
     "pair.sending": "Cifratura e invio del wallet...",
+    "pair.waiting_import_confirmation": "Wallet consegnato. In attesa della conferma di importazione...",
     "pair.send_complete": "Trasferimento Completato",
-    "pair.send_complete_subtitle": "Il dispositivo di destinazione ora può importare il wallet.",
+    "pair.send_complete_subtitle": "Il dispositivo di destinazione ha confermato l'importazione.",
     "pair.connect_error": "Impossibile abbinare il dispositivo di destinazione",
     "pair.send_error": "Impossibile inviare il wallet cifrato",
     "pair.e2ee_notice": "Questo dispositivo non espone mai i dati privati in chiaro.",
@@ -9496,10 +9541,21 @@ class DeviceTransferService {
   constructor() {
     this.socket = null;
     this.sessionId = null;
+    this.role = null;
     this.sharedKey = null;
     this.myKeyPair = null;
     this.myPublicKeyB64 = null;
     this.incomingPayloadResolver = null;
+    this.queuedIncomingTransfer = null;
+    this.pendingIncomingTransferId = null;
+    this.completedIncomingTransferId = null;
+    this.pendingTransferId = null;
+    this.pendingEncryptedPayload = null;
+    this.pendingTransferResolver = null;
+    this.pendingTransferRejecter = null;
+    this.retryTimer = null;
+    this.transferTimeout = null;
+    this.payloadReceived = false;
     this.statusListener = null;
     this.hasEchoedPublicKey = false;
   }
@@ -9533,7 +9589,12 @@ class DeviceTransferService {
       timeout: 1e4
     });
     this.socket.on("connect", () => {
-      this.emitStatus(this.sharedKey ? "paired" : "connecting");
+      this.emitJoin();
+      if (this.pendingTransferId) {
+        this.emitStatus(this.payloadReceived ? "delivered" : "sending");
+      } else {
+        this.emitStatus(this.sharedKey ? "paired" : this.role === "destination" ? "waiting" : "connecting");
+      }
     });
     this.socket.on("connect_error", (err) => {
       this.emitStatus("error", err.message || "Connection error");
@@ -9542,6 +9603,9 @@ class DeviceTransferService {
       if (reason !== "io client disconnect") {
         this.emitStatus("error", `Disconnected: ${reason}`);
       }
+    });
+    this.socket.on("bridge_session_error", (data) => {
+      this.emitStatus("error", data?.error || "Unable to join transfer session");
     });
     this.socket.on("bridge_signer_ready", async (data) => {
       if (!this.myKeyPair || !data?.publicKey) return;
@@ -9552,46 +9616,91 @@ class DeviceTransferService {
           this.hasEchoedPublicKey = true;
           this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: this.myPublicKeyB64 });
         }
-        this.emitStatus("paired");
+        if (this.pendingEncryptedPayload && !this.payloadReceived) {
+          this.emitStatus("sending");
+          this.emitPendingPayload();
+        } else {
+          this.emitStatus("paired");
+        }
       } catch (error) {
         this.emitStatus("error", error?.message || "Handshake failed");
       }
     });
     this.socket.on("bridge_sync_accounts", async (data) => {
-      if (!this.sharedKey || !data?.encrypted) return;
+      if (!this.sharedKey || !data?.encrypted || !data?.transferId) return;
+      if (this.completedIncomingTransferId === data.transferId) {
+        this.emitTransferAck(data.transferId, "imported");
+        return;
+      }
+      if (this.pendingIncomingTransferId === data.transferId) {
+        this.emitTransferAck(data.transferId, "received");
+        return;
+      }
       try {
         const decrypted = await decryptMessage(data.encrypted, this.sharedKey);
         const payload = JSON.parse(decrypted);
-        this.emitStatus("transferred");
-        this.incomingPayloadResolver?.(payload);
-        this.incomingPayloadResolver = null;
+        this.pendingIncomingTransferId = data.transferId;
+        this.emitTransferAck(data.transferId, "received");
+        const transfer = {
+          payload,
+          confirmImported: () => this.finishIncomingTransfer(data.transferId, "imported"),
+          rejectImport: (message) => this.finishIncomingTransfer(data.transferId, "failed", message)
+        };
+        if (this.incomingPayloadResolver) {
+          this.incomingPayloadResolver(transfer);
+          this.incomingPayloadResolver = null;
+        } else {
+          this.queuedIncomingTransfer = transfer;
+        }
       } catch (error) {
+        this.emitTransferAck(data.transferId, "failed", error?.message || "Unable to decrypt wallet");
         this.emitStatus("error", error?.message || "Import failed");
+      }
+    });
+    this.socket.on("bridge_sync_ack", (data) => {
+      if (!data?.transferId || data.transferId !== this.pendingTransferId) return;
+      if (data.phase === "received") {
+        this.payloadReceived = true;
+        this.emitStatus("delivered");
+        return;
+      }
+      if (data.phase === "imported") {
+        this.finishOutgoingTransfer();
+        return;
+      }
+      if (data.phase === "failed") {
+        this.failOutgoingTransfer(data.error || "The destination device could not import the wallet");
       }
     });
   }
   async startReceiveSession() {
     this.disconnect();
-    this.ensureSocket();
     this.sessionId = this.createSessionCode();
+    this.role = "destination";
     this.myKeyPair = await generateEncryptionKeys();
     this.sharedKey = null;
     this.hasEchoedPublicKey = false;
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
     this.myPublicKeyB64 = myPubB64;
     this.emitStatus("waiting");
-    this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
+    this.ensureSocket();
+    this.emitJoin();
     return { code: this.formatCode(this.sessionId) };
   }
   async waitForIncomingPayload(timeoutMs = 5 * 60 * 1e3) {
+    if (this.queuedIncomingTransfer) {
+      const transfer = this.queuedIncomingTransfer;
+      this.queuedIncomingTransfer = null;
+      return transfer;
+    }
     return new Promise((resolve, reject) => {
       const timeoutId = window.setTimeout(() => {
         this.incomingPayloadResolver = null;
         reject(new Error("Transfer timed out"));
       }, timeoutMs);
-      this.incomingPayloadResolver = (payload) => {
+      this.incomingPayloadResolver = (transfer) => {
         clearTimeout(timeoutId);
-        resolve(payload);
+        resolve(transfer);
       };
     });
   }
@@ -9601,14 +9710,15 @@ class DeviceTransferService {
       throw new Error("Invalid transfer code");
     }
     this.disconnect();
-    this.ensureSocket();
     this.sessionId = code;
+    this.role = "source";
     this.myKeyPair = await generateEncryptionKeys();
     this.sharedKey = null;
     this.hasEchoedPublicKey = false;
     const myPubB64 = await exportKeyToBase64(this.myKeyPair.publicKey);
     this.myPublicKeyB64 = myPubB64;
     this.emitStatus("connecting");
+    this.ensureSocket();
     const pairedPromise = new Promise((resolve, reject) => {
       const timeoutId = window.setTimeout(() => {
         reject(new Error("Target device did not respond in time"));
@@ -9627,28 +9737,116 @@ class DeviceTransferService {
         }
       };
     });
-    this.socket?.emit("bridge_join", { sessionId: this.sessionId, publicKey: myPubB64 });
+    this.emitJoin();
     await pairedPromise;
   }
-  async sendPayload(payload) {
+  async sendPayload(payload, timeoutMs = 9e4) {
     if (!this.socket || !this.sharedKey || !this.sessionId) {
       throw new Error("Transfer session not ready");
     }
-    const encrypted = await encryptMessage(JSON.stringify(payload), this.sharedKey);
-    this.socket.emit("bridge_sync_accounts", { sessionId: this.sessionId, encrypted });
+    this.clearOutgoingTransfer();
+    this.pendingTransferId = window.crypto.randomUUID();
+    this.pendingEncryptedPayload = await encryptMessage(JSON.stringify(payload), this.sharedKey);
+    this.payloadReceived = false;
+    this.emitStatus("sending");
+    return new Promise((resolve, reject) => {
+      this.pendingTransferResolver = resolve;
+      this.pendingTransferRejecter = reject;
+      this.transferTimeout = window.setTimeout(() => {
+        this.failOutgoingTransfer(
+          this.payloadReceived ? "The destination received the wallet but did not confirm the import" : "The destination device did not receive the wallet in time"
+        );
+      }, timeoutMs);
+      this.emitPendingPayload();
+      this.retryTimer = window.setInterval(() => {
+        this.emitPendingPayload();
+      }, 2500);
+    });
+  }
+  emitJoin() {
+    if (!this.socket?.connected || !this.sessionId || !this.myPublicKeyB64) return;
+    this.socket.emit("bridge_join", {
+      sessionId: this.sessionId,
+      publicKey: this.myPublicKeyB64,
+      role: this.role ? `device-transfer-${this.role}` : void 0
+    }, (response) => {
+      if (response && response.success === false) {
+        this.emitStatus("error", response.error || "Unable to join transfer session");
+      }
+    });
+  }
+  emitPendingPayload() {
+    if (!this.socket?.connected || !this.sessionId || !this.pendingTransferId || !this.pendingEncryptedPayload) return;
+    this.socket.emit("bridge_sync_accounts", {
+      sessionId: this.sessionId,
+      transferId: this.pendingTransferId,
+      encrypted: this.pendingEncryptedPayload
+    });
+  }
+  emitTransferAck(transferId, phase, error) {
+    if (!this.socket?.connected || !this.sessionId) return;
+    this.socket.emit("bridge_sync_ack", { sessionId: this.sessionId, transferId, phase, error });
+  }
+  finishIncomingTransfer(transferId, phase, error) {
+    if (this.pendingIncomingTransferId !== transferId) return;
+    this.emitTransferAck(transferId, phase, error);
+    if (phase === "imported") {
+      this.completedIncomingTransferId = transferId;
+      this.emitStatus("transferred");
+    } else {
+      this.emitStatus("error", error || "Wallet import failed");
+    }
+    this.pendingIncomingTransferId = null;
+  }
+  finishOutgoingTransfer() {
+    const resolve = this.pendingTransferResolver;
+    this.clearOutgoingTransfer();
     this.emitStatus("transferred");
+    resolve?.();
+  }
+  failOutgoingTransfer(message) {
+    const reject = this.pendingTransferRejecter;
+    this.clearOutgoingTransfer();
+    this.emitStatus("error", message);
+    reject?.(new Error(message));
+  }
+  clearRetryTimer() {
+    if (this.retryTimer !== null) {
+      window.clearInterval(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+  clearOutgoingTransfer() {
+    this.clearRetryTimer();
+    if (this.transferTimeout !== null) {
+      window.clearTimeout(this.transferTimeout);
+      this.transferTimeout = null;
+    }
+    this.pendingTransferId = null;
+    this.pendingEncryptedPayload = null;
+    this.pendingTransferResolver = null;
+    this.pendingTransferRejecter = null;
+    this.payloadReceived = false;
   }
   disconnect() {
+    if (this.pendingTransferRejecter) {
+      this.pendingTransferRejecter(new Error("Transfer cancelled"));
+    }
+    this.clearOutgoingTransfer();
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
     this.sessionId = null;
+    this.role = null;
     this.sharedKey = null;
     this.myKeyPair = null;
     this.myPublicKeyB64 = null;
     this.hasEchoedPublicKey = false;
     this.incomingPayloadResolver = null;
+    this.queuedIncomingTransfer = null;
+    this.pendingIncomingTransferId = null;
+    this.completedIncomingTransferId = null;
     this.emitStatus("idle");
   }
 }
@@ -9663,6 +9861,8 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
     deviceTransferService.onStatusChange((nextStatus, detail) => {
       if (nextStatus === "connecting" || nextStatus === "waiting") setStatus("connecting");
       if (nextStatus === "paired") setStatus("paired");
+      if (nextStatus === "sending") setStatus("sending");
+      if (nextStatus === "delivered") setStatus("delivered");
       if (nextStatus === "transferred") setStatus("sent");
       if (nextStatus === "error") {
         setStatus("error");
@@ -9785,6 +9985,7 @@ const SyncExportModal = ({ accounts, walletConfig, onClose }) => {
         }
       ),
       status === "sending" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.sending") }),
+      status === "delivered" && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full py-4 rounded-xl bg-dark-900 text-center text-sm font-bold text-slate-300 border border-dark-700", children: t("pair.waiting_import_confirmation") }),
       status === "sent" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full py-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-black text-green-400 uppercase tracking-widest text-sm", children: t("pair.send_complete") }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-slate-400 mt-1", children: t("pair.send_complete_subtitle") })
@@ -9823,12 +10024,18 @@ const SyncImportModal = ({ onClose, onImport }) => {
         if (!mounted) return;
         setPairCode(code);
         setStatus("waiting");
-        const payload = await deviceTransferService.waitForIncomingPayload();
+        const transfer = await deviceTransferService.waitForIncomingPayload();
         if (!mounted) return;
         setStatus("importing");
-        await onImportRef.current(payload);
+        try {
+          await onImportRef.current(transfer.payload);
+          transfer.confirmImported();
+        } catch (importError) {
+          transfer.rejectImport(importError?.message || t("pair.receive_error"));
+          throw importError;
+        }
         if (!mounted) return;
-        setSuccessMsg(t("pair.receive_success_message", { count: payload.accounts.length }));
+        setSuccessMsg(t("pair.receive_success_message", { count: transfer.payload.accounts.length }));
         setStatus("done");
       } catch (e) {
         if (!mounted) return;
@@ -9897,12 +10104,63 @@ const SyncImportModal = ({ onClose, onImport }) => {
   ] }) });
 };
 
+const WalletTransferModal = ({
+  accounts,
+  walletConfig,
+  onClose,
+  onImport
+}) => {
+  const { t } = useTranslation();
+  const [role, setRole] = reactExports.useState(null);
+  if (role === "send") {
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(SyncExportModal, { accounts, walletConfig, onClose });
+  }
+  if (role === "receive") {
+    return /* @__PURE__ */ jsxRuntimeExports.jsx(SyncImportModal, { onClose, onImport });
+  }
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-800 border border-dark-700 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: onClose, className: "absolute top-4 right-4 text-slate-400 hover:text-white", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-6 h-6", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xl font-black text-white mb-2", children: t("pair.choose_title") }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mb-6", children: t("pair.choose_subtitle") }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => setRole("send"),
+          disabled: accounts.length === 0,
+          className: "w-full bg-dark-900 hover:bg-dark-700 disabled:opacity-40 disabled:hover:bg-dark-900 border border-dark-600 p-4 rounded-2xl flex items-center gap-4 text-left transition-colors",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 16V4m0 0L8 8m4-4l4 4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" }) }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm text-white", children: t("pair.role_send") }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: t("pair.role_send_hint") })
+            ] })
+          ]
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: () => setRole("receive"),
+          className: "w-full bg-dark-900 hover:bg-dark-700 border border-dark-600 p-4 rounded-2xl flex items-center gap-4 text-left transition-colors",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 4v12m0 0l-4-4m4 4l4-4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" }) }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-sm text-white", children: t("pair.role_receive") }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: t("pair.role_receive_hint") })
+            ] })
+          ]
+        }
+      )
+    ] })
+  ] }) });
+};
+
 const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport, onSyncImport }) => {
   const { t } = useTranslation();
   const [showTOTP, setShowTOTP] = reactExports.useState(false);
   const [showBio, setShowBio] = reactExports.useState(false);
-  const [showSyncExport, setShowSyncExport] = reactExports.useState(false);
-  const [showSyncImport, setShowSyncImport] = reactExports.useState(false);
+  const [showWalletTransfer, setShowWalletTransfer] = reactExports.useState(false);
   const chainCounts = {
     hive: accounts.filter((account) => account.chain === Chain.HIVE).length,
     blurt: accounts.filter((account) => account.chain === Chain.BLURT).length,
@@ -9961,30 +10219,20 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 border-t border-dark-700 space-y-3", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1", children: t("pair.section_title") }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[10px] text-slate-500 -mt-1 mb-2", children: t("pair.section_subtitle") }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              onClick: () => setShowSyncExport(true),
-              className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" }) }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: t("pair.send_cta") })
-              ]
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              onClick: () => setShowSyncImport(true),
-              className: "bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex flex-col items-center gap-2 transition-all group",
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }) }) }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-xs", children: t("pair.receive_cta") })
-              ]
-            }
-          )
-        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            onClick: () => setShowWalletTransfer(true),
+            className: "w-full bg-dark-800 hover:bg-dark-700 border border-dark-600 text-slate-200 p-3 rounded-xl flex items-center gap-3 transition-all group text-left",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-5 h-5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 7h11m0 0l-4-4m4 4l-4 4M16 17H5m0 0l4 4m-4-4l4-4" }) }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-bold text-xs", children: t("pair.transfer_cta") }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[10px] text-slate-500 mt-1", children: t("pair.transfer_cta_hint") })
+              ] })
+            ]
+          }
+        ) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-slate-400 uppercase tracking-wider mb-1 mt-4", children: "Security" }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
           "button",
@@ -10051,18 +10299,12 @@ const ManageWallets = ({ accounts, walletState, setWalletState, onEdit, onImport
         onComplete: () => setShowBio(false)
       }
     ),
-    showSyncExport && /* @__PURE__ */ jsxRuntimeExports.jsx(
-      SyncExportModal,
+    showWalletTransfer && /* @__PURE__ */ jsxRuntimeExports.jsx(
+      WalletTransferModal,
       {
         accounts,
         walletConfig: walletState,
-        onClose: () => setShowSyncExport(false)
-      }
-    ),
-    showSyncImport && /* @__PURE__ */ jsxRuntimeExports.jsx(
-      SyncImportModal,
-      {
-        onClose: () => setShowSyncImport(false),
+        onClose: () => setShowWalletTransfer(false),
         onImport: onSyncImport
       }
     )

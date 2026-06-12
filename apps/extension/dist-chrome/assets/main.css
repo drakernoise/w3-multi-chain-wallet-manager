@@ -3108,6 +3108,10 @@ body,
   opacity: 0.3;
 }
 
+.disabled\:opacity-40:disabled {
+  opacity: 0.4;
+}
+
 .disabled\:opacity-50:disabled {
   opacity: 0.5;
 }
@@ -3115,6 +3119,11 @@ body,
 .disabled\:grayscale:disabled {
   --tw-grayscale: grayscale(100%);
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
+}
+
+.disabled\:hover\:bg-dark-900:hover:disabled {
+  --tw-bg-opacity: 1;
+  background-color: rgb(15 23 42 / var(--tw-bg-opacity, 1));
 }
 
 .group:hover .group-hover\:translate-x-1 {
@@ -3136,10 +3145,6 @@ body,
 
 .group:hover .group-hover\:bg-blue-500\/20 {
   background-color: rgb(59 130 246 / 0.2);
-}
-
-.group:hover .group-hover\:bg-green-500\/20 {
-  background-color: rgb(34 197 94 / 0.2);
 }
 
 .group:hover .group-hover\:bg-purple-500\/20 {
