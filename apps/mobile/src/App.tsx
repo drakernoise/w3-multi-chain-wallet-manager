@@ -22,7 +22,7 @@ import { storageService } from '@services/storageService'
 import { mobileProvider, SignRequest as MobileSignRequest } from './services/mobileProvider'
 import { SignRequestModal } from './components/SignRequestModal'
 import { PermissionsManager } from './components/PermissionsManager'
-import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning'
+import { scanGravityQrCode } from './services/gravityQrScanner'
 import 'gravity-shared/styles/global.css'
 import './App.css'
 
@@ -252,6 +252,7 @@ function App() {
 
 function MobileContent() {
   const HISTORY_CACHE_STORAGE_KEY = 'gravity_account_history_cache_v1'
+  const LAST_WALLET_CHAIN_STORAGE_KEY = 'gravity_last_wallet_chain'
   const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000
 
   type HistoryCacheEntry = {
@@ -274,7 +275,7 @@ function MobileContent() {
 
   // Navigation & View State
   const [currentView, setCurrentView] = useState<'wallets' | 'multisig' | 'bridge' | 'chat' | 'settings' | 'explorer'>('wallets')
-  const [activeChain, setActiveChain] = useState<Chain>(Chain.HIVE)
+  const [activeChain, setActiveChain] = useState<Chain>(Chain.BLURT)
 
   // Bridge State
   const [activeRequest, setActiveRequest] = useState<SignRequest | null>(null)
@@ -301,9 +302,9 @@ function MobileContent() {
   const [historyCache, setHistoryCache] = useState<HistoryCache>({})
   const [historyLoadingKeys, setHistoryLoadingKeys] = useState<Record<string, boolean>>({})
   const [historyCacheLoaded, setHistoryCacheLoaded] = useState(false)
+  const [walletChainRestored, setWalletChainRestored] = useState(false)
 
   // QR & PIN Pairing State
-  const [isScanning, setIsScanning] = useState(false)
   const [showPinPrompt, setShowPinPrompt] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [pinValue, setPinValue] = useState('')
@@ -311,6 +312,23 @@ function MobileContent() {
   const accountsRef = useRef<Account[]>([])
   const historyCacheRef = useRef<HistoryCache>({})
   const historySyncInFlightRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    storageService.getItem(LAST_WALLET_CHAIN_STORAGE_KEY)
+      .then((storedChain) => {
+        if (storedChain === Chain.BLURT || storedChain === Chain.HIVE || storedChain === Chain.STEEM) {
+          setActiveChain(storedChain)
+        }
+      })
+      .catch((error) => console.warn('[Mobile] Failed to restore last wallet chain:', error))
+      .finally(() => setWalletChainRestored(true))
+  }, [])
+
+  useEffect(() => {
+    if (!walletChainRestored) return
+    storageService.setItem(LAST_WALLET_CHAIN_STORAGE_KEY, activeChain)
+      .catch((error) => console.warn('[Mobile] Failed to persist wallet chain:', error))
+  }, [activeChain, walletChainRestored])
 
   const getHistoryCacheKey = (account: Pick<Account, 'chain' | 'name'>) =>
     `${account.chain}:${account.name}`.toLowerCase()
@@ -1160,68 +1178,29 @@ function MobileContent() {
 
   const startScan = async () => {
     try {
-      console.log('[Scanner] Checking ML Kit module availability...');
-      const isAvailable = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
-      if (!isAvailable.available) {
-        console.log('[Scanner] ML Kit module not found. Installing...');
-        showToast("Preparing scanner... (Downloading assets, please wait)");
-        await BarcodeScanner.installGoogleBarcodeScannerModule();
+      console.log('[Scanner] Opening Gravity QR scanner...');
+      const qrData = await scanGravityQrCode();
+      if (!qrData.startsWith('gravity:bridge:')) {
+        showToast("Invalid QR Code: Not a Gravity Bridge session");
+        return;
       }
 
-      // 1. Check Permissions
-      const status = await BarcodeScanner.checkPermissions();
-      if (status.camera !== 'granted') {
-        const req = await BarcodeScanner.requestPermissions();
-        if (req.camera !== 'granted') {
-          showToast("Camera permission is required to scan QR codes.");
-          return;
-        }
+      console.log('[Scanner] Valid Gravity Bridge QR found');
+      try {
+        await bridgeService.connectToExtension(qrData);
+        setShowPinPrompt(true);
+      } catch (err) {
+        console.error('[Scanner] Bridge connection failed', err);
+        showToast("Connection failed: " + err);
       }
-
-      // 2. Start Scanning
-      console.log('[Scanner] Starting scan sequence...');
-      document.documentElement.classList.add('barcode-scanner-active');
-      document.body.classList.add('barcode-scanner-active');
-      setIsScanning(true);
-
-      // Radical delay to ensure all CSS classes are parsed and applied
-      await new Promise(r => setTimeout(r, 500));
-
-      const listener = await BarcodeScanner.addListener('barcodeScanned', async (result) => {
-        console.log('[Scanner] Barcode detected!', result.barcode.displayValue);
-
-        await BarcodeScanner.stopScan();
-        document.documentElement.classList.remove('barcode-scanner-active');
-        document.body.classList.remove('barcode-scanner-active');
-        setIsScanning(false);
-        listener.remove();
-
-        const qrData = result.barcode.displayValue;
-        if (qrData.startsWith('gravity:bridge:')) {
-          console.log('[Scanner] Valid Gravity Bridge QR found');
-          try {
-            await bridgeService.connectToExtension(qrData);
-            setShowPinPrompt(true);
-          } catch (err) {
-            console.error('[Scanner] Bridge connection failed', err);
-            showToast("Connection failed: " + err);
-          }
-        } else {
-          showToast("Invalid QR Code: Not a Gravity Bridge session");
-        }
-      });
-
-      console.log('[Scanner] Calling BarcodeScanner.startScan()...');
-      await BarcodeScanner.startScan({
-        formats: [BarcodeFormat.QrCode]
-      });
-
-    } catch (e) {
-      console.error("[Scanner] StartScan failed", e);
-      setIsScanning(false);
-      document.documentElement.classList.remove('barcode-scanner-active');
-      document.body.classList.remove('barcode-scanner-active');
-      showToast("Error opening scanner: " + e);
+    } catch (e: any) {
+      const message = String(e?.message || e || '');
+      if (message.toLowerCase().includes('scan canceled')) {
+        console.log('[Scanner] Scan cancelled by user');
+        return;
+      }
+      console.error("[Scanner] Native scan failed", e);
+      showToast("Error opening scanner: " + message);
     }
   }
 
@@ -1246,30 +1225,6 @@ function MobileContent() {
     }
   }
 
-  const cancelScan = async () => {
-    console.log('[Scanner] Cancelling scan...');
-    await BarcodeScanner.stopScan();
-    setIsScanning(false);
-    document.documentElement.classList.remove('barcode-scanner-active');
-    document.body.classList.remove('barcode-scanner-active');
-  }
-
-  if (isScanning) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-between pb-20 pt-10 bg-transparent scanner-ui-overlay">
-        <div className="w-64 h-64 border-2 border-white/50 rounded-3xl relative">
-          <div className="absolute inset-0 border-4 border-purple-500 rounded-3xl animate-pulse"></div>
-        </div>
-        <button
-          onClick={cancelScan}
-          className="bg-red-600/80 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-sm backdrop-blur-md"
-        >
-          Cancel Scan
-        </button>
-      </div>
-    );
-  }
-
   if (isLocked) {
     return (
       <div className="h-screen w-screen overflow-hidden">
@@ -1283,9 +1238,9 @@ function MobileContent() {
   }
 
   return (
-    <div className={`flex flex-col h-screen w-screen text-white p-6 relative overflow-hidden transition-colors ${isScanning ? 'bg-transparent' : 'bg-dark-900'}`}>
+    <div className={`flex flex-col h-screen w-screen text-white relative overflow-hidden transition-colors ${currentView === 'explorer' ? 'mobile-browser-host p-0' : 'bg-dark-900 p-6'}`}>
       {/* Header */}
-      {!isScanning && (
+      {currentView !== 'explorer' && (
         <header className="flex justify-between items-center mb-4 shrink-0 transition-opacity">
           <div>
             <h1 className="text-2xl font-black tracking-tighter">GRAVITY</h1>
@@ -1451,7 +1406,8 @@ function MobileContent() {
       </main>
 
       {/* Navigation Bar */}
-      <nav className="shrink-0 grid grid-cols-6 gap-2 border-t border-dark-800 pt-6 mt-4">
+      {currentView !== 'explorer' && (
+        <nav className="shrink-0 grid grid-cols-6 gap-2 border-t border-dark-800 pt-6 mt-4">
         <button
           onClick={() => setCurrentView('wallets')}
           className={`flex flex-col items-center gap-1.5 transition-all outline-none bg-transparent border-none p-0 ${currentView === 'wallets' ? 'text-purple-400 opacity-100' : 'opacity-30'}`}
@@ -1490,11 +1446,11 @@ function MobileContent() {
 
         <button
           onClick={() => setCurrentView('explorer')}
-          className={`flex flex-col items-center gap-1.5 transition-all outline-none bg-transparent border-none p-0 ${currentView === 'explorer' ? 'text-blue-400 opacity-100' : 'opacity-30'}`}
+          className="flex flex-col items-center gap-1.5 transition-all outline-none bg-transparent border-none p-0 opacity-30"
           style={{ backgroundColor: 'transparent' }}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-          <span className={`text-[8px] font-black uppercase tracking-widest ${currentView === 'explorer' ? 'border-b border-blue-400' : ''}`}>Explorer</span>
+          <span className="text-[8px] font-black uppercase tracking-widest">Explorer</span>
         </button>
 
         <button
@@ -1505,7 +1461,8 @@ function MobileContent() {
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           <span className={`text-[8px] font-black uppercase tracking-widest ${currentView === 'settings' ? 'border-b border-purple-400' : ''}`}>Settings</span>
         </button>
-      </nav>
+        </nav>
+      )}
 
       {/* MODALS */}
 

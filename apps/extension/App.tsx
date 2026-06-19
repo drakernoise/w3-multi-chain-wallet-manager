@@ -104,6 +104,11 @@ function AppContent() {
     partial?: boolean;
   };
   type HistoryCache = Record<string, HistoryCacheEntry>;
+  type EnabledDAppSite = {
+    origin: string;
+    match: string;
+    enabledAt: number;
+  };
 
   const getHistoryCacheKey = (account: Pick<Account, 'chain' | 'name'>) => `${account.chain}:${account.name}`.toLowerCase();
 
@@ -156,6 +161,9 @@ function AppContent() {
     }
   });
   const [web3Context, setWeb3Context] = useState<string | null>(null);
+  const [currentSite, setCurrentSite] = useState<{ origin: string; match: string; host: string } | null>(null);
+  const [sitePermissionGranted, setSitePermissionGranted] = useState(false);
+  const [isEnablingSite, setIsEnablingSite] = useState(false);
 
   // Notifications
   const { showNotification } = useNotification();
@@ -166,6 +174,196 @@ function AppContent() {
   // Signing Request ID
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showBridge, setShowBridge] = useState(false);
+
+  const dynamicSiteScriptId = (origin: string, kind: 'content' | 'provider') => {
+    let hash = 0;
+    for (let i = 0; i < origin.length; i++) {
+      hash = ((hash << 5) - hash + origin.charCodeAt(i)) | 0;
+    }
+    return `gravity_${kind}_${Math.abs(hash)}`;
+  };
+
+  const getActiveHttpTab = () => new Promise<any | null>((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.tabs?.query) {
+      resolve(null);
+      return;
+    }
+
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+      const tab = Array.isArray(tabs) ? tabs[0] : null;
+      if (!tab?.id || !tab?.url) {
+        resolve(null);
+        return;
+      }
+
+      try {
+        const url = new URL(tab.url);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+          resolve(null);
+          return;
+        }
+        resolve(tab);
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+
+  const registerGravityForSite = async (site: { origin: string; match: string }) => {
+    if (typeof chrome === 'undefined' || !chrome.scripting?.registerContentScripts) return;
+
+    const contentId = dynamicSiteScriptId(site.origin, 'content');
+    const providerId = dynamicSiteScriptId(site.origin, 'provider');
+
+    await new Promise<void>((resolve) => {
+      chrome.scripting.unregisterContentScripts({ ids: [contentId, providerId] }, () => resolve());
+    });
+
+    await chrome.scripting.registerContentScripts([
+      {
+        id: contentId,
+        matches: [site.match],
+        js: ['assets/content.js'],
+        runAt: 'document_start',
+        persistAcrossSessions: true
+      },
+      {
+        id: providerId,
+        matches: [site.match],
+        js: ['assets/provider.js'],
+        runAt: 'document_start',
+        world: 'MAIN',
+        allFrames: true,
+        persistAcrossSessions: true
+      }
+    ]);
+  };
+
+  const injectGravityIntoCurrentTab = async (tabId: number) => {
+    if (typeof chrome === 'undefined' || !chrome.scripting?.executeScript) return;
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['assets/content.js']
+    });
+
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      files: ['assets/provider.js'],
+      world: 'MAIN'
+    });
+  };
+
+  const refreshCurrentSiteStatus = async () => {
+    const tab = await getActiveHttpTab();
+    if (!tab?.url) {
+      setCurrentSite(null);
+      setSitePermissionGranted(false);
+      return;
+    }
+
+    const url = new URL(tab.url);
+    const site = {
+      origin: url.origin,
+      match: `${url.origin}/*`,
+      host: url.hostname.replace(/^www\./, '')
+    };
+    setCurrentSite(site);
+
+    if (typeof chrome === 'undefined' || !chrome.permissions?.contains) {
+      setSitePermissionGranted(false);
+      return;
+    }
+
+    chrome.permissions.contains({ origins: [site.match] }, (granted: boolean) => {
+      setSitePermissionGranted(Boolean(granted));
+    });
+  };
+
+  const enableGravityOnCurrentSite = async () => {
+    let site = currentSite;
+    if (!site) {
+      const tab = await getActiveHttpTab();
+      if (tab?.url) {
+        const url = new URL(tab.url);
+        site = {
+          origin: url.origin,
+          match: `${url.origin}/*`,
+          host: url.hostname.replace(/^www\./, '')
+        };
+      }
+    }
+
+    if (!site) {
+      showNotification('Open a website tab first, then enable Gravity for that site.', 'error');
+      return;
+    }
+
+    setIsEnablingSite(true);
+    try {
+      const granted = await new Promise<boolean>((resolve) => {
+        if (!chrome.permissions?.request) {
+          resolve(false);
+          return;
+        }
+        chrome.permissions.request({ origins: [site.match] }, (ok: boolean) => {
+          resolve(Boolean(ok));
+        });
+      });
+
+      if (!granted) {
+        showNotification(`Permission denied for ${site.host}`, 'error');
+        return;
+      }
+
+      await registerGravityForSite(site);
+
+      const tab = await getActiveHttpTab();
+      if (!tab?.id) {
+        showNotification(`Gravity enabled on ${site.host}. Reload that site to use it.`, 'success');
+        return;
+      }
+      await injectGravityIntoCurrentTab(tab.id);
+
+      const stored = await new Promise<EnabledDAppSite[]>((resolve) => {
+        chrome.storage.local.get(['gravity_enabled_dapp_sites'], (result: any) => {
+          resolve(Array.isArray(result.gravity_enabled_dapp_sites) ? result.gravity_enabled_dapp_sites : []);
+        });
+      });
+      const next = [
+        ...stored.filter((saved) => saved.origin !== site.origin),
+        { origin: site.origin, match: site.match, enabledAt: Date.now() }
+      ];
+      await chrome.storage.local.set({ gravity_enabled_dapp_sites: next });
+
+      setCurrentSite(site);
+      setSitePermissionGranted(true);
+      showNotification(`Gravity enabled on ${site.host}. Reload the page if the dApp already checked for a wallet.`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      showNotification(`Could not enable this site: ${message}`, 'error');
+    } finally {
+      setIsEnablingSite(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshCurrentSiteStatus();
+
+    if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+    chrome.storage.local.get(['gravity_enabled_dapp_sites'], (result: any) => {
+      const sites: EnabledDAppSite[] = Array.isArray(result.gravity_enabled_dapp_sites)
+        ? result.gravity_enabled_dapp_sites
+        : [];
+      sites.forEach((site) => {
+        if (site?.origin && site?.match) {
+          registerGravityForSite(site).catch((error) => {
+            console.warn('Failed to restore Gravity dynamic site:', site.origin, error);
+          });
+        }
+      });
+    });
+  }, []);
 
   useEffect(() => {
     const handleWindowError = (event: ErrorEvent) => {
@@ -1033,6 +1231,20 @@ function AppContent() {
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                 {web3Context}
               </div>
+            )}
+            {currentSite && (
+              <button
+                onClick={enableGravityOnCurrentSite}
+                disabled={sitePermissionGranted || isEnablingSite}
+                className={`text-[10px] px-2 py-1 rounded border transition-colors max-w-[145px] truncate ${
+                  sitePermissionGranted
+                    ? 'bg-green-950/40 text-green-400 border-green-800 cursor-default'
+                    : 'bg-blue-950/40 hover:bg-blue-900/50 text-blue-300 border-blue-800'
+                }`}
+                title={sitePermissionGranted ? `Gravity is enabled on ${currentSite.host}` : `Enable Gravity on ${currentSite.host}`}
+              >
+                {sitePermissionGranted ? 'Site enabled' : isEnablingSite ? 'Enabling...' : `Enable ${currentSite.host}`}
+              </button>
             )}
             {currentView !== ViewState.CHAT && (
               <button

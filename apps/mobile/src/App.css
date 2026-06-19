@@ -45,33 +45,12 @@
   scrollbar-width: none;
 }
 
-/* 
- * CRITICAL: Scanner Transparency
- * Capacitor MLKit Barcode Scanning renders BEHIND the webview.
- * When scanning is active, we MUST make the entire webview hierarchy transparent.
- * This includes html, body, root and any layout containers.
- */
-.barcode-scanner-active,
-.barcode-scanner-active * {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
+.mobile-browser-host {
+  background: #f8f9fa;
 }
 
-/* Re-allow some essential tools/modals to be visible if needed, 
-   but for now we want EVERYTHING under the scanner UI to be transparent */
-.barcode-scanner-active .scanner-ui-overlay {
-  background: transparent !important;
-  display: flex !important;
-}
-
-.barcode-scanner-active .scanner-ui-overlay * {
-  background: transparent !important;
-}
-
-.barcode-scanner-active .scanner-ui-overlay button {
-  background: rgba(220, 38, 38, 0.8) !important;
-  /* Keep cancel button visible */
-  color: white !important;
+@media (prefers-color-scheme: dark) {
+  .mobile-browser-host {
+    background: #202124;
+  }
 }

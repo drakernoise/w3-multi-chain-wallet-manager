@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.widget.Toolbar xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="64dp"
+    android:elevation="2dp"
+    android:paddingStart="6dp"
+    android:paddingTop="7dp"
+    android:paddingEnd="6dp"
+    android:paddingBottom="7dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/closeButton"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/close_button"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/arrow_back_enabled" />
+
+        <ImageButton
+            android:id="@+id/backButton"
+            android:layout_width="38dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/back_button"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/arrow_back_disabled" />
+
+        <TextView
+            android:id="@+id/titleText"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginHorizontal="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/gravity_browser_omnibox"
+            android:drawableStart="@drawable/gravity_browser_lock"
+            android:drawablePadding="8dp"
+            android:ellipsize="middle"
+            android:gravity="center_vertical"
+            android:maxLines="1"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:singleLine="true"
+            android:text="@string/title"
+            android:textSize="14sp" />
+
+        <ImageButton
+            android:id="@+id/forwardButton"
+            android:layout_width="38dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/forward_button"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/arrow_forward_disabled" />
+
+        <ImageButton
+            android:id="@+id/reloadButton"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/reload_button"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_refresh"
+            android:visibility="gone" />
+
+        <ImageButton
+            android:id="@+id/buttonNearDone"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
+
+        <ImageButton
+            android:id="@+id/shareButton"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</android.widget.Toolbar>

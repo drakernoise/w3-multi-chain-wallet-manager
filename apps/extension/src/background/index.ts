@@ -105,7 +105,15 @@ function detectChainFromUrl(url: string = ""): string | null {
         ) return 'HIVE';
 
         // BLURT
-        const blurtHosts = ['blurt.blog', 'blurtwallet.com', 'twiggy.lat'];
+        const blurtHosts = [
+            'blurt.blog',
+            'blurtwallet.com',
+            'twiggy.lat',
+            'beblurt.com',
+            'blurt.one',
+            'blurtscan.com',
+            'ecosynthesizer.com'
+        ];
         if (
             blurtHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
             host.includes('blurt')

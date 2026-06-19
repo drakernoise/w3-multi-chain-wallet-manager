@@ -86,7 +86,15 @@ function detectChainFromUrl(url = "") {
     const host = u.hostname.toLowerCase();
     const hiveHosts = ["peakd.com", "ecency.com", "tribaldex.com"];
     if (hiveHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("hive")) return "HIVE";
-    const blurtHosts = ["blurt.blog", "blurtwallet.com", "twiggy.lat"];
+    const blurtHosts = [
+      "blurt.blog",
+      "blurtwallet.com",
+      "twiggy.lat",
+      "beblurt.com",
+      "blurt.one",
+      "blurtscan.com",
+      "ecosynthesizer.com"
+    ];
     if (blurtHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("blurt")) return "BLURT";
     const steemHosts = ["steemit.com"];
     if (steemHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("steem")) return "STEEM";

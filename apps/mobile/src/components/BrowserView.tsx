@@ -1,7 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InAppBrowser, ToolBarType, BackgroundColor } from '@capgo/inappbrowser';
 import { mobileProvider } from '../services/mobileProvider';
-import { Globe, ExternalLink, RotateCw, Plus, X, ArrowRight } from 'lucide-react';
+import {
+    ArrowLeft,
+    ArrowRight,
+    LockKeyhole,
+    MoreVertical,
+    Moon,
+    Plus,
+    Search,
+    ShieldCheck,
+    Sun,
+    X
+} from 'lucide-react';
 
 import { Account } from '@types';
 
@@ -12,6 +23,7 @@ interface BrowserViewProps {
 
 export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = [] }) => {
     const STORAGE_KEY = 'gravity_mobile_explorer_sites_v1';
+    const THEME_STORAGE_KEY = 'gravity_mobile_explorer_theme_v1';
     const BRIDGE_VERSION = 'bridge-2026-03-21-1';
     const DEFAULT_SITE_ORDER = [
         'https://hive-engine.com',
@@ -25,8 +37,16 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
         'https://splinterlands.com'
     ];
     const [inputUrl, setInputUrl] = useState('');
-    const [showUrlModal, setShowUrlModal] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
     const [launchingTarget, setLaunchingTarget] = useState<string | null>(null);
+    const [systemDark, setSystemDark] = useState(() =>
+        typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+    );
+    const [themePreference, setThemePreference] = useState<'system' | 'light' | 'dark'>(() => {
+        const stored = localStorage.getItem(THEME_STORAGE_KEY);
+        return stored === 'light' || stored === 'dark' ? stored : 'system';
+    });
+    const isDark = themePreference === 'system' ? systemDark : themePreference === 'dark';
     const injectionScriptRef = useRef<string>('');
     const initialTargetRef = useRef<string | null>(null);
     const peakdResetAttemptedRef = useRef(false);
@@ -77,6 +97,18 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(dApps));
     }, [dApps]);
+
+    useEffect(() => {
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const updateSystemTheme = (event: MediaQueryListEvent) => setSystemDark(event.matches);
+        setSystemDark(media.matches);
+        media.addEventListener('change', updateSystemTheme);
+        return () => media.removeEventListener('change', updateSystemTheme);
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_STORAGE_KEY, themePreference);
+    }, [themePreference]);
 
     const normalizeTarget = (value: string) => {
         let target = value.trim();
@@ -287,17 +319,17 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
 
             await InAppBrowser.openWebView({
                 url: targetUrl,
-                title: 'Gravity dApp Explorer',
-                toolbarType: ToolBarType.NAVIGATION, // Better for general browsing
-                backgroundColor: BackgroundColor.BLACK,
+                title: inferName(targetUrl),
+                toolbarType: ToolBarType.NAVIGATION,
+                backgroundColor: isDark ? BackgroundColor.BLACK : BackgroundColor.WHITE,
                 isPresentAfterPageLoad: true,
                 preShowScript: injectionScript,
                 showReloadButton: true,
                 visibleTitle: true,
                 showArrow: true,
                 activeNativeNavigationForWebview: true,
-                toolbarColor: '#0f172a',
-                toolbarTextColor: '#ffffff'
+                toolbarColor: isDark ? '#202124' : '#ffffff',
+                toolbarTextColor: isDark ? '#f1f3f4' : '#202124'
             });
             console.log('[GWDBG][browser:opened]', JSON.stringify({ targetUrl }));
             setTimeout(() => {
@@ -315,187 +347,284 @@ export const BrowserView: React.FC<BrowserViewProps> = ({ onClose, accounts = []
         e.preventDefault();
         if (!inputUrl) return;
         const target = normalizeTarget(inputUrl);
-        setShowUrlModal(false);
+        setShowMenu(false);
         openBrowser(target);
     };
 
-    return (
-        <div className="flex flex-col h-full w-full space-y-6 animate-fadeIn pb-32 overflow-y-auto px-4 pt-6 bg-dark-950">
-            <div className="bg-dark-800/50 border border-dark-700/50 rounded-[28px] p-5 shadow-2xl backdrop-blur-md">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-blue-600/20 rounded-2xl flex items-center justify-center text-blue-400 border border-blue-500/20 shrink-0">
-                        <Globe size={20} />
-                    </div>
-                    <div className="min-w-0">
-                        <h2 className="text-lg font-black tracking-tight text-white">Web 3.0 Explorer</h2>
-                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Secure Blockchain Gateway</p>
-                    </div>
-                </div>
+    const toggleDarkMode = () => {
+        setThemePreference(isDark ? 'light' : 'dark');
+    };
 
+    return (
+        <div className={`relative flex h-full w-full flex-col overflow-y-auto px-4 pb-28 pt-2 animate-fadeIn no-scrollbar transition-colors ${
+            isDark ? 'bg-[#202124] text-[#e8eaed]' : 'bg-[#f8f9fa] text-[#202124]'
+        }`}>
+            <div className="relative flex h-12 shrink-0 items-center justify-between">
                 <button
                     type="button"
-                    onClick={() => setShowUrlModal(true)}
-                    className="w-full flex items-center justify-between rounded-2xl border border-dark-600 bg-dark-900 px-4 py-4 text-left transition-all active:scale-[0.99]"
+                    onClick={onClose}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent ${
+                        isDark ? 'text-[#bdc1c6] active:bg-[#3c4043]' : 'text-[#5f6368] active:bg-[#e8eaed]'
+                    }`}
+                    aria-label="Back to wallet"
                 >
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600/10 text-blue-400">
-                            <Globe size={18} />
-                        </div>
-                        <div className="min-w-0">
-                            <div className="text-sm font-bold text-white">Open URL</div>
-                            <div className="truncate text-xs text-slate-400">
-                                {inputUrl || 'Type a website or search term'}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-900/40">
-                        <ArrowRight size={18} />
-                    </div>
+                    <ArrowLeft size={22} />
                 </button>
-                <div className="mt-3 flex items-center justify-between gap-3 px-1">
-                    <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-500">
-                        Quick access shortcuts
-                    </p>
+                <div className={`text-sm font-medium ${isDark ? 'text-[#bdc1c6]' : 'text-[#5f6368]'}`}>New tab</div>
+                <div className="flex items-center">
                     <button
                         type="button"
-                        onClick={addCurrentSite}
-                        className="inline-flex items-center gap-2 rounded-full border border-dark-600 bg-dark-900 px-3 py-1.5 text-[11px] font-bold text-slate-300 transition-all active:scale-95"
+                        onClick={toggleDarkMode}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent ${
+                            isDark ? 'text-[#bdc1c6] active:bg-[#3c4043]' : 'text-[#5f6368] active:bg-[#e8eaed]'
+                        }`}
+                        aria-label={isDark ? 'Use light mode' : 'Use dark mode'}
                     >
-                        <Plus size={12} />
-                        Save current
+                        {isDark ? <Sun size={20} /> : <Moon size={20} />}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowMenu((current) => !current)}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent ${
+                            isDark ? 'text-[#bdc1c6] active:bg-[#3c4043]' : 'text-[#5f6368] active:bg-[#e8eaed]'
+                        }`}
+                        aria-label="Browser menu"
+                    >
+                        <MoreVertical size={22} />
                     </button>
                 </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-                {dApps.map((dApp) => (
-                    <div
-                        key={dApp.url}
-                        onClick={() => openBrowser(dApp.url)}
-                        className={`bg-dark-800/40 border border-dark-700/30 p-5 rounded-[28px] flex flex-col items-center gap-4 transition-all active:scale-[0.97] hover:bg-dark-700/60 group relative overflow-hidden h-44 ${launchingTarget ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
-                    >
+                {showMenu && (
+                    <div className={`absolute right-0 top-11 z-30 w-60 overflow-hidden rounded-xl border py-2 text-sm shadow-xl ${
+                        isDark ? 'border-[#5f6368] bg-[#303134] text-[#e8eaed]' : 'border-[#dadce0] bg-white text-[#202124]'
+                    }`}>
                         <button
                             type="button"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                removeSite(dApp.url);
-                            }}
-                            className="absolute left-3 top-3 z-10 rounded-full bg-dark-950/85 p-2 text-slate-400 opacity-70 transition hover:opacity-100"
-                            aria-label={`Remove ${dApp.name}`}
+                            onClick={toggleDarkMode}
+                            className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
+                                isDark ? 'active:bg-[#3c4043]' : 'active:bg-[#f1f3f4]'
+                            }`}
                         >
-                            <X size={14} />
+                            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                            {isDark ? 'Light mode' : 'Dark mode'}
                         </button>
-                        <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <ExternalLink size={20} />
-                        </div>
-                        <div className="w-20 h-20 bg-white shadow-xl rounded-2xl flex items-center justify-center border-4 border-dark-900 overflow-hidden transform group-hover:scale-110 group-hover:rotate-2 transition-all duration-500">
-                            <img
-                                src={getFaviconCandidates(dApp.url)[0]}
-                                alt={dApp.name}
-                                className="w-12 h-12 object-contain"
-                                onError={(event) => {
-                                    const img = event.currentTarget;
-                                    const next = img.dataset.fallbackIndex ? Number(img.dataset.fallbackIndex) + 1 : 1;
-                                    const candidates = getFaviconCandidates(dApp.url);
-                                    if (next < candidates.length) {
-                                        img.dataset.fallbackIndex = String(next);
-                                        img.src = candidates[next];
-                                        return;
-                                    }
-                                    img.src = '/vite.svg';
-                                }}
-                            />
-                        </div>
-                        <div className="text-center">
-                            <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors uppercase tracking-tight">{dApp.name}</p>
-                            <div className="mt-1.5 flex items-center justify-center gap-1.5 bg-dark-900/50 px-3 py-1 rounded-full border border-white/5">
-                                <span className={`w-1.5 h-1.5 rounded-full ${dApp.chain === 'Hive' ? 'bg-red-500' : dApp.chain === 'Steem' ? 'bg-blue-500 shadow-blue-500/50' : 'bg-orange-500 shadow-orange-500/50'} shadow-sm animate-pulse`}></span>
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{dApp.chain}</span>
-                            </div>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setThemePreference('system');
+                                setShowMenu(false);
+                            }}
+                            className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
+                                isDark ? 'active:bg-[#3c4043]' : 'active:bg-[#f1f3f4]'
+                            }`}
+                        >
+                            <ShieldCheck size={18} />
+                            Use device theme
+                            {themePreference === 'system' && <span className="ml-auto text-[#1a73e8]">On</span>}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                addCurrentSite();
+                                setShowMenu(false);
+                            }}
+                            disabled={!inputUrl}
+                            className={`flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-40 ${
+                                isDark ? 'active:bg-[#3c4043]' : 'active:bg-[#f1f3f4]'
+                            }`}
+                        >
+                            <Plus size={18} />
+                            Add current shortcut
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowMenu(false)}
+                            className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
+                                isDark ? 'active:bg-[#3c4043]' : 'active:bg-[#f1f3f4]'
+                            }`}
+                        >
+                            <X size={18} />
+                            Close menu
+                        </button>
                     </div>
-                ))}
+                )}
             </div>
 
-            {launchingTarget && (
-                <div className="fixed inset-0 z-40 bg-dark-950/78 backdrop-blur-sm flex items-center justify-center px-6">
-                    <div className="w-full max-w-sm rounded-[28px] border border-blue-500/20 bg-slate-950/92 p-6 shadow-2xl text-center">
-                        <div className="mx-auto mb-4 h-12 w-12 rounded-full border-2 border-blue-500/30 border-t-blue-400 animate-spin" />
-                        <div className="text-sm font-black uppercase tracking-[0.22em] text-blue-300">Opening dApp</div>
-                        <div className="mt-3 text-xs font-semibold text-slate-400 break-all">{launchingTarget}</div>
-                        <div className="mt-4 text-[11px] text-slate-500">Please wait. Repeated taps are disabled while the webview is preparing.</div>
-                    </div>
+            <div className="mx-auto mt-[7vh] flex w-full max-w-md flex-col items-center">
+                <div className="mb-7 flex items-center gap-3">
+                    <img src="/logowallet.png" alt="Gravity" className="h-14 w-14 rounded-full shadow-sm" />
+                    <div className={`text-[34px] font-medium tracking-[-0.04em] ${isDark ? 'text-[#e8eaed]' : 'text-[#3c4043]'}`}>Gravity</div>
                 </div>
-            )}
 
-            {showUrlModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4 pb-[max(env(safe-area-inset-bottom),1rem)] pt-6">
-                    <div className="w-full max-w-md rounded-[28px] border border-dark-700 bg-dark-900 p-5 shadow-2xl mb-[22vh]">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                            <div>
-                                <h3 className="text-lg font-black text-white">Open URL</h3>
-                                <p className="text-xs font-medium text-slate-400">Enter a site address or search term</p>
-                            </div>
+                <form onSubmit={handleGo} className="w-full">
+                    <div className={`flex h-13 min-h-[52px] w-full items-center rounded-[26px] border border-transparent px-4 shadow-sm transition focus-within:shadow-md ${
+                        isDark
+                            ? 'bg-[#303134] focus-within:border-[#5f6368] focus-within:bg-[#303134]'
+                            : 'bg-[#eef0f3] focus-within:border-[#d2e3fc] focus-within:bg-white'
+                    }`}>
+                        <Search size={20} className={`mr-3 shrink-0 ${isDark ? 'text-[#bdc1c6]' : 'text-[#5f6368]'}`} />
+                        <input
+                            type="text"
+                            value={inputUrl}
+                            onChange={(event) => setInputUrl(event.target.value)}
+                            placeholder="Search or type web address"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            autoComplete="off"
+                            spellCheck={false}
+                            className={`min-w-0 flex-1 border-none bg-transparent text-[16px] outline-none ${
+                                isDark ? 'text-[#e8eaed] placeholder:text-[#9aa0a6]' : 'text-[#202124] placeholder:text-[#5f6368]'
+                            }`}
+                        />
+                        {inputUrl && (
                             <button
                                 type="button"
-                                onClick={() => setShowUrlModal(false)}
-                                className="flex h-10 w-10 items-center justify-center rounded-full bg-dark-800 text-slate-400"
-                                aria-label="Close URL modal"
+                                onClick={() => setInputUrl('')}
+                                className={`mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                                    isDark ? 'text-[#bdc1c6] active:bg-[#5f6368]' : 'text-[#5f6368] active:bg-[#dadce0]'
+                                }`}
+                                aria-label="Clear address"
                             >
                                 <X size={18} />
                             </button>
-                        </div>
+                        )}
+                        <button
+                            type="submit"
+                            disabled={!inputUrl || Boolean(launchingTarget)}
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1a73e8] active:bg-[#d2e3fc] disabled:opacity-30"
+                            aria-label="Open address"
+                        >
+                            <ArrowRight size={20} />
+                        </button>
+                    </div>
+                </form>
 
-                        <form onSubmit={handleGo} className="space-y-5">
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={inputUrl}
-                                    onChange={(e) => setInputUrl(e.target.value)}
-                                    placeholder="https://example.com"
-                                    autoCapitalize="none"
-                                    autoCorrect="off"
-                                    autoComplete="off"
-                                    spellCheck={false}
-                                    autoFocus
-                                    className="w-full rounded-2xl border border-dark-600 bg-dark-800 py-4 pl-12 pr-4 text-sm font-medium text-white focus:outline-none focus:border-blue-500/50"
+                <div className="mt-7 grid w-full grid-cols-4 gap-x-2 gap-y-6 px-1">
+                    {dApps.slice(0, 8).map((dApp) => (
+                        <button
+                            type="button"
+                            key={dApp.url}
+                            onClick={() => openBrowser(dApp.url)}
+                            disabled={Boolean(launchingTarget)}
+                            className={`group flex min-w-0 flex-col items-center gap-2 bg-transparent p-0 disabled:opacity-40 ${
+                                isDark ? 'text-[#e8eaed]' : 'text-[#3c4043]'
+                            }`}
+                        >
+                            <span className={`flex h-12 w-12 items-center justify-center overflow-hidden rounded-full shadow-sm transition-transform group-active:scale-95 ${
+                                isDark ? 'bg-[#303134]' : 'bg-[#e8eaed]'
+                            }`}>
+                                <img
+                                    src={getFaviconCandidates(dApp.url)[0]}
+                                    alt=""
+                                    className="h-7 w-7 object-contain"
+                                    onError={(event) => {
+                                        const img = event.currentTarget;
+                                        const next = img.dataset.fallbackIndex ? Number(img.dataset.fallbackIndex) + 1 : 1;
+                                        const candidates = getFaviconCandidates(dApp.url);
+                                        if (next < candidates.length) {
+                                            img.dataset.fallbackIndex = String(next);
+                                            img.src = candidates[next];
+                                            return;
+                                        }
+                                        img.src = '/logowallet.png';
+                                    }}
                                 />
-                                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                            </div>
+                            </span>
+                            <span className="w-full truncate px-1 text-center text-[11px] font-medium">{dApp.name}</span>
+                        </button>
+                    ))}
+                </div>
 
-                            <div className="flex items-center justify-between gap-3 pt-1">
+                <div className={`mt-8 flex w-full items-center justify-between border-t pt-4 ${
+                    isDark ? 'border-[#3c4043]' : 'border-[#dadce0]'
+                }`}>
+                    <div>
+                        <div className={`text-sm font-medium ${isDark ? 'text-[#e8eaed]' : 'text-[#3c4043]'}`}>Your dApps</div>
+                        <div className={`mt-0.5 text-xs ${isDark ? 'text-[#9aa0a6]' : 'text-[#80868b]'}`}>{dApps.length} saved sites</div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={addCurrentSite}
+                        disabled={!inputUrl}
+                        className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium text-[#1a73e8] disabled:opacity-40 ${
+                            isDark ? 'border-[#5f6368] bg-[#303134] active:bg-[#3c4043]' : 'border-[#dadce0] bg-white active:bg-[#f1f3f4]'
+                        }`}
+                    >
+                        <Plus size={16} />
+                        Add shortcut
+                    </button>
+                </div>
+
+                {dApps.length > 8 && (
+                    <div className={`mt-3 w-full overflow-hidden rounded-2xl border ${
+                        isDark ? 'border-[#5f6368] bg-[#303134]' : 'border-[#dadce0] bg-white'
+                    }`}>
+                        {dApps.slice(8).map((dApp) => (
+                            <div key={dApp.url} className={`flex items-center border-b last:border-b-0 ${
+                                isDark ? 'border-[#3c4043]' : 'border-[#f1f3f4]'
+                            }`}>
                                 <button
                                     type="button"
-                                    onClick={addCurrentSite}
-                                    className="inline-flex min-h-[48px] items-center gap-2 rounded-full border border-dark-600 bg-dark-800 px-4 py-3 text-xs font-bold text-slate-300"
+                                    onClick={() => openBrowser(dApp.url)}
+                                    className={`flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left ${
+                                        isDark ? 'active:bg-[#3c4043]' : 'active:bg-[#f1f3f4]'
+                                    }`}
                                 >
-                                    <Plus size={12} />
-                                    Save shortcut
+                                    <img
+                                        src={getFaviconCandidates(dApp.url)[0]}
+                                        alt=""
+                                        className="h-6 w-6 object-contain"
+                                        onError={(event) => {
+                                            event.currentTarget.src = '/logowallet.png';
+                                        }}
+                                    />
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-sm font-medium">{dApp.name}</span>
+                                        <span className={`block truncate text-xs ${isDark ? 'text-[#9aa0a6]' : 'text-[#80868b]'}`}>{dApp.url}</span>
+                                    </span>
                                 </button>
                                 <button
-                                    type="submit"
-                                    className="inline-flex min-h-[48px] items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-900/40"
+                                    type="button"
+                                    onClick={() => removeSite(dApp.url)}
+                                    className={`mr-2 flex h-10 w-10 items-center justify-center rounded-full ${
+                                        isDark ? 'text-[#bdc1c6] active:bg-[#3c4043]' : 'text-[#5f6368] active:bg-[#f1f3f4]'
+                                    }`}
+                                    aria-label={`Remove ${dApp.name}`}
                                 >
-                                    Open
-                                    <ArrowRight size={16} />
+                                    <X size={18} />
                                 </button>
                             </div>
-                        </form>
+                        ))}
+                    </div>
+                )}
+
+                <div className={`mt-6 flex w-full items-start gap-3 rounded-2xl px-4 py-4 text-left ${
+                    isDark ? 'bg-[#202e3f]' : 'bg-[#e8f0fe]'
+                }`}>
+                    <ShieldCheck size={21} className="mt-0.5 shrink-0 text-[#1967d2]" />
+                    <div>
+                        <div className="text-sm font-medium text-[#174ea6]">Gravity signing enabled</div>
+                        <div className={`mt-1 text-xs leading-relaxed ${isDark ? 'text-[#bdc1c6]' : 'text-[#3c4043]'}`}>
+                            Supported dApps can request signatures without exposing your private keys.
+                        </div>
+                    </div>
+                    <LockKeyhole size={16} className="ml-auto mt-0.5 shrink-0 text-[#1967d2]" />
+                </div>
+            </div>
+
+            {launchingTarget && (
+                <div className={`fixed inset-0 z-40 flex items-center justify-center px-6 backdrop-blur-sm ${
+                    isDark ? 'bg-[#202124]/90' : 'bg-white/85'
+                }`}>
+                    <div className={`w-full max-w-sm rounded-2xl border p-6 text-center shadow-xl ${
+                        isDark ? 'border-[#5f6368] bg-[#303134]' : 'border-[#dadce0] bg-white'
+                    }`}>
+                        <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-[#d2e3fc] border-t-[#1a73e8]" />
+                        <div className={`text-sm font-medium ${isDark ? 'text-[#e8eaed]' : 'text-[#202124]'}`}>Opening page</div>
+                        <div className={`mt-2 break-all text-xs ${isDark ? 'text-[#bdc1c6]' : 'text-[#5f6368]'}`}>{launchingTarget}</div>
                     </div>
                 </div>
             )}
-
-            <div className="bg-blue-600/5 border border-blue-500/10 rounded-[32px] p-6 text-center shadow-inner relative group">
-                <div className="absolute inset-0 bg-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[32px]"></div>
-                <div className="flex items-center justify-center gap-2 mb-2 text-blue-400">
-                    <RotateCw size={14} className="animate-spin-slow" />
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em]">Navigation Control</h3>
-                </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-semibold px-4">
-                    Use the <span className="text-blue-400 font-bold border-b border-blue-400/30 pb-0.5">reload button</span> at the top to refresh. <br/>
-                    <span className="text-[8px] opacity-40 italic">Native pull-to-refresh is currently limited by the engine.</span>
-                </p>
-            </div>
         </div>
     );
 };
