@@ -18016,27 +18016,53 @@ function AppContent() {
     }
     return `gravity_${kind}_${Math.abs(hash)}`;
   };
+  const isHttpTab = (tab) => {
+    if (!tab?.id || !tab?.url) return false;
+    try {
+      const url = new URL(tab.url);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  };
   const getActiveHttpTab = () => new Promise((resolve) => {
     if (typeof chrome === "undefined" || !chrome.tabs?.query) {
       resolve(null);
       return;
     }
+    const resolveTab = (tab) => {
+      resolve(isHttpTab(tab) ? tab : null);
+    };
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = Array.isArray(tabs) ? tabs[0] : null;
-      if (!tab?.id || !tab?.url) {
+      const currentWindowTab = Array.isArray(tabs) ? tabs.find(isHttpTab) : null;
+      if (currentWindowTab) {
+        resolveTab(currentWindowTab);
+        return;
+      }
+      if (!chrome.windows?.getAll) {
         resolve(null);
         return;
       }
-      try {
-        const url = new URL(tab.url);
-        if (url.protocol !== "https:" && url.protocol !== "http:") {
-          resolve(null);
+      chrome.windows.getAll({ populate: true, windowTypes: ["normal"] }, (windows) => {
+        const normalWindows = Array.isArray(windows) ? windows : [];
+        const focusedWindow = normalWindows.find((window2) => window2.focused);
+        const focusedTab = focusedWindow?.tabs?.find((tab) => tab.active && isHttpTab(tab));
+        if (focusedTab) {
+          resolveTab(focusedTab);
           return;
         }
-        resolve(tab);
-      } catch {
-        resolve(null);
-      }
+        for (const browserWindow of normalWindows) {
+          const tab = browserWindow.tabs?.find((candidate) => candidate.active && isHttpTab(candidate));
+          if (tab) {
+            resolveTab(tab);
+            return;
+          }
+        }
+        chrome.tabs.query({ active: true }, (allActiveTabs) => {
+          const tab = Array.isArray(allActiveTabs) ? allActiveTabs.find(isHttpTab) : null;
+          resolveTab(tab || null);
+        });
+      });
     });
   });
   const registerGravityForSite = async (site) => {
