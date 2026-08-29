@@ -4,7 +4,7 @@ import { getChainConfig, isChainSupported } from '@config/chainConfig';
 import { getActiveNode, benchmarkNodes } from '@services/nodeService';
 import { Chain } from 'gravity-shared/types';
 import { normalizeKeyType, requiresActiveAuthority, selectBroadcastKey } from 'gravity-shared/utils/authority';
-import { readHistoryCache, refreshHistoryForAccounts, refreshHistoryFromSession } from './history';
+import { refreshHistoryForAccounts, refreshHistoryFromSession } from './history';
 
 declare var chrome: any;
 
@@ -201,10 +201,6 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         return false;
     }
 
-    if (request.type === 'gravity_history_get') {
-        readHistoryCache().then((cache) => sendResponse({ cache }));
-        return true;
-    }
 
     // 1. Request from Web Page (via Content Script)
     if (request.type === 'gravity_request') {
@@ -648,8 +644,10 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             const permlink = request.params[1];
             const author = request.params[2];
             const weight = Number(request.params[3]);
-            const key = account.postingKey || account.activeKey;
-            if (!key) return { success: false, error: 'Posting or Active key required for voting' };
+            // Posting only. Voting never needs the Active key, and falling back to it
+            // here contradicted selectBroadcastKey, which the other broadcast paths use.
+            const key = account.postingKey;
+            if (!key) return { success: false, error: 'Posting key required for voting' };
             response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
 
         } else if (isCustomJson) {
@@ -752,8 +750,9 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                 json_metadata: jsonMetadataStr || '{}'
             }];
 
-            const key = account.postingKey || account.activeKey;
-            if (!key) return { success: false, error: 'Posting or Active key required for posting' };
+            // Posting only, for the same reason as voting above.
+            const key = account.postingKey;
+            if (!key) return { success: false, error: 'Posting key required for posting' };
 
             response = await broadcastOperations(account.chain, key, [op]);
 

@@ -53,14 +53,23 @@ export const readHistoryCache = async (): Promise<HistoryCache> => {
     }
 };
 
-const writeHistoryEntry = async (key: string, entry: HistoryCacheEntry) => {
-    try {
-        const cache = await readHistoryCache();
-        cache[key] = entry;
-        await chrome.storage.local.set({ [HISTORY_CACHE_STORAGE_KEY]: JSON.stringify(cache) });
-    } catch (error) {
-        console.warn('[Gravity] History cache write failed:', error);
-    }
+// The cache is one JSON blob, so writing an entry is read-modify-write. inFlight only
+// guards a single account, and the alarm and the popup can be refreshing different
+// accounts at once, so unserialised writes drop each other's entries. Chaining them
+// keeps every write reading the previous one's result.
+let writeQueue: Promise<void> = Promise.resolve();
+
+const writeHistoryEntry = (key: string, entry: HistoryCacheEntry): Promise<void> => {
+    writeQueue = writeQueue.then(async () => {
+        try {
+            const cache = await readHistoryCache();
+            cache[key] = entry;
+            await chrome.storage.local.set({ [HISTORY_CACHE_STORAGE_KEY]: JSON.stringify(cache) });
+        } catch (error) {
+            console.warn('[Gravity] History cache write failed:', error);
+        }
+    });
+    return writeQueue;
 };
 
 // Nudges an open popup. When none is open there is no receiver and the callback sees
@@ -104,6 +113,26 @@ const refreshOneAccount = async (account: HistoryAccount, force: boolean, partia
                     ? { maxPages: 5 }
                     : {}
         );
+
+        // fetchAccountHistory returns [] both for "this account has no history" and for
+        // "every candidate node failed". Account history only ever grows, so an empty
+        // result against a non-empty cache is the failure case — writing it through would
+        // wipe the user's visible history and then mark the emptiness fresh for the TTL.
+        //
+        // Only the full-refresh path can lose data: an incremental walk returns [] when
+        // there is simply nothing new, and the partial path merges into the cache anyway.
+        const wouldReplaceCache = !shouldIncremental && !(partial && cachedItems.length > 0);
+        if (wouldReplaceCache && fetched.length === 0 && cachedItems.length > 0) {
+            const entry: HistoryCacheEntry = {
+                items: cachedItems,
+                updatedAt: cached?.updatedAt || Date.now(),
+                error: 'History nodes returned nothing; keeping cached entries.',
+                partial: cached?.partial
+            };
+            await writeHistoryEntry(key, entry);
+            broadcastHistoryEntry(key, entry);
+            return;
+        }
 
         const items = shouldIncremental || (partial && cachedItems.length > 0)
             ? mergeHistoryItems(cachedItems, fetched)

@@ -89022,10 +89022,16 @@ const ACTIVE_KEY_OPS = [
   "account_witness_vote",
   "account_update",
   "account_update2",
+  "account_witness_proxy",
+  "change_recovery_account",
+  "decline_voting_rights",
   "transfer",
+  "recurrent_transfer",
   "transfer_to_vesting",
   "withdraw_vesting",
   "delegate_vesting_shares",
+  "claim_account",
+  "create_claimed_account",
   "account_create",
   "account_create_with_delegation",
   "transfer_to_savings",
@@ -89037,6 +89043,7 @@ const ACTIVE_KEY_OPS = [
   "claim_reward_balance",
   "delegate_rc",
   "create_proposal",
+  "update_proposal",
   "update_proposal_votes",
   "remove_proposal",
   // Market operations (wallet.hive.blog, etc.)
@@ -89065,7 +89072,16 @@ const getOperationName = (op) => {
   }
   return "";
 };
-const requiresActiveAuthority = (operations) => Array.isArray(operations) && operations.some((op) => ACTIVE_KEY_OPS.includes(getOperationName(op)));
+const getOperationData = (op) => {
+  if (Array.isArray(op)) return op[1] || {};
+  if (op && typeof op === "object") return op.value || op.data || op;
+  return {};
+};
+const requiresActiveAuthority = (operations) => Array.isArray(operations) && operations.some((op) => {
+  if (ACTIVE_KEY_OPS.includes(getOperationName(op))) return true;
+  const required = getOperationData(op).required_auths;
+  return Array.isArray(required) && required.length > 0;
+});
 const selectBroadcastKey = (account, requestedKeyType, operations) => {
   const needsActive = normalizeKeyType(requestedKeyType) === "active" || requiresActiveAuthority(operations);
   return needsActive ? { key: account.activeKey || "", keyType: "active" } : { key: account.postingKey || "", keyType: "posting" };
@@ -89608,7 +89624,7 @@ const getAuthorizingAccount = (operations) => {
   for (const op of operations || []) {
     const data = Array.isArray(op) ? op[1] : op;
     if (!data || typeof data !== "object") continue;
-    const name = data.required_posting_auths?.[0] || data.required_auths?.[0] || data.author || data.voter || data.from || data.account;
+    const name = data.required_posting_auths?.[0] || data.required_auths?.[0] || data.voter || data.author || data.from || data.account;
     if (typeof name === "string" && name) return name;
   }
   return null;
@@ -89623,6 +89639,12 @@ const diagnoseAuthorityFailure = async (chain, key, operations) => {
   const label = type === "active" ? "Active" : "Posting";
   const onChainKeys = (auth.keyAuths || []).map((entry) => entry[0]);
   if (!onChainKeys.includes(publicKey)) {
+    const otherType = type === "active" ? "posting" : "active";
+    const otherAuth = await getAccountAuthorities(chain, username, otherType);
+    if ((otherAuth?.keyAuths || []).some((entry) => entry[0] === publicKey)) {
+      const otherLabel = otherType === "active" ? "Active" : "Posting";
+      return `This operation needs the ${label} authority of @${username}, but the wallet signed it with that account's ${otherLabel} key (${publicKey}). Import the ${label} key for @${username}.`;
+    }
     return `The ${label} key stored for @${username} is not the one this account uses on ${chain}. The wallet signed with ${publicKey}, but the account's ${type} authority is ${onChainKeys.join(", ") || "empty"}. Re-import the current ${label} key for @${username}.`;
   }
   if ((auth.threshold || 1) > 1 || (auth.accountAuths || []).length > 0) {

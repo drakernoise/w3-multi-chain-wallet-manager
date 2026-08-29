@@ -37,14 +37,18 @@ const readHistoryCache = async () => {
     return {};
   }
 };
-const writeHistoryEntry = async (key, entry) => {
-  try {
-    const cache = await readHistoryCache();
-    cache[key] = entry;
-    await chrome.storage.local.set({ [HISTORY_CACHE_STORAGE_KEY]: JSON.stringify(cache) });
-  } catch (error) {
-    console.warn("[Gravity] History cache write failed:", error);
-  }
+let writeQueue = Promise.resolve();
+const writeHistoryEntry = (key, entry) => {
+  writeQueue = writeQueue.then(async () => {
+    try {
+      const cache = await readHistoryCache();
+      cache[key] = entry;
+      await chrome.storage.local.set({ [HISTORY_CACHE_STORAGE_KEY]: JSON.stringify(cache) });
+    } catch (error) {
+      console.warn("[Gravity] History cache write failed:", error);
+    }
+  });
+  return writeQueue;
 };
 const broadcastHistoryEntry = (key, entry) => {
   try {
@@ -74,6 +78,18 @@ const refreshOneAccount = async (account, force, partial) => {
       account.name,
       shouldIncremental ? { incremental: true, knownItemKeys: cachedItems.map(getHistoryItemKey) } : partial ? { maxPages: 5 } : {}
     );
+    const wouldReplaceCache = !shouldIncremental && !(partial && cachedItems.length > 0);
+    if (wouldReplaceCache && fetched.length === 0 && cachedItems.length > 0) {
+      const entry2 = {
+        items: cachedItems,
+        updatedAt: cached?.updatedAt || Date.now(),
+        error: "History nodes returned nothing; keeping cached entries.",
+        partial: cached?.partial
+      };
+      await writeHistoryEntry(key, entry2);
+      broadcastHistoryEntry(key, entry2);
+      return;
+    }
     const items = shouldIncremental || partial && cachedItems.length > 0 ? mergeHistoryItems(cachedItems, fetched) : fetched;
     const entry = { items, updatedAt: Date.now(), error: null, partial };
     await writeHistoryEntry(key, entry);
@@ -247,10 +263,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }).catch((error) => console.warn("[Gravity] History refresh failed:", error));
     sendResponse({ started: true });
     return false;
-  }
-  if (request.type === "gravity_history_get") {
-    readHistoryCache().then((cache) => sendResponse({ cache }));
-    return true;
   }
   if (request.type === "gravity_request") {
     const originalParams = Array.isArray(request.params) ? request.params.map((param) => param && typeof param === "object" ? { ...param } : param) : request.params;
@@ -556,8 +568,8 @@ async function tryAutoSign(request, sender) {
       const permlink = request.params[1];
       const author = request.params[2];
       const weight = Number(request.params[3]);
-      const key = account.postingKey || account.activeKey;
-      if (!key) return { success: false, error: "Posting or Active key required for voting" };
+      const key = account.postingKey;
+      if (!key) return { success: false, error: "Posting key required for voting" };
       response = await broadcastVote(account.chain, account.name, key, author, permlink, weight);
     } else if (isCustomJson) {
       const id = request.params[1];
@@ -650,8 +662,8 @@ async function tryAutoSign(request, sender) {
         body: body || "",
         json_metadata: jsonMetadataStr || "{}"
       }];
-      const key = account.postingKey || account.activeKey;
-      if (!key) return { success: false, error: "Posting or Active key required for posting" };
+      const key = account.postingKey;
+      if (!key) return { success: false, error: "Posting key required for posting" };
       response = await broadcastOperations(account.chain, key, [op]);
     } else if (isPowerUp) {
       const rawTo = request.params[1] || account.name;

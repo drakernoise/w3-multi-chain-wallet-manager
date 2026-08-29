@@ -23,10 +23,16 @@ export const ACTIVE_KEY_OPS: readonly string[] = [
     'account_witness_vote',
     'account_update',
     'account_update2',
+    'account_witness_proxy',
+    'change_recovery_account',
+    'decline_voting_rights',
     'transfer',
+    'recurrent_transfer',
     'transfer_to_vesting',
     'withdraw_vesting',
     'delegate_vesting_shares',
+    'claim_account',
+    'create_claimed_account',
     'account_create',
     'account_create_with_delegation',
     'transfer_to_savings',
@@ -38,6 +44,7 @@ export const ACTIVE_KEY_OPS: readonly string[] = [
     'claim_reward_balance',
     'delegate_rc',
     'create_proposal',
+    'update_proposal',
     'update_proposal_votes',
     'remove_proposal',
     // Market operations (wallet.hive.blog, etc.)
@@ -70,9 +77,24 @@ export const getOperationName = (op: any): string => {
     return '';
 };
 
+/** The payload half of `[name, data]` or `{ type, ... }`. */
+const getOperationData = (op: any): any => {
+    if (Array.isArray(op)) return op[1] || {};
+    if (op && typeof op === 'object') return op.value || op.data || op;
+    return {};
+};
+
 export const requiresActiveAuthority = (operations: any[]): boolean =>
     Array.isArray(operations) &&
-    operations.some((op) => ACTIVE_KEY_OPS.includes(getOperationName(op)));
+    operations.some((op) => {
+        if (ACTIVE_KEY_OPS.includes(getOperationName(op))) return true;
+
+        // custom_json declares its own authority and the name alone cannot tell
+        // them apart: required_posting_auths is Posting, required_auths is Active.
+        // Hive Engine and Splinterlands send both shapes.
+        const required = getOperationData(op).required_auths;
+        return Array.isArray(required) && required.length > 0;
+    });
 
 export interface BroadcastKeySelection {
     /** Empty when the account has not imported the key this broadcast needs. */

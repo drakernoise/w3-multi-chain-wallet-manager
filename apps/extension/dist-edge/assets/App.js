@@ -15310,7 +15310,8 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       if (!account) {
         throw new Error(t("sign.account_not_found"));
       }
-      if (isMultisig && multisigProgress && !multisigProgress.canBroadcast) {
+      const isMemoOperation = request.method === "decodeMemo" || request.method === "encodeMemo" || request.method === "requestVerifyKey";
+      if (isMultisig && multisigProgress && !multisigProgress.canBroadcast && !isMemoOperation) {
         const msResult = await handleMultisigSign(account);
         showNotification(msResult.message || "Signature collected", "success");
         notifyBackground(msResult, null);
@@ -17975,6 +17976,7 @@ function AppContent() {
   const { t } = useTranslation();
   const HISTORY_CACHE_STORAGE_KEY = "gravity_account_history_cache_v1";
   const HISTORY_CACHE_TTL_MS = 5 * 60 * 1e3;
+  const HISTORY_LOADING_TIMEOUT_MS = 90 * 1e3;
   const getHistoryCacheKey = (account) => `${account.chain}:${account.name}`.toLowerCase();
   const getPreferredChain = (accounts, preferred) => {
     if (preferred && accounts.some((account) => account.chain === preferred)) {
@@ -18136,6 +18138,14 @@ function AppContent() {
       });
       return next;
     });
+    const clearLoading = () => {
+      setHistoryLoadingKeys((prev) => {
+        const next = { ...prev };
+        targets.forEach((account) => delete next[getHistoryCacheKey(account)]);
+        return next;
+      });
+    };
+    const failsafe = setTimeout(clearLoading, HISTORY_LOADING_TIMEOUT_MS);
     try {
       chrome.runtime.sendMessage({
         type: "gravity_history_refresh",
@@ -18143,10 +18153,15 @@ function AppContent() {
         force,
         partial
       }, () => {
-        void chrome.runtime.lastError;
+        if (chrome.runtime.lastError) {
+          clearTimeout(failsafe);
+          clearLoading();
+        }
       });
     } catch (error) {
       console.warn("History refresh request failed:", error);
+      clearTimeout(failsafe);
+      clearLoading();
     }
   };
   const refreshAccountHistory = async (account, force = false, partial = false) => preloadHistory([account], force, partial);

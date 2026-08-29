@@ -94,6 +94,8 @@ function AppContent() {
   const { t } = useTranslation();
   const HISTORY_CACHE_STORAGE_KEY = 'gravity_account_history_cache_v1';
   const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
+  // Upper bound on how long a spinner may wait for the worker's broadcast.
+  const HISTORY_LOADING_TIMEOUT_MS = 90 * 1000;
 
   type HistoryCacheEntry = {
     items: HistoryItem[];
@@ -290,6 +292,19 @@ function AppContent() {
       return next;
     });
 
+    const clearLoading = () => {
+      setHistoryLoadingKeys((prev) => {
+        const next = { ...prev };
+        targets.forEach((account) => delete next[getHistoryCacheKey(account)]);
+        return next;
+      });
+    };
+
+    // The spinner is normally cleared by the worker's per-account broadcast. That
+    // broadcast is the only signal, so a worker torn down mid-walk or a dropped message
+    // would leave it spinning forever. Give it a deadline of its own.
+    const failsafe = setTimeout(clearLoading, HISTORY_LOADING_TIMEOUT_MS);
+
     try {
       chrome.runtime.sendMessage({
         type: 'gravity_history_refresh',
@@ -297,10 +312,16 @@ function AppContent() {
         force,
         partial
       }, () => {
-        void chrome.runtime.lastError;
+        // No receiver means the worker never took the job, so nothing will arrive.
+        if (chrome.runtime.lastError) {
+          clearTimeout(failsafe);
+          clearLoading();
+        }
       });
     } catch (error) {
       console.warn('History refresh request failed:', error);
+      clearTimeout(failsafe);
+      clearLoading();
     }
   };
 

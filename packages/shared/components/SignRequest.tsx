@@ -211,7 +211,15 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 throw new Error(t('sign.account_not_found'));
             }
 
-            if (isMultisig && multisigProgress && !multisigProgress.canBroadcast) {
+            // Memo operations are local key usage, never a broadcast, so there is no
+            // threshold to reach and no co-signer to wait for. Without this guard a
+            // multisig account answering a requestVerifyKey challenge got the partial-sign
+            // stub back instead of the decrypted text.
+            const isMemoOperation = request.method === 'decodeMemo'
+                || request.method === 'encodeMemo'
+                || request.method === 'requestVerifyKey';
+
+            if (isMultisig && multisigProgress && !multisigProgress.canBroadcast && !isMemoOperation) {
                 // If it's a multisig account and we haven't reached the threshold yet,
                 // we perform a "Partial Sign" (Authorized Step)
                 const msResult = await handleMultisigSign(account);

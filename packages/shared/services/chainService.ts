@@ -779,10 +779,13 @@ const getAuthorizingAccount = (operations: any[]): string | null => {
     for (const op of operations || []) {
         const data = Array.isArray(op) ? op[1] : op;
         if (!data || typeof data !== 'object') continue;
+        // voter before author: a `vote` carries both, and the signer is the voter.
+        // Reading author first blamed the post's author, telling the user to
+        // re-import a key for somebody else's account.
         const name =
             data.required_posting_auths?.[0] ||
             data.required_auths?.[0] ||
-            data.author || data.voter || data.from || data.account;
+            data.voter || data.author || data.from || data.account;
         if (typeof name === 'string' && name) return name;
     }
     return null;
@@ -806,6 +809,19 @@ const diagnoseAuthorityFailure = async (chain: Chain, key: string, operations: a
     const onChainKeys = (auth.keyAuths || []).map((entry: any) => entry[0]);
 
     if (!onChainKeys.includes(publicKey)) {
+        // The authority needed comes from the operations, but the key that signed is
+        // whatever the caller passed. Those can disagree — a dApp may explicitly ask
+        // for Active on a posting operation — and reporting "your Posting key is
+        // wrong" about an Active key is both false and unactionable. Check the other
+        // authority before blaming the key.
+        const otherType = type === 'active' ? 'posting' : 'active';
+        const otherAuth = await getAccountAuthorities(chain, username, otherType);
+        if ((otherAuth?.keyAuths || []).some((entry: any) => entry[0] === publicKey)) {
+            const otherLabel = otherType === 'active' ? 'Active' : 'Posting';
+            return `This operation needs the ${label} authority of @${username}, but the wallet signed it ` +
+                `with that account's ${otherLabel} key (${publicKey}). Import the ${label} key for @${username}.`;
+        }
+
         return `The ${label} key stored for @${username} is not the one this account uses on ${chain}. ` +
             `The wallet signed with ${publicKey}, but the account's ${type} authority is ${onChainKeys.join(', ') || 'empty'}. ` +
             `Re-import the current ${label} key for @${username}.`;
