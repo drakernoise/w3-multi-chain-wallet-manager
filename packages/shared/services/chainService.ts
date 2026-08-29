@@ -4,6 +4,7 @@ import { Client as SteemClient, PrivateKey as SteemPrivateKey, cryptoUtils as st
 import { BLURT_CANDIDATES, getActiveNode, getActiveNodeAsync, HIVE_CANDIDATES, STEEM_CANDIDATES } from './nodeService';
 import { getChainConfig } from '../config/chainConfig';
 import * as blurt from '@blurtfoundation/blurtjs';
+import { requiresActiveAuthority } from '../utils/authority';
 
 export interface ChainAccountData {
     name: string;
@@ -760,6 +761,67 @@ export const getAccountAuthorities = async (chain: Chain, username: string, type
     }
 };
 
+/** Public key for a WIF, or null if the WIF is unusable on this chain. */
+export const derivePublicKey = (chain: Chain, key: string): string | null => {
+    try {
+        if (chain === Chain.BLURT) return blurt.auth.wifToPublic(key);
+        const prefix = getChainConfig(chain).addressPrefix;
+        if (chain === Chain.HIVE) return HivePrivateKey.fromString(key).createPublic(prefix).toString();
+        if (chain === Chain.STEEM) return SteemPrivateKey.fromString(key).createPublic(prefix).toString();
+    } catch {
+        return null;
+    }
+    return null;
+};
+
+/** The account whose authority the node is checking for these operations. */
+const getAuthorizingAccount = (operations: any[]): string | null => {
+    for (const op of operations || []) {
+        const data = Array.isArray(op) ? op[1] : op;
+        if (!data || typeof data !== 'object') continue;
+        const name =
+            data.required_posting_auths?.[0] ||
+            data.required_auths?.[0] ||
+            data.author || data.voter || data.from || data.account;
+        if (typeof name === 'string' && name) return name;
+    }
+    return null;
+};
+
+/**
+ * The node rejected the signature. Say why in terms the user can act on: usually
+ * the stored key simply is not the one the account's authority lists (a rotated
+ * key), which the raw "missing required posting authority" never makes obvious.
+ */
+const diagnoseAuthorityFailure = async (chain: Chain, key: string, operations: any[]): Promise<string | null> => {
+    const username = getAuthorizingAccount(operations);
+    const publicKey = derivePublicKey(chain, key);
+    if (!username || !publicKey) return null;
+
+    const type = requiresActiveAuthority(operations) ? 'active' : 'posting';
+    const auth = await getAccountAuthorities(chain, username, type);
+    if (!auth) return null;
+
+    const label = type === 'active' ? 'Active' : 'Posting';
+    const onChainKeys = (auth.keyAuths || []).map((entry: any) => entry[0]);
+
+    if (!onChainKeys.includes(publicKey)) {
+        return `The ${label} key stored for @${username} is not the one this account uses on ${chain}. ` +
+            `The wallet signed with ${publicKey}, but the account's ${type} authority is ${onChainKeys.join(', ') || 'empty'}. ` +
+            `Re-import the current ${label} key for @${username}.`;
+    }
+
+    if ((auth.threshold || 1) > 1 || (auth.accountAuths || []).length > 0) {
+        return `@${username} needs more than one signature for this operation (${label} threshold ${auth.threshold}).`;
+    }
+
+    // The key IS the account's key and the node still refused the signature. Say so
+    // loudly rather than falling back to a generic message that blames the key.
+    return `The node rejected the signature even though the ${label} key stored for @${username} (${publicKey}) ` +
+        `is the one its ${type} authority lists. The signed bytes did not match what the node verified. ` +
+        `Operations: ${(operations || []).map((op: any) => (Array.isArray(op) ? op[0] : op?.type)).join(', ')}.`;
+};
+
 export const calculateThresholdProgress = (auth: MultiSigAuthority, signatures: any[]): MultisigProgress => {
     let currentWeight = 0;
     const seenSigners = new Set<string>();
@@ -948,7 +1010,8 @@ const formatChainError = (error: any): string => {
 
     // Handle other common errors
     if (msg.includes('balance')) return "Insufficient balance for this operation.";
-    if (msg.includes('authority')) return "Missing required authority. Check your Active key.";
+    if (msg.includes('posting authority')) return "Missing required posting authority. Check the Posting key imported for this account.";
+    if (msg.includes('authority')) return "Missing required authority. Check the keys imported for this account.";
 
     // Handle Blurt specific assertion errors
     if (msg.includes('Assert Exception') && msg.includes("doesn't exist")) {
@@ -1206,7 +1269,6 @@ export const broadcastOperations = async (
     // Try primary node first, then fallbacks
     const nodesToTry = [nodeUrl, ...getFallbackNodes(chain).filter(n => n !== nodeUrl)];
     let lastError: any = null;
-    let authorityErrorOccurred = false;
 
     for (const node of nodesToTry) {
         try {
@@ -1225,9 +1287,14 @@ export const broadcastOperations = async (
             const errMsg = e.message || String(e);
             console.warn('[BroadcastOps] Node failed:', node, errMsg);
 
-            // If it's an authority error, don't retry - it will fail on all nodes
+            // If it's an authority error, don't retry - it will fail on all nodes.
+            // Explain which key was actually used instead of the node's opaque message.
             if (isAuthorityError(errMsg)) {
-                authorityErrorOccurred = true;
+                const diagnosis = await diagnoseAuthorityFailure(chain, activeKey, cleanOperations);
+                if (diagnosis) {
+                    console.error('[BroadcastOps] Authority failure:', diagnosis);
+                    return { success: false, error: diagnosis };
+                }
                 lastError = e;
                 break;
             }
@@ -1251,11 +1318,6 @@ export const broadcastOperations = async (
     }
 
     console.error("Broadcast Ops Error:", lastError);
-
-    // Provide clearer error message for authority issues
-    if (authorityErrorOccurred) {
-        return { success: false, error: "Missing required authority. Please verify you have the correct Active key for this account." };
-    }
 
     return { success: false, error: formatChainError(lastError) };
 };
@@ -1476,7 +1538,55 @@ interface FetchAccountHistoryOptions {
     incremental?: boolean;
     knownItemKeys?: string[];
     maxPages?: number;
+    /** Aborts the whole walk when the caller goes away (popup closing, unmount). */
+    signal?: AbortSignal;
+    /** Per-request ceiling so one silent node cannot stall the node loop. */
+    requestTimeoutMs?: number;
 }
+
+const HISTORY_REQUEST_TIMEOUT_MS = 15000;
+
+/**
+ * A node that accepts the connection and never answers used to block the walk until
+ * Chrome's own network timeout, so every request gets its own deadline. The caller's
+ * signal is folded in so an unmount stops the walk instead of orphaning it.
+ *
+ * Abort reasons stay distinguishable on purpose: TimeoutError means the node is at
+ * fault and we should fail over, AbortError means the caller left and we should stop.
+ */
+const createRequestSignal = (external?: AbortSignal) => {
+    const controller = new AbortController();
+    const onExternalAbort = () => controller.abort(external?.reason);
+
+    if (external) {
+        if (external.aborted) controller.abort(external.reason);
+        else external.addEventListener('abort', onExternalAbort, { once: true });
+    }
+
+    const timer = setTimeout(
+        () => controller.abort(new DOMException('History request timed out', 'TimeoutError')),
+        HISTORY_REQUEST_TIMEOUT_MS
+    );
+
+    return {
+        signal: controller.signal,
+        cleanup: () => {
+            clearTimeout(timer);
+            external?.removeEventListener('abort', onExternalAbort);
+        }
+    };
+};
+
+export const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]): HistoryItem[] => {
+    const byKey = new Map<string, HistoryItem>();
+    [...incoming, ...existing].forEach((item) => {
+        byKey.set(getHistoryItemKey(item), item);
+    });
+
+    return Array.from(byKey.values())
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 250);
+};
 
 export const fetchAccountHistory = async (chain: Chain, username: string, options: FetchAccountHistoryOptions = {}): Promise<HistoryItem[]> => {
     const node = await getActiveNodeAsync(chain);
@@ -1679,23 +1789,29 @@ export const fetchAccountHistory = async (chain: Chain, username: string, option
     };
 
     const fetchHistoryPage = async (rpcNode: string, from: number, limit: number) => {
-        const response = await fetch(rpcNode, {
-            method: 'POST',
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'condenser_api.get_account_history',
-                params: [username, from, limit],
-                id: 1
-            }),
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        if (response.status === 429) throw new Error(`Node ${rpcNode} rate limited history requests`);
-        if (!response.ok) throw new Error(`Node ${rpcNode} returned HTTP ${response.status}`);
-        const json = await response.json();
-        if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
-        return normalizeHistoryEntries(json);
+        const { signal, cleanup } = createRequestSignal(options.signal);
+        try {
+            const response = await fetch(rpcNode, {
+                method: 'POST',
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'condenser_api.get_account_history',
+                    params: [username, from, limit],
+                    id: 1
+                }),
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                signal
+            });
+            if (response.status === 429) throw new Error(`Node ${rpcNode} rate limited history requests`);
+            if (!response.ok) throw new Error(`Node ${rpcNode} returned HTTP ${response.status}`);
+            const json = await response.json();
+            if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+            return normalizeHistoryEntries(json);
+        } finally {
+            cleanup();
+        }
     };
 
     try {
@@ -1729,6 +1845,10 @@ export const fetchAccountHistory = async (chain: Chain, username: string, option
                     from = oldestIndex - 1;
                 }
             } catch (nodeError) {
+                // The caller went away (popup closed, component unmounted). The node is
+                // innocent, and there is nobody left to hand results to, so stop instead
+                // of blaming it and walking the remaining candidates for nothing.
+                if (options.signal?.aborted) throw nodeError;
                 console.warn(`History node failed for ${chain} at ${rpcNode}:`, nodeError);
                 continue;
             }
@@ -1736,7 +1856,12 @@ export const fetchAccountHistory = async (chain: Chain, username: string, option
             const parsed = processHistoryEntries(collected);
             if (parsed.length > 0) return parsed;
         }
-    } catch (e) { console.error("Fetch History Error:", e); }
+    } catch (e) {
+        // Let an abort surface so the caller can tell "you cancelled me" apart from
+        // "every node failed" and skip writing a bogus error into its cache.
+        if (options.signal?.aborted) throw e;
+        console.error("Fetch History Error:", e);
+    }
     return [];
 };
 

@@ -295,15 +295,20 @@ if (!(window as any)._gravityProvider) {
         }
 
         /**
-         * Alias for requestSignBuffer (WhaleVault compatibility)
+         * Decrypt an encrypted challenge to prove ownership of a private key.
+         *
+         * Keychain semantics: `encryptedMessage` is an encrypted memo (starts with '#')
+         * that gets DECODED with the account's private key — it is not signed. dApps use
+         * it for proof-of-key login: they encrypt a nonce to the account's public key and
+         * check that the returned plaintext matches.
          */
         requestVerifyKey = (
             username: string,
-            message: string,
+            encryptedMessage: string,
             key: string,
             callback?: Function
         ): Promise<any> | void => {
-            return this.requestSignBuffer(username, message, key, callback);
+            return this.send('requestVerifyKey', [username, encryptedMessage, key], callback);
         }
 
         /**

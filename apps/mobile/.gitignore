@@ -7,6 +7,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# adb logcat dumps kept locally for debugging (whole-device logs, not app source)
+logcat*.txt
+
 node_modules
 dist
 dist-ssr

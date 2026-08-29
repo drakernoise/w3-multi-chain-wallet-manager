@@ -9549,18 +9549,18 @@ Response.redirect = function(url, status) {
   return new Response(null, {status: status, headers: {location: url}})
 };
 
-var DOMException = g.DOMException;
+var DOMException$1 = g.DOMException;
 try {
-  new DOMException();
+  new DOMException$1();
 } catch (err) {
-  DOMException = function(message, name) {
+  DOMException$1 = function(message, name) {
     this.message = message;
     this.name = name;
     var error = Error(message);
     this.stack = error.stack;
   };
-  DOMException.prototype = Object.create(Error.prototype);
-  DOMException.prototype.constructor = DOMException;
+  DOMException$1.prototype = Object.create(Error.prototype);
+  DOMException$1.prototype.constructor = DOMException$1;
 }
 
 function fetch$1(input, init) {
@@ -9568,7 +9568,7 @@ function fetch$1(input, init) {
     var request = new Request(input, init);
 
     if (request.signal && request.signal.aborted) {
-      return reject(new DOMException('Aborted', 'AbortError'))
+      return reject(new DOMException$1('Aborted', 'AbortError'))
     }
 
     var xhr = new XMLHttpRequest();
@@ -9610,7 +9610,7 @@ function fetch$1(input, init) {
 
     xhr.onabort = function() {
       setTimeout(function() {
-        reject(new DOMException('Aborted', 'AbortError'));
+        reject(new DOMException$1('Aborted', 'AbortError'));
       }, 0);
     };
 
@@ -89016,6 +89016,61 @@ function requireLib () {
 
 var libExports = requireLib();
 
+const ACTIVE_KEY_OPS = [
+  "witness_update",
+  "witness_set_properties",
+  "account_witness_vote",
+  "account_update",
+  "account_update2",
+  "transfer",
+  "transfer_to_vesting",
+  "withdraw_vesting",
+  "delegate_vesting_shares",
+  "account_create",
+  "account_create_with_delegation",
+  "transfer_to_savings",
+  "transfer_from_savings",
+  "escrow_transfer",
+  "escrow_release",
+  "escrow_dispute",
+  "escrow_approve",
+  "claim_reward_balance",
+  "delegate_rc",
+  "create_proposal",
+  "update_proposal_votes",
+  "remove_proposal",
+  // Market operations (wallet.hive.blog, etc.)
+  "limit_order_create",
+  "limit_order_create2",
+  "limit_order_cancel",
+  "convert",
+  "collateralized_convert",
+  "fill_convert_request",
+  "cancel_transfer_from_savings",
+  "set_withdraw_vesting_route"
+];
+const normalizeKeyType = (type) => {
+  if (typeof type !== "string") return "";
+  const normalized = type.trim().toLowerCase();
+  if (normalized === "posting" || normalized === "active" || normalized === "memo") {
+    return normalized;
+  }
+  return "";
+};
+const getOperationName = (op) => {
+  if (Array.isArray(op)) return typeof op[0] === "string" ? op[0] : "";
+  if (op && typeof op === "object") {
+    const name = op.type || op.operation || op.method;
+    return typeof name === "string" ? name : "";
+  }
+  return "";
+};
+const requiresActiveAuthority = (operations) => Array.isArray(operations) && operations.some((op) => ACTIVE_KEY_OPS.includes(getOperationName(op)));
+const selectBroadcastKey = (account, requestedKeyType, operations) => {
+  const needsActive = normalizeKeyType(requestedKeyType) === "active" || requiresActiveAuthority(operations);
+  return needsActive ? { key: account.activeKey || "", keyType: "active" } : { key: account.postingKey || "", keyType: "posting" };
+};
+
 const getSignatureWeight = (auth, sig) => {
   const accountWeight = auth.accountAuths.find((entry) => entry[0] === sig.username)?.[1] || 0;
   const keyWeight = auth.keyAuths.find((entry) => entry[0] === sig.pubKey)?.[1] || 0;
@@ -89538,6 +89593,43 @@ const getAccountAuthorities = async (chain, username, type = "active") => {
     return null;
   }
 };
+const derivePublicKey = (chain, key) => {
+  try {
+    if (chain === Chain.BLURT) return libExports.auth.wifToPublic(key);
+    const prefix = getChainConfig(chain).addressPrefix;
+    if (chain === Chain.HIVE) return indexBrowserExports$1.PrivateKey.fromString(key).createPublic(prefix).toString();
+    if (chain === Chain.STEEM) return indexBrowserExports.PrivateKey.fromString(key).createPublic(prefix).toString();
+  } catch {
+    return null;
+  }
+  return null;
+};
+const getAuthorizingAccount = (operations) => {
+  for (const op of operations || []) {
+    const data = Array.isArray(op) ? op[1] : op;
+    if (!data || typeof data !== "object") continue;
+    const name = data.required_posting_auths?.[0] || data.required_auths?.[0] || data.author || data.voter || data.from || data.account;
+    if (typeof name === "string" && name) return name;
+  }
+  return null;
+};
+const diagnoseAuthorityFailure = async (chain, key, operations) => {
+  const username = getAuthorizingAccount(operations);
+  const publicKey = derivePublicKey(chain, key);
+  if (!username || !publicKey) return null;
+  const type = requiresActiveAuthority(operations) ? "active" : "posting";
+  const auth = await getAccountAuthorities(chain, username, type);
+  if (!auth) return null;
+  const label = type === "active" ? "Active" : "Posting";
+  const onChainKeys = (auth.keyAuths || []).map((entry) => entry[0]);
+  if (!onChainKeys.includes(publicKey)) {
+    return `The ${label} key stored for @${username} is not the one this account uses on ${chain}. The wallet signed with ${publicKey}, but the account's ${type} authority is ${onChainKeys.join(", ") || "empty"}. Re-import the current ${label} key for @${username}.`;
+  }
+  if ((auth.threshold || 1) > 1 || (auth.accountAuths || []).length > 0) {
+    return `@${username} needs more than one signature for this operation (${label} threshold ${auth.threshold}).`;
+  }
+  return `The node rejected the signature even though the ${label} key stored for @${username} (${publicKey}) is the one its ${type} authority lists. The signed bytes did not match what the node verified. Operations: ${(operations || []).map((op) => Array.isArray(op) ? op[0] : op?.type).join(", ")}.`;
+};
 const calculateThresholdProgress = (auth, signatures) => {
   let currentWeight = 0;
   const seenSigners = /* @__PURE__ */ new Set();
@@ -89688,7 +89780,8 @@ const formatChainError = (error) => {
     return "Insufficient funds. You do not have enough balance for this operation.";
   }
   if (msg.includes("balance")) return "Insufficient balance for this operation.";
-  if (msg.includes("authority")) return "Missing required authority. Check your Active key.";
+  if (msg.includes("posting authority")) return "Missing required posting authority. Check the Posting key imported for this account.";
+  if (msg.includes("authority")) return "Missing required authority. Check the keys imported for this account.";
   if (msg.includes("Assert Exception") && msg.includes("doesn't exist")) {
     return "Blockchain error: Account or data not found on the current node. Try switching RPC nodes.";
   }
@@ -89882,7 +89975,6 @@ const broadcastOperations = async (chain, activeKey, operations) => {
   };
   const nodesToTry = [nodeUrl, ...getFallbackNodes(chain).filter((n) => n !== nodeUrl)];
   let lastError = null;
-  let authorityErrorOccurred = false;
   for (const node of nodesToTry) {
     try {
       console.log("[BroadcastOps] Trying node:", node);
@@ -89900,7 +89992,11 @@ const broadcastOperations = async (chain, activeKey, operations) => {
       const errMsg = e.message || String(e);
       console.warn("[BroadcastOps] Node failed:", node, errMsg);
       if (isAuthorityError(errMsg)) {
-        authorityErrorOccurred = true;
+        const diagnosis = await diagnoseAuthorityFailure(chain, activeKey, cleanOperations);
+        if (diagnosis) {
+          console.error("[BroadcastOps] Authority failure:", diagnosis);
+          return { success: false, error: diagnosis };
+        }
         lastError = e;
         break;
       }
@@ -89917,9 +90013,6 @@ const broadcastOperations = async (chain, activeKey, operations) => {
     }
   }
   console.error("Broadcast Ops Error:", lastError);
-  if (authorityErrorOccurred) {
-    return { success: false, error: "Missing required authority. Please verify you have the correct Active key for this account." };
-  }
   return { success: false, error: formatChainError(lastError) };
 };
 const broadcastBulkTransfer = async (chain, from, activeKey, items, tokenSymbol) => {
@@ -90086,6 +90179,33 @@ const getHistoryItemKey = (item) => [
   item.amount || "",
   item.memo || ""
 ].join("|");
+const HISTORY_REQUEST_TIMEOUT_MS = 15e3;
+const createRequestSignal = (external) => {
+  const controller = new AbortController();
+  const onExternalAbort = () => controller.abort(external?.reason);
+  if (external) {
+    if (external.aborted) controller.abort(external.reason);
+    else external.addEventListener("abort", onExternalAbort, { once: true });
+  }
+  const timer = setTimeout(
+    () => controller.abort(new DOMException("History request timed out", "TimeoutError")),
+    HISTORY_REQUEST_TIMEOUT_MS
+  );
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timer);
+      external?.removeEventListener("abort", onExternalAbort);
+    }
+  };
+};
+const mergeHistoryItems = (existing, incoming) => {
+  const byKey = /* @__PURE__ */ new Map();
+  [...incoming, ...existing].forEach((item) => {
+    byKey.set(getHistoryItemKey(item), item);
+  });
+  return Array.from(byKey.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 250);
+};
 const fetchAccountHistory = async (chain, username, options = {}) => {
   const node = await getActiveNodeAsync(chain);
   const maxVisibleItems = 50;
@@ -90274,23 +90394,29 @@ const fetchAccountHistory = async (chain, username, options = {}) => {
     return [node, ...candidates[chain].filter((candidate) => candidate !== node)];
   };
   const fetchHistoryPage = async (rpcNode, from, limit) => {
-    const response = await fetch(rpcNode, {
-      method: "POST",
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "condenser_api.get_account_history",
-        params: [username, from, limit],
-        id: 1
-      }),
-      headers: {
-        "Content-Type": "application/json"
-      }
-    });
-    if (response.status === 429) throw new Error(`Node ${rpcNode} rate limited history requests`);
-    if (!response.ok) throw new Error(`Node ${rpcNode} returned HTTP ${response.status}`);
-    const json = await response.json();
-    if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
-    return normalizeHistoryEntries(json);
+    const { signal, cleanup } = createRequestSignal(options.signal);
+    try {
+      const response = await fetch(rpcNode, {
+        method: "POST",
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "condenser_api.get_account_history",
+          params: [username, from, limit],
+          id: 1
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        signal
+      });
+      if (response.status === 429) throw new Error(`Node ${rpcNode} rate limited history requests`);
+      if (!response.ok) throw new Error(`Node ${rpcNode} returned HTTP ${response.status}`);
+      const json = await response.json();
+      if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+      return normalizeHistoryEntries(json);
+    } finally {
+      cleanup();
+    }
   };
   try {
     const collected = [];
@@ -90317,6 +90443,7 @@ const fetchAccountHistory = async (chain, username, options = {}) => {
           from = oldestIndex - 1;
         }
       } catch (nodeError) {
+        if (options.signal?.aborted) throw nodeError;
         console.warn(`History node failed for ${chain} at ${rpcNode}:`, nodeError);
         continue;
       }
@@ -90324,6 +90451,7 @@ const fetchAccountHistory = async (chain, username, options = {}) => {
       if (parsed.length > 0) return parsed;
     }
   } catch (e) {
+    if (options.signal?.aborted) throw e;
     console.error("Fetch History Error:", e);
   }
   return [];
@@ -90441,4 +90569,4 @@ const decodeMemo = async (chain, _username, encodedMemo, key) => {
   }
 };
 
-export { calculateThresholdProgress as A, getAccountAuthorities as B, Chain as C, createUnsignedTransaction as D, signTransactionEnvelope as E, selectBroadcastSignatures as F, broadcastSignedTransaction as G, indexBrowserExports$1 as H, indexBrowserExports as I, fetchBalances as J, detectWeb3Context as K, fetchAccountHistory as L, getHistoryItemKey as M, ViewState as V, broadcastTransfer as a, benchmarkNodes as b, broadcastVote as c, broadcastCustomJson as d, broadcastOperations as e, getChainConfig as f, getActiveNode as g, broadcastPowerUp as h, isChainSupported as i, broadcastPowerDown as j, broadcastDelegation as k, broadcastWitnessVote as l, decodeMemo as m, encodeMemo as n, global as o, checkAccountExists as p, broadcastSavingsDeposit as q, requireCryptoBrowserify as r, signMessage as s, broadcastSavingsWithdraw as t, fetchAccountData as u, validateAccountKeys as v, broadcastRCDelegate as w, broadcastRCUndelegate as x, broadcastBulkTransfer as y, fetchCustomJsonEventsForAccounts as z };
+export { broadcastSavingsDeposit as A, broadcastSavingsWithdraw as B, Chain as C, fetchAccountData as D, broadcastRCDelegate as E, broadcastRCUndelegate as F, broadcastBulkTransfer as G, fetchCustomJsonEventsForAccounts as H, calculateThresholdProgress as I, getAccountAuthorities as J, createUnsignedTransaction as K, signTransactionEnvelope as L, selectBroadcastSignatures as M, broadcastSignedTransaction as N, indexBrowserExports$1 as O, indexBrowserExports as P, fetchBalances as Q, detectWeb3Context as R, ViewState as V, getActiveNode as a, benchmarkNodes as b, broadcastTransfer as c, broadcastVote as d, broadcastCustomJson as e, fetchAccountHistory as f, getHistoryItemKey as g, selectBroadcastKey as h, derivePublicKey as i, broadcastOperations as j, isChainSupported as k, getChainConfig as l, mergeHistoryItems as m, normalizeKeyType as n, broadcastPowerUp as o, broadcastPowerDown as p, broadcastDelegation as q, requiresActiveAuthority as r, signMessage as s, broadcastWitnessVote as t, decodeMemo as u, validateAccountKeys as v, encodeMemo as w, global as x, requireCryptoBrowserify as y, checkAccountExists as z };

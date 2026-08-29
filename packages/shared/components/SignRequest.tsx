@@ -3,7 +3,8 @@ import { useTranslation } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Account, Chain } from '../types';
 import { MultiSigProgress } from './MultiSigProgress';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, getAccountAuthorities, MultiSigAuthority, MultisigProgress as IMultisigProgress, validateAccountKeys } from '../services/chainService';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, getAccountAuthorities, MultiSigAuthority, MultisigProgress as IMultisigProgress, validateAccountKeys, encodeMemo, decodeMemo } from '../services/chainService';
+import { normalizeKeyType, selectBroadcastKey } from '../utils/authority';
 
 interface SignRequestProps {
     requestId: string;
@@ -12,15 +13,6 @@ interface SignRequestProps {
 }
 
 declare const chrome: any;
-
-const normalizeKeyType = (type: any): 'posting' | 'active' | 'memo' | '' => {
-    if (typeof type !== 'string') return '';
-    const normalized = type.trim().toLowerCase();
-    if (normalized === 'posting' || normalized === 'active' || normalized === 'memo') {
-        return normalized;
-    }
-    return '';
-};
 
 export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, onComplete }) => {
     const { t } = useTranslation();
@@ -242,6 +234,8 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             const isDelegation = method === 'requestDelegation' || method === 'delegation';
             const isPost = method === 'requestPost' || method === 'post';
             const isWitnessVote = method === 'requestWitnessVote' || method === 'witnessVote';
+            const isDecodeMemo = method === 'decodeMemo' || method === 'requestVerifyKey';
+            const isEncodeMemo = method === 'encodeMemo';
 
             // Check Key Requirement properly
             const needsActive = isTransfer || isPowerUp || isPowerDown || isDelegation || isWitnessVote ||
@@ -393,6 +387,35 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     ...restResponse
                 };
 
+            } else if (isDecodeMemo || isEncodeMemo) {
+                // Memo crypto: nothing is broadcast, we just use the account's private key
+                // locally. requestVerifyKey shares decodeMemo's params and semantics.
+                const receiver = isEncodeMemo ? request.params[1] : null;
+                const memo = isEncodeMemo ? request.params[2] : request.params[1];
+                const type = isEncodeMemo ? request.params[3] : request.params[2];
+                const normalizedType = normalizeKeyType(type);
+
+                let keyStr = "";
+                if (normalizedType === 'posting') keyStr = account.postingKey || "";
+                else if (normalizedType === 'active') keyStr = account.activeKey || "";
+                else if (normalizedType === 'memo') keyStr = account.memoKey || "";
+
+                if (!keyStr) throw new Error(t('sign.key_missing_generic').replace('{type}', normalizedType || String(type)));
+
+                const output = isEncodeMemo
+                    ? await encodeMemo(account.chain, account.name, receiver, memo, keyStr)
+                    : await decodeMemo(account.chain, account.name, memo, keyStr);
+
+                result = {
+                    success: true,
+                    result: output,
+                    data: {
+                        username: account.name,
+                        message: output
+                    },
+                    message: t('sign.success')
+                };
+
             } else if (isBroadcast) {
                 // Generic Broadcast
                 let rawOperations = request.params[1];
@@ -425,61 +448,10 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                     ? firstOperation[0]
                     : firstOperation?.type || firstOperation?.operation || firstOperation?.method || null;
 
-                // Determine which operations require Active key
-                const requiresActiveKey = operations.some((op: any) => {
-                    const opName = Array.isArray(op) ? op[0] : op.type || op[0];
-                    // Operations that require Active key
-                    const activeKeyOps = [
-                        'witness_update',
-                        'witness_set_properties',
-                        'account_witness_vote',
-                        'account_update',
-                        'account_update2',
-                        'transfer',
-                        'transfer_to_vesting',
-                        'withdraw_vesting',
-                        'delegate_vesting_shares',
-                        'account_create',
-                        'account_create_with_delegation',
-                        'transfer_to_savings',
-                        'transfer_from_savings',
-                        'escrow_transfer',
-                        'escrow_release',
-                        'escrow_dispute',
-                        'escrow_approve',
-                        'claim_reward_balance',
-                        'delegate_rc',
-                        'create_proposal',
-                        'update_proposal_votes',
-                        'remove_proposal',
-                        // Market operations (wallet.hive.blog, etc.)
-                        'limit_order_create',
-                        'limit_order_create2',
-                        'limit_order_cancel',
-                        'convert',
-                        'collateralized_convert',
-                        'fill_convert_request',
-                        'cancel_transfer_from_savings',
-                        'set_withdraw_vesting_route'
-                    ];
-                    return activeKeyOps.includes(opName);
-                });
+                const { key, keyType: selectedKeyType } = selectBroadcastKey(account, keyType, operations);
 
-                let key = account.postingKey;
-                // If specifically Active requested, use Active
-                if (normalizeKeyType(keyType) === 'active') key = account.activeKey;
-                // If operation requires Active key, use Active
-                else if (requiresActiveKey) key = account.activeKey;
-                // If Posting requested but missing, try Active
-                if (!key && account.activeKey) key = account.activeKey;
-
-                const requiredKeyType = requiresActiveKey ? 'Active' : (keyType || 'Posting');
+                const requiredKeyType = selectedKeyType === 'active' ? 'Active' : 'Posting';
                 if (!key) throw new Error(t('sign.key_missing_type').replace('{type}', requiredKeyType));
-
-                // CRITICAL: If operation requires Active key but we selected wrong key, force Active
-                if (requiresActiveKey && key !== account.activeKey && account.activeKey) {
-                    key = account.activeKey;
-                }
 
                 const response = await broadcastOperations(account.chain, key, operations);
                 if (!response.success) throw new Error(response.error);
@@ -731,6 +703,8 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
     const isBroadcast = method === 'requestBroadcast' || method === 'broadcast';
     const isPost = method === 'requestPost' || method === 'post';
     const isWitnessVote = method === 'requestWitnessVote' || method === 'witnessVote';
+    const isDecodeMemo = method === 'decodeMemo' || method === 'requestVerifyKey';
+    const isEncodeMemo = method === 'encodeMemo';
     const isFile = origin === 'file' || origin.startsWith('file://');
     const domain = isFile ? t('sign.local_file') : (origin.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/im) || [null, origin])[1];
 
@@ -880,6 +854,44 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                             <div className="flex justify-between items-center text-xs text-slate-500 pt-2">
                                 <span>{t('sign.key_type')}</span>
                                 <span className="text-blue-400 font-bold">{request.params[2]}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700">
+                                <span>{t('sign.from')}</span>
+                                <span className="text-white font-bold">@{request.params[0]}</span>
+                            </div>
+                        </div>
+                    </div>
+                ) : (isDecodeMemo || isEncodeMemo) ? (
+                    <div className="w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down">
+                        <h3 className="text-xs uppercase tracking-widest text-slate-500 mb-4 text-center">
+                            {isDecodeMemo ? t('sign.decode_memo_title') : t('sign.encode_memo_title')}
+                        </h3>
+
+                        <div className="space-y-4">
+                            <p className="text-xs text-slate-400 text-center">
+                                {isDecodeMemo ? t('sign.decode_memo_desc') : t('sign.encode_memo_desc')}
+                            </p>
+
+                            {isEncodeMemo && (
+                                <div className="flex justify-between border-b border-dark-700 pb-2">
+                                    <span className="text-xs text-slate-500">{t('sign.to')}</span>
+                                    <span className="text-sm text-white font-bold">@{request.params[1]}</span>
+                                </div>
+                            )}
+
+                            <div className="bg-dark-900 p-4 rounded-lg border border-dark-700">
+                                <p className="text-xs text-slate-500 mb-2 uppercase">{t('sign.message_label')}</p>
+                                <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                                    <p className="text-sm text-slate-300 font-mono break-all">
+                                        {isEncodeMemo ? request.params[2] : request.params[1]}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-center text-xs text-slate-500 pt-2">
+                                <span>{t('sign.key_type')}</span>
+                                <span className="text-blue-400 font-bold">{isEncodeMemo ? request.params[3] : request.params[2]}</span>
                             </div>
 
                             <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700">

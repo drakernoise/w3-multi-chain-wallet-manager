@@ -23,9 +23,7 @@ import { SyncPayload } from '@types';
 
 import {
   fetchBalances as serviceFetchBalances,
-  fetchAccountHistory,
   HistoryItem,
-  getHistoryItemKey,
   broadcastTransfer,
   detectWeb3Context
 } from '@services/chainService';
@@ -104,11 +102,6 @@ function AppContent() {
     partial?: boolean;
   };
   type HistoryCache = Record<string, HistoryCacheEntry>;
-  type EnabledDAppSite = {
-    origin: string;
-    match: string;
-    enabledAt: number;
-  };
 
   const getHistoryCacheKey = (account: Pick<Account, 'chain' | 'name'>) => `${account.chain}:${account.name}`.toLowerCase();
 
@@ -161,240 +154,15 @@ function AppContent() {
     }
   });
   const [web3Context, setWeb3Context] = useState<string | null>(null);
-  const [currentSite, setCurrentSite] = useState<{ origin: string; match: string; host: string } | null>(null);
-  const [sitePermissionGranted, setSitePermissionGranted] = useState(false);
-  const [isEnablingSite, setIsEnablingSite] = useState(false);
 
   // Notifications
   const { showNotification } = useNotification();
   const [lockReason, setLockReason] = useState<string | null>(null);
-  const historySyncInFlightRef = useRef<Set<string>>(new Set());
   const historyCacheRef = useRef<HistoryCache>({});
 
   // Signing Request ID
   const [requestId, setRequestId] = useState<string | null>(null);
   const [showBridge, setShowBridge] = useState(false);
-
-  const dynamicSiteScriptId = (origin: string, kind: 'content' | 'provider') => {
-    let hash = 0;
-    for (let i = 0; i < origin.length; i++) {
-      hash = ((hash << 5) - hash + origin.charCodeAt(i)) | 0;
-    }
-    return `gravity_${kind}_${Math.abs(hash)}`;
-  };
-
-  const isHttpTab = (tab: any) => {
-    if (!tab?.id || !tab?.url) return false;
-    try {
-      const url = new URL(tab.url);
-      return url.protocol === 'https:' || url.protocol === 'http:';
-    } catch {
-      return false;
-    }
-  };
-
-  const getActiveHttpTab = () => new Promise<any | null>((resolve) => {
-    if (typeof chrome === 'undefined' || !chrome.tabs?.query) {
-      resolve(null);
-      return;
-    }
-
-    const resolveTab = (tab: any | null) => {
-      resolve(isHttpTab(tab) ? tab : null);
-    };
-
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
-      const currentWindowTab = Array.isArray(tabs) ? tabs.find(isHttpTab) : null;
-      if (currentWindowTab) {
-        resolveTab(currentWindowTab);
-        return;
-      }
-
-      if (!chrome.windows?.getAll) {
-        resolve(null);
-        return;
-      }
-
-      chrome.windows.getAll({ populate: true, windowTypes: ['normal'] }, (windows: any[]) => {
-        const normalWindows = Array.isArray(windows) ? windows : [];
-        const focusedWindow = normalWindows.find((window) => window.focused);
-        const focusedTab = focusedWindow?.tabs?.find((tab: any) => tab.active && isHttpTab(tab));
-        if (focusedTab) {
-          resolveTab(focusedTab);
-          return;
-        }
-
-        for (const browserWindow of normalWindows) {
-          const tab = browserWindow.tabs?.find((candidate: any) => candidate.active && isHttpTab(candidate));
-          if (tab) {
-            resolveTab(tab);
-            return;
-          }
-        }
-
-        chrome.tabs.query({ active: true }, (allActiveTabs: any[]) => {
-          const tab = Array.isArray(allActiveTabs) ? allActiveTabs.find(isHttpTab) : null;
-          resolveTab(tab || null);
-        });
-      });
-    });
-  });
-
-  const registerGravityForSite = async (site: { origin: string; match: string }) => {
-    if (typeof chrome === 'undefined' || !chrome.scripting?.registerContentScripts) return;
-
-    const contentId = dynamicSiteScriptId(site.origin, 'content');
-    const providerId = dynamicSiteScriptId(site.origin, 'provider');
-
-    await new Promise<void>((resolve) => {
-      chrome.scripting.unregisterContentScripts({ ids: [contentId, providerId] }, () => resolve());
-    });
-
-    await chrome.scripting.registerContentScripts([
-      {
-        id: contentId,
-        matches: [site.match],
-        js: ['assets/content.js'],
-        runAt: 'document_start',
-        persistAcrossSessions: true
-      },
-      {
-        id: providerId,
-        matches: [site.match],
-        js: ['assets/provider.js'],
-        runAt: 'document_start',
-        world: 'MAIN',
-        allFrames: true,
-        persistAcrossSessions: true
-      }
-    ]);
-  };
-
-  const injectGravityIntoCurrentTab = async (tabId: number) => {
-    if (typeof chrome === 'undefined' || !chrome.scripting?.executeScript) return;
-
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['assets/content.js']
-    });
-
-    await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      files: ['assets/provider.js'],
-      world: 'MAIN'
-    });
-  };
-
-  const refreshCurrentSiteStatus = async () => {
-    const tab = await getActiveHttpTab();
-    if (!tab?.url) {
-      setCurrentSite(null);
-      setSitePermissionGranted(false);
-      return;
-    }
-
-    const url = new URL(tab.url);
-    const site = {
-      origin: url.origin,
-      match: `${url.origin}/*`,
-      host: url.hostname.replace(/^www\./, '')
-    };
-    setCurrentSite(site);
-
-    if (typeof chrome === 'undefined' || !chrome.permissions?.contains) {
-      setSitePermissionGranted(false);
-      return;
-    }
-
-    chrome.permissions.contains({ origins: [site.match] }, (granted: boolean) => {
-      setSitePermissionGranted(Boolean(granted));
-    });
-  };
-
-  const enableGravityOnCurrentSite = async () => {
-    let site = currentSite;
-    if (!site) {
-      const tab = await getActiveHttpTab();
-      if (tab?.url) {
-        const url = new URL(tab.url);
-        site = {
-          origin: url.origin,
-          match: `${url.origin}/*`,
-          host: url.hostname.replace(/^www\./, '')
-        };
-      }
-    }
-
-    if (!site) {
-      showNotification('Open a website tab first, then enable Gravity for that site.', 'error');
-      return;
-    }
-
-    setIsEnablingSite(true);
-    try {
-      const granted = await new Promise<boolean>((resolve) => {
-        if (!chrome.permissions?.request) {
-          resolve(false);
-          return;
-        }
-        chrome.permissions.request({ origins: [site.match] }, (ok: boolean) => {
-          resolve(Boolean(ok));
-        });
-      });
-
-      if (!granted) {
-        showNotification(`Permission denied for ${site.host}`, 'error');
-        return;
-      }
-
-      await registerGravityForSite(site);
-
-      const tab = await getActiveHttpTab();
-      if (!tab?.id) {
-        showNotification(`Gravity enabled on ${site.host}. Reload that site to use it.`, 'success');
-        return;
-      }
-      await injectGravityIntoCurrentTab(tab.id);
-
-      const stored = await new Promise<EnabledDAppSite[]>((resolve) => {
-        chrome.storage.local.get(['gravity_enabled_dapp_sites'], (result: any) => {
-          resolve(Array.isArray(result.gravity_enabled_dapp_sites) ? result.gravity_enabled_dapp_sites : []);
-        });
-      });
-      const next = [
-        ...stored.filter((saved) => saved.origin !== site.origin),
-        { origin: site.origin, match: site.match, enabledAt: Date.now() }
-      ];
-      await chrome.storage.local.set({ gravity_enabled_dapp_sites: next });
-
-      setCurrentSite(site);
-      setSitePermissionGranted(true);
-      showNotification(`Gravity enabled on ${site.host}. Reload the page if the dApp already checked for a wallet.`, 'success');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      showNotification(`Could not enable this site: ${message}`, 'error');
-    } finally {
-      setIsEnablingSite(false);
-    }
-  };
-
-  useEffect(() => {
-    refreshCurrentSiteStatus();
-
-    if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-    chrome.storage.local.get(['gravity_enabled_dapp_sites'], (result: any) => {
-      const sites: EnabledDAppSite[] = Array.isArray(result.gravity_enabled_dapp_sites)
-        ? result.gravity_enabled_dapp_sites
-        : [];
-      sites.forEach((site) => {
-        if (site?.origin && site?.match) {
-          registerGravityForSite(site).catch((error) => {
-            console.warn('Failed to restore Gravity dynamic site:', site.origin, error);
-          });
-        }
-      });
-    });
-  }, []);
 
   useEffect(() => {
     const handleWindowError = (event: ErrorEvent) => {
@@ -490,14 +258,6 @@ function AppContent() {
     return Array.from(byKey.values());
   };
 
-  const persistHistoryCache = async (nextCache: HistoryCache) => {
-    try {
-      await storageService.setItem(HISTORY_CACHE_STORAGE_KEY, JSON.stringify(nextCache));
-    } catch (error) {
-      console.warn('History cache save failed:', error);
-    }
-  };
-
   const loadHistoryCache = async () => {
     try {
       const raw = await storageService.getItem(HISTORY_CACHE_STORAGE_KEY);
@@ -512,81 +272,63 @@ function AppContent() {
     }
   };
 
-  const updateHistoryCacheEntry = (key: string, entry: HistoryCacheEntry) => {
-    setHistoryCache((prev) => {
-      const next = { ...prev, [key]: entry };
-      historyCacheRef.current = next;
-      persistHistoryCache(next);
+  // History is fetched by the service worker, not here. A full walk is hundreds of
+  // sequential RPC calls and the popup can vanish at any moment; the worker survives that
+  // and persists each account as it lands. All we do is ask, then render what arrives.
+  const preloadHistory = async (accounts: Account[], force = false, partial = true) => {
+    const targets = accounts.filter((account) => account?.chain && account?.name);
+    if (targets.length === 0) return;
+
+    setHistoryLoadingKeys((prev) => {
+      const next = { ...prev };
+      targets.forEach((account) => {
+        const key = getHistoryCacheKey(account);
+        const cached = historyCacheRef.current[key];
+        const cacheIsFresh = cached && !cached.partial && Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS;
+        if (force || !cacheIsFresh) next[key] = true;
+      });
       return next;
     });
-  };
-
-  const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
-    const byKey = new Map<string, HistoryItem>();
-    [...incoming, ...existing].forEach((item) => {
-      byKey.set(getHistoryItemKey(item), item);
-    });
-
-    return Array.from(byKey.values())
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 250);
-  };
-
-  const refreshAccountHistory = async (account: Account, force = false, partial = false) => {
-    const key = getHistoryCacheKey(account);
-    const cached = historyCacheRef.current[key];
-    const cachedItems = cached?.items || [];
-    const isProducerReward = (item: HistoryItem) => item.type === 'producer_reward' || (item.type === 'reward' && item.memo === 'Producer Reward');
-    const hasVisibleHistory = cachedItems.some((item) => !isProducerReward(item));
-    const cacheIsFresh = cached && hasVisibleHistory && !cached.partial && Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS;
-    const shouldIncremental = hasVisibleHistory && !cached?.partial && !partial && (force || !cacheIsFresh);
-
-    if (!force && cacheIsFresh) return cached.items;
-    if (historySyncInFlightRef.current.has(key)) return cached?.items || [];
-
-    historySyncInFlightRef.current.add(key);
-    setHistoryLoadingKeys((prev) => ({ ...prev, [key]: true }));
 
     try {
-      const fetchedItems = await fetchAccountHistory(account.chain, account.name, shouldIncremental ? {
-        incremental: true,
-        knownItemKeys: cached.items.map(getHistoryItemKey)
-      } : partial ? {
-        maxPages: 5
-      } : {});
-      const items = shouldIncremental ? mergeHistoryItems(cached.items, fetchedItems) : partial && cachedItems.length > 0 ? mergeHistoryItems(cachedItems, fetchedItems) : fetchedItems;
-      updateHistoryCacheEntry(key, {
-        items,
-        updatedAt: Date.now(),
-        error: null,
+      chrome.runtime.sendMessage({
+        type: 'gravity_history_refresh',
+        accounts: targets.map((account) => ({ chain: account.chain, name: account.name })),
+        force,
         partial
+      }, () => {
+        void chrome.runtime.lastError;
       });
-      return items;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      updateHistoryCacheEntry(key, {
-        items: cached?.items || [],
-        updatedAt: cached?.updatedAt || Date.now(),
-        error: message,
-        partial: cached?.partial
-      });
-      return cached?.items || [];
-    } finally {
-      historySyncInFlightRef.current.delete(key);
-      setHistoryLoadingKeys((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
+      console.warn('History refresh request failed:', error);
     }
   };
 
-  const preloadHistory = async (accounts: Account[], force = false, partial = true) => {
-    for (const account of accounts) {
-      await refreshAccountHistory(account, force, partial);
-      await new Promise((resolve) => setTimeout(resolve, 150));
-    }
-  };
+  const refreshAccountHistory = async (account: Account, force = false, partial = false) =>
+    preloadHistory([account], force, partial);
+
+  // The worker pushes each account as it finishes so the list fills in progressively.
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
+
+    const listener = (message: any) => {
+      if (message?.type !== 'gravity_history_update' || !message.key) return;
+
+      setHistoryCache((prev) => {
+        const next = { ...prev, [message.key]: message.entry };
+        historyCacheRef.current = next;
+        return next;
+      });
+      setHistoryLoadingKeys((prev) => {
+        const next = { ...prev };
+        delete next[message.key];
+        return next;
+      });
+    };
+
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1051,13 +793,10 @@ function AppContent() {
 
   useEffect(() => {
     if (isLocked || walletState.accounts.length === 0) return;
+    // One kick on unlock. The recurring 10-minute refresh is a chrome.alarms job in the
+    // service worker now — the old setInterval here only ticked while the popup happened
+    // to stay open that long, which it essentially never does.
     preloadHistory(walletState.accounts, false, true);
-
-    const id = setInterval(() => {
-      preloadHistory(walletState.accounts, false, true);
-    }, 10 * 60 * 1000);
-
-    return () => clearInterval(id);
   }, [isLocked, walletState.accounts.map((account) => `${account.chain}:${account.name}`).sort().join('|')]);
 
   /* Detached Window State */
@@ -1262,20 +1001,6 @@ function AppContent() {
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                 {web3Context}
               </div>
-            )}
-            {currentSite && (
-              <button
-                onClick={enableGravityOnCurrentSite}
-                disabled={sitePermissionGranted || isEnablingSite}
-                className={`text-[10px] px-2 py-1 rounded border transition-colors max-w-[145px] truncate ${
-                  sitePermissionGranted
-                    ? 'bg-green-950/40 text-green-400 border-green-800 cursor-default'
-                    : 'bg-blue-950/40 hover:bg-blue-900/50 text-blue-300 border-blue-800'
-                }`}
-                title={sitePermissionGranted ? `Gravity is enabled on ${currentSite.host}` : `Enable Gravity on ${currentSite.host}`}
-              >
-                {sitePermissionGranted ? 'Site enabled' : isEnablingSite ? 'Enabling...' : `Enable ${currentSite.host}`}
-              </button>
             )}
             {currentView !== ViewState.CHAT && (
               <button

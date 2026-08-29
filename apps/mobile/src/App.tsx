@@ -5,6 +5,7 @@ import { LanguageProvider } from '@contexts/LanguageContext'
 import { NotificationProvider } from '@contexts/NotificationContext'
 import { LockScreen } from '@components/LockScreen'
 import { bridgeService, SignRequest, SignResponse } from '@services/bridgeService'
+import { requiresActiveAuthority, selectBroadcastKey } from 'gravity-shared/utils/authority'
 import {
   broadcastTransfer,
   broadcastOperations,
@@ -780,38 +781,6 @@ function MobileContent() {
       // --- 3. Key Identification ---
       const method = request.operation;
       const postingOps = ['vote', 'comment', 'post', 'custom_json', 'requestVote', 'requestPost'];
-      const activeKeyOps = [
-        'witness_update',
-        'witness_set_properties',
-        'account_witness_vote',
-        'account_update',
-        'account_update2',
-        'transfer',
-        'transfer_to_vesting',
-        'withdraw_vesting',
-        'delegate_vesting_shares',
-        'account_create',
-        'account_create_with_delegation',
-        'transfer_to_savings',
-        'transfer_from_savings',
-        'escrow_transfer',
-        'escrow_release',
-        'escrow_dispute',
-        'escrow_approve',
-        'claim_reward_balance',
-        'delegate_rc',
-        'create_proposal',
-        'update_proposal_votes',
-        'remove_proposal',
-        'limit_order_create',
-        'limit_order_create2',
-        'limit_order_cancel',
-        'convert',
-        'collateralized_convert',
-        'fill_convert_request',
-        'cancel_transfer_from_savings',
-        'set_withdraw_vesting_route'
-      ];
       let signBufferType: any = opData.type;
       if (typeof signBufferType === 'string') {
         try {
@@ -1019,15 +988,10 @@ function MobileContent() {
         normalizedBroadcastOps = normalizedOps;
 
         const requestedKeyType = typeof opData.type === 'string' ? opData.type : '';
-        const requiresActiveKey = normalizedOps.some((op: any) => {
-          const opName = Array.isArray(op) ? op[0] : op?.type || op?.[0];
-          return activeKeyOps.includes(opName);
-        });
-        needsPosting = !requiresActiveKey;
-        signingKey = account.postingKey;
-        if (requestedKeyType === 'Active') signingKey = account.activeKey;
-        else if (requiresActiveKey) signingKey = account.activeKey;
-        if (!signingKey && account.activeKey) signingKey = account.activeKey;
+        const requiresActiveKey = requiresActiveAuthority(normalizedOps);
+        const selection = selectBroadcastKey(account, requestedKeyType, normalizedOps);
+        needsPosting = selection.keyType === 'posting';
+        signingKey = selection.key;
 
         console.log('[GWDBG][mobile:broadcast-key-selection]', JSON.stringify({
           requestId,

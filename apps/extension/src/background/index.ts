@@ -1,8 +1,10 @@
 import './polyfill';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, encodeMemo, decodeMemo, validateAccountKeys } from '@services/chainService';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, encodeMemo, decodeMemo, validateAccountKeys, derivePublicKey } from '@services/chainService';
 import { getChainConfig, isChainSupported } from '@config/chainConfig';
 import { getActiveNode, benchmarkNodes } from '@services/nodeService';
 import { Chain } from 'gravity-shared/types';
+import { normalizeKeyType, requiresActiveAuthority, selectBroadcastKey } from 'gravity-shared/utils/authority';
+import { readHistoryCache, refreshHistoryForAccounts, refreshHistoryFromSession } from './history';
 
 declare var chrome: any;
 
@@ -46,6 +48,9 @@ chrome.alarms.onAlarm.addListener((alarm: any) => {
     if (alarm.name === 'rpcBenchmark') {
         runBenchmark();
     }
+    if (alarm.name === 'historyRefresh') {
+        refreshHistoryFromSession();
+    }
 });
 
 // RPC Benchmarking & Synchronization
@@ -86,7 +91,18 @@ async function initializeRpcNodes() {
 
 // Sanitize persisted nodes before the initial benchmark can reuse them.
 initializeRpcNodes();
-chrome.alarms.create('rpcBenchmark', { periodInMinutes: 10 });
+// chrome.alarms.create replaces an existing alarm of the same name, restarting its
+// countdown. This runs at service-worker top level, and the worker now wakes on every
+// message from any page, so recreating unconditionally would keep pushing these periodic
+// alarms back and they would rarely fire at all.
+const ensurePeriodicAlarm = (name: string, periodInMinutes: number) => {
+    chrome.alarms.get(name, (existing: any) => {
+        if (!existing) chrome.alarms.create(name, { periodInMinutes });
+    });
+};
+
+ensurePeriodicAlarm('rpcBenchmark', 10);
+ensurePeriodicAlarm('historyRefresh', 10);
 
 let unreadCount = 0;
 
@@ -98,7 +114,7 @@ function detectChainFromUrl(url: string = ""): string | null {
 
         // Use configuration for detection if possible, or keep simple heuristics for now
         // HIVE
-        const hiveHosts = ['peakd.com', 'ecency.com', 'tribaldex.com'];
+        const hiveHosts = ['peakd.com', 'ecency.com', 'tribaldex.com', 'magi.eco'];
         if (
             hiveHosts.some(domain => host === domain || host.endsWith(`.${domain}`)) ||
             host.includes('hive')
@@ -132,14 +148,6 @@ function detectChainFromUrl(url: string = ""): string | null {
     }
 }
 
-function normalizeKeyType(type: any): 'posting' | 'active' | 'memo' | '' {
-    if (typeof type !== 'string') return '';
-    const normalized = type.trim().toLowerCase();
-    if (normalized === 'posting' || normalized === 'active' || normalized === 'memo') {
-        return normalized;
-    }
-    return '';
-}
 
 async function resolveBestAccountForRequest(accounts: any[], username: string, detectedChain: string | null, normalizedKeyType: 'posting' | 'active' | 'memo' | '' = '') {
     const potentialAccounts = accounts.filter((a: any) => a.name === username);
@@ -151,6 +159,11 @@ async function resolveBestAccountForRequest(accounts: any[], username: string, d
 
     if (candidates.length === 0) {
         candidates = potentialAccounts;
+    }
+
+    if (candidates.length > 1) {
+        console.warn(`[Gravity] ${candidates.length} stored entries for @${username}`,
+            `(${candidates.map((c: any) => c.chain).join(', ')}) — picking the one whose ${normalizedKeyType || 'first'} key the chain accepts`);
     }
 
     if (normalizedKeyType === 'posting' && candidates.length > 1) {
@@ -175,6 +188,23 @@ async function resolveBestAccountForRequest(accounts: any[], username: string, d
 // Listen for messages from Content Script or Popup
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
     if (!request) return false;
+
+    // History lives here, not in the popup: the walk survives the popup closing.
+    if (request.type === 'gravity_history_refresh') {
+        // Deliberately not awaited. The popup gets an immediate ack and the worker keeps
+        // fetching after it closes, persisting each account as it lands.
+        refreshHistoryForAccounts(request.accounts || [], {
+            force: request.force === true,
+            partial: request.partial !== false
+        }).catch((error: any) => console.warn('[Gravity] History refresh failed:', error));
+        sendResponse({ started: true });
+        return false;
+    }
+
+    if (request.type === 'gravity_history_get') {
+        readHistoryCache().then((cache) => sendResponse({ cache }));
+        return true;
+    }
 
     // 1. Request from Web Page (via Content Script)
     if (request.type === 'gravity_request') {
@@ -264,6 +294,9 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
         }
 
         // Twiggy/General Fix: Some dApps pass domain as params[0]
+        // Deliberately excludes requestVerifyKey: the shift triggers on a dotted params[0],
+        // and dots are legal in account names, so a user like @alice.dev would get their
+        // params silently mangled. No dApp passes a domain to it, unlike the Twiggy calls.
         const methodsWithDomainFix = ['requestVote', 'vote', 'requestPost', 'post', 'requestBroadcast', 'broadcast', 'requestSignBuffer', 'signBuffer', 'decodeMemo', 'encodeMemo'];
         if (methodsWithDomainFix.includes(request.method as string) && Array.isArray(request.params)) {
             const params = request.params;
@@ -545,8 +578,18 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const url = sender?.tab?.url || sender?.url || "";
         const detectedChain = detectChainFromUrl(url);
 
-        // 2. Find account matching Name AND Chain (if known)
-        const requestedKeyType = normalizeKeyType(request.params?.[2]);
+        // 2. Find account matching Name AND Chain (if known).
+        // Many dApps (blurt.blog's condenser among them) send no keyType at all. Without
+        // one we used to take the first account entry with a matching name and never check
+        // its key against the chain, so a stale or duplicate entry would sign and the node
+        // would reject a transaction the user had a perfectly good key for. When the dApp
+        // stays silent, derive the authority from the operations instead.
+        let requestedKeyType = normalizeKeyType(request.params?.[2]);
+        if (!requestedKeyType && (request.method === 'requestBroadcast' || request.method === 'broadcast')) {
+            const requestOps = Array.isArray(request.params?.[1]) ? request.params[1] : [];
+            requestedKeyType = requiresActiveAuthority(requestOps) ? 'active' : 'posting';
+        }
+
         let account = await resolveBestAccountForRequest(
             session.session_accounts,
             username,
@@ -587,7 +630,9 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
         const isDelegation = method === 'requestDelegation' || method === 'delegation';
         const isPost = method === 'requestPost' || method === 'post';
         const isWitnessVote = method === 'requestWitnessVote' || method === 'witnessVote';
-        const isDecodeMemo = method === 'decodeMemo';
+        // requestVerifyKey shares decodeMemo's shape — (username, encryptedMemo, keyType) —
+        // and its semantics: decrypt the challenge, never sign it.
+        const isDecodeMemo = method === 'decodeMemo' || method === 'requestVerifyKey';
         const isEncodeMemo = method === 'encodeMemo';
 
         let response: any;
@@ -665,58 +710,21 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                 }
             }
 
-            // Determine which operations require Active key
-            const requiresActiveKey = Array.isArray(operations) && operations.some((op: any) => {
-                const opName = Array.isArray(op) ? op[0] : op.type || op[0];
-                // Operations that require Active key
-                const activeKeyOps = [
-                    'witness_update',
-                    'witness_set_properties',
-                    'account_witness_vote',
-                    'account_update',
-                    'account_update2',
-                    'transfer',
-                    'transfer_to_vesting',
-                    'withdraw_vesting',
-                    'delegate_vesting_shares',
-                    'account_create',
-                    'account_create_with_delegation',
-                    'transfer_to_savings',
-                    'transfer_from_savings',
-                    'escrow_transfer',
-                    'escrow_release',
-                    'escrow_dispute',
-                    'escrow_approve',
-                    'claim_reward_balance',
-                    'delegate_rc',
-                    'create_proposal',
-                    'update_proposal_votes',
-                    'remove_proposal',
-                    // Market operations (wallet.hive.blog, etc.)
-                    'limit_order_create',
-                    'limit_order_create2',
-                    'limit_order_cancel',
-                    'convert',
-                    'collateralized_convert',
-                    'fill_convert_request',
-                    'cancel_transfer_from_savings',
-                    'set_withdraw_vesting_route'
-                ];
-                return activeKeyOps.includes(opName);
-            });
-
-            let keyStr = "";
-            const normalizedKeyType = (keyType || '').toLowerCase();
-
-            if (normalizedKeyType === 'posting') keyStr = account.postingKey || "";
-            else if (normalizedKeyType === 'active') keyStr = account.activeKey || "";
-            else if (requiresActiveKey) keyStr = account.activeKey || ""; // Auto-detect Active key requirement
-            else keyStr = account.activeKey || ""; // Default fallback
+            const { key: keyStr, keyType: selectedKeyType } = selectBroadcastKey(
+                account,
+                keyType,
+                Array.isArray(operations) ? operations : []
+            );
 
             if (!keyStr) {
-                const requiredType = requiresActiveKey ? 'Active' : (keyType || 'Active');
+                const requiredType = selectedKeyType === 'active' ? 'Active' : 'Posting';
                 return { success: false, error: `${requiredType} key required for broadcast operation` };
             }
+
+            // Public key only — says exactly which stored key is about to sign, so a wrong
+            // or duplicate account entry is obvious without inspecting the vault.
+            console.log('[Broadcast] Signing as', `@${account.name}`, 'on', account.chain,
+                'with', selectedKeyType, 'key', derivePublicKey(account.chain, keyStr));
 
             response = await broadcastOperations(account.chain, keyStr, operations);
 
@@ -893,6 +901,18 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
                     signature: response.result
                 },
                 message: 'Signed successfully',
+                ...restResponse
+            }
+            : (isDecodeMemo || isEncodeMemo)
+            ? {
+                // Memo operations never broadcast, so no txId/operation fields belong here.
+                success: true,
+                result: response.result,
+                data: {
+                    username: username,
+                    message: response.result
+                },
+                message: isDecodeMemo ? 'Decoded successfully' : 'Encoded successfully',
                 ...restResponse
             }
             : {

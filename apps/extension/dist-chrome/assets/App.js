@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { o as global, r as requireCryptoBrowserify, V as ViewState, C as Chain, p as checkAccountExists, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, q as broadcastSavingsDeposit, t as broadcastSavingsWithdraw, u as fetchAccountData, w as broadcastRCDelegate, x as broadcastRCUndelegate, y as broadcastBulkTransfer, d as broadcastCustomJson, z as fetchCustomJsonEventsForAccounts, A as calculateThresholdProgress, B as getAccountAuthorities, D as createUnsignedTransaction, E as signTransactionEnvelope, F as selectBroadcastSignatures, G as broadcastSignedTransaction, H as indexBrowserExports, I as indexBrowserExports$1, v as validateAccountKeys, a as broadcastTransfer, c as broadcastVote, s as signMessage, e as broadcastOperations, l as broadcastWitnessVote, J as fetchBalances, K as detectWeb3Context, b as benchmarkNodes, L as fetchAccountHistory, M as getHistoryItemKey } from './chainService.js';
+import { x as global, y as requireCryptoBrowserify, V as ViewState, C as Chain, z as checkAccountExists, o as broadcastPowerUp, p as broadcastPowerDown, q as broadcastDelegation, A as broadcastSavingsDeposit, B as broadcastSavingsWithdraw, D as fetchAccountData, E as broadcastRCDelegate, F as broadcastRCUndelegate, G as broadcastBulkTransfer, e as broadcastCustomJson, H as fetchCustomJsonEventsForAccounts, I as calculateThresholdProgress, J as getAccountAuthorities, K as createUnsignedTransaction, L as signTransactionEnvelope, M as selectBroadcastSignatures, N as broadcastSignedTransaction, O as indexBrowserExports, P as indexBrowserExports$1, v as validateAccountKeys, n as normalizeKeyType, c as broadcastTransfer, d as broadcastVote, s as signMessage, w as encodeMemo, u as decodeMemo, h as selectBroadcastKey, j as broadcastOperations, t as broadcastWitnessVote, Q as fetchBalances, R as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -6341,6 +6341,10 @@ const translations = {
     "sign.user_rejected": "User rejected request",
     "sign.success": "Signed successfully",
     "sign.trust_domain": "Trust this site (Don't ask again)",
+    "sign.decode_memo_title": "Decrypt Message",
+    "sign.encode_memo_title": "Encrypt Message",
+    "sign.decode_memo_desc": "This site wants to decrypt a message with your private key. Nothing is broadcast to the blockchain.",
+    "sign.encode_memo_desc": "This site wants to encrypt a message with your private key. Nothing is broadcast to the blockchain.",
     // Errors
     "validation.invalid_amount": "Please enter a valid amount greater than 0.",
     "validation.required": "All fields are required.",
@@ -6949,6 +6953,10 @@ const translations = {
     "sign.user_rejected": "El usuario rechazó la solicitud",
     "sign.success": "Firmado exitosamente",
     "sign.trust_domain": "Confiar en este sitio (No volver a preguntar)",
+    "sign.decode_memo_title": "Descifrar mensaje",
+    "sign.encode_memo_title": "Cifrar mensaje",
+    "sign.decode_memo_desc": "Este sitio quiere descifrar un mensaje con tu clave privada. No se difunde nada a la blockchain.",
+    "sign.encode_memo_desc": "Este sitio quiere cifrar un mensaje con tu clave privada. No se difunde nada a la blockchain.",
     // Errors
     "validation.invalid_amount": "Por favor ingresa una cantidad válida mayor a 0.",
     "validation.required": "Todos los campos son obligatorios.",
@@ -7417,6 +7425,10 @@ const translations = {
     "sign.user_rejected": "L'utilisateur a rejeté la demande",
     "sign.success": "Signé avec succès",
     "sign.trust_domain": "Faire confiance à ce site",
+    "sign.decode_memo_title": "Déchiffrer le message",
+    "sign.encode_memo_title": "Chiffrer le message",
+    "sign.decode_memo_desc": "Ce site veut déchiffrer un message avec votre clé privée. Rien n'est diffusé sur la blockchain.",
+    "sign.encode_memo_desc": "Ce site veut chiffrer un message avec votre clé privée. Rien n'est diffusé sur la blockchain.",
     "sign.expired": "Demande expirée ou non trouvée",
     "sign.buffer_title": "Signer Message",
     "sign.message_label": "Message",
@@ -7905,6 +7917,10 @@ const translations = {
     "sign.user_rejected": "Benutzer hat Anfrage abgelehnt",
     "sign.success": "Erfolgreich signiert",
     "sign.trust_domain": "Dieser Seite vertrauen",
+    "sign.decode_memo_title": "Nachricht entschlüsseln",
+    "sign.encode_memo_title": "Nachricht verschlüsseln",
+    "sign.decode_memo_desc": "Diese Seite möchte eine Nachricht mit deinem privaten Schlüssel entschlüsseln. Es wird nichts an die Blockchain gesendet.",
+    "sign.encode_memo_desc": "Diese Seite möchte eine Nachricht mit deinem privaten Schlüssel verschlüsseln. Es wird nichts an die Blockchain gesendet.",
     "sign.expired": "Anfrage abgelaufen oder nicht gefunden",
     "sign.buffer_title": "Nachricht signieren",
     "sign.message_label": "Nachricht",
@@ -8393,6 +8409,10 @@ const translations = {
     "sign.user_rejected": "L'utente ha rifiutato la richiesta",
     "sign.success": "Firmato con successo",
     "sign.trust_domain": "Fidati di questo sito",
+    "sign.decode_memo_title": "Decifra messaggio",
+    "sign.encode_memo_title": "Cifra messaggio",
+    "sign.decode_memo_desc": "Questo sito vuole decifrare un messaggio con la tua chiave privata. Nulla viene trasmesso alla blockchain.",
+    "sign.encode_memo_desc": "Questo sito vuole cifrare un messaggio con la tua chiave privata. Nulla viene trasmesso alla blockchain.",
     "sign.expired": "Richiesta scaduta o non trovata",
     "sign.buffer_title": "Firma Messaggio",
     "sign.message_label": "Messaggio",
@@ -15136,14 +15156,6 @@ const MultiSigProgress = ({
   ] });
 };
 
-const normalizeKeyType = (type) => {
-  if (typeof type !== "string") return "";
-  const normalized = type.trim().toLowerCase();
-  if (normalized === "posting" || normalized === "active" || normalized === "memo") {
-    return normalized;
-  }
-  return "";
-};
 const SignRequest = ({ requestId, accounts, onComplete }) => {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
@@ -15316,6 +15328,8 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       const isDelegation = method2 === "requestDelegation" || method2 === "delegation";
       const isPost2 = method2 === "requestPost" || method2 === "post";
       const isWitnessVote2 = method2 === "requestWitnessVote" || method2 === "witnessVote";
+      const isDecodeMemo2 = method2 === "decodeMemo" || method2 === "requestVerifyKey";
+      const isEncodeMemo2 = method2 === "encodeMemo";
       const needsActive = isTransfer2 || isPowerUp || isPowerDown || isDelegation || isWitnessVote2 || isBroadcast2 && !account.postingKey || // Broadcast assumes Active?
       isCustomJson2 && normalizeKeyType(request.params[2]) === "active";
       if (needsActive && !account.activeKey) {
@@ -15441,6 +15455,26 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           message: t("sign.success"),
           ...restResponse
         };
+      } else if (isDecodeMemo2 || isEncodeMemo2) {
+        const receiver = isEncodeMemo2 ? request.params[1] : null;
+        const memo = isEncodeMemo2 ? request.params[2] : request.params[1];
+        const type = isEncodeMemo2 ? request.params[3] : request.params[2];
+        const normalizedType = normalizeKeyType(type);
+        let keyStr = "";
+        if (normalizedType === "posting") keyStr = account.postingKey || "";
+        else if (normalizedType === "active") keyStr = account.activeKey || "";
+        else if (normalizedType === "memo") keyStr = account.memoKey || "";
+        if (!keyStr) throw new Error(t("sign.key_missing_generic").replace("{type}", normalizedType || String(type)));
+        const output = isEncodeMemo2 ? await encodeMemo(account.chain, account.name, receiver, memo, keyStr) : await decodeMemo(account.chain, account.name, memo, keyStr);
+        result = {
+          success: true,
+          result: output,
+          data: {
+            username: account.name,
+            message: output
+          },
+          message: t("sign.success")
+        };
       } else if (isBroadcast2) {
         let rawOperations = request.params[1];
         const keyType = request.params[2];
@@ -15459,52 +15493,9 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         });
         const firstOperation = operations.find((op) => Array.isArray(op) || op && typeof op === "object");
         const firstOperationName = Array.isArray(firstOperation) ? firstOperation[0] : firstOperation?.type || firstOperation?.operation || firstOperation?.method || null;
-        const requiresActiveKey = operations.some((op) => {
-          const opName = Array.isArray(op) ? op[0] : op.type || op[0];
-          const activeKeyOps = [
-            "witness_update",
-            "witness_set_properties",
-            "account_witness_vote",
-            "account_update",
-            "account_update2",
-            "transfer",
-            "transfer_to_vesting",
-            "withdraw_vesting",
-            "delegate_vesting_shares",
-            "account_create",
-            "account_create_with_delegation",
-            "transfer_to_savings",
-            "transfer_from_savings",
-            "escrow_transfer",
-            "escrow_release",
-            "escrow_dispute",
-            "escrow_approve",
-            "claim_reward_balance",
-            "delegate_rc",
-            "create_proposal",
-            "update_proposal_votes",
-            "remove_proposal",
-            // Market operations (wallet.hive.blog, etc.)
-            "limit_order_create",
-            "limit_order_create2",
-            "limit_order_cancel",
-            "convert",
-            "collateralized_convert",
-            "fill_convert_request",
-            "cancel_transfer_from_savings",
-            "set_withdraw_vesting_route"
-          ];
-          return activeKeyOps.includes(opName);
-        });
-        let key = account.postingKey;
-        if (normalizeKeyType(keyType) === "active") key = account.activeKey;
-        else if (requiresActiveKey) key = account.activeKey;
-        if (!key && account.activeKey) key = account.activeKey;
-        const requiredKeyType = requiresActiveKey ? "Active" : keyType || "Posting";
+        const { key, keyType: selectedKeyType } = selectBroadcastKey(account, keyType, operations);
+        const requiredKeyType = selectedKeyType === "active" ? "Active" : "Posting";
         if (!key) throw new Error(t("sign.key_missing_type").replace("{type}", requiredKeyType));
-        if (requiresActiveKey && key !== account.activeKey && account.activeKey) {
-          key = account.activeKey;
-        }
         const response = await broadcastOperations(account.chain, key, operations);
         if (!response.success) throw new Error(response.error);
         const opResult = response.opResult || response.txId;
@@ -15709,6 +15700,8 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
   const isSignBuffer = method === "requestSignBuffer" || method === "signBuffer";
   const isPost = method === "requestPost" || method === "post";
   const isWitnessVote = method === "requestWitnessVote" || method === "witnessVote";
+  const isDecodeMemo = method === "decodeMemo" || method === "requestVerifyKey";
+  const isEncodeMemo = method === "encodeMemo";
   const isFile = origin === "file" || origin.startsWith("file://");
   const domain = isFile ? t("sign.local_file") : (origin.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:\/\n?]+)/im) || [null, origin])[1];
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full bg-dark-900 text-slate-200 flex flex-col relative overflow-hidden", children: [
@@ -15845,6 +15838,33 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.key_type") }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-400 font-bold", children: request.params[2] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.from") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-white font-bold", children: [
+              "@",
+              request.params[0]
+            ] })
+          ] })
+        ] })
+      ] }) : isDecodeMemo || isEncodeMemo ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-xs mx-auto bg-dark-800 rounded-xl p-6 border border-dark-600 shadow-lg animate-fade-in-down", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-xs uppercase tracking-widest text-slate-500 mb-4 text-center", children: isDecodeMemo ? t("sign.decode_memo_title") : t("sign.encode_memo_title") }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 text-center", children: isDecodeMemo ? t("sign.decode_memo_desc") : t("sign.encode_memo_desc") }),
+          isEncodeMemo && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between border-b border-dark-700 pb-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-slate-500", children: t("sign.to") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-sm text-white font-bold", children: [
+              "@",
+              request.params[1]
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-dark-900 p-4 rounded-lg border border-dark-700", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 mb-2 uppercase", children: t("sign.message_label") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "max-h-40 overflow-y-auto custom-scrollbar", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-300 font-mono break-all", children: isEncodeMemo ? request.params[2] : request.params[1] }) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.key_type") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-blue-400 font-bold", children: isEncodeMemo ? request.params[3] : request.params[2] })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-dark-700", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t("sign.from") }),
@@ -18000,204 +18020,11 @@ function AppContent() {
     }
   });
   const [web3Context, setWeb3Context] = reactExports.useState(null);
-  const [currentSite, setCurrentSite] = reactExports.useState(null);
-  const [sitePermissionGranted, setSitePermissionGranted] = reactExports.useState(false);
-  const [isEnablingSite, setIsEnablingSite] = reactExports.useState(false);
   const { showNotification } = useNotification();
   const [lockReason, setLockReason] = reactExports.useState(null);
-  const historySyncInFlightRef = reactExports.useRef(/* @__PURE__ */ new Set());
   const historyCacheRef = reactExports.useRef({});
   const [requestId, setRequestId] = reactExports.useState(null);
   const [showBridge, setShowBridge] = reactExports.useState(false);
-  const dynamicSiteScriptId = (origin, kind) => {
-    let hash = 0;
-    for (let i = 0; i < origin.length; i++) {
-      hash = (hash << 5) - hash + origin.charCodeAt(i) | 0;
-    }
-    return `gravity_${kind}_${Math.abs(hash)}`;
-  };
-  const isHttpTab = (tab) => {
-    if (!tab?.id || !tab?.url) return false;
-    try {
-      const url = new URL(tab.url);
-      return url.protocol === "https:" || url.protocol === "http:";
-    } catch {
-      return false;
-    }
-  };
-  const getActiveHttpTab = () => new Promise((resolve) => {
-    if (typeof chrome === "undefined" || !chrome.tabs?.query) {
-      resolve(null);
-      return;
-    }
-    const resolveTab = (tab) => {
-      resolve(isHttpTab(tab) ? tab : null);
-    };
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const currentWindowTab = Array.isArray(tabs) ? tabs.find(isHttpTab) : null;
-      if (currentWindowTab) {
-        resolveTab(currentWindowTab);
-        return;
-      }
-      if (!chrome.windows?.getAll) {
-        resolve(null);
-        return;
-      }
-      chrome.windows.getAll({ populate: true, windowTypes: ["normal"] }, (windows) => {
-        const normalWindows = Array.isArray(windows) ? windows : [];
-        const focusedWindow = normalWindows.find((window2) => window2.focused);
-        const focusedTab = focusedWindow?.tabs?.find((tab) => tab.active && isHttpTab(tab));
-        if (focusedTab) {
-          resolveTab(focusedTab);
-          return;
-        }
-        for (const browserWindow of normalWindows) {
-          const tab = browserWindow.tabs?.find((candidate) => candidate.active && isHttpTab(candidate));
-          if (tab) {
-            resolveTab(tab);
-            return;
-          }
-        }
-        chrome.tabs.query({ active: true }, (allActiveTabs) => {
-          const tab = Array.isArray(allActiveTabs) ? allActiveTabs.find(isHttpTab) : null;
-          resolveTab(tab || null);
-        });
-      });
-    });
-  });
-  const registerGravityForSite = async (site) => {
-    if (typeof chrome === "undefined" || !chrome.scripting?.registerContentScripts) return;
-    const contentId = dynamicSiteScriptId(site.origin, "content");
-    const providerId = dynamicSiteScriptId(site.origin, "provider");
-    await new Promise((resolve) => {
-      chrome.scripting.unregisterContentScripts({ ids: [contentId, providerId] }, () => resolve());
-    });
-    await chrome.scripting.registerContentScripts([
-      {
-        id: contentId,
-        matches: [site.match],
-        js: ["assets/content.js"],
-        runAt: "document_start",
-        persistAcrossSessions: true
-      },
-      {
-        id: providerId,
-        matches: [site.match],
-        js: ["assets/provider.js"],
-        runAt: "document_start",
-        world: "MAIN",
-        allFrames: true,
-        persistAcrossSessions: true
-      }
-    ]);
-  };
-  const injectGravityIntoCurrentTab = async (tabId) => {
-    if (typeof chrome === "undefined" || !chrome.scripting?.executeScript) return;
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ["assets/content.js"]
-    });
-    await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      files: ["assets/provider.js"],
-      world: "MAIN"
-    });
-  };
-  const refreshCurrentSiteStatus = async () => {
-    const tab = await getActiveHttpTab();
-    if (!tab?.url) {
-      setCurrentSite(null);
-      setSitePermissionGranted(false);
-      return;
-    }
-    const url = new URL(tab.url);
-    const site = {
-      origin: url.origin,
-      match: `${url.origin}/*`,
-      host: url.hostname.replace(/^www\./, "")
-    };
-    setCurrentSite(site);
-    if (typeof chrome === "undefined" || !chrome.permissions?.contains) {
-      setSitePermissionGranted(false);
-      return;
-    }
-    chrome.permissions.contains({ origins: [site.match] }, (granted) => {
-      setSitePermissionGranted(Boolean(granted));
-    });
-  };
-  const enableGravityOnCurrentSite = async () => {
-    let site = currentSite;
-    if (!site) {
-      const tab = await getActiveHttpTab();
-      if (tab?.url) {
-        const url = new URL(tab.url);
-        site = {
-          origin: url.origin,
-          match: `${url.origin}/*`,
-          host: url.hostname.replace(/^www\./, "")
-        };
-      }
-    }
-    if (!site) {
-      showNotification("Open a website tab first, then enable Gravity for that site.", "error");
-      return;
-    }
-    setIsEnablingSite(true);
-    try {
-      const granted = await new Promise((resolve) => {
-        if (!chrome.permissions?.request) {
-          resolve(false);
-          return;
-        }
-        chrome.permissions.request({ origins: [site.match] }, (ok) => {
-          resolve(Boolean(ok));
-        });
-      });
-      if (!granted) {
-        showNotification(`Permission denied for ${site.host}`, "error");
-        return;
-      }
-      await registerGravityForSite(site);
-      const tab = await getActiveHttpTab();
-      if (!tab?.id) {
-        showNotification(`Gravity enabled on ${site.host}. Reload that site to use it.`, "success");
-        return;
-      }
-      await injectGravityIntoCurrentTab(tab.id);
-      const stored = await new Promise((resolve) => {
-        chrome.storage.local.get(["gravity_enabled_dapp_sites"], (result) => {
-          resolve(Array.isArray(result.gravity_enabled_dapp_sites) ? result.gravity_enabled_dapp_sites : []);
-        });
-      });
-      const next = [
-        ...stored.filter((saved) => saved.origin !== site.origin),
-        { origin: site.origin, match: site.match, enabledAt: Date.now() }
-      ];
-      await chrome.storage.local.set({ gravity_enabled_dapp_sites: next });
-      setCurrentSite(site);
-      setSitePermissionGranted(true);
-      showNotification(`Gravity enabled on ${site.host}. Reload the page if the dApp already checked for a wallet.`, "success");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      showNotification(`Could not enable this site: ${message}`, "error");
-    } finally {
-      setIsEnablingSite(false);
-    }
-  };
-  reactExports.useEffect(() => {
-    refreshCurrentSiteStatus();
-    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
-    chrome.storage.local.get(["gravity_enabled_dapp_sites"], (result) => {
-      const sites = Array.isArray(result.gravity_enabled_dapp_sites) ? result.gravity_enabled_dapp_sites : [];
-      sites.forEach((site) => {
-        if (site?.origin && site?.match) {
-          registerGravityForSite(site).catch((error) => {
-            console.warn("Failed to restore Gravity dynamic site:", site.origin, error);
-          });
-        }
-      });
-    });
-  }, []);
   reactExports.useEffect(() => {
     const handleWindowError = (event) => {
       try {
@@ -18283,13 +18110,6 @@ function AppContent() {
     }
     return Array.from(byKey.values());
   };
-  const persistHistoryCache = async (nextCache) => {
-    try {
-      await storageService.setItem(HISTORY_CACHE_STORAGE_KEY, JSON.stringify(nextCache));
-    } catch (error) {
-      console.warn("History cache save failed:", error);
-    }
-  };
   const loadHistoryCache = async () => {
     try {
       const raw = await storageService.getItem(HISTORY_CACHE_STORAGE_KEY);
@@ -18303,72 +18123,51 @@ function AppContent() {
       console.warn("History cache load failed:", error);
     }
   };
-  const updateHistoryCacheEntry = (key, entry) => {
-    setHistoryCache((prev) => {
-      const next = { ...prev, [key]: entry };
-      historyCacheRef.current = next;
-      persistHistoryCache(next);
+  const preloadHistory = async (accounts, force = false, partial = true) => {
+    const targets = accounts.filter((account) => account?.chain && account?.name);
+    if (targets.length === 0) return;
+    setHistoryLoadingKeys((prev) => {
+      const next = { ...prev };
+      targets.forEach((account) => {
+        const key = getHistoryCacheKey(account);
+        const cached = historyCacheRef.current[key];
+        const cacheIsFresh = cached && !cached.partial && Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS;
+        if (force || !cacheIsFresh) next[key] = true;
+      });
       return next;
     });
-  };
-  const mergeHistoryItems = (existing, incoming) => {
-    const byKey = /* @__PURE__ */ new Map();
-    [...incoming, ...existing].forEach((item) => {
-      byKey.set(getHistoryItemKey(item), item);
-    });
-    return Array.from(byKey.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 250);
-  };
-  const refreshAccountHistory = async (account, force = false, partial = false) => {
-    const key = getHistoryCacheKey(account);
-    const cached = historyCacheRef.current[key];
-    const cachedItems = cached?.items || [];
-    const isProducerReward = (item) => item.type === "producer_reward" || item.type === "reward" && item.memo === "Producer Reward";
-    const hasVisibleHistory = cachedItems.some((item) => !isProducerReward(item));
-    const cacheIsFresh = cached && hasVisibleHistory && !cached.partial && Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS;
-    const shouldIncremental = hasVisibleHistory && !cached?.partial && !partial && (force || !cacheIsFresh);
-    if (!force && cacheIsFresh) return cached.items;
-    if (historySyncInFlightRef.current.has(key)) return cached?.items || [];
-    historySyncInFlightRef.current.add(key);
-    setHistoryLoadingKeys((prev) => ({ ...prev, [key]: true }));
     try {
-      const fetchedItems = await fetchAccountHistory(account.chain, account.name, shouldIncremental ? {
-        incremental: true,
-        knownItemKeys: cached.items.map(getHistoryItemKey)
-      } : partial ? {
-        maxPages: 5
-      } : {});
-      const items = shouldIncremental ? mergeHistoryItems(cached.items, fetchedItems) : partial && cachedItems.length > 0 ? mergeHistoryItems(cachedItems, fetchedItems) : fetchedItems;
-      updateHistoryCacheEntry(key, {
-        items,
-        updatedAt: Date.now(),
-        error: null,
+      chrome.runtime.sendMessage({
+        type: "gravity_history_refresh",
+        accounts: targets.map((account) => ({ chain: account.chain, name: account.name })),
+        force,
         partial
+      }, () => {
+        void chrome.runtime.lastError;
       });
-      return items;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      updateHistoryCacheEntry(key, {
-        items: cached?.items || [],
-        updatedAt: cached?.updatedAt || Date.now(),
-        error: message,
-        partial: cached?.partial
-      });
-      return cached?.items || [];
-    } finally {
-      historySyncInFlightRef.current.delete(key);
-      setHistoryLoadingKeys((prev) => {
-        const next = { ...prev };
-        delete next[key];
+      console.warn("History refresh request failed:", error);
+    }
+  };
+  const refreshAccountHistory = async (account, force = false, partial = false) => preloadHistory([account], force, partial);
+  reactExports.useEffect(() => {
+    if (typeof chrome === "undefined" || !chrome.runtime?.onMessage) return;
+    const listener = (message) => {
+      if (message?.type !== "gravity_history_update" || !message.key) return;
+      setHistoryCache((prev) => {
+        const next = { ...prev, [message.key]: message.entry };
+        historyCacheRef.current = next;
         return next;
       });
-    }
-  };
-  const preloadHistory = async (accounts, force = false, partial = true) => {
-    for (const account of accounts) {
-      await refreshAccountHistory(account, force, partial);
-      await new Promise((resolve) => setTimeout(resolve, 150));
-    }
-  };
+      setHistoryLoadingKeys((prev) => {
+        const next = { ...prev };
+        delete next[message.key];
+        return next;
+      });
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, []);
   reactExports.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const req = params.get("requestId");
@@ -18759,10 +18558,6 @@ function AppContent() {
   reactExports.useEffect(() => {
     if (isLocked || walletState.accounts.length === 0) return;
     preloadHistory(walletState.accounts, false, true);
-    const id = setInterval(() => {
-      preloadHistory(walletState.accounts, false, true);
-    }, 10 * 60 * 1e3);
-    return () => clearInterval(id);
   }, [isLocked, walletState.accounts.map((account) => `${account.chain}:${account.name}`).sort().join("|")]);
   const [isDetached, setIsDetached] = reactExports.useState(false);
   reactExports.useEffect(() => {
@@ -18946,16 +18741,6 @@ function AppContent() {
             /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "w-3 h-3", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" }) }),
             web3Context
           ] }),
-          currentSite && /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: enableGravityOnCurrentSite,
-              disabled: sitePermissionGranted || isEnablingSite,
-              className: `text-[10px] px-2 py-1 rounded border transition-colors max-w-[145px] truncate ${sitePermissionGranted ? "bg-green-950/40 text-green-400 border-green-800 cursor-default" : "bg-blue-950/40 hover:bg-blue-900/50 text-blue-300 border-blue-800"}`,
-              title: sitePermissionGranted ? `Gravity is enabled on ${currentSite.host}` : `Enable Gravity on ${currentSite.host}`,
-              children: sitePermissionGranted ? "Site enabled" : isEnablingSite ? "Enabling..." : `Enable ${currentSite.host}`
-            }
-          ),
           currentView !== ViewState.CHAT && /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {

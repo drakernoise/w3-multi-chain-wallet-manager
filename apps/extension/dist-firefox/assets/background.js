@@ -1,5 +1,5 @@
 import './ws-polyfill.js';
-import { b as benchmarkNodes, C as Chain, g as getActiveNode, a as broadcastTransfer, c as broadcastVote, d as broadcastCustomJson, v as validateAccountKeys, s as signMessage, e as broadcastOperations, i as isChainSupported, f as getChainConfig, h as broadcastPowerUp, j as broadcastPowerDown, k as broadcastDelegation, l as broadcastWitnessVote, m as decodeMemo, n as encodeMemo } from './chainService.js';
+import { f as fetchAccountHistory, g as getHistoryItemKey, m as mergeHistoryItems, b as benchmarkNodes, C as Chain, a as getActiveNode, n as normalizeKeyType, r as requiresActiveAuthority, c as broadcastTransfer, d as broadcastVote, e as broadcastCustomJson, v as validateAccountKeys, s as signMessage, h as selectBroadcastKey, i as derivePublicKey, j as broadcastOperations, k as isChainSupported, l as getChainConfig, o as broadcastPowerUp, p as broadcastPowerDown, q as broadcastDelegation, t as broadcastWitnessVote, u as decodeMemo, w as encodeMemo } from './chainService.js';
 import './index.js';
 
 if (typeof globalThis.WebSocket === "undefined") {
@@ -19,6 +19,103 @@ if (typeof globalThis.WebSocket === "undefined") {
   console.log("Gravity: WebSocket Polyfill Applied (Success)");
 }
 self.exports = {};
+
+const HISTORY_CACHE_STORAGE_KEY = "gravity_account_history_cache_v1";
+const HISTORY_CACHE_TTL_MS = 5 * 60 * 1e3;
+const ACCOUNT_STAGGER_MS = 150;
+const getHistoryCacheKey = (account) => `${account.chain}:${account.name}`.toLowerCase();
+const inFlight = /* @__PURE__ */ new Set();
+const readHistoryCache = async () => {
+  try {
+    const stored = await chrome.storage.local.get([HISTORY_CACHE_STORAGE_KEY]);
+    const raw = stored?.[HISTORY_CACHE_STORAGE_KEY];
+    if (!raw) return {};
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (error) {
+    console.warn("[Gravity] History cache read failed:", error);
+    return {};
+  }
+};
+const writeHistoryEntry = async (key, entry) => {
+  try {
+    const cache = await readHistoryCache();
+    cache[key] = entry;
+    await chrome.storage.local.set({ [HISTORY_CACHE_STORAGE_KEY]: JSON.stringify(cache) });
+  } catch (error) {
+    console.warn("[Gravity] History cache write failed:", error);
+  }
+};
+const broadcastHistoryEntry = (key, entry) => {
+  try {
+    chrome.runtime.sendMessage({ type: "gravity_history_update", key, entry }, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch (_error) {
+  }
+};
+const isProducerReward = (item) => item.type === "producer_reward" || item.type === "reward" && item.memo === "Producer Reward";
+const refreshOneAccount = async (account, force, partial) => {
+  const key = getHistoryCacheKey(account);
+  if (inFlight.has(key)) return;
+  const cache = await readHistoryCache();
+  const cached = cache[key];
+  const cachedItems = cached?.items || [];
+  const hasVisibleHistory = cachedItems.some((item) => !isProducerReward(item));
+  const cacheIsFresh = Boolean(
+    cached && hasVisibleHistory && !cached.partial && Date.now() - cached.updatedAt < HISTORY_CACHE_TTL_MS
+  );
+  if (!force && cacheIsFresh) return;
+  const shouldIncremental = hasVisibleHistory && !cached?.partial && !partial && (force || !cacheIsFresh);
+  inFlight.add(key);
+  try {
+    const fetched = await fetchAccountHistory(
+      account.chain,
+      account.name,
+      shouldIncremental ? { incremental: true, knownItemKeys: cachedItems.map(getHistoryItemKey) } : partial ? { maxPages: 5 } : {}
+    );
+    const items = shouldIncremental || partial && cachedItems.length > 0 ? mergeHistoryItems(cachedItems, fetched) : fetched;
+    const entry = { items, updatedAt: Date.now(), error: null, partial };
+    await writeHistoryEntry(key, entry);
+    broadcastHistoryEntry(key, entry);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const entry = {
+      items: cachedItems,
+      updatedAt: cached?.updatedAt || Date.now(),
+      error: message,
+      partial: cached?.partial
+    };
+    await writeHistoryEntry(key, entry);
+    broadcastHistoryEntry(key, entry);
+  } finally {
+    inFlight.delete(key);
+  }
+};
+const refreshHistoryForAccounts = async (accounts, { force = false, partial = true } = {}) => {
+  const seen = /* @__PURE__ */ new Set();
+  for (const account of accounts) {
+    if (!account?.chain || !account?.name) continue;
+    const key = getHistoryCacheKey(account);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    await refreshOneAccount(account, force, partial);
+    await new Promise((resolve) => setTimeout(resolve, ACCOUNT_STAGGER_MS));
+  }
+};
+const refreshHistoryFromSession = async () => {
+  try {
+    const session = await chrome.storage.session.get(["session_accounts"]);
+    const accounts = session?.session_accounts;
+    if (!Array.isArray(accounts) || accounts.length === 0) return;
+    await refreshHistoryForAccounts(
+      accounts.map((account) => ({ chain: account.chain, name: account.name })),
+      { partial: true }
+    );
+  } catch (error) {
+    console.warn("[Gravity] Scheduled history refresh failed:", error);
+  }
+};
 
 const OFFSCREEN_DOCUMENT_PATH = "src/offscreen/offscreen.html";
 async function setupOffscreenDocument(path) {
@@ -44,6 +141,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
   if (alarm.name === "rpcBenchmark") {
     runBenchmark();
+  }
+  if (alarm.name === "historyRefresh") {
+    refreshHistoryFromSession();
   }
 });
 async function runBenchmark() {
@@ -77,16 +177,30 @@ async function initializeRpcNodes() {
   await runBenchmark();
 }
 initializeRpcNodes();
-chrome.alarms.create("rpcBenchmark", { periodInMinutes: 10 });
+const ensurePeriodicAlarm = (name, periodInMinutes) => {
+  chrome.alarms.get(name, (existing) => {
+    if (!existing) chrome.alarms.create(name, { periodInMinutes });
+  });
+};
+ensurePeriodicAlarm("rpcBenchmark", 10);
+ensurePeriodicAlarm("historyRefresh", 10);
 let unreadCount = 0;
 function detectChainFromUrl(url = "") {
   if (!url) return null;
   try {
     const u = new URL(url);
     const host = u.hostname.toLowerCase();
-    const hiveHosts = ["peakd.com", "ecency.com", "tribaldex.com"];
+    const hiveHosts = ["peakd.com", "ecency.com", "tribaldex.com", "magi.eco"];
     if (hiveHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("hive")) return "HIVE";
-    const blurtHosts = ["blurt.blog", "blurtwallet.com", "twiggy.lat"];
+    const blurtHosts = [
+      "blurt.blog",
+      "blurtwallet.com",
+      "twiggy.lat",
+      "beblurt.com",
+      "blurt.one",
+      "blurtscan.com",
+      "ecosynthesizer.com"
+    ];
     if (blurtHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("blurt")) return "BLURT";
     const steemHosts = ["steemit.com"];
     if (steemHosts.some((domain) => host === domain || host.endsWith(`.${domain}`)) || host.includes("steem")) return "STEEM";
@@ -95,20 +209,18 @@ function detectChainFromUrl(url = "") {
     return null;
   }
 }
-function normalizeKeyType(type) {
-  if (typeof type !== "string") return "";
-  const normalized = type.trim().toLowerCase();
-  if (normalized === "posting" || normalized === "active" || normalized === "memo") {
-    return normalized;
-  }
-  return "";
-}
 async function resolveBestAccountForRequest(accounts, username, detectedChain, normalizedKeyType = "") {
   const potentialAccounts = accounts.filter((a) => a.name === username);
   if (potentialAccounts.length === 0) return null;
   let candidates = detectedChain ? potentialAccounts.filter((a) => a.chain === detectedChain) : potentialAccounts;
   if (candidates.length === 0) {
     candidates = potentialAccounts;
+  }
+  if (candidates.length > 1) {
+    console.warn(
+      `[Gravity] ${candidates.length} stored entries for @${username}`,
+      `(${candidates.map((c) => c.chain).join(", ")}) — picking the one whose ${normalizedKeyType || "first"} key the chain accepts`
+    );
   }
   if (normalizedKeyType === "posting" && candidates.length > 1) {
     for (const candidate of candidates) {
@@ -128,6 +240,18 @@ async function resolveBestAccountForRequest(accounts, username, detectedChain, n
 }
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request) return false;
+  if (request.type === "gravity_history_refresh") {
+    refreshHistoryForAccounts(request.accounts || [], {
+      force: request.force === true,
+      partial: request.partial !== false
+    }).catch((error) => console.warn("[Gravity] History refresh failed:", error));
+    sendResponse({ started: true });
+    return false;
+  }
+  if (request.type === "gravity_history_get") {
+    readHistoryCache().then((cache) => sendResponse({ cache }));
+    return true;
+  }
   if (request.type === "gravity_request") {
     const originalParams = Array.isArray(request.params) ? request.params.map((param) => param && typeof param === "object" ? { ...param } : param) : request.params;
     if (typeof request.method !== "string" || request.method.length > 64) {
@@ -387,7 +511,11 @@ async function tryAutoSign(request, sender) {
     if (!session.session_accounts || session.session_accounts.length === 0) return null;
     const url = sender?.tab?.url || sender?.url || "";
     const detectedChain = detectChainFromUrl(url);
-    const requestedKeyType = normalizeKeyType(request.params?.[2]);
+    let requestedKeyType = normalizeKeyType(request.params?.[2]);
+    if (!requestedKeyType && (request.method === "requestBroadcast" || request.method === "broadcast")) {
+      const requestOps = Array.isArray(request.params?.[1]) ? request.params[1] : [];
+      requestedKeyType = requiresActiveAuthority(requestOps) ? "active" : "posting";
+    }
     let account = await resolveBestAccountForRequest(
       session.session_accounts,
       username,
@@ -415,7 +543,7 @@ async function tryAutoSign(request, sender) {
     const isDelegation = method === "requestDelegation" || method === "delegation";
     const isPost = method === "requestPost" || method === "post";
     const isWitnessVote = method === "requestWitnessVote" || method === "witnessVote";
-    const isDecodeMemo = method === "decodeMemo";
+    const isDecodeMemo = method === "decodeMemo" || method === "requestVerifyKey";
     const isEncodeMemo = method === "encodeMemo";
     let response;
     if (isTransfer) {
@@ -482,53 +610,25 @@ async function tryAutoSign(request, sender) {
           return { success: false, error: "Invalid broadcast format: operations is not an array" };
         }
       }
-      const requiresActiveKey = Array.isArray(operations) && operations.some((op) => {
-        const opName = Array.isArray(op) ? op[0] : op.type || op[0];
-        const activeKeyOps = [
-          "witness_update",
-          "witness_set_properties",
-          "account_witness_vote",
-          "account_update",
-          "account_update2",
-          "transfer",
-          "transfer_to_vesting",
-          "withdraw_vesting",
-          "delegate_vesting_shares",
-          "account_create",
-          "account_create_with_delegation",
-          "transfer_to_savings",
-          "transfer_from_savings",
-          "escrow_transfer",
-          "escrow_release",
-          "escrow_dispute",
-          "escrow_approve",
-          "claim_reward_balance",
-          "delegate_rc",
-          "create_proposal",
-          "update_proposal_votes",
-          "remove_proposal",
-          // Market operations (wallet.hive.blog, etc.)
-          "limit_order_create",
-          "limit_order_create2",
-          "limit_order_cancel",
-          "convert",
-          "collateralized_convert",
-          "fill_convert_request",
-          "cancel_transfer_from_savings",
-          "set_withdraw_vesting_route"
-        ];
-        return activeKeyOps.includes(opName);
-      });
-      let keyStr = "";
-      const normalizedKeyType = (keyType || "").toLowerCase();
-      if (normalizedKeyType === "posting") keyStr = account.postingKey || "";
-      else if (normalizedKeyType === "active") keyStr = account.activeKey || "";
-      else if (requiresActiveKey) keyStr = account.activeKey || "";
-      else keyStr = account.activeKey || "";
+      const { key: keyStr, keyType: selectedKeyType } = selectBroadcastKey(
+        account,
+        keyType,
+        Array.isArray(operations) ? operations : []
+      );
       if (!keyStr) {
-        const requiredType = requiresActiveKey ? "Active" : keyType || "Active";
+        const requiredType = selectedKeyType === "active" ? "Active" : "Posting";
         return { success: false, error: `${requiredType} key required for broadcast operation` };
       }
+      console.log(
+        "[Broadcast] Signing as",
+        `@${account.name}`,
+        "on",
+        account.chain,
+        "with",
+        selectedKeyType,
+        "key",
+        derivePublicKey(account.chain, keyStr)
+      );
       response = await broadcastOperations(account.chain, keyStr, operations);
     } else if (isPost) {
       const title = request.params[1];
@@ -674,6 +774,16 @@ async function tryAutoSign(request, sender) {
         signature: response.result
       },
       message: "Signed successfully",
+      ...restResponse
+    } : isDecodeMemo || isEncodeMemo ? {
+      // Memo operations never broadcast, so no txId/operation fields belong here.
+      success: true,
+      result: response.result,
+      data: {
+        username,
+        message: response.result
+      },
+      message: isDecodeMemo ? "Decoded successfully" : "Encoded successfully",
       ...restResponse
     } : {
       success: true,

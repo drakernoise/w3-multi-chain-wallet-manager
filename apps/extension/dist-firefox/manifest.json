@@ -25,36 +25,14 @@
   },
   "permissions": [
     "storage",
-    "activeTab",
-    "tabs",
     "alarms",
     "notifications"
   ],
   "content_scripts": [
     {
       "matches": [
-        "https://peakd.com/*",
-        "https://ecency.com/*",
-        "https://hive.blog/*",
-        "https://wallet.hive.blog/*",
-        "https://tribaldex.com/*",
-        "https://*.tribaldex.com/*",
-        "https://hive-engine.com/*",
-        "https://*.hive-engine.com/*",
-        "https://splinterlands.com/*",
-        "https://peakmonsters.com/*",
-        "https://inleo.io/*",
-        "https://3speak.tv/*",
-        "https://blurt.blog/*",
-        "https://twiggy.lat/*",
-        "https://blurtwallet.com/*",
-        "https://*.blurtwallet.com/*",
-        "https://blurtplugin.online/*",
-        "https://forum.blurt.pl/*",
-        "https://beblurt.com/*",
-        "https://blurt.one/*",
-        "https://steemitwallet.com/*",
-        "https://steemworld.org/*"
+        "https://*/*",
+        "http://*/*"
       ],
       "js": [
         "assets/content.js"
@@ -63,28 +41,8 @@
     },
     {
       "matches": [
-        "https://peakd.com/*",
-        "https://ecency.com/*",
-        "https://hive.blog/*",
-        "https://wallet.hive.blog/*",
-        "https://tribaldex.com/*",
-        "https://*.tribaldex.com/*",
-        "https://hive-engine.com/*",
-        "https://*.hive-engine.com/*",
-        "https://splinterlands.com/*",
-        "https://peakmonsters.com/*",
-        "https://inleo.io/*",
-        "https://3speak.tv/*",
-        "https://blurt.blog/*",
-        "https://twiggy.lat/*",
-        "https://blurtwallet.com/*",
-        "https://*.blurtwallet.com/*",
-        "https://blurtplugin.online/*",
-        "https://forum.blurt.pl/*",
-        "https://beblurt.com/*",
-        "https://blurt.one/*",
-        "https://steemitwallet.com/*",
-        "https://steemworld.org/*"
+        "https://*/*",
+        "http://*/*"
       ],
       "js": [
         "assets/provider.js"
@@ -99,68 +57,14 @@
         "assets/provider.js"
       ],
       "matches": [
-        "https://peakd.com/*",
-        "https://ecency.com/*",
-        "https://hive.blog/*",
-        "https://wallet.hive.blog/*",
-        "https://tribaldex.com/*",
-        "https://*.tribaldex.com/*",
-        "https://hive-engine.com/*",
-        "https://*.hive-engine.com/*",
-        "https://splinterlands.com/*",
-        "https://peakmonsters.com/*",
-        "https://inleo.io/*",
-        "https://3speak.tv/*",
-        "https://blurt.blog/*",
-        "https://twiggy.lat/*",
-        "https://blurtwallet.com/*",
-        "https://*.blurtwallet.com/*",
-        "https://blurtplugin.online/*",
-        "https://forum.blurt.pl/*",
-        "https://beblurt.com/*",
-        "https://blurt.one/*",
-        "https://steemitwallet.com/*",
-        "https://steemworld.org/*"
+        "https://*/*",
+        "http://*/*"
       ]
     }
   ],
   "host_permissions": [
-    "https://peakd.com/*",
-    "https://ecency.com/*",
-    "https://hive.blog/*",
-    "https://wallet.hive.blog/*",
-    "https://tribaldex.com/*",
-    "https://*.tribaldex.com/*",
-    "https://hive-engine.com/*",
-    "https://*.hive-engine.com/*",
-    "https://splinterlands.com/*",
-    "https://peakmonsters.com/*",
-    "https://inleo.io/*",
-    "https://3speak.tv/*",
-    "https://blurt.blog/*",
-    "https://twiggy.lat/*",
-    "https://blurtwallet.com/*",
-    "https://*.blurtwallet.com/*",
-    "https://blurtplugin.online/*",
-    "https://forum.blurt.pl/*",
-    "https://beblurt.com/*",
-    "https://blurt.one/*",
-    "https://steemitwallet.com/*",
-    "https://steemworld.org/*",
-    "https://api.hive.blog/*",
-    "https://anyx.io/*",
-    "https://hive-api.arcange.eu/*",
-    "https://api.deathwing.me/*",
-    "https://techcoderx.com/*",
-    "https://api.steemit.com/*",
-    "https://api.steem.fans/*",
-    "https://api.steememory.com/*",
-    "https://rpc.drakernoise.com/*",
-    "https://blurt-rpc.saboin.com/*",
-    "https://rpc.mahdiyari.info/*",
-    "https://hive-api.3speak.tv/*",
-    "https://api.justyy.com/*",
-    "https://api.blurt.blog/*"
+    "https://*/*",
+    "http://*/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://chat.gravitywallet.drakernoise.com wss://chat.gravitywallet.drakernoise.com https://api.hive.blog https://anyx.io https://hive-api.arcange.eu https://api.deathwing.me https://techcoderx.com https://api.steemit.com https://api.steem.fans https://api.steememory.com https://rpc.drakernoise.com https://blurt-rpc.saboin.com https://rpc.mahdiyari.info https://hive-api.3speak.tv https://api.justyy.com https://api.blurt.blog"
