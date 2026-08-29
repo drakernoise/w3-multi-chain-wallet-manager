@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Account, Chain } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
-import { broadcastPowerUp, broadcastPowerDown, broadcastDelegation, checkAccountExists } from '../services/chainService';
+import { broadcastPowerUp, broadcastPowerDown, broadcastDelegation, checkAccountExists, formatAssetAmount } from '../services/chainService';
 import { storageService } from '../services/storageService';
 
 declare const chrome: any;
@@ -115,7 +115,9 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
         e.preventDefault();
 
         // Skip amount validation if we're stopping power down
-        if (!isStoppingPowerDown && (!amount || parseFloat(amount) <= 0)) {
+        // Phrased as `!(x > 0)` on purpose: `parseFloat('abc') <= 0` is false, so the
+        // obvious form let NaN straight through to be formatted as the string "NaN".
+        if (!isStoppingPowerDown && !(parseFloat(amount) > 0)) {
             setError(t('power.invalid_amount'));
             return;
         }
@@ -154,7 +156,9 @@ export const PowerModal: React.FC<PowerModalProps> = ({ account, type, onClose, 
             const tokenSymbol = getTokenSymbol();
 
             if (type === 'powerup') {
-                const formattedAmount = `${parseFloat(amount).toFixed(3)} ${tokenSymbol} `;
+                // The trailing space that used to close this template produced
+                // "1.000 HIVE " as the asset string.
+                const formattedAmount = `${formatAssetAmount(amount)} ${tokenSymbol}`;
                 response = await broadcastPowerUp(account.chain, account.name, account.activeKey!, recipient, formattedAmount);
             } else if (type === 'powerdown') {
                 if (isStoppingPowerDown) {

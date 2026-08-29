@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { y as global, z as requireCryptoBrowserify, V as ViewState, C as Chain, A as checkAccountExists, p as broadcastPowerUp, q as broadcastPowerDown, t as broadcastDelegation, B as broadcastSavingsDeposit, D as broadcastSavingsWithdraw, E as fetchAccountData, F as broadcastRCDelegate, G as broadcastRCUndelegate, H as broadcastBulkTransfer, e as broadcastCustomJson, I as fetchCustomJsonEventsForAccounts, J as calculateThresholdProgress, K as getAccountAuthorities, L as createUnsignedTransaction, M as signTransactionEnvelope, N as selectBroadcastSignatures, O as broadcastSignedTransaction, P as indexBrowserExports, Q as indexBrowserExports$1, v as validateAccountKeys, n as normalizeKeyType, c as broadcastTransfer, d as broadcastVote, s as signMessage, x as encodeMemo, w as decodeMemo, h as selectBroadcastKey, j as broadcastOperations, o as formatAssetAmount, u as broadcastWitnessVote, R as fetchBalances, S as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { y as global, z as requireCryptoBrowserify, V as ViewState, C as Chain, A as checkAccountExists, o as formatAssetAmount, p as broadcastPowerUp, q as broadcastPowerDown, t as broadcastDelegation, B as broadcastSavingsDeposit, D as broadcastSavingsWithdraw, E as fetchAccountData, F as broadcastRCDelegate, G as broadcastRCUndelegate, H as broadcastBulkTransfer, e as broadcastCustomJson, I as fetchCustomJsonEventsForAccounts, J as calculateThresholdProgress, K as getAccountAuthorities, L as createUnsignedTransaction, M as signTransactionEnvelope, N as selectBroadcastSignatures, O as broadcastSignedTransaction, P as indexBrowserExports, Q as indexBrowserExports$1, v as validateAccountKeys, n as normalizeKeyType, c as broadcastTransfer, d as broadcastVote, s as signMessage, x as encodeMemo, w as decodeMemo, h as selectBroadcastKey, j as broadcastOperations, u as broadcastWitnessVote, R as fetchBalances, S as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -10413,7 +10413,7 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
   };
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isStoppingPowerDown && (!amount || parseFloat(amount) <= 0)) {
+    if (!isStoppingPowerDown && !(parseFloat(amount) > 0)) {
       setError(t("power.invalid_amount"));
       return;
     }
@@ -10439,7 +10439,7 @@ const PowerModal = ({ account, type, onClose, onSuccess }) => {
       let response;
       const tokenSymbol = getTokenSymbol();
       if (type === "powerup") {
-        const formattedAmount = `${parseFloat(amount).toFixed(3)} ${tokenSymbol} `;
+        const formattedAmount = `${formatAssetAmount(amount)} ${tokenSymbol}`;
         response = await broadcastPowerUp(account.chain, account.name, account.activeKey, recipient, formattedAmount);
       } else if (type === "powerdown") {
         if (isStoppingPowerDown) {
@@ -10782,7 +10782,7 @@ const SavingsModal = ({ account, type, onClose, onSuccess }) => {
       setError(t("savings.blurt_not_supported"));
       return;
     }
-    if (!amount || parseFloat(amount) <= 0) {
+    if (!(parseFloat(amount) > 0)) {
       setError(t("savings.invalid_amount"));
       return;
     }
@@ -10794,7 +10794,7 @@ const SavingsModal = ({ account, type, onClose, onSuccess }) => {
     setError("");
     try {
       const stablecoin = getStablecoinSymbol();
-      const formattedAmount = `${parseFloat(amount).toFixed(3)} ${stablecoin}`;
+      const formattedAmount = `${formatAssetAmount(amount)} ${stablecoin}`;
       let response;
       if (type === "deposit") {
         response = await broadcastSavingsDeposit(account.chain, account.name, account.activeKey, formattedAmount);

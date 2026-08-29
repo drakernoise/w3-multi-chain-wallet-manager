@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Account, Chain } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
-import { broadcastSavingsDeposit, broadcastSavingsWithdraw } from '../services/chainService';
+import { broadcastSavingsDeposit, broadcastSavingsWithdraw, formatAssetAmount } from '../services/chainService';
 
 interface SavingsModalProps {
     account: Account;
@@ -47,7 +47,9 @@ export const SavingsModal: React.FC<SavingsModalProps> = ({ account, type, onClo
             return;
         }
 
-        if (!amount || parseFloat(amount) <= 0) {
+        // `!(x > 0)` rather than `<= 0`: NaN compares false against both, so the obvious
+        // form let a non-numeric amount through to become the string "NaN".
+        if (!(parseFloat(amount) > 0)) {
             setError(t('savings.invalid_amount'));
             return;
         }
@@ -62,7 +64,7 @@ export const SavingsModal: React.FC<SavingsModalProps> = ({ account, type, onClo
 
         try {
             const stablecoin = getStablecoinSymbol();
-            const formattedAmount = `${parseFloat(amount).toFixed(3)} ${stablecoin}`;
+            const formattedAmount = `${formatAssetAmount(amount)} ${stablecoin}`;
 
             let response;
             if (type === 'deposit') {
