@@ -2143,14 +2143,15 @@ class SocketWithUpgrade extends SocketWithoutUpgrade {
  */
 let Socket$1 = class Socket extends SocketWithUpgrade {
     constructor(uri, opts = {}) {
-        const o = typeof uri === "object" ? uri : opts;
+        const isOptionsOnly = typeof uri === "object";
+        const o = isOptionsOnly ? { ...uri } : { ...opts };
         if (!o.transports ||
             (o.transports && typeof o.transports[0] === "string")) {
             o.transports = (o.transports || ["polling", "websocket", "webtransport"])
                 .map((transportName) => transports[transportName])
                 .filter((t) => !!t);
         }
-        super(uri, o);
+        super(isOptionsOnly ? o : uri, o);
     }
 };
 
