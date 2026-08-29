@@ -45,6 +45,7 @@ if (!window._gravityProvider) {
     messageType: "gravity_request",
     responseType: "gravity_response"
   };
+  const REQUEST_TIMEOUT_MS = 5 * 60 * 1e3;
   const WALLET_ALIASES = [
     "hive_keychain",
     "whalevault",
@@ -136,8 +137,20 @@ if (!window._gravityProvider) {
           requestChain: this.chainHint
         }, window.location.origin);
       };
+      const armTimeout = (fire) => {
+        setTimeout(() => {
+          if (!this.callbacks.has(id)) return;
+          this.callbacks.delete(id);
+          fire({
+            success: false,
+            error: "timeout",
+            message: `${PROVIDER_CONFIG.name}: no response for ${method}.`
+          });
+        }, REQUEST_TIMEOUT_MS);
+      };
       if (typeof callback === "function") {
         this.callbacks.set(id, callback);
+        armTimeout((response) => callback(response));
         sendMessage();
       } else {
         return new Promise((resolve, reject) => {
@@ -148,6 +161,7 @@ if (!window._gravityProvider) {
               reject(response);
             }
           });
+          armTimeout(reject);
           sendMessage();
         });
       }

@@ -1,5 +1,5 @@
 import './ws-polyfill.js';
-import { f as fetchAccountHistory, g as getHistoryItemKey, m as mergeHistoryItems, b as benchmarkNodes, C as Chain, a as getActiveNode, n as normalizeKeyType, r as requiresActiveAuthority, c as broadcastTransfer, d as broadcastVote, e as broadcastCustomJson, v as validateAccountKeys, s as signMessage, h as selectBroadcastKey, i as derivePublicKey, j as broadcastOperations, k as isChainSupported, l as getChainConfig, o as broadcastPowerUp, p as broadcastPowerDown, q as broadcastDelegation, t as broadcastWitnessVote, u as decodeMemo, w as encodeMemo } from './chainService.js';
+import { f as fetchAccountHistory, g as getHistoryItemKey, m as mergeHistoryItems, b as benchmarkNodes, C as Chain, a as getActiveNode, n as normalizeKeyType, r as requiresActiveAuthority, c as broadcastTransfer, d as broadcastVote, e as broadcastCustomJson, v as validateAccountKeys, s as signMessage, h as selectBroadcastKey, i as derivePublicKey, j as broadcastOperations, k as isChainSupported, l as getChainConfig, o as formatAssetAmount, p as broadcastPowerUp, q as broadcastPowerDown, t as broadcastDelegation, u as broadcastWitnessVote, w as decodeMemo, x as encodeMemo } from './chainService.js';
 import './index.js';
 
 if (typeof globalThis.WebSocket === "undefined") {
@@ -254,6 +254,39 @@ async function resolveBestAccountForRequest(accounts, username, detectedChain, n
   }
   return candidates[0] || null;
 }
+async function deliverRequestOutcome(requestId, result, error) {
+  const stored = await chrome.storage.session.get([`req_${requestId}`]);
+  const pending = stored?.[`req_${requestId}`];
+  if (!pending) return;
+  await chrome.storage.session.remove([`req_${requestId}`]);
+  const targetOptions = {};
+  if (typeof pending.frameId !== "undefined") targetOptions.frameId = pending.frameId;
+  const payload = error ? { success: false, error } : { success: true, ...result };
+  const message = { type: "gravity_response", id: requestId, response: payload };
+  chrome.tabs.sendMessage(pending.tabId, message, targetOptions, () => {
+    const lastError = chrome.runtime.lastError;
+    if (!lastError) return;
+    console.error(`[Gravity] Failed to send response to tab ${pending.tabId} (frame ${pending.frameId}): ${lastError.message || JSON.stringify(lastError)}`);
+    if (targetOptions.frameId) {
+      chrome.tabs.sendMessage(pending.tabId, message, () => {
+        if (chrome.runtime.lastError) {
+          console.error(`[Gravity] Fallback also failed: ${chrome.runtime.lastError.message}`);
+        }
+      });
+    }
+  });
+}
+chrome.runtime.onConnect.addListener((port) => {
+  const match = /^gravity_sign_prompt_(.+)$/.exec(port.name || "");
+  if (!match) return;
+  const requestId = match[1];
+  port.onDisconnect.addListener(() => {
+    void chrome.runtime.lastError;
+    deliverRequestOutcome(requestId, null, "user_cancel").catch((err) => {
+      console.warn("[Gravity] Failed to cancel dismissed request:", err);
+    });
+  });
+});
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request) return false;
   if (request.type === "gravity_history_refresh") {
@@ -414,39 +447,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   if (request.type === "gravity_resolve_request") {
     const { requestId, result, error } = request;
-    chrome.storage.session.get([`req_${requestId}`]).then((res) => {
-      const pending = res[`req_${requestId}`];
-      if (pending) {
-        const targetOptions = {};
-        if (typeof pending.frameId !== "undefined") targetOptions.frameId = pending.frameId;
-        const payload = error ? { success: false, error } : { success: true, ...result };
-        chrome.tabs.sendMessage(pending.tabId, {
-          type: "gravity_response",
-          id: requestId,
-          // Use the original ID
-          response: payload
-        }, targetOptions, () => {
-          const lastError = chrome.runtime.lastError;
-          if (lastError) {
-            const errMsg = lastError.message || JSON.stringify(lastError);
-            console.error(`[Gravity] Failed to send response to tab ${pending.tabId} (frame ${pending.frameId}): ${errMsg}`);
-            if (targetOptions.frameId) {
-              console.log(`[Gravity] Attempting fallback response to entire tab ${pending.tabId}...`);
-              chrome.tabs.sendMessage(pending.tabId, {
-                type: "gravity_response",
-                id: requestId,
-                response: payload
-              }, () => {
-                if (chrome.runtime.lastError) {
-                  console.error(`[Gravity] Fallback also failed: ${chrome.runtime.lastError.message}`);
-                }
-              });
-            }
-          }
-        });
-        chrome.storage.session.remove([`req_${requestId}`]);
-      }
-    }).catch((err) => {
+    deliverRequestOutcome(requestId, result, error).catch((err) => {
       console.error("[Gravity] Error resolving request from storage:", err);
     });
     sendResponse({ ack: true });
@@ -672,7 +673,11 @@ async function tryAutoSign(request, sender) {
       if (amount && !amount.includes(" ")) {
         const config = isChainSupported(account.chain) ? getChainConfig(account.chain) : null;
         const symbol = config ? config.primaryToken : "HIVE";
-        amount = `${parseFloat(amount).toFixed(3)} ${symbol}`;
+        try {
+          amount = `${formatAssetAmount(amount)} ${symbol}`;
+        } catch (e) {
+          return { success: false, error: e.message };
+        }
       }
       if (!account.activeKey) return { success: false, error: "Gravity Wallet: Active Key required for Power Up." };
       response = await broadcastPowerUp(account.chain, account.name, account.activeKey, to, amount);

@@ -1,6 +1,6 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./web.js","./main.js","./modulepreload-polyfill.js","./index.js","./main.css","./chainService.js","./index2.js"])))=>i.map(i=>d[i]);
 import { _ as __vitePreload, r as reactExports, j as jsxRuntimeExports, R as React } from './main.js';
-import { x as global, y as requireCryptoBrowserify, V as ViewState, C as Chain, z as checkAccountExists, o as broadcastPowerUp, p as broadcastPowerDown, q as broadcastDelegation, A as broadcastSavingsDeposit, B as broadcastSavingsWithdraw, D as fetchAccountData, E as broadcastRCDelegate, F as broadcastRCUndelegate, G as broadcastBulkTransfer, e as broadcastCustomJson, H as fetchCustomJsonEventsForAccounts, I as calculateThresholdProgress, J as getAccountAuthorities, K as createUnsignedTransaction, L as signTransactionEnvelope, M as selectBroadcastSignatures, N as broadcastSignedTransaction, O as indexBrowserExports, P as indexBrowserExports$1, v as validateAccountKeys, n as normalizeKeyType, c as broadcastTransfer, d as broadcastVote, s as signMessage, w as encodeMemo, u as decodeMemo, h as selectBroadcastKey, j as broadcastOperations, t as broadcastWitnessVote, Q as fetchBalances, R as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
+import { y as global, z as requireCryptoBrowserify, V as ViewState, C as Chain, A as checkAccountExists, p as broadcastPowerUp, q as broadcastPowerDown, t as broadcastDelegation, B as broadcastSavingsDeposit, D as broadcastSavingsWithdraw, E as fetchAccountData, F as broadcastRCDelegate, G as broadcastRCUndelegate, H as broadcastBulkTransfer, e as broadcastCustomJson, I as fetchCustomJsonEventsForAccounts, J as calculateThresholdProgress, K as getAccountAuthorities, L as createUnsignedTransaction, M as signTransactionEnvelope, N as selectBroadcastSignatures, O as broadcastSignedTransaction, P as indexBrowserExports, Q as indexBrowserExports$1, v as validateAccountKeys, n as normalizeKeyType, c as broadcastTransfer, d as broadcastVote, s as signMessage, x as encodeMemo, w as decodeMemo, h as selectBroadcastKey, j as broadcastOperations, o as formatAssetAmount, u as broadcastWitnessVote, R as fetchBalances, S as detectWeb3Context, b as benchmarkNodes } from './chainService.js';
 import { l as lookup } from './index2.js';
 import { a as Buffer, g as getDefaultExportFromCjs } from './index.js';
 
@@ -15532,7 +15532,7 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
         let amount = request.params[2];
         if (amount && !amount.includes(" ")) {
           const symbol = account.chain === Chain.HIVE ? "HIVE" : account.chain === Chain.STEEM ? "STEEM" : "BLURT";
-          amount = `${parseFloat(amount).toFixed(3)} ${symbol}`;
+          amount = `${formatAssetAmount(amount)} ${symbol}`;
         }
         const response = await broadcastPowerUp(account.chain, account.name, account.activeKey, to, amount);
         if (!response.success) throw new Error(response.error);
@@ -15659,6 +15659,22 @@ const SignRequest = ({ requestId, accounts, onComplete }) => {
       notifyBackground(null, e.message);
     }
   };
+  reactExports.useEffect(() => {
+    if (!requestId || typeof chrome === "undefined" || !chrome.runtime?.connect) return;
+    let port;
+    try {
+      port = chrome.runtime.connect({ name: `gravity_sign_prompt_${requestId}` });
+    } catch (e) {
+      console.warn("Gravity: could not open prompt lifetime port", e);
+      return;
+    }
+    return () => {
+      try {
+        port.disconnect();
+      } catch (_e) {
+      }
+    };
+  }, [requestId]);
   reactExports.useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.key === "Enter" && !processing && !loading && !error) {

@@ -889,6 +889,40 @@ export const selectBroadcastSignatures = (
 };
 
 
+/**
+ * Format an amount for the 3-decimal native tokens of these chains.
+ *
+ * `parseFloat(amount).toFixed(3)` was doing this unguarded, which let a dApp's raw
+ * string through in four bad ways: "abc" became the literal "NaN", "-5" stayed
+ * negative, "0.0001" became a zero transfer, and — worst — toFixed rounds, so
+ * "1.9999" became 2.000 and moved more funds than the user approved.
+ *
+ * Truncation is deliberate: under-sending by less than 0.001 is recoverable, sending
+ * more than was shown on the confirmation screen is not. The excess precision is
+ * dropped via a fixed string rather than `Math.floor(n * 1000)`, which would turn
+ * 0.29 into 0.289 because 0.29 * 1000 is 289.99999999999994.
+ */
+export const formatAssetAmount = (amount: any): string => {
+    const raw = String(amount ?? '').trim();
+    const numeric = parseFloat(raw);
+
+    if (!Number.isFinite(numeric)) {
+        throw new Error(`Invalid amount: ${JSON.stringify(amount)}`);
+    }
+    if (numeric < 0) {
+        throw new Error(`Amount cannot be negative: ${raw}`);
+    }
+
+    const fixed = numeric.toFixed(6);
+    const truncated = fixed.slice(0, fixed.indexOf('.') + 4);
+
+    if (parseFloat(truncated) <= 0) {
+        throw new Error(`Amount ${raw} is below the smallest transferable unit (0.001).`);
+    }
+
+    return truncated;
+};
+
 export const broadcastTransfer = async (
     chain: Chain,
     from: string,
@@ -898,7 +932,12 @@ export const broadcastTransfer = async (
     memo: string,
     tokenSymbol?: string
 ): Promise<{ success: boolean; txId?: string; error?: string; opResult?: any }> => {
-    const formattedAmount = parseFloat(amount).toFixed(3);
+    let formattedAmount: string;
+    try {
+        formattedAmount = formatAssetAmount(amount);
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
     const nodeUrl = getActiveNode(chain);
     const defaultToken = chain === Chain.HIVE ? 'HIVE' : chain === Chain.STEEM ? 'STEEM' : 'BLURT';
     const symbol = tokenSymbol || defaultToken;

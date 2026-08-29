@@ -18,6 +18,9 @@ if (!(window as any)._gravityProvider) {
         responseType: 'gravity_response'
     } as const;
 
+    // Ceiling on how long a dApp waits for an answer it may never get.
+    const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+
     // Supported wallet aliases for multi-chain compatibility
     const WALLET_ALIASES = [
         'hive_keychain',
@@ -141,8 +144,25 @@ if (!(window as any)._gravityProvider) {
                 }, window.location.origin);
             };
 
+            // Backstop for a response that never arrives — a dropped message, a worker
+            // torn down mid-flight. Without it the entry sits in the map for the life of
+            // the page and the dApp waits forever. Generous enough that a user reading
+            // the prompt is never cut off; dismissing it is handled by the wallet itself.
+            const armTimeout = (fire: (response: ProviderResponse) => void): void => {
+                setTimeout(() => {
+                    if (!this.callbacks.has(id)) return;
+                    this.callbacks.delete(id);
+                    fire({
+                        success: false,
+                        error: 'timeout',
+                        message: `${PROVIDER_CONFIG.name}: no response for ${method}.`
+                    });
+                }, REQUEST_TIMEOUT_MS);
+            };
+
             if (typeof callback === 'function') {
                 this.callbacks.set(id, callback);
+                armTimeout((response) => callback(response));
                 sendMessage();
             } else {
                 return new Promise((resolve, reject) => {
@@ -153,6 +173,7 @@ if (!(window as any)._gravityProvider) {
                             reject(response);
                         }
                     });
+                    armTimeout(reject);
                     sendMessage();
                 });
             }

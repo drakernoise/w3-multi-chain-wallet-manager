@@ -89685,8 +89685,29 @@ const selectBroadcastSignatures = (auth, signatures) => {
   }
   return selected;
 };
+const formatAssetAmount = (amount) => {
+  const raw = String(amount ?? "").trim();
+  const numeric = parseFloat(raw);
+  if (!Number.isFinite(numeric)) {
+    throw new Error(`Invalid amount: ${JSON.stringify(amount)}`);
+  }
+  if (numeric < 0) {
+    throw new Error(`Amount cannot be negative: ${raw}`);
+  }
+  const fixed = numeric.toFixed(6);
+  const truncated = fixed.slice(0, fixed.indexOf(".") + 4);
+  if (parseFloat(truncated) <= 0) {
+    throw new Error(`Amount ${raw} is below the smallest transferable unit (0.001).`);
+  }
+  return truncated;
+};
 const broadcastTransfer = async (chain, from, activeKey, to, amount, memo, tokenSymbol) => {
-  const formattedAmount = parseFloat(amount).toFixed(3);
+  let formattedAmount;
+  try {
+    formattedAmount = formatAssetAmount(amount);
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
   const nodeUrl = getActiveNode(chain);
   const defaultToken = chain === Chain.HIVE ? "HIVE" : chain === Chain.STEEM ? "STEEM" : "BLURT";
   const symbol = tokenSymbol || defaultToken;
@@ -90591,4 +90612,4 @@ const decodeMemo = async (chain, _username, encodedMemo, key) => {
   }
 };
 
-export { broadcastSavingsDeposit as A, broadcastSavingsWithdraw as B, Chain as C, fetchAccountData as D, broadcastRCDelegate as E, broadcastRCUndelegate as F, broadcastBulkTransfer as G, fetchCustomJsonEventsForAccounts as H, calculateThresholdProgress as I, getAccountAuthorities as J, createUnsignedTransaction as K, signTransactionEnvelope as L, selectBroadcastSignatures as M, broadcastSignedTransaction as N, indexBrowserExports$1 as O, indexBrowserExports as P, fetchBalances as Q, detectWeb3Context as R, ViewState as V, getActiveNode as a, benchmarkNodes as b, broadcastTransfer as c, broadcastVote as d, broadcastCustomJson as e, fetchAccountHistory as f, getHistoryItemKey as g, selectBroadcastKey as h, derivePublicKey as i, broadcastOperations as j, isChainSupported as k, getChainConfig as l, mergeHistoryItems as m, normalizeKeyType as n, broadcastPowerUp as o, broadcastPowerDown as p, broadcastDelegation as q, requiresActiveAuthority as r, signMessage as s, broadcastWitnessVote as t, decodeMemo as u, validateAccountKeys as v, encodeMemo as w, global as x, requireCryptoBrowserify as y, checkAccountExists as z };
+export { checkAccountExists as A, broadcastSavingsDeposit as B, Chain as C, broadcastSavingsWithdraw as D, fetchAccountData as E, broadcastRCDelegate as F, broadcastRCUndelegate as G, broadcastBulkTransfer as H, fetchCustomJsonEventsForAccounts as I, calculateThresholdProgress as J, getAccountAuthorities as K, createUnsignedTransaction as L, signTransactionEnvelope as M, selectBroadcastSignatures as N, broadcastSignedTransaction as O, indexBrowserExports$1 as P, indexBrowserExports as Q, fetchBalances as R, detectWeb3Context as S, ViewState as V, getActiveNode as a, benchmarkNodes as b, broadcastTransfer as c, broadcastVote as d, broadcastCustomJson as e, fetchAccountHistory as f, getHistoryItemKey as g, selectBroadcastKey as h, derivePublicKey as i, broadcastOperations as j, isChainSupported as k, getChainConfig as l, mergeHistoryItems as m, normalizeKeyType as n, formatAssetAmount as o, broadcastPowerUp as p, broadcastPowerDown as q, requiresActiveAuthority as r, signMessage as s, broadcastDelegation as t, broadcastWitnessVote as u, validateAccountKeys as v, decodeMemo as w, encodeMemo as x, global as y, requireCryptoBrowserify as z };

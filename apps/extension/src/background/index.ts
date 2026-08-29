@@ -1,5 +1,5 @@
 import './polyfill';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, encodeMemo, decodeMemo, validateAccountKeys, derivePublicKey } from '@services/chainService';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, encodeMemo, decodeMemo, validateAccountKeys, derivePublicKey, formatAssetAmount } from '@services/chainService';
 import { getChainConfig, isChainSupported } from '@config/chainConfig';
 import { getActiveNode, benchmarkNodes } from '@services/nodeService';
 import { Chain } from 'gravity-shared/types';
@@ -186,6 +186,64 @@ async function resolveBestAccountForRequest(accounts: any[], username: string, d
 }
 
 // Listen for messages from Content Script or Popup
+/**
+ * Hand a pending request's outcome back to the page and forget it.
+ *
+ * Resolving is a one-shot: the session entry is removed first, so the prompt deciding
+ * and the prompt being dismissed cannot both answer the same request.
+ */
+async function deliverRequestOutcome(requestId: string, result: any, error: any): Promise<void> {
+    const stored = await chrome.storage.session.get([`req_${requestId}`]);
+    const pending = stored?.[`req_${requestId}`];
+    if (!pending) return;
+
+    await chrome.storage.session.remove([`req_${requestId}`]);
+
+    const targetOptions: any = {};
+    if (typeof pending.frameId !== 'undefined') targetOptions.frameId = pending.frameId;
+
+    const payload = error ? { success: false, error } : { success: true, ...result };
+    const message = { type: 'gravity_response', id: requestId, response: payload };
+
+    chrome.tabs.sendMessage(pending.tabId, message, targetOptions, () => {
+        const lastError = chrome.runtime.lastError;
+        if (!lastError) return;
+
+        console.error(`[Gravity] Failed to send response to tab ${pending.tabId} (frame ${pending.frameId}): ${lastError.message || JSON.stringify(lastError)}`);
+
+        // Fallback: the frame may be gone while the tab is still there.
+        if (targetOptions.frameId) {
+            chrome.tabs.sendMessage(pending.tabId, message, () => {
+                if (chrome.runtime.lastError) {
+                    console.error(`[Gravity] Fallback also failed: ${chrome.runtime.lastError.message}`);
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Notice when a signing prompt goes away without deciding.
+ *
+ * Closing the action popup by clicking elsewhere is the most ordinary gesture there is,
+ * and nothing used to resolve the request: the dApp's promise never settled, the
+ * provider kept the callback forever, and req_<id> sat in session storage. The prompt
+ * holds a port open for as long as it is on screen, so its disconnect is the signal.
+ * deliverRequestOutcome is a no-op if the user actually decided.
+ */
+chrome.runtime.onConnect.addListener((port: any) => {
+    const match = /^gravity_sign_prompt_(.+)$/.exec(port.name || '');
+    if (!match) return;
+
+    const requestId = match[1];
+    port.onDisconnect.addListener(() => {
+        void chrome.runtime.lastError;
+        deliverRequestOutcome(requestId, null, 'user_cancel').catch((err: any) => {
+            console.warn('[Gravity] Failed to cancel dismissed request:', err);
+        });
+    });
+});
+
 chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: Function) => {
     if (!request) return false;
 
@@ -417,45 +475,7 @@ chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: F
     if (request.type === 'gravity_resolve_request') {
         const { requestId, result, error } = request;
 
-        chrome.storage.session.get([`req_${requestId}`]).then((res: any) => {
-            const pending = res[`req_${requestId}`];
-            if (pending) {
-                const targetOptions: any = {};
-                if (typeof pending.frameId !== 'undefined') targetOptions.frameId = pending.frameId;
-
-                // Clean result construction:
-                const payload = error ? { success: false, error } : { success: true, ...result };
-
-                chrome.tabs.sendMessage(pending.tabId, {
-                    type: 'gravity_response',
-                    id: requestId, // Use the original ID
-                    response: payload
-                }, targetOptions, () => {
-                    const lastError = chrome.runtime.lastError;
-                    if (lastError) {
-                        const errMsg = lastError.message || JSON.stringify(lastError);
-                        console.error(`[Gravity] Failed to send response to tab ${pending.tabId} (frame ${pending.frameId}): ${errMsg}`);
-
-                        // Fallback: Try sending to the tab in general if frame-specific failed
-                        if (targetOptions.frameId) {
-                            console.log(`[Gravity] Attempting fallback response to entire tab ${pending.tabId}...`);
-                            chrome.tabs.sendMessage(pending.tabId, {
-                                type: 'gravity_response',
-                                id: requestId,
-                                response: payload
-                            }, () => {
-                                if (chrome.runtime.lastError) {
-                                    console.error(`[Gravity] Fallback also failed: ${chrome.runtime.lastError.message}`);
-                                }
-                            });
-                        }
-                    }
-                });
-
-                // Cleanup
-                chrome.storage.session.remove([`req_${requestId}`]);
-            }
-        }).catch((err: any) => {
+        deliverRequestOutcome(requestId, result, error).catch((err: any) => {
             console.error('[Gravity] Error resolving request from storage:', err);
         });
 
@@ -763,7 +783,11 @@ async function tryAutoSign(request: any, sender: any): Promise<any | null> {
             if (amount && !amount.includes(' ')) {
                 const config = isChainSupported(account.chain) ? getChainConfig(account.chain) : null;
                 const symbol = config ? config.primaryToken : 'HIVE';
-                amount = `${parseFloat(amount).toFixed(3)} ${symbol}`;
+                try {
+                    amount = `${formatAssetAmount(amount)} ${symbol}`;
+                } catch (e: any) {
+                    return { success: false, error: e.message };
+                }
             }
             if (!account.activeKey) return { success: false, error: "Gravity Wallet: Active Key required for Power Up." };
             response = await broadcastPowerUp(account.chain, account.name, account.activeKey, to, amount);

@@ -3,7 +3,7 @@ import { useTranslation } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Account, Chain } from '../types';
 import { MultiSigProgress } from './MultiSigProgress';
-import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, getAccountAuthorities, MultiSigAuthority, MultisigProgress as IMultisigProgress, validateAccountKeys, encodeMemo, decodeMemo } from '../services/chainService';
+import { broadcastTransfer, broadcastVote, broadcastCustomJson, signMessage, broadcastOperations, broadcastPowerUp, broadcastPowerDown, broadcastDelegation, broadcastWitnessVote, getAccountAuthorities, MultiSigAuthority, MultisigProgress as IMultisigProgress, validateAccountKeys, encodeMemo, decodeMemo, formatAssetAmount } from '../services/chainService';
 import { normalizeKeyType, selectBroadcastKey } from '../utils/authority';
 
 interface SignRequestProps {
@@ -505,7 +505,7 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
                 let amount = request.params[2];
                 if (amount && !amount.includes(' ')) {
                     const symbol = account.chain === Chain.HIVE ? 'HIVE' : account.chain === Chain.STEEM ? 'STEEM' : 'BLURT';
-                    amount = `${parseFloat(amount).toFixed(3)} ${symbol}`;
+                    amount = `${formatAssetAmount(amount)} ${symbol}`;
                 }
                 const response = await broadcastPowerUp(account.chain, account.name, account.activeKey!, to, amount);
                 if (!response.success) throw new Error(response.error);
@@ -660,6 +660,29 @@ export const SignRequest: React.FC<SignRequestProps> = ({ requestId, accounts, o
             notifyBackground(null, e.message);
         }
     };
+
+    // Hold a port open for as long as this prompt is on screen. Closing the popup by
+    // clicking elsewhere unmounts us without a decision, and the disconnect is what tells
+    // the background to cancel the request instead of leaving the dApp waiting forever.
+    useEffect(() => {
+        if (!requestId || typeof chrome === 'undefined' || !chrome.runtime?.connect) return;
+
+        let port: any;
+        try {
+            port = chrome.runtime.connect({ name: `gravity_sign_prompt_${requestId}` });
+        } catch (e) {
+            console.warn('Gravity: could not open prompt lifetime port', e);
+            return;
+        }
+
+        return () => {
+            try {
+                port.disconnect();
+            } catch (_e) {
+                // Already gone.
+            }
+        };
+    }, [requestId]);
 
     // Global Key Listener for Enter
     useEffect(() => {
